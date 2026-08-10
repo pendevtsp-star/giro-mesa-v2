@@ -1,0 +1,79 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "AUTH_DATABASE_URL",
+    "MANAGEMENT_DATABASE_URL",
+    "GROWTH_DATABASE_URL",
+    "PILOT_DATABASE_URL",
+    "SYNC_DATABASE_URL",
+    "WORKER_DATABASE_URL",
+    "PUBLIC_ORDER_DATABASE_URL",
+    "APP_URL",
+    "CUSTOMER_APP_URL",
+    "OPS_APP_URL",
+    "API_URL",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_OPS_URL",
+    "NEXT_PUBLIC_GOOGLE_AUTH_ENABLED",
+    "NEXT_PUBLIC_WHATSAPP_NUMBER",
+    "NEXT_PUBLIC_CUSTOMER_API_URL",
+    "NEXT_PUBLIC_CUSTOMER_API_ENABLED",
+    "NEXT_PUBLIC_DEMO_HUB_ACK",
+    "CUSTOMER_QA_DEMO_SLUG",
+    "VITE_API_URL",
+    "VITE_SITE_URL",
+    "VITE_DEMO_MODE",
+    "LOG_LEVEL",
+    "TRUST_PROXY",
+    "CORS_ORIGINS",
+    "SESSION_SECRET",
+    "MFA_ENCRYPTION_KEY",
+    "OUTBOX_ENCRYPTION_KEY",
+    "PLATFORM_ADMIN_EMAILS",
+    "INTERNAL_API_KEY",
+    "COOKIE_DOMAIN",
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "LEGAL_TERMS_VERSION",
+    "EMAIL_PROVIDER_ENABLED",
+    "EMAIL_PROVIDER_CREDENTIAL_REFERENCE",
+    "RESEND_API_KEY",
+    "RESEND_FROM",
+    "RESEND_REPLY_TO",
+    "PUBLIC_HUB_ACK_TIMEOUT_MS",
+    "WEBHOOK_SIGNING_MASTER_KEY",
+    "DOSECLUB_PROVIDER_ENABLED",
+    "ASAAS_API_URL",
+    "ASAAS_API_KEY",
+    "ASAAS_WEBHOOK_SECRET",
+    "OPENAI_API_KEY",
+    "PORT",
+    "HOST"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": []
+    }
+  }
+}

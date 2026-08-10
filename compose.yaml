@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: giromesa_v2
+      POSTGRES_USER: giromesa
+      POSTGRES_PASSWORD: giromesa
+    ports:
+      - "5440:5432"
+    volumes:
+      - giromesa_v2_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U giromesa -d giromesa_v2"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  giromesa_v2_postgres:

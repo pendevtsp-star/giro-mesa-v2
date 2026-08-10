@@ -1,0 +1,21 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@nestjs/core': true
+  '@scarf/scarf': true
+  argon2: true
+  esbuild: true
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - argon2
+  - esbuild
+  - sharp
+
+overrides:
+  esbuild: 0.28.2
+  find-my-way: 9.7.0
+  "@nestjs/swagger>js-yaml": 5.2.3
+  "@redocly/openapi-core>js-yaml": 4.3.1

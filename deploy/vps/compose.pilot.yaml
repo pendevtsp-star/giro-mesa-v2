@@ -1,0 +1,118 @@
+name: giromesa-v2-pilot
+
+x-backend-service: &backend-service
+  env_file:
+    - ${GIROMESA_ENV_FILE:-/srv/apps/giromesa-v2/shared/.env}
+  restart: unless-stopped
+  networks:
+    - giromesa-v2
+
+x-web-service: &web-service
+  restart: unless-stopped
+  networks:
+    - giromesa-v2
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-giromesa_v2}
+      POSTGRES_USER: ${POSTGRES_USER:-giromesa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-giromesa} -d ${POSTGRES_DB:-giromesa_v2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - giromesa-v2
+
+  migrate:
+    <<: *backend-service
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-api:${GIROMESA_IMAGE_TAG:-pilot}
+    command: ["pnpm", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles: [tools]
+
+  api:
+    <<: *backend-service
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-api:${GIROMESA_IMAGE_TAG:-pilot}
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3200
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3210:3200"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3200/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    <<: *backend-service
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-worker:${GIROMESA_IMAGE_TAG:-pilot}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  site:
+    <<: *web-service
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-site:${GIROMESA_IMAGE_TAG:-pilot}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api-pilot.giromesa.com.br}
+      NEXT_PUBLIC_OPS_URL: ${NEXT_PUBLIC_OPS_URL:-https://app-pilot.giromesa.com.br}
+      NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-true}
+      NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3110:3100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  customer:
+    <<: *web-service
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-customer:${GIROMESA_IMAGE_TAG:-pilot}
+    environment:
+      NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-https://api-pilot.giromesa.com.br}
+      NEXT_PUBLIC_CUSTOMER_API_ENABLED: ${NEXT_PUBLIC_CUSTOMER_API_ENABLED:-true}
+      NEXT_PUBLIC_DEMO_HUB_ACK: ${NEXT_PUBLIC_DEMO_HUB_ACK:-false}
+      CUSTOMER_QA_DEMO_SLUG: ${CUSTOMER_QA_DEMO_SLUG:-demo}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3111:3101"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3101/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ops:
+    image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-ops:${GIROMESA_IMAGE_TAG:-pilot}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3112:80"
+    networks:
+      - giromesa-v2
+
+volumes:
+  postgres_data:
+
+networks:
+  giromesa-v2:
+    name: giromesa-v2-pilot

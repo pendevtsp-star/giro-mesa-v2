@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="GiroMesa.OpsShell.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="#F5F3EE">
+  <Grid>
+    <HybridWebView
+        x:Name="Hybrid"
+        DefaultFile="index.html"
+        HybridRoot="wwwroot"
+        RawMessageReceived="OnRawMessageReceived" />
+  </Grid>
+</ContentPage>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application
+    x:Class="GiroMesa.OpsShell.App"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+  <Application.Resources>
+    <Color x:Key="GiroInk">#13231F</Color>
+    <Color x:Key="GiroGreen">#0F7A5A</Color>
+  </Application.Resources>
+</Application>

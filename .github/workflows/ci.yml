@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: giromesa_ci
+          POSTGRES_USER: giromesa
+          POSTGRES_PASSWORD: giromesa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U giromesa -d giromesa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
+      - name: Prepare integration databases
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_management
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_growth
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_pilot
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_sync
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_worker
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_public
+          for database in giromesa_ci giromesa_management giromesa_growth giromesa_pilot giromesa_sync giromesa_worker giromesa_public; do
+            DATABASE_URL="postgresql://giromesa:giromesa@localhost:5432/$database" pnpm db:migrate
+          done
+      - name: Prove logical backup and restore
+        run: |
+          container="${{ job.services.postgres.id }}"
+          docker exec "$container" pg_dump -U giromesa --no-owner --no-privileges giromesa_sync > /tmp/giromesa_sync.sql
+          docker exec "$container" createdb -U giromesa giromesa_restore
+          docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U giromesa -d giromesa_restore < /tmp/giromesa_sync.sql
+          source_tables=$(docker exec "$container" psql -U giromesa -d giromesa_sync -tAc "select count(*) from information_schema.tables where table_schema = 'public'")
+          restored_tables=$(docker exec "$container" psql -U giromesa -d giromesa_restore -tAc "select count(*) from information_schema.tables where table_schema = 'public'")
+          source_migrations=$(docker exec "$container" psql -U giromesa -d giromesa_sync -tAc 'select count(*) from drizzle.__drizzle_migrations')
+          restored_migrations=$(docker exec "$container" psql -U giromesa -d giromesa_restore -tAc 'select count(*) from drizzle.__drizzle_migrations')
+          test "$source_tables" = "$restored_tables"
+          test "$source_migrations" = "$restored_migrations"
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+        env:
+          DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_ci
+          MANAGEMENT_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_management
+          GROWTH_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_growth
+          PILOT_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_pilot
+          SYNC_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_sync
+          WORKER_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_worker
+          PUBLIC_ORDER_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_public
+          AUTH_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_ci
+      - run: pnpm build
+      - name: Verify generated OpenAPI and TypeScript client
+        run: |
+          DATABASE_URL="postgresql://giromesa:giromesa@localhost:5432/giromesa_ci" SESSION_SECRET="ci-session-secret-at-least-32-characters" pnpm openapi:generate
+          pnpm clients:generate:ts
+          git diff --exit-code -- apps/api/openapi packages/contracts/src/generated-api.ts
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
+  dotnet:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm clients:generate:csharp
+      - run: git diff --exit-code -- packages/api-client-csharp/Generated
+      - run: dotnet restore apps/edge-hub/GiroMesa.EdgeHub.csproj
+      - run: dotnet build apps/edge-hub/GiroMesa.EdgeHub.csproj --configuration Release --no-restore
+      - run: dotnet test apps/edge-hub.tests/GiroMesa.EdgeHub.Tests.csproj --configuration Release
+      - run: dotnet build packages/api-client-csharp/GiroMesa.ApiClient.csproj --configuration Release
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+        working-directory: infra/terraform
+      - run: terraform init -backend=false
+        working-directory: infra/terraform
+      - run: terraform validate
+        working-directory: infra/terraform
