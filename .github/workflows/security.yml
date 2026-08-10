@@ -23,3 +23,47 @@ jobs:
           --volume "$PWD:/repo"
           zricethezav/gitleaks:v8.28.0
           detect --source=/repo --redact --no-banner
+
+  dependencies-and-sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install exactly from lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Fail on high or critical dependency vulnerabilities
+        run: pnpm audit --audit-level=high
+      - name: Generate SPDX SBOM
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/repo:ro"
+          --volume "${{ runner.temp }}:/out"
+          anchore/syft:v1.38.2
+          scan dir:/repo -o spdx-json=/out/sbom.spdx.json
+      - name: Retain SBOM evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx-${{ github.sha }}
+          path: ${{ runner.temp }}/sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+  container-definitions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan Dockerfiles and dependencies for high or critical findings
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/repo:ro"
+          aquasec/trivy:0.69.2
+          fs --quiet --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed
+          --scanners vuln,misconfig /repo
+      - name: Verify local supply-chain release contract
+        run: node scripts/check-supply-chain.mjs

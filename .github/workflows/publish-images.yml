@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: publish-pilot-${{ github.event.workflow_run.head_branch || github.ref }}
@@ -49,7 +51,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -71,3 +74,11 @@ jobs:
             ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha || github.sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          provenance: mode=max
+          sbom: true
+      - name: Attest published image provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
