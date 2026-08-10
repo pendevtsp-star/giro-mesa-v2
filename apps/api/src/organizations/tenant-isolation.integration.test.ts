@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
 import {
   auditEvents,
@@ -9,42 +9,20 @@ import {
   outboxEvents,
   posCatalogCategories,
 } from "@giromesa/db";
-import {
-  Body,
-  type CanActivate,
-  Controller,
-  type ExecutionContext,
-  Injectable,
-  Module,
-  Param,
-  Post,
-  Req,
-  UseGuards,
-} from "@nestjs/common";
+import { Body, Controller, Module, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { APP_INTERCEPTOR, NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { FastifyRequest } from "fastify";
+import { AuthService } from "../auth/auth.service.js";
+import { SessionGuard } from "../auth/session.guard.js";
 import { DatabaseService } from "../database/database.module.js";
 import { TenantContextInterceptor } from "../database/tenant-context.interceptor.js";
 
 const integrationUrl = process.env.TENANT_ISOLATION_DATABASE_URL;
 let probeConnection: DatabaseConnection | undefined;
 
-@Injectable()
-class ProbeAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext) {
-    const request = context
-      .switchToHttp()
-      .getRequest<FastifyRequest & { auth?: { identityId: string } }>();
-    const identityId = request.headers["x-test-identity"];
-    if (typeof identityId !== "string") return false;
-    request.auth = { identityId };
-    return true;
-  }
-}
-
 @Controller("organizations/:organizationId/units/:unitId")
-@UseGuards(ProbeAuthGuard)
+@UseGuards(SessionGuard)
 class TenantProbeController {
   constructor(private readonly database: DatabaseService) {}
 
@@ -65,7 +43,6 @@ class TenantProbeController {
 @Module({
   controllers: [TenantProbeController],
   providers: [
-    ProbeAuthGuard,
     {
       provide: DatabaseService,
       useFactory: () => {
@@ -73,6 +50,8 @@ class TenantProbeController {
         return new DatabaseService(probeConnection);
       },
     },
+    AuthService,
+    SessionGuard,
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
 })
@@ -124,6 +103,8 @@ describe("tenant context boundary", () => {
     const outboxA = randomUUID();
     const outboxB = randomUUID();
     const publicMenuA = randomUUID();
+    const tokenA = `session-a-${suffix}`;
+    const tokenB = `session-b-${suffix}`;
     let app: NestFastifyApplication | undefined;
 
     for (const role of [loginRole, arbitraryRole, legacyLoginRole]) {
@@ -165,6 +146,12 @@ describe("tenant context boundary", () => {
       insert into role_bindings (membership_id, role)
       values (${membershipA}, 'owner'), (${membershipB}, 'owner')
     `;
+    await owner`
+      insert into auth_sessions (identity_id, token_hash, expires_at)
+      values
+        (${identityA}, ${createHash("sha256").update(tokenA).digest("hex")}, now() + interval '1 hour'),
+        (${identityB}, ${createHash("sha256").update(tokenB).digest("hex")}, now() + interval '1 hour')
+    `;
 
     const appUrl = applicationUrl(integrationUrl, loginRole, password);
     const database = new DatabaseService(createDatabase(appUrl, { max: 1 }));
@@ -193,6 +180,62 @@ describe("tenant context boundary", () => {
           and ('public' = any(roles) or policyname = 'giromesa_legacy_unscoped')
       `;
       assert.equal(publicBypass[0]?.count, 0);
+      const [privileges] = await owner<
+        {
+          app_audit_insert: boolean;
+          app_audit_select: boolean;
+          app_audit_update: boolean;
+          app_charge_delete: boolean;
+          app_ledger_update: boolean;
+          app_order_delete: boolean;
+          app_order_update: boolean;
+          app_organization_delete: boolean;
+          app_outbox_insert: boolean;
+          app_outbox_select: boolean;
+          app_role_binding_update: boolean;
+          identity_outbox_insert: boolean;
+          identity_outbox_select: boolean;
+          worker_outbox_insert: boolean;
+          worker_outbox_select: boolean;
+          worker_outbox_update: boolean;
+        }[]
+      >`
+        select
+          has_table_privilege('giromesa_app', 'audit_events', 'insert') app_audit_insert,
+          has_table_privilege('giromesa_app', 'audit_events', 'select') app_audit_select,
+          has_table_privilege('giromesa_app', 'audit_events', 'update') app_audit_update,
+          has_table_privilege('giromesa_app', 'charges', 'delete') app_charge_delete,
+          has_table_privilege('giromesa_app', 'growth_loyalty_ledger', 'update') app_ledger_update,
+          has_table_privilege('giromesa_app', 'pos_orders', 'delete') app_order_delete,
+          has_table_privilege('giromesa_app', 'pos_orders', 'update') app_order_update,
+          has_table_privilege('giromesa_app', 'organizations', 'delete') app_organization_delete,
+          has_table_privilege('giromesa_app', 'outbox_events', 'insert') app_outbox_insert,
+          has_table_privilege('giromesa_app', 'outbox_events', 'select') app_outbox_select,
+          has_table_privilege('giromesa_app', 'role_bindings', 'update') app_role_binding_update,
+          has_table_privilege('giromesa_identity', 'outbox_events', 'insert') identity_outbox_insert,
+          has_table_privilege('giromesa_identity', 'outbox_events', 'select') identity_outbox_select,
+          has_table_privilege('giromesa_worker', 'outbox_events', 'insert') worker_outbox_insert,
+          has_table_privilege('giromesa_worker', 'outbox_events', 'select') worker_outbox_select,
+          has_table_privilege('giromesa_worker', 'outbox_events', 'update') worker_outbox_update
+      `;
+      assert.deepEqual(privileges, {
+        app_audit_insert: true,
+        app_audit_select: false,
+        app_audit_update: false,
+        app_charge_delete: false,
+        app_ledger_update: false,
+        app_order_delete: false,
+        app_order_update: true,
+        app_organization_delete: false,
+        app_outbox_insert: true,
+        app_outbox_select: false,
+        app_role_binding_update: false,
+        identity_outbox_insert: true,
+        identity_outbox_select: false,
+        worker_outbox_insert: false,
+        worker_outbox_select: true,
+        worker_outbox_update: true,
+      });
       const futureTable = `tenant_future_${suffix}`;
       await owner.unsafe(`create table "${futureTable}" (id uuid primary key)`);
       const [futurePrivileges] = await owner<{ app_can_select: boolean }[]>`
@@ -328,7 +371,7 @@ describe("tenant context boundary", () => {
       const httpB = await app.inject({
         method: "POST",
         url: `/organizations/${organizationB}/units/${unitB}/probe`,
-        headers: { "x-test-identity": identityB },
+        headers: { authorization: `Bearer ${tokenB}` },
         payload: { organizationId: organizationA, unitId: unitA },
       });
       assert.equal(httpB.statusCode, 201);
@@ -336,7 +379,7 @@ describe("tenant context boundary", () => {
       const unauthorized = await app.inject({
         method: "POST",
         url: `/organizations/${organizationB}/units/${unitB}/probe`,
-        headers: { "x-test-identity": identityA },
+        headers: { authorization: `Bearer ${tokenA}` },
         payload: {},
       });
       assert.equal(unauthorized.statusCode, 201);

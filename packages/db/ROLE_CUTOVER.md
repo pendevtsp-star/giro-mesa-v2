@@ -7,7 +7,7 @@ the platform secret store. They must be `NOINHERIT`, `NOSUPERUSER`, and `NOBYPAS
 
 | Group role | Login | Scope |
 | --- | --- | --- |
-| `giromesa_app` | no | Tenant DML under transaction-local organization/unit context; outbox is insert-only. |
+| `giromesa_app` | no | Explicit per-table verbs under transaction-local organization/unit context; outbox/audit are insert-only and append-only ledgers/events have no update/delete. |
 | `giromesa_identity` | no | Authentication tables, actor-scoped membership discovery, and new-organization bootstrap. |
 | `giromesa_public` | no | Published commercial catalog, lead forms, approved global outbox topics, and public-menu scope resolution. |
 | `giromesa_internal` | no | Authorizes an internal-key request; tenant DML still runs as `giromesa_app` with the route organization. |
@@ -17,6 +17,10 @@ the platform secret store. They must be `NOINHERIT`, `NOSUPERUSER`, and `NOBYPAS
 
 No default table or sequence privileges are granted. A new table is inaccessible to every runtime
 role until a migration explicitly grants privileges and installs its policy.
+The migration aborts if a newly tenant-scoped table is missing from the verb matrix. `DELETE` is
+currently limited to `pos_product_stations`, the only destructive tenant operation used by the
+application; organizations, role bindings, charges, security events, financial movements and
+ledgers cannot be deleted by `giromesa_app`.
 
 ## Provisioning
 
