@@ -63,7 +63,7 @@ jobs:
           docker run --rm
           --volume "${{ github.workspace }}:/repo:ro"
           aquasec/trivy:0.69.2
-          fs --quiet --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed
+          fs --quiet --exit-code 1 --severity HIGH,CRITICAL
           --scanners vuln,misconfig /repo
       - name: Verify local supply-chain release contract
         run: node scripts/check-supply-chain.mjs
