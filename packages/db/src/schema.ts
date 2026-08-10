@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
@@ -560,6 +561,10 @@ export const outboxEvents = pgTable(
     topic: varchar("topic", { length: 120 }).notNull(),
     aggregateType: varchar("aggregate_type", { length: 80 }).notNull(),
     aggregateId: varchar("aggregate_id", { length: 160 }).notNull(),
+    sourceCommandId: uuid("source_command_id"),
+    aggregateSequence: integer("aggregate_sequence"),
+    occupancyEpoch: uuid("occupancy_epoch"),
+    resourceVersion: integer("resource_version"),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     attempts: integer("attempts").notNull().default(0),
     availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
@@ -571,6 +576,9 @@ export const outboxEvents = pgTable(
   (table) => [
     index("outbox_pending_idx").on(table.processedAt, table.availableAt),
     index("outbox_organization_idx").on(table.organizationId, table.createdAt),
+    uniqueIndex("outbox_command_effect_unique")
+      .on(table.organizationId, table.unitId, table.topic, table.sourceCommandId)
+      .where(sql`${table.sourceCommandId} IS NOT NULL`),
     foreignKey({
       name: "outbox_events_organization_unit_fk",
       columns: [table.organizationId, table.unitId],

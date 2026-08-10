@@ -402,6 +402,8 @@ export const posTabs = pgTable(
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
     tableId: uuid("table_id"),
+    occupancyEpoch: uuid("occupancy_epoch").notNull().defaultRandom(),
+    resourceVersion: integer("resource_version").notNull().default(0),
     openedByIdentityId: uuid("opened_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -443,6 +445,7 @@ export const posTabs = pgTable(
       "pos_tabs_totals_check",
       sql`${table.tipCents} >= 0 AND ${table.subtotalCents} >= 0 AND ${table.discountCents} >= 0 AND ${table.serviceChargeCents} >= 0 AND ${table.totalCents} >= 0`,
     ),
+    check("pos_tabs_resource_version_check", sql`${table.resourceVersion} >= 0`),
   ],
 );
 

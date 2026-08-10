@@ -1,17 +1,25 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import * as eventSchema from "./event-schema.js";
 import * as growthSchema from "./growth-schema.js";
 import * as managementSchema from "./management-schema.js";
 import * as operationsSchema from "./operations-schema.js";
 import * as baseSchema from "./schema.js";
 
+export * from "./event-schema.js";
 export * from "./growth-schema.js";
 export * from "./management-schema.js";
 export * from "./operations-schema.js";
 export * from "./schema.js";
 export * from "./tenant-context.js";
 
-const schema = { ...baseSchema, ...operationsSchema, ...managementSchema, ...growthSchema };
+const schema = {
+  ...baseSchema,
+  ...eventSchema,
+  ...operationsSchema,
+  ...managementSchema,
+  ...growthSchema,
+};
 
 export function createDatabase(
   connectionString = process.env.DATABASE_URL,

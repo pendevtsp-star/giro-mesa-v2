@@ -14,7 +14,7 @@ import {
   transferTabSchema,
 } from "../pilot-operations/pilot-schemas.js";
 import { stableOperationalId } from "./stable-operational-id.js";
-import type { SyncEventInput } from "./sync.schemas.js";
+import type { NormalizedSyncEventInput, SyncEventInput } from "./sync.schemas.js";
 
 const pilotEnvelopeSchema = z
   .object({
@@ -71,7 +71,7 @@ export class SyncPilotService {
   constructor(private readonly pilot: PilotPosService) {}
 
   async apply(
-    event: SyncEventInput,
+    event: NormalizedSyncEventInput | SyncEventInput,
     scope: { organizationId: string; unitId: string },
   ): Promise<Record<string, unknown> | null> {
     if (!event.type.startsWith("pos.")) return null;

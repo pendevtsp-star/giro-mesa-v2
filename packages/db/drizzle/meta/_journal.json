@@ -71,6 +71,13 @@
       "when": 1786392589317,
       "tag": "0009_tenant_rls_and_event_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786399894853,
+      "tag": "0010_event_foundation",
+      "breakpoints": true
     }
   ]
 }

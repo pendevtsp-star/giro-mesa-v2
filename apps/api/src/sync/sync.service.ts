@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import {
+  aggregateSequenceStates,
   auditEvents,
+  commandInbox,
+  commandQuarantine,
   deviceEnrollments,
   hubCommands,
   hubHeartbeats,
@@ -9,6 +12,7 @@ import {
   outboxEvents,
   roleBindings,
 } from "@giromesa/db";
+import { type CommandEnvelope, createCommandEnvelope } from "@giromesa/domain";
 import {
   ConflictException,
   HttpException,
@@ -17,11 +21,15 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import { DatabaseService } from "../database/database.module.js";
 import { OperationalSnapshotService } from "./operational-snapshot.service.js";
-import type { SyncBatchInput, SyncEventInput } from "./sync.schemas.js";
+import {
+  type NormalizedSyncEventInput,
+  normalizeSyncBatch,
+  type SyncBatchInput,
+} from "./sync.schemas.js";
 import { SyncPilotService } from "./sync-pilot.service.js";
 
 const hashSyncKey = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -56,8 +64,9 @@ export class SyncService {
     private readonly snapshots: OperationalSnapshotService,
   ) {}
 
-  async synchronize(syncKey: string | undefined, input: SyncBatchInput) {
+  async synchronize(syncKey: string | undefined, rawInput: SyncBatchInput) {
     if (!syncKey) throw this.invalidHubKey();
+    const input = normalizeSyncBatch(rawInput);
     const hub = await this.database.db.transaction(async (tx) => {
       const [hub] = await tx
         .select({
@@ -140,44 +149,52 @@ export class SyncService {
     );
     const acceptedEventIds: string[] = [];
     const rejectedEvents: Array<{ id: string; code: string }> = [];
+    const eventResults: Array<{
+      id: string;
+      replayed: boolean;
+      result: Record<string, unknown>;
+    }> = [];
 
     for (const event of input.events) {
       if (!allowedActors.has(event.actorId)) {
         rejectedEvents.push({ id: event.id, code: "ACTOR_SCOPE_DENIED" });
-        continue;
-      }
-      const persisted = await this.persistEnvelope(event, hub.organizationId, hub.unitId);
-      if (!persisted) {
-        rejectedEvents.push({ id: event.id, code: "IDEMPOTENCY_CONFLICT" });
-        continue;
-      }
-      if (persisted.status === "processed") {
-        acceptedEventIds.push(event.id);
-        continue;
-      }
-      if (persisted.status === "rejected") {
-        rejectedEvents.push({
+        eventResults.push({
           id: event.id,
-          code: persisted.rejectionReason ?? "COMMAND_REJECTED",
+          replayed: false,
+          result: { status: "rejected", code: "ACTOR_SCOPE_DENIED" },
         });
         continue;
       }
       try {
-        await this.pilot.apply(event, hub);
-      } catch (error) {
-        const code = this.deterministicRejection(error);
-        if (code) {
-          await this.rejectEnvelope(event.id, hub.organizationId, hub.unitId, code);
-          rejectedEvents.push({ id: event.id, code });
-        } else {
-          this.logger.warn(
-            `Operational command ${event.id} remains pending after transient failure`,
-          );
+        const outcome = await this.database.withTenantContext(
+          {
+            source: "http",
+            organizationId: hub.organizationId,
+            unitId: hub.unitId,
+            actorIdentityId: event.actorId,
+          },
+          () => this.applyEnvelope(event, hub),
+        );
+        const result = outcome.result as Record<string, unknown>;
+        eventResults.push({ id: event.id, replayed: outcome.replayed, result });
+        if (result.status === "applied") acceptedEventIds.push(event.id);
+        else {
+          rejectedEvents.push({
+            id: event.id,
+            code: typeof result.code === "string" ? result.code : "COMMAND_REJECTED",
+          });
         }
-        continue;
+      } catch (error) {
+        this.logger.warn(`Operational command ${event.id} rolled back after transient failure`);
+        const code =
+          error instanceof TypeError ? "INVALID_COMMAND_CONTEXT" : "COMMAND_RETRY_REQUIRED";
+        rejectedEvents.push({ id: event.id, code });
+        eventResults.push({
+          id: event.id,
+          replayed: false,
+          result: { status: "rejected", code, retryable: code === "COMMAND_RETRY_REQUIRED" },
+        });
       }
-      await this.processEnvelope(event, hub);
-      acceptedEventIds.push(event.id);
     }
 
     const now = new Date();
@@ -203,96 +220,329 @@ export class SyncService {
       .limit(100);
     const snapshot = await this.snapshots.capture(hub.organizationId, hub.unitId);
 
-    return { acceptedEventIds, rejectedEvents, commands, snapshot, serverTime: now };
+    return { acceptedEventIds, rejectedEvents, eventResults, commands, snapshot, serverTime: now };
   }
 
-  private async persistEnvelope(event: SyncEventInput, organizationId: string, unitId: string) {
-    const [inserted] = await this.database.db
+  private async applyEnvelope(
+    event: NormalizedSyncEventInput,
+    hub: { id: string; organizationId: string; unitId: string },
+  ) {
+    const envelope = createCommandEnvelope(event, {
+      organizationId: hub.organizationId,
+      unitId: hub.unitId,
+      receivedAt: new Date().toISOString(),
+    });
+    const fingerprint = this.envelopeFingerprint(envelope);
+    const scope = and(
+      eq(commandInbox.organizationId, hub.organizationId),
+      eq(commandInbox.unitId, hub.unitId),
+    );
+
+    await this.database.db.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`command-idempotency:${hub.organizationId}:${hub.unitId}:${event.idempotencyKey}`}, 0))`,
+    );
+    await this.database.db.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`command-aggregate:${hub.organizationId}:${hub.unitId}:${event.aggregate.type}:${event.aggregate.id}:${event.occupancyEpoch}`}, 0))`,
+    );
+
+    const [existingReceipt] = await this.database.db
+      .select()
+      .from(commandInbox)
+      .where(
+        and(
+          scope,
+          or(
+            eq(commandInbox.commandId, event.commandId),
+            eq(commandInbox.idempotencyKey, event.idempotencyKey),
+          ),
+        ),
+      )
+      .limit(1);
+    if (existingReceipt && existingReceipt.fingerprint !== fingerprint) {
+      return {
+        replayed: true,
+        result: { status: "rejected", code: this.idempotencyConflictCode(event) },
+      };
+    }
+    if (existingReceipt && existingReceipt.status !== "quarantined") {
+      return { replayed: true, result: existingReceipt.result as Record<string, unknown> };
+    }
+
+    const aggregateScope = and(
+      eq(aggregateSequenceStates.organizationId, hub.organizationId),
+      eq(aggregateSequenceStates.unitId, hub.unitId),
+      eq(aggregateSequenceStates.aggregateType, event.aggregate.type),
+      eq(aggregateSequenceStates.aggregateId, event.aggregate.id),
+      eq(aggregateSequenceStates.occupancyEpoch, event.occupancyEpoch),
+    );
+    const [sequenceState] = await this.database.db
+      .select()
+      .from(aggregateSequenceStates)
+      .where(aggregateScope)
+      .limit(1);
+    const expectedSequence = (sequenceState?.lastSequence ?? 0) + 1;
+    if (event.aggregateSequence !== expectedSequence) {
+      if (existingReceipt) {
+        return { replayed: true, result: existingReceipt.result as Record<string, unknown> };
+      }
+      const code =
+        event.aggregateSequence > expectedSequence
+          ? "AGGREGATE_SEQUENCE_GAP"
+          : "AGGREGATE_SEQUENCE_OUT_OF_ORDER";
+      const result = {
+        status: "quarantined",
+        code,
+        expectedSequence,
+        receivedSequence: event.aggregateSequence,
+      } as const;
+      await this.database.db.insert(commandInbox).values({
+        ...this.receiptValues(envelope, fingerprint),
+        status: "quarantined",
+        result,
+      });
+      await this.database.db.insert(commandQuarantine).values({
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        commandId: event.commandId,
+        reason: code,
+        evidence: {
+          aggregate: event.aggregate,
+          occupancyEpoch: event.occupancyEpoch,
+          expectedSequence,
+          receivedSequence: event.aggregateSequence,
+          lastCommandId: sequenceState?.lastCommandId ?? null,
+        },
+      });
+      return { replayed: false, result };
+    }
+
+    const redactedPayload = redactOperationalSecrets(event.payload) as Record<string, unknown>;
+    const [insertedCommand] = await this.database.db
       .insert(operationalCommands)
       .values({
-        id: event.id,
-        organizationId,
-        unitId,
+        id: event.commandId,
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
         actorIdentityId: event.actorId,
         deviceId: event.deviceId,
         idempotencyKey: event.idempotencyKey,
         type: event.type,
         version: event.version,
         occurredAt: new Date(event.occurredAt),
-        payload: redactOperationalSecrets(event.payload) as Record<string, unknown>,
+        payload: redactedPayload,
       })
       .onConflictDoNothing()
       .returning();
-    if (inserted) return inserted;
-    const [existing] = await this.database.db
-      .select()
-      .from(operationalCommands)
-      .where(
-        or(
-          eq(operationalCommands.id, event.id),
-          and(
-            eq(operationalCommands.unitId, unitId),
-            eq(operationalCommands.idempotencyKey, event.idempotencyKey),
-          ),
-        ),
-      )
-      .limit(1);
-    return existing && this.matchesEvent(existing, event, organizationId, unitId) ? existing : null;
-  }
-
-  private async processEnvelope(
-    event: SyncEventInput,
-    hub: { id: string; organizationId: string; unitId: string },
-  ) {
-    await this.database.db.transaction(async (tx) => {
-      const [processed] = await tx
-        .update(operationalCommands)
-        .set({ status: "processed", rejectionReason: null })
+    if (!insertedCommand) {
+      const [legacyCommand] = await this.database.db
+        .select()
+        .from(operationalCommands)
         .where(
-          and(
-            eq(operationalCommands.id, event.id),
-            eq(operationalCommands.organizationId, hub.organizationId),
-            eq(operationalCommands.unitId, hub.unitId),
-            eq(operationalCommands.status, "accepted"),
+          or(
+            eq(operationalCommands.id, event.commandId),
+            and(
+              eq(operationalCommands.unitId, hub.unitId),
+              eq(operationalCommands.idempotencyKey, event.idempotencyKey),
+            ),
           ),
         )
-        .returning({ id: operationalCommands.id });
-      if (!processed) return;
-      await tx.insert(auditEvents).values({
-        organizationId: hub.organizationId,
-        unitId: hub.unitId,
-        actorIdentityId: event.actorId,
-        action: "operational_command.processed_from_edge",
-        entityType: "operational_command",
-        entityId: event.id,
-        metadata: { type: event.type, deviceId: event.deviceId, hubId: hub.id },
+        .limit(1);
+      if (
+        !legacyCommand ||
+        !this.matchesEvent(legacyCommand, event, hub.organizationId, hub.unitId)
+      ) {
+        return {
+          replayed: true,
+          result: { status: "rejected", code: this.idempotencyConflictCode(event) },
+        };
+      }
+      const result = { status: "applied", effect: { legacyReplay: true } } as const;
+      await this.advanceSequence(event, hub);
+      await this.database.db.insert(commandInbox).values({
+        ...this.receiptValues(envelope, fingerprint),
+        status: "applied",
+        result,
+        completedAt: new Date(),
       });
-      await tx.insert(outboxEvents).values({
-        organizationId: hub.organizationId,
-        unitId: hub.unitId,
-        topic: "operational.command_processed",
-        aggregateType: "operational_command",
-        aggregateId: event.id,
-        payload: {
-          commandId: event.id,
-          organizationId: hub.organizationId,
-          unitId: hub.unitId,
-          type: event.type,
-        },
-      });
-    });
-  }
+      return { replayed: true, result };
+    }
 
-  private async rejectEnvelope(id: string, organizationId: string, unitId: string, code: string) {
+    let effect: Record<string, unknown> | null;
+    try {
+      effect = await this.pilot.apply(event, hub);
+    } catch (error) {
+      const code = this.deterministicRejection(error);
+      if (!code) throw error;
+      const result = { status: "rejected", code } as const;
+      await this.database.db
+        .update(operationalCommands)
+        .set({ status: "rejected", rejectionReason: code })
+        .where(
+          and(
+            eq(operationalCommands.id, event.commandId),
+            eq(operationalCommands.organizationId, hub.organizationId),
+            eq(operationalCommands.unitId, hub.unitId),
+          ),
+        );
+      await this.advanceSequence(event, hub);
+      await this.completeReceipt(existingReceipt !== undefined, envelope, fingerprint, result);
+      return { replayed: existingReceipt !== undefined, result };
+    }
+
+    const result = { status: "applied", effect } as const;
     await this.database.db
       .update(operationalCommands)
-      .set({ status: "rejected", rejectionReason: code.slice(0, 200) })
+      .set({ status: "processed", rejectionReason: null })
       .where(
         and(
-          eq(operationalCommands.id, id),
-          eq(operationalCommands.organizationId, organizationId),
-          eq(operationalCommands.unitId, unitId),
-          eq(operationalCommands.status, "accepted"),
+          eq(operationalCommands.id, event.commandId),
+          eq(operationalCommands.organizationId, hub.organizationId),
+          eq(operationalCommands.unitId, hub.unitId),
+        ),
+      );
+    await this.advanceSequence(event, hub);
+    await this.completeReceipt(existingReceipt !== undefined, envelope, fingerprint, result);
+    await this.database.db.insert(auditEvents).values({
+      organizationId: hub.organizationId,
+      unitId: hub.unitId,
+      actorIdentityId: event.actorId,
+      action: "operational_command.processed_from_edge",
+      entityType: "operational_command",
+      entityId: event.commandId,
+      metadata: {
+        type: event.type,
+        deviceId: event.deviceId,
+        hubId: hub.id,
+        aggregate: event.aggregate,
+        occupancyEpoch: event.occupancyEpoch,
+        aggregateSequence: event.aggregateSequence,
+      },
+    });
+    await this.database.db.insert(outboxEvents).values({
+      organizationId: hub.organizationId,
+      unitId: hub.unitId,
+      topic: "operational.command_processed",
+      aggregateType: event.aggregate.type,
+      aggregateId: event.aggregate.id,
+      sourceCommandId: event.commandId,
+      aggregateSequence: event.aggregateSequence,
+      occupancyEpoch: event.occupancyEpoch,
+      resourceVersion: event.resourceVersion,
+      payload: {
+        commandId: event.commandId,
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        type: event.type,
+        aggregate: event.aggregate,
+        occupancyEpoch: event.occupancyEpoch,
+        resourceVersion: event.resourceVersion,
+        aggregateSequence: event.aggregateSequence,
+      },
+    });
+    return { replayed: existingReceipt !== undefined, result };
+  }
+
+  private receiptValues(envelope: CommandEnvelope, fingerprint: string) {
+    return {
+      organizationId: envelope.organizationId,
+      unitId: envelope.unitId,
+      commandId: envelope.commandId,
+      idempotencyKey: envelope.idempotencyKey,
+      fingerprint,
+      actorIdentityId: envelope.actorId,
+      deviceId: envelope.deviceId,
+      commandType: envelope.type,
+      aggregateType: envelope.aggregate.type,
+      aggregateId: envelope.aggregate.id,
+      occupancyEpoch: envelope.occupancyEpoch,
+      resourceVersion: envelope.resourceVersion,
+      aggregateSequence: envelope.aggregateSequence,
+      occurredAt: new Date(envelope.occurredAt),
+      receivedAt: new Date(envelope.receivedAt),
+      payload: redactOperationalSecrets(envelope.payload) as Record<string, unknown>,
+    };
+  }
+
+  private envelopeFingerprint(envelope: CommandEnvelope) {
+    const { receivedAt: _receivedAt, ...stableEnvelope } = envelope;
+    return createHash("sha256").update(canonicalJson(stableEnvelope)).digest("hex");
+  }
+
+  private idempotencyConflictCode(event: NormalizedSyncEventInput) {
+    return event.aggregate.type === "legacy.operational_command"
+      ? "IDEMPOTENCY_CONFLICT"
+      : "IDEMPOTENCY_KEY_REUSED";
+  }
+
+  private async advanceSequence(
+    event: NormalizedSyncEventInput,
+    hub: { organizationId: string; unitId: string },
+  ) {
+    await this.database.db
+      .insert(aggregateSequenceStates)
+      .values({
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        aggregateType: event.aggregate.type,
+        aggregateId: event.aggregate.id,
+        occupancyEpoch: event.occupancyEpoch,
+        lastSequence: event.aggregateSequence,
+        resourceVersion: event.resourceVersion,
+        lastCommandId: event.commandId,
+      })
+      .onConflictDoUpdate({
+        target: [
+          aggregateSequenceStates.organizationId,
+          aggregateSequenceStates.unitId,
+          aggregateSequenceStates.aggregateType,
+          aggregateSequenceStates.aggregateId,
+          aggregateSequenceStates.occupancyEpoch,
+        ],
+        set: {
+          lastSequence: event.aggregateSequence,
+          resourceVersion: event.resourceVersion,
+          lastCommandId: event.commandId,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  private async completeReceipt(
+    recovering: boolean,
+    envelope: CommandEnvelope,
+    fingerprint: string,
+    result: { status: "applied" | "rejected"; [key: string]: unknown },
+  ) {
+    const now = new Date();
+    if (!recovering) {
+      await this.database.db.insert(commandInbox).values({
+        ...this.receiptValues(envelope, fingerprint),
+        status: result.status,
+        result,
+        completedAt: now,
+      });
+      return;
+    }
+    await this.database.db
+      .update(commandInbox)
+      .set({ status: result.status, result, completedAt: now })
+      .where(
+        and(
+          eq(commandInbox.organizationId, envelope.organizationId),
+          eq(commandInbox.unitId, envelope.unitId),
+          eq(commandInbox.commandId, envelope.commandId),
+          eq(commandInbox.fingerprint, fingerprint),
+        ),
+      );
+    await this.database.db
+      .update(commandQuarantine)
+      .set({ status: "recovered", recoveredAt: now })
+      .where(
+        and(
+          eq(commandQuarantine.organizationId, envelope.organizationId),
+          eq(commandQuarantine.unitId, envelope.unitId),
+          eq(commandQuarantine.commandId, envelope.commandId),
+          eq(commandQuarantine.status, "pending"),
         ),
       );
   }
@@ -403,7 +653,7 @@ export class SyncService {
 
   private matchesEvent(
     existing: typeof operationalCommands.$inferSelect,
-    event: SyncEventInput,
+    event: NormalizedSyncEventInput,
     organizationId: string,
     unitId: string,
   ) {

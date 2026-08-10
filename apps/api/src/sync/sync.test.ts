@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { stableOperationalId } from "./stable-operational-id.js";
 import { hubSyncKey } from "./sync.controller.js";
-import { syncBatchSchema } from "./sync.schemas.js";
+import { normalizeSyncBatch, syncBatchSchema } from "./sync.schemas.js";
 import { canonicalJson, redactOperationalSecrets } from "./sync.service.js";
 
 describe("edge sync boundaries", () => {
@@ -24,6 +24,76 @@ describe("edge sync boundaries", () => {
       syncBatchSchema.safeParse({
         ...base,
         acknowledgedCommandIds: Array.from({ length: 101 }, () => crypto.randomUUID()),
+      }).success,
+      false,
+    );
+  });
+
+  it("accepts protocol N and N-1 while deriving legacy ordering metadata", () => {
+    const id = crypto.randomUUID();
+    const actorId = crypto.randomUUID();
+    const deviceId = crypto.randomUUID();
+    const occurredAt = new Date().toISOString();
+    const legacy = normalizeSyncBatch({
+      protocolVersion: 1,
+      hubVersion: "1.9.0",
+      events: [
+        {
+          id,
+          actorId,
+          deviceId,
+          idempotencyKey: "legacy-command-1",
+          type: "order.created",
+          payload: {},
+          version: 1,
+          occurredAt,
+        },
+      ],
+    });
+    assert.equal(legacy.events[0]?.commandId, id);
+    assert.equal(legacy.events[0]?.aggregateSequence, 1);
+
+    const current = normalizeSyncBatch({
+      protocolVersion: 2,
+      hubVersion: "2.0.0",
+      events: [
+        {
+          commandId: id,
+          actorId,
+          deviceId,
+          idempotencyKey: "ordered-command-1",
+          type: "order.item_added",
+          payload: {},
+          aggregate: { type: "tab", id: crypto.randomUUID() },
+          occupancyEpoch: crypto.randomUUID(),
+          resourceVersion: 0,
+          aggregateSequence: 1,
+          occurredAt,
+        },
+      ],
+    });
+    assert.equal(current.events[0]?.commandId, id);
+    assert.equal(current.events[0]?.aggregate.type, "tab");
+    assert.equal(
+      syncBatchSchema.safeParse({
+        protocolVersion: 2,
+        hubVersion: "2.0.0",
+        events: [
+          {
+            commandId: current.events[0]?.commandId,
+            actorId,
+            deviceId,
+            idempotencyKey: "ordered-command-1",
+            type: "order.item_added",
+            payload: {},
+            aggregate: current.events[0]?.aggregate,
+            occupancyEpoch: current.events[0]?.occupancyEpoch,
+            resourceVersion: 0,
+            aggregateSequence: 1,
+            occurredAt,
+            organizationId: crypto.randomUUID(),
+          },
+        ],
       }).success,
       false,
     );
