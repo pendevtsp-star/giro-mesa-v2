@@ -21,7 +21,7 @@
 
 ## Lote 0 — Baseline e protecoes de release
 
-### Tarefa 0.1: registrar baseline reproduzivel
+### Task 1: registrar baseline reproduzivel
 
 **Arquivos:**
 - Modificar: `package.json`
@@ -34,7 +34,7 @@
 3. Implementar manifesto de release e scripts.
 4. Rodar `rtk pnpm test`, `rtk pnpm lint`, `rtk pnpm typecheck` e `rtk pnpm build`.
 
-### Tarefa 0.2: supply chain e scan
+### Task 2: supply chain e scan
 
 **Arquivos:**
 - Criar: `.github/workflows/security.yml`
@@ -45,7 +45,7 @@ Adicionar secret scan, dependency/SCA, SBOM, imagens non-root e provenance sem p
 
 ## Lote 1 — Fundacao multitenant, eventos e reconciliacao
 
-### Tarefa 1.1: contexto e RLS
+### Task 3: contexto e RLS
 
 **Arquivos:**
 - Modificar: `packages/db/src/schema.ts`
@@ -58,7 +58,7 @@ Adicionar secret scan, dependency/SCA, SBOM, imagens non-root e provenance sem p
 
 Testar HTTP, jobs e reaproveitamento de conexao com tenant alternado; aplicar `FORCE RLS`, papeis separados e limpeza de contexto.
 
-### Tarefa 1.2: command envelope, inbox/outbox e sequencia
+### Task 4: command envelope, inbox/outbox e sequencia
 
 **Arquivos:**
 - Criar: `packages/domain/src/command-envelope.ts`
@@ -70,7 +70,7 @@ Testar HTTP, jobs e reaproveitamento de conexao com tenant alternado; aplicar `F
 
 Adicionar idempotency, occupancy epoch, resource version, aggregate sequence, inbox, outbox, quarantine e replay seguro.
 
-### Tarefa 1.3: matriz de conflitos
+### Task 5: matriz de conflitos
 
 **Arquivos:**
 - Criar: `packages/domain/src/conflict-matrix.ts`
@@ -83,7 +83,7 @@ Cobrir fechamento, transferencia, preco, cancelamento, pagamento, reorder, dupli
 
 ## Lote 2 — Autenticacao, verificacao, onboarding e provisionamento
 
-### Tarefa 2.1: verificacao de e-mail e sessao
+### Task 6: verificacao de e-mail e sessao
 
 **Arquivos:**
 - Modificar: `apps/api/src/auth/auth.service.ts`
@@ -95,7 +95,7 @@ Cobrir fechamento, transferencia, preco, cancelamento, pagamento, reorder, dupli
 
 Tokens hash-only, expiram, uso unico, resend rate-limited; Google verificado continua valido.
 
-### Tarefa 2.2: saga de provisionamento
+### Task 7: saga de provisionamento
 
 **Arquivos:**
 - Modificar: `apps/api/src/onboarding/onboarding.service.ts`
@@ -106,7 +106,7 @@ Tokens hash-only, expiram, uso unico, resend rate-limited; Google verificado con
 
 Estados recuperaveis, idempotencia, compensacao, seed demo isolado e trial apos checklist minimo.
 
-### Tarefa 2.3: onboarding operacional completo
+### Task 8: onboarding operacional completo
 
 **Arquivos:**
 - Criar: `apps/ops/src/onboarding.tsx`
@@ -120,7 +120,7 @@ Implementar organizacao, unidade, plano, fiscal, catalogo, mesas, equipe, QR, KD
 
 ## Lote 3 — PWA, bridge e identidade visual base
 
-### Tarefa 3.1: bridge seguro no navegador
+### Task 9: bridge seguro no navegador
 
 **Arquivos:**
 - Modificar: `apps/ops/index.html`
@@ -129,7 +129,7 @@ Implementar organizacao, unidade, plano, fiscal, catalogo, mesas, equipe, QR, KD
 
 Carregar bridge MAUI apenas quando o host nativo estiver disponivel; navegador puro nao solicita script inexistente.
 
-### Tarefa 3.2: manifests, service workers e updates
+### Task 10: manifests, service workers e updates
 
 **Arquivos:**
 - Criar: `apps/ops/public/manifest.webmanifest`
@@ -143,7 +143,7 @@ Carregar bridge MAUI apenas quando o host nativo estiver disponivel; navegador p
 
 Adicionar update coordenado, migracao IndexedDB, TTL, limpeza e estados de conectividade por camada.
 
-### Tarefa 3.3: favicon, icons e eliminacao de pseudo-icones
+### Task 11: favicon, icons e eliminacao de pseudo-icones
 
 **Arquivos:**
 - Modificar: `apps/site/app/layout.tsx`
@@ -158,7 +158,7 @@ Usar uma familia de icones e preservar conteudo livre do cliente.
 
 ## Lote 4 — Landing premium e menu publicavel
 
-### Tarefa 4.1: hero e performance comercial
+### Task 12: hero e performance comercial
 
 **Arquivos:**
 - Modificar: `apps/site/app/page.tsx`
@@ -169,7 +169,7 @@ Usar uma familia de icones e preservar conteudo livre do cliente.
 
 Remover os dois eyebrows, adicionar carrossel nitido com controles, pausa, teclado, reduced motion e budget de LCP; manter WhatsApp e e-mail.
 
-### Tarefa 4.2: branding e ciclo do menu
+### Task 13: branding e ciclo do menu
 
 **Arquivos:**
 - Modificar: `packages/db/src/growth-schema.ts`
@@ -186,7 +186,7 @@ Draft/preview/version/publish atomico, logo/capa/cores/fotos, upload recodificad
 
 ## Lote 5 — Pracas, turnos, ocupacao e mapa operacional
 
-### Tarefa 5.1: schema e maquina de ocupacao
+### Task 14: schema e maquina de ocupacao
 
 **Arquivos:**
 - Modificar: `packages/db/src/operations-schema.ts`
@@ -198,7 +198,7 @@ Draft/preview/version/publish atomico, logo/capa/cores/fotos, upload recodificad
 
 Adicionar DiningRoom, ServiceArea, layout version, shift, assignment, group, occupancy e transicoes exclusivas.
 
-### Tarefa 5.2: APIs do mapa
+### Task 15: APIs do mapa
 
 **Arquivos:**
 - Criar: `apps/api/src/salon/salon.module.ts`
@@ -210,7 +210,7 @@ Adicionar DiningRoom, ServiceArea, layout version, shift, assignment, group, occ
 
 CRUD versionado, publish imutavel, atribuicao de praca, presenca lease/ack e fila de excecoes.
 
-### Tarefa 5.3: canvas operacional estruturado
+### Task 16: canvas operacional estruturado
 
 **Arquivos:**
 - Criar: `apps/ops/src/salon-map.tsx`
@@ -223,7 +223,7 @@ Mapa com edit/operation, zoom/drag, layout estavel, busca, filtros, praca do gar
 
 ## Lote 6 — QR seguro, chamados e conta parcial
 
-### Tarefa 6.1: token por ocupacao
+### Task 17: token por ocupacao
 
 **Arquivos:**
 - Modificar: `apps/api/src/public-menu/public-menu.service.ts`
@@ -234,7 +234,7 @@ Mapa com edit/operation, zoom/drag, layout estavel, busca, filtros, praca do gar
 
 Assinatura, nonce, capabilities, expiracao, revogacao, rate limit e occupancy epoch.
 
-### Tarefa 6.2: chamados roteados e parcial
+### Task 18: chamados roteados e parcial
 
 **Arquivos:**
 - Modificar: `apps/api/src/realtime/realtime.service.ts`
@@ -248,7 +248,7 @@ Estados recebido/encaminhado/atendido, primary/support/fallback e parcial da ocu
 
 ## Lote 7 — KDS, impressao e Edge Hub
 
-### Tarefa 7.1: dispatch ledger por destino
+### Task 19: dispatch ledger por destino
 
 **Arquivos:**
 - Modificar: `packages/db/src/operations-schema.ts`
@@ -261,7 +261,7 @@ Estados recebido/encaminhado/atendido, primary/support/fallback e parcial da ocu
 
 Implementar modos por estacao, ack, reprint, cancelamento, contingencia, DLQ e reconciliacao.
 
-### Tarefa 7.2: KDS de producao
+### Task 20: KDS de producao
 
 **Arquivos:**
 - Modificar: `apps/ops/src/operations.tsx`
@@ -272,7 +272,7 @@ Implementar modos por estacao, ack, reprint, cancelamento, contingencia, DLQ e r
 
 Legibilidade a distancia, prioridades redundantes, estacoes, SLA, undo curto e estados de dispositivo.
 
-### Tarefa 7.3: endurecer Edge Hub
+### Task 21: endurecer Edge Hub
 
 **Arquivos:**
 - Modificar: `apps/edge-hub/Security/DeviceAuthenticator.cs`
@@ -286,7 +286,7 @@ mTLS, identidade, revogacao, clone/rollback, disco/clock, backup, reinstalacao e
 
 ## Lote 8 — Pagamentos, ledger, fiscal e SmartPOS
 
-### Tarefa 8.1: ledger monetario
+### Task 22: ledger monetario
 
 **Arquivos:**
 - Modificar: `packages/db/src/management-schema.ts`
@@ -299,7 +299,7 @@ mTLS, identidade, revogacao, clone/rollback, disco/clock, backup, reinstalacao e
 
 Partidas balanceadas, parcial, servico, gorjeta, taxa, estorno, chargeback e ajuste.
 
-### Tarefa 8.2: adapters e estado incerto
+### Task 23: adapters e estado incerto
 
 **Arquivos:**
 - Criar: `packages/domain/src/payment-adapter.ts`
@@ -312,7 +312,7 @@ Partidas balanceadas, parcial, servico, gorjeta, taxa, estorno, chargeback e aju
 
 PaymentIntent/Attempt/terminal, lookup, callback, reconcile, manual review e sem PAN/CVV.
 
-### Tarefa 8.3: fiscal desacoplado
+### Task 24: fiscal desacoplado
 
 **Arquivos:**
 - Modificar: `apps/edge-hub/Adapters/FocusFiscalGateway.cs`
@@ -326,7 +326,7 @@ Venda preservada, documento pending/retry/authorized/rejected/cancelled e homolo
 
 ## Lote 9 — Estoque, retornaveis e incidentes
 
-### Tarefa 9.1: unidades e ficha versionada
+### Task 25: unidades e ficha versionada
 
 **Arquivos:**
 - Modificar: `packages/db/src/management-schema.ts`
@@ -338,7 +338,7 @@ Venda preservada, documento pending/retry/authorized/rejected/cancelled e homolo
 
 Decimal, unidade dimensional, conversao, yield e ficha tecnica effective-dated.
 
-### Tarefa 9.2: ledger de vasilhames
+### Task 26: ledger de vasilhames
 
 **Arquivos:**
 - Criar: `apps/api/src/returnables/returnables.module.ts`
@@ -350,7 +350,7 @@ Decimal, unidade dimensional, conversao, yield e ficha tecnica effective-dated.
 
 Tracking agregado/serializado, fornecedor, lote, deposito, mesa, garcom e reconciliacao fisica.
 
-### Tarefa 9.3: incidentes gerenciais
+### Task 27: incidentes gerenciais
 
 **Arquivos:**
 - Criar: `apps/api/src/incidents/incidents.module.ts`
@@ -362,7 +362,7 @@ Linguagem neutra, evidencias, aprovacao e relatorio; nenhuma integracao automati
 
 ## Lote 10 — Taxa de servico, comissao e participacao
 
-### Tarefa 10.1: rule engine seguro
+### Task 28: rule engine seguro
 
 **Arquivos:**
 - Modificar: `packages/domain/src/commercial.ts`
@@ -373,7 +373,7 @@ Linguagem neutra, evidencias, aprovacao e relatorio; nenhuma integracao automati
 
 DSL tipada sem eval, versao, vigencia, simulacao, memoria e freeze.
 
-### Tarefa 10.2: apuracao e relatorios
+### Task 29: apuracao e relatorios
 
 **Arquivos:**
 - Modificar: `apps/api/src/management/management.service.ts`
@@ -386,7 +386,7 @@ Separar servico, comissao e participacao; estimated/approved/closed; PDF, CSV e 
 
 ## Lote 11 — DoseClub Integration Contract v2
 
-### Tarefa 11.1: receiver GiroMesa
+### Task 30: receiver GiroMesa
 
 **Arquivos:**
 - Criar: `apps/api/src/integrations/doseclub/doseclub.module.ts`
@@ -399,7 +399,7 @@ Separar servico, comissao e participacao; estimated/approved/closed; PDF, CSV e 
 
 Preservar header e idempotencia atuais; introduzir contract version, venda, reserva, consumo, reversao e reconcile.
 
-### Tarefa 11.2: compatibilidade no DoseClub
+### Task 31: compatibilidade no DoseClub
 
 **Repositorio:** `C:\Users\maxue\projetos_programação\clube_do_whisky`
 
@@ -410,7 +410,7 @@ Preservar header e idempotencia atuais; introduzir contract version, venda, rese
 
 Manter standalone, flag `inventoryMode`, v1 compativel e migracao explicita para v2.
 
-### Tarefa 11.3: reconciliacao e UI de mapeamento
+### Task 32: reconciliacao e UI de mapeamento
 
 **Arquivos:**
 - Criar: `apps/worker/src/doseclub-reconciliation.ts`
@@ -422,7 +422,7 @@ Mapeamento de produtos, divergencias, DLQ, requeue e reconciliacao diaria.
 
 ## Lote 12 — Backoffice completo
 
-### Tarefa 12.1: APIs administrativas seguras
+### Task 33: APIs administrativas seguras
 
 **Arquivos:**
 - Modificar: `apps/api/src/platform/platform.service.ts`
@@ -432,7 +432,7 @@ Mapeamento de produtos, divergencias, DLQ, requeue e reconciliacao diaria.
 
 Leads, tenant, plan, entitlement, user, suspension, onboarding, billing, support, integration, incident e audit com step-up/dual-control.
 
-### Tarefa 12.2: UI acionavel
+### Task 34: UI acionavel
 
 **Arquivos:**
 - Modificar: `apps/ops/src/platform.tsx`
@@ -444,7 +444,7 @@ Read-only inicial, contexto permanente, impacto, justificativa, approvals e tril
 
 ## Lote 13 — Demo coerente, observabilidade e LGPD
 
-### Tarefa 13.1: demo isolada
+### Task 35: demo isolada
 
 **Arquivos:**
 - Modificar: `packages/db/src/seed.ts`
@@ -454,7 +454,7 @@ Read-only inicial, contexto permanente, impacto, justificativa, approvals e tril
 
 120 mesas, pracas, turnos, KDS, estoque, retornaveis, incidentes, pagamentos e DoseClub sem contaminar producao.
 
-### Tarefa 13.2: OpenTelemetry e runbooks
+### Task 36: OpenTelemetry e runbooks
 
 **Arquivos:**
 - Criar: `apps/api/src/observability/observability.module.ts`
@@ -466,7 +466,7 @@ Read-only inicial, contexto permanente, impacto, justificativa, approvals e tril
 
 Metricas/logs/traces, redacao, budgets de cardinalidade, dashboards, alertas, owners e synthetic checks.
 
-### Tarefa 13.3: ciclo LGPD
+### Task 37: ciclo LGPD
 
 **Arquivos:**
 - Criar: `docs/privacy/data-inventory.md`
@@ -478,7 +478,7 @@ Exportar, corrigir, anonimizar/excluir e propagar conforme politica, inclusive o
 
 ## Lote 14 — QA Impeccable, carga, DR e release
 
-### Tarefa 14.1: refinamento por papel
+### Task 38: refinamento por papel
 
 **Arquivos:**
 - Modificar: `apps/ops/src/styles.css`
@@ -489,7 +489,7 @@ Exportar, corrigir, anonimizar/excluir e propagar conforme politica, inclusive o
 
 Aplicar Impeccable: hierarquia, tipografia, contraste, densidade, estados, responsividade, reduced motion e alvos touch; capturar desktop/tablet/POS/mobile/KDS.
 
-### Tarefa 14.2: carga e soak
+### Task 39: carga e soak
 
 **Arquivos:**
 - Criar: `load/k6-operational.js`
@@ -499,7 +499,7 @@ Aplicar Impeccable: hierarquia, tipografia, contraste, densidade, estados, respo
 
 Modelar 500 mesas, 50 terminais, 2.000 QR por unidade, multiplos tenants e 2x alvo com thresholds obrigatorios.
 
-### Tarefa 14.3: backup/restore e niveis de release
+### Task 40: backup/restore e niveis de release
 
 **Arquivos:**
 - Criar: `scripts/backup-production.ps1`
