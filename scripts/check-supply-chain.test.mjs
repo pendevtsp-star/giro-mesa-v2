@@ -37,7 +37,9 @@ for (const style of buildArgStyles) {
   });
 
   test(`rejects a sensitive name in ${style.name} Docker build args`, () => {
-    const errors = validateWorkflowBuildArgs(dockerBuildWorkflow(style.value("API_TOKEN=forbidden")));
+    const errors = validateWorkflowBuildArgs(
+      dockerBuildWorkflow(style.value("API_TOKEN=forbidden")),
+    );
 
     assert.deepEqual(errors, ["workflow Docker build args must not use sensitive argument names"]);
   });
