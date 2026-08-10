@@ -26,6 +26,17 @@ api=https://api.cloudflare.com/client/v4
 headers=(-H "Authorization: Bearer $token" -H "Content-Type: application/json")
 hosts=(pilot.giromesa.com.br menu-pilot.giromesa.com.br app-pilot.giromesa.com.br api-pilot.giromesa.com.br)
 
+zone_response=$(curl --silent --show-error "${headers[@]}" "$api/zones/$zone_id")
+if [[ $(jq -r '.success // false' <<< "$zone_response") != true ]]; then
+  zone_response=$(curl --silent --show-error "${headers[@]}" "$api/zones?name=giromesa.com.br&status=active")
+  zone_id=$(jq -r '.result[0].id // empty' <<< "$zone_response")
+  if [[ -z "$zone_id" ]]; then
+    echo "O token Cloudflare não consegue localizar a zona ativa giromesa.com.br." >&2
+    exit 1
+  fi
+  echo "Zone ID legado estava obsoleto; zona ativa localizada sem expor o identificador."
+fi
+
 for host in "${hosts[@]}"; do
   response=$(curl --fail --silent --show-error "${headers[@]}" "$api/zones/$zone_id/dns_records?type=A&name=$host")
   record_id=$(jq -r '.result[0].id // empty' <<< "$response")
