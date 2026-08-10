@@ -6,12 +6,34 @@ test("supply-chain configuration meets the local release contract", () => {
   assert.deepEqual(validateSupplyChain(), []);
 });
 
-test("rejects GitHub secrets and sensitive build-arg names", () => {
-  const errors = validateWorkflowBuildArgs(`
-    build-args: |
-      API_TOKEN=\${{ secrets.API_TOKEN }}
-      PUBLIC_VALUE=safe
-  `);
+const dockerBuildWorkflow = (buildArgs) => `
+jobs:
+  publish:
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          password: \${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          build-args: ${buildArgs}
+      - run: echo done
+`;
 
-  assert.deepEqual(errors, ["workflow build arguments must not carry secrets or sensitive values"]);
+test("rejects GitHub secrets in inline Docker build args", () => {
+  const errors = validateWorkflowBuildArgs(
+    dockerBuildWorkflow("PUBLIC_VALUE=" + "${{" + " secrets.API_TOKEN }}"),
+  );
+
+  assert.deepEqual(errors, ["workflow Docker build args must not carry GitHub secrets"]);
+});
+
+test("rejects sensitive Docker build-arg names in folded, chomping, and list forms", () => {
+  const errors = validateWorkflowBuildArgs(
+    dockerBuildWorkflow(`>-
+            PUBLIC_VALUE=safe
+            - API_TOKEN=forbidden
+            - PASSWORD=also-forbidden`),
+  );
+
+  assert.deepEqual(errors, ["workflow Docker build args must not use sensitive argument names"]);
 });

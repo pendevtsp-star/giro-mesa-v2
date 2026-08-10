@@ -8,32 +8,46 @@ const requireText = (contents, pattern, description, errors) => {
 };
 
 export function validateWorkflowBuildArgs(workflow) {
-  const buildArgs = [];
-  let blockIndentation = null;
+  const lines = workflow.split(/\r?\n/);
+  const buildArgsValues = [];
+  const indentation = (line) => line.match(/^\s*/)[0].length;
 
-  for (const line of workflow.split(/\r?\n/)) {
-    const buildArgsBlock = line.match(/^(\s*)build-args:\s*\|\s*$/);
-    if (buildArgsBlock) {
-      blockIndentation = buildArgsBlock[1].length;
-      continue;
-    }
-    if (blockIndentation === null) continue;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^\s*(?:-\s+)?uses:\s*docker\/build-push-action@/i.test(lines[index])) continue;
 
-    const indentation = line.match(/^\s*/)[0].length;
-    if (line.trim() && indentation <= blockIndentation) {
-      blockIndentation = null;
-      continue;
+    const actionIndentation = indentation(lines[index]);
+    let end = index + 1;
+    while (end < lines.length) {
+      if (/^\s*-\s+/.test(lines[end]) && indentation(lines[end]) < actionIndentation) break;
+      end += 1;
     }
-    buildArgs.push(line);
+
+    for (let input = index + 1; input < end; input += 1) {
+      const match = lines[input].match(/^(\s*)build-args:\s*(.*)$/);
+      if (!match) continue;
+      const valueIndentation = match[1].length;
+      if (match[2]) buildArgsValues.push(match[2]);
+
+      for (let value = input + 1; value < end; value += 1) {
+        if (lines[value].trim() && indentation(lines[value]) <= valueIndentation) break;
+        buildArgsValues.push(lines[value]);
+      }
+    }
   }
 
-  const buildArgsText = buildArgs.join("\n");
-  const hasSecretExpression = /\$\{\{\s*secrets\./i.test(buildArgsText);
-  const hasSensitiveBuildArgument =
-    /^[ \t]*[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|PRIVATE_KEY)[A-Z0-9_]*\s*=/im.test(buildArgsText);
-  return hasSecretExpression || hasSensitiveBuildArgument
-    ? ["workflow build arguments must not carry secrets or sensitive values"]
-    : [];
+  const buildArgsText = buildArgsValues.join("\n");
+  const errors = [];
+  if (/\$\{\{\s*secrets\./i.test(buildArgsText)) {
+    errors.push("workflow Docker build args must not carry GitHub secrets");
+  }
+  if (
+    /^[ \t]*(?:-\s+)?[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|PRIVATE_KEY)[A-Z0-9_]*\s*=/im.test(
+      buildArgsText,
+    )
+  ) {
+    errors.push("workflow Docker build args must not use sensitive argument names");
+  }
+  return errors;
 }
 
 export function validateSupplyChain() {
