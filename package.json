@@ -26,12 +26,22 @@
     "db:seed": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:seed"
   },
   "productionBaseline": {
-    "level": "not-assessed",
-    "artifact": "git:f85fd47d4d3113d21c57871968013e175c2d7a71",
-    "migration": "0008_final-recipes-and-operations",
+    "level": "software-ready",
+    "artifact": "git:85591d0d1337082c54a862a2865cdf413668426b",
+    "migration": {
+      "id": "0008_final-recipes-and-operations",
+      "status": "verified",
+      "evidence": "git:85591d0d1337082c54a862a2865cdf413668426b"
+    },
     "gateResults": {
-      "automated": "not-run",
-      "external": "not-run"
+      "automated": {
+        "status": "passed",
+        "evidence": "git:85591d0d1337082c54a862a2865cdf413668426b"
+      },
+      "security": {
+        "status": "passed",
+        "evidence": "git:85591d0d1337082c54a862a2865cdf413668426b"
+      }
     }
   },
   "devDependencies": {
