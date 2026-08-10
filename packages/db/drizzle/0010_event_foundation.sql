@@ -79,6 +79,81 @@ CREATE UNIQUE INDEX "outbox_command_effect_unique" ON "outbox_events" USING btre
 CREATE UNIQUE INDEX "operational_command_idempotency_unique" ON "operational_commands" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
 ALTER TABLE "pos_tabs" ADD CONSTRAINT "pos_tabs_resource_version_check" CHECK ("pos_tabs"."resource_version" >= 0);--> statement-breakpoint
 
+GRANT SELECT (id, organization_id, unit_id, sync_key_hash, revoked_at), UPDATE (revoked_at)
+  ON public.device_enrollments TO giromesa_migrator;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_resolve_sync_hub(requested_sync_key_hash text)
+RETURNS TABLE (hub_id uuid, organization_id uuid, unit_id uuid)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT device.id, device.organization_id, device.unit_id
+  FROM public.device_enrollments AS device
+  WHERE device.sync_key_hash = requested_sync_key_hash
+    AND device.revoked_at IS NULL
+  LIMIT 1
+$$;--> statement-breakpoint
+ALTER FUNCTION public.giromesa_resolve_sync_hub(text) OWNER TO giromesa_migrator;--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.giromesa_resolve_sync_hub(text) FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION public.giromesa_resolve_sync_hub(text) TO giromesa_internal;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_lock_command_device(requested_device_id uuid)
+RETURNS TABLE (device_id uuid, organization_id uuid, unit_id uuid, revoked_at timestamptz)
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT device.id, device.organization_id, device.unit_id, device.revoked_at
+  FROM public.device_enrollments AS device
+  WHERE device.id = requested_device_id
+  FOR UPDATE
+$$;--> statement-breakpoint
+ALTER FUNCTION public.giromesa_lock_command_device(uuid) OWNER TO giromesa_migrator;--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.giromesa_lock_command_device(uuid) FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION public.giromesa_lock_command_device(uuid) TO giromesa_internal;--> statement-breakpoint
+GRANT UPDATE (status) ON public.memberships TO giromesa_migrator;--> statement-breakpoint
+GRANT UPDATE (role) ON public.role_bindings TO giromesa_migrator;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_lock_command_actor(
+  expected_organization_id uuid,
+  expected_unit_id uuid,
+  expected_actor_identity_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  locked_membership_id uuid;
+  locked_binding_id uuid;
+BEGIN
+  SELECT membership.id INTO locked_membership_id
+  FROM public.memberships AS membership
+  WHERE membership.organization_id = expected_organization_id
+    AND membership.identity_id = expected_actor_identity_id
+    AND membership.status = 'active'
+  FOR UPDATE;
+
+  IF locked_membership_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT binding.id INTO locked_binding_id
+  FROM public.role_bindings AS binding
+  WHERE binding.membership_id = locked_membership_id
+    AND (binding.unit_id IS NULL OR binding.unit_id = expected_unit_id)
+  LIMIT 1
+  FOR UPDATE;
+
+  RETURN locked_binding_id IS NOT NULL;
+END
+$$;--> statement-breakpoint
+ALTER FUNCTION public.giromesa_lock_command_actor(uuid, uuid, uuid) OWNER TO giromesa_migrator;--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.giromesa_lock_command_actor(uuid, uuid, uuid) FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION public.giromesa_lock_command_actor(uuid, uuid, uuid) TO giromesa_internal;--> statement-breakpoint
+
 ALTER TABLE public.aggregate_sequence_states FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.command_inbox FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.command_quarantine FORCE ROW LEVEL SECURITY;--> statement-breakpoint

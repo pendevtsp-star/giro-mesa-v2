@@ -11,7 +11,7 @@ import {
   operationalCommands,
   outboxEvents,
 } from "@giromesa/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import type { OperationalSnapshotService } from "./operational-snapshot.service.js";
 import type { NormalizedSyncEventInput, OrderedSyncEventInput } from "./sync.schemas.js";
@@ -44,6 +44,8 @@ it("applies concurrent ordered commands effectively once with durable denials an
   }
 
   const databaseName = `giromesa_ordering_${randomUUID().replaceAll("-", "")}`;
+  const runtimeRole = `gm_runtime_${randomBytes(6).toString("hex")}`;
+  const runtimePassword = randomBytes(24).toString("base64url");
   const admin = createDatabase(integrationUrl).client;
   const databaseUrl = new URL(integrationUrl);
   databaseUrl.pathname = `/${databaseName}`;
@@ -52,17 +54,38 @@ it("applies concurrent ordered commands effectively once with durable denials an
   process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION = "v1";
   process.env.COMMAND_FINGERPRINT_KEYS = JSON.stringify({ v1: fingerprintKey(1) });
   let database: DatabaseService | undefined;
+  let migrated: ReturnType<typeof createDatabase> | undefined;
+  let revoker: ReturnType<typeof createDatabase> | undefined;
   try {
     await admin.unsafe(`create database "${databaseName}"`);
-    const migrated = createDatabase(databaseUrl.toString(), { max: 4 });
+    migrated = createDatabase(databaseUrl.toString(), { max: 4 });
     const migrationFiles = (await readdir(migrationsDirectory))
       .filter((file) => /^\d{4}_.*\.sql$/.test(file))
       .sort();
     assert.equal(migrationFiles.at(-1), "0010_event_foundation.sql");
     for (const file of migrationFiles) await applyMigration(migrated.client, file);
 
-    database = new DatabaseService(migrated);
+    await admin.unsafe(
+      `create role "${runtimeRole}" login password '${runtimePassword}' noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
+    );
+    await admin.unsafe(`grant giromesa_app, giromesa_internal to "${runtimeRole}"`);
+    const runtimeDatabaseUrl = new URL(databaseUrl);
+    runtimeDatabaseUrl.username = runtimeRole;
+    runtimeDatabaseUrl.password = runtimePassword;
+    database = new DatabaseService(createDatabase(runtimeDatabaseUrl.toString(), { max: 4 }));
     const serviceDatabase = database;
+    const [runtimeAttributes] = await serviceDatabase.client<
+      { current_user: string; rolbypassrls: boolean; rolinherit: boolean; rolsuper: boolean }[]
+    >`
+      select current_user, rolinherit, rolbypassrls, rolsuper
+      from pg_roles where rolname = current_user
+    `;
+    assert.deepEqual(runtimeAttributes, {
+      current_user: runtimeRole,
+      rolbypassrls: false,
+      rolinherit: false,
+      rolsuper: false,
+    });
     const suffix = randomBytes(8).toString("hex");
     const organizationA = randomUUID();
     const organizationB = randomUUID();
@@ -79,6 +102,7 @@ it("applies concurrent ordered commands effectively once with durable denials an
     const deviceB = randomUUID();
     const crossUnitDevice = randomUUID();
     const revokedDevice = randomUUID();
+    const raceDevice = randomUUID();
     const keyA = randomBytes(32).toString("base64url");
     const keyB = randomBytes(32).toString("base64url");
     await migrated.client`
@@ -119,13 +143,52 @@ it("applies concurrent ordered commands effectively once with durable denials an
         (${deviceA}, ${organizationA}, ${unitA}, 'Terminal A', null, null),
         (${deviceB}, ${organizationB}, ${unitB}, 'Terminal B', null, null),
         (${crossUnitDevice}, ${organizationA}, ${unitA2}, 'Terminal A2', null, null),
-        (${revokedDevice}, ${organizationA}, ${unitA}, 'Revoked A', null, now())
+        (${revokedDevice}, ${organizationA}, ${unitA}, 'Revoked A', null, now()),
+        (${raceDevice}, ${organizationA}, ${unitA}, 'Race Terminal A', null, null)
     `;
+    const runtimeContext = await serviceDatabase.withTenantContext(
+      {
+        source: "internal",
+        organizationId: organizationA,
+        unitId: unitA,
+        actorIdentityId: null,
+      },
+      async (tx) => {
+        const roles = await tx.execute<{
+          current_user: string;
+          internal_member: boolean;
+          session_user: string;
+        }>(sql`
+          select
+            current_user,
+            session_user,
+            pg_has_role(session_user, 'giromesa_internal', 'member') internal_member
+        `);
+        return [...roles][0];
+      },
+    );
+    assert.deepEqual(runtimeContext, {
+      current_user: "giromesa_app",
+      internal_member: true,
+      session_user: runtimeRole,
+    });
 
+    let signalPilotEntered!: () => void;
+    let releasePilot!: () => void;
+    const pilotEntered = new Promise<void>((resolve) => {
+      signalPilotEntered = resolve;
+    });
+    const pilotRelease = new Promise<void>((resolve) => {
+      releasePilot = resolve;
+    });
     let durableEffects = 0;
     const pilot = {
       apply: async (event: NormalizedSyncEventInput) => {
         if (event.type === "test.transient") throw new Error("transient probe");
+        if (event.type === "test.revoke-race") {
+          signalPilotEntered();
+          await pilotRelease;
+        }
         durableEffects += 1;
         return { effectNumber: durableEffects };
       },
@@ -160,6 +223,17 @@ it("applies concurrent ordered commands effectively once with durable denials an
 
     const firstEvent = event(1, { payload: { sequence: 1, approval: { pin: "1234" } } });
     const first = await sync.synchronize(keyA, batch([firstEvent]));
+    const thirdEvent = event(3);
+    assert.equal(
+      (await sync.synchronize(keyA, batch([thirdEvent]))).rejectedEvents[0]?.code,
+      "AGGREGATE_SEQUENCE_GAP",
+    );
+    const [v1GapReceipt] = await migrated.db
+      .select()
+      .from(commandInbox)
+      .where(eq(commandInbox.commandId, thirdEvent.commandId));
+    assert.equal(v1GapReceipt?.fingerprintKeyVersion, "v1");
+    assert.equal(v1GapReceipt?.status, "quarantined");
     process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION = "v2";
     process.env.COMMAND_FINGERPRINT_KEYS = JSON.stringify({
       v1: fingerprintKey(1),
@@ -193,11 +267,6 @@ it("applies concurrent ordered commands effectively once with durable denials an
     );
     assert.equal(divergent.rejectedEvents[0]?.code, "IDEMPOTENCY_KEY_REUSED");
 
-    const thirdEvent = event(3);
-    assert.equal(
-      (await sync.synchronize(keyA, batch([thirdEvent]))).rejectedEvents[0]?.code,
-      "AGGREGATE_SEQUENCE_GAP",
-    );
     const secondEvent = event(2);
     assert.deepEqual((await sync.synchronize(keyA, batch([secondEvent]))).acceptedEventIds, [
       secondEvent.commandId,
@@ -205,6 +274,28 @@ it("applies concurrent ordered commands effectively once with durable denials an
     const recovered = await sync.synchronize(keyA, batch([thirdEvent]));
     assert.deepEqual(recovered.acceptedEventIds, [thirdEvent.commandId]);
     assert.equal(recovered.eventResults[0]?.replayed, true);
+    const [recoveredV1Receipt] = await migrated.db
+      .select()
+      .from(commandInbox)
+      .where(eq(commandInbox.commandId, thirdEvent.commandId));
+    assert.equal(recoveredV1Receipt?.fingerprintKeyVersion, "v1");
+    assert.equal(recoveredV1Receipt?.fingerprint, v1GapReceipt?.fingerprint);
+    assert.equal(recoveredV1Receipt?.status, "applied");
+    assert.equal(
+      (
+        await migrated.db
+          .select()
+          .from(outboxEvents)
+          .where(eq(outboxEvents.sourceCommandId, thirdEvent.commandId))
+      ).length,
+      1,
+    );
+    const stableRecoveredReplay = await sync.synchronize(keyA, batch([thirdEvent]));
+    assert.deepEqual(
+      stableRecoveredReplay.eventResults[0]?.result,
+      recovered.eventResults[0]?.result,
+    );
+    assert.equal(stableRecoveredReplay.eventResults[0]?.replayed, true);
     const duplicateSequence = event(2);
     assert.equal(
       (await sync.synchronize(keyA, batch([duplicateSequence]))).rejectedEvents[0]?.code,
@@ -349,6 +440,97 @@ it("applies concurrent ordered commands effectively once with durable denials an
       [organizationA, organizationB].sort(),
     );
 
+    const deniedGap = event(13, { actorId: randomUUID() });
+    const deniedGapResult = await sync.synchronize(keyA, batch([deniedGap]));
+    assert.equal(deniedGapResult.rejectedEvents[0]?.code, "AGGREGATE_SEQUENCE_GAP");
+    const [deniedGapReceipt] = await migrated.db
+      .select()
+      .from(commandInbox)
+      .where(eq(commandInbox.commandId, deniedGap.commandId));
+    assert.equal(deniedGapReceipt?.fingerprintKeyVersion, "v2");
+    assert.equal(deniedGapReceipt?.preconditionCode, "ACTOR_SCOPE_DENIED");
+    process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION = "v3";
+    process.env.COMMAND_FINGERPRINT_KEYS = JSON.stringify({
+      v1: fingerprintKey(1),
+      v2: fingerprintKey(2),
+      v3: fingerprintKey(3),
+    });
+    const twelfthEvent = event(12);
+    assert.deepEqual((await sync.synchronize(keyA, batch([twelfthEvent]))).acceptedEventIds, [
+      twelfthEvent.commandId,
+    ]);
+    const deniedGapRecovered = await sync.synchronize(keyA, batch([deniedGap]));
+    assert.equal(deniedGapRecovered.rejectedEvents[0]?.code, "ACTOR_SCOPE_DENIED");
+    assert.equal(deniedGapRecovered.eventResults[0]?.replayed, true);
+    const [deniedGapRecoveredReceipt] = await migrated.db
+      .select()
+      .from(commandInbox)
+      .where(eq(commandInbox.commandId, deniedGap.commandId));
+    assert.equal(deniedGapRecoveredReceipt?.fingerprintKeyVersion, "v2");
+    assert.equal(deniedGapRecoveredReceipt?.fingerprint, deniedGapReceipt?.fingerprint);
+    assert.equal(deniedGapRecoveredReceipt?.status, "rejected");
+    const [deniedQuarantine] = await migrated.db
+      .select()
+      .from(commandQuarantine)
+      .where(eq(commandQuarantine.commandId, deniedGap.commandId));
+    assert.equal(deniedQuarantine?.status, "recovered");
+    assert.deepEqual(
+      (await sync.synchronize(keyA, batch([deniedGap]))).eventResults[0]?.result,
+      deniedGapRecovered.eventResults[0]?.result,
+    );
+
+    const revokeRaceEvent = event(14, { deviceId: raceDevice, type: "test.revoke-race" });
+    const commandDuringRevocation = sync.synchronize(keyA, batch([revokeRaceEvent]));
+    await pilotEntered;
+    revoker = createDatabase(databaseUrl.toString(), { max: 1 });
+    const revokerConnection = revoker;
+    const [revokerBackend] = await revokerConnection.client<
+      { pid: number }[]
+    >`select pg_backend_pid() pid`;
+    assert.ok(revokerBackend);
+    const revocation = (async () =>
+      revokerConnection.client`
+        update device_enrollments set revoked_at = now() where id = ${raceDevice}
+      `)();
+    let revocationWaitedOnLock = false;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const [activity] = await admin<
+        { wait_event_type: string | null }[]
+      >`select wait_event_type from pg_stat_activity where pid = ${revokerBackend.pid}`;
+      if (activity?.wait_event_type === "Lock") {
+        revocationWaitedOnLock = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(revocationWaitedOnLock, true);
+    releasePilot();
+    assert.deepEqual((await commandDuringRevocation).acceptedEventIds, [revokeRaceEvent.commandId]);
+    await revocation;
+    const afterRevocation = event(15, { deviceId: raceDevice });
+    assert.equal(
+      (await sync.synchronize(keyA, batch([afterRevocation]))).rejectedEvents[0]?.code,
+      "DEVICE_REVOKED",
+    );
+    assert.equal(
+      (
+        await migrated.db
+          .select()
+          .from(outboxEvents)
+          .where(eq(outboxEvents.sourceCommandId, afterRevocation.commandId))
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await migrated.db
+          .select()
+          .from(operationalCommands)
+          .where(eq(operationalCommands.id, afterRevocation.commandId))
+      ).length,
+      0,
+    );
+
     for (const scope of [
       { organizationId: organizationA, unitId: unitA, actorIdentityId: actorA },
       { organizationId: organizationB, unitId: unitB, actorIdentityId: actorB },
@@ -419,6 +601,45 @@ it("applies concurrent ordered commands effectively once with durable denials an
           }),
       ),
     );
+    await assert.rejects(() =>
+      serviceDatabase.withTenantContext(
+        {
+          source: "http",
+          organizationId: organizationA,
+          unitId: unitA,
+          actorIdentityId: actorA,
+        },
+        (tx) =>
+          tx.insert(aggregateSequenceStates).values({
+            organizationId: organizationB,
+            unitId: unitB,
+            aggregateType: "tab",
+            aggregateId: randomUUID(),
+            occupancyEpoch: randomUUID(),
+            lastSequence: 1,
+            resourceVersion: 0,
+            lastCommandId: randomUUID(),
+          }),
+      ),
+    );
+    await assert.rejects(() =>
+      serviceDatabase.withTenantContext(
+        {
+          source: "http",
+          organizationId: organizationA,
+          unitId: unitA,
+          actorIdentityId: actorA,
+        },
+        (tx) =>
+          tx.insert(commandQuarantine).values({
+            organizationId: organizationB,
+            unitId: unitB,
+            commandId: tenantBEvent.commandId,
+            reason: "CROSS_TENANT_PROBE",
+            evidence: {},
+          }),
+      ),
+    );
 
     const [state] = await migrated.db
       .select()
@@ -430,7 +651,7 @@ it("applies concurrent ordered commands effectively once with durable denials an
           eq(aggregateSequenceStates.occupancyEpoch, occupancyEpoch),
         ),
       );
-    assert.equal(state?.lastSequence, 11);
+    assert.equal(state?.lastSequence, 15);
     const [gapReceipt] = await migrated.db
       .select()
       .from(commandQuarantine)
@@ -451,9 +672,9 @@ it("applies concurrent ordered commands effectively once with durable denials an
           .from(outboxEvents)
           .where(eq(outboxEvents.organizationId, organizationA))
       ).length,
-      7,
+      9,
     );
-    assert.equal(durableEffects, 8);
+    assert.equal(durableEffects, 10);
 
     const security = await migrated.client<
       {
@@ -508,6 +729,32 @@ it("applies concurrent ordered commands effectively once with durable denials an
         table.table_name,
       );
     }
+    const [functionSecurity] = await migrated.client<
+      {
+        app_actor_execute: boolean;
+        app_device_execute: boolean;
+        app_hub_execute: boolean;
+        internal_actor_execute: boolean;
+        internal_device_execute: boolean;
+        internal_hub_execute: boolean;
+      }[]
+    >`
+      select
+        has_function_privilege('giromesa_app', 'giromesa_resolve_sync_hub(text)', 'execute') app_hub_execute,
+        has_function_privilege('giromesa_app', 'giromesa_lock_command_device(uuid)', 'execute') app_device_execute,
+        has_function_privilege('giromesa_app', 'giromesa_lock_command_actor(uuid,uuid,uuid)', 'execute') app_actor_execute,
+        has_function_privilege('giromesa_internal', 'giromesa_resolve_sync_hub(text)', 'execute') internal_hub_execute,
+        has_function_privilege('giromesa_internal', 'giromesa_lock_command_device(uuid)', 'execute') internal_device_execute,
+        has_function_privilege('giromesa_internal', 'giromesa_lock_command_actor(uuid,uuid,uuid)', 'execute') internal_actor_execute
+    `;
+    assert.deepEqual(functionSecurity, {
+      app_actor_execute: false,
+      app_device_execute: false,
+      app_hub_execute: false,
+      internal_actor_execute: true,
+      internal_device_execute: true,
+      internal_hub_execute: true,
+    });
   } finally {
     if (previousFingerprintVersion === undefined)
       delete process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION;
@@ -515,10 +762,13 @@ it("applies concurrent ordered commands effectively once with durable denials an
     if (previousFingerprintKeys === undefined) delete process.env.COMMAND_FINGERPRINT_KEYS;
     else process.env.COMMAND_FINGERPRINT_KEYS = previousFingerprintKeys;
     if (database) await database.onModuleDestroy();
+    if (revoker) await revoker.client.end();
+    if (migrated) await migrated.client.end();
     await admin.unsafe(
       `select pg_terminate_backend(pid) from pg_stat_activity where datname = '${databaseName}'`,
     );
     await admin.unsafe(`drop database if exists "${databaseName}"`);
+    await admin.unsafe(`drop role if exists "${runtimeRole}"`);
     await admin.end();
   }
 });

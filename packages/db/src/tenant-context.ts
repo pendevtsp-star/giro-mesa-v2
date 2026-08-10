@@ -12,7 +12,7 @@ export type TenantContext = Readonly<{
 }>;
 
 export type TenantTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type DatabaseContextRole = "identity" | "public" | "worker";
+export type DatabaseContextRole = "identity" | "internal" | "public" | "worker";
 
 interface ActiveTenantScope {
   context: TenantContext | null;

@@ -7,10 +7,8 @@ import {
   deviceEnrollments,
   hubCommands,
   hubHeartbeats,
-  memberships,
   operationalCommands,
   outboxEvents,
-  roleBindings,
 } from "@giromesa/db";
 import { type CommandEnvelope, createCommandEnvelope } from "@giromesa/domain";
 import {
@@ -69,100 +67,66 @@ export class SyncService {
     if (!syncKey) throw this.invalidHubKey();
     const input = normalizeSyncBatch(rawInput);
     const fingerprintKeyring = loadCommandFingerprintKeyring();
-    const hub = await this.database.db.transaction(async (tx) => {
-      const [hub] = await tx
-        .select({
-          id: deviceEnrollments.id,
-          organizationId: deviceEnrollments.organizationId,
-          unitId: deviceEnrollments.unitId,
-        })
-        .from(deviceEnrollments)
-        .where(
-          and(
-            eq(deviceEnrollments.syncKeyHash, hashSyncKey(syncKey)),
-            isNull(deviceEnrollments.revokedAt),
-          ),
-        )
-        .limit(1);
-      if (!hub) throw this.invalidHubKey();
-
-      const now = new Date();
-      await tx
-        .insert(hubHeartbeats)
-        .values({
-          organizationId: hub.organizationId,
-          unitId: hub.unitId,
-          hubId: hub.id,
-          version: input.hubVersion,
-          lastSeenAt: now,
-          metadata: { ...input.metadata, protocolVersion: input.protocolVersion },
-        })
-        .onConflictDoUpdate({
-          target: hubHeartbeats.unitId,
-          set: {
+    const hub = await this.database.withRoleContext("internal", null, async (tx) => {
+      const resolved = await tx.execute<{
+        hub_id: string;
+        organization_id: string;
+        unit_id: string;
+      }>(sql`select * from public.giromesa_resolve_sync_hub(${hashSyncKey(syncKey)})`);
+      const [scope] = [...resolved];
+      if (!scope) throw this.invalidHubKey();
+      return {
+        id: scope.hub_id,
+        organizationId: scope.organization_id,
+        unitId: scope.unit_id,
+      };
+    });
+    await this.database.withTenantContext(
+      {
+        source: "internal",
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        actorIdentityId: null,
+      },
+      async (tx) => {
+        const now = new Date();
+        await tx
+          .insert(hubHeartbeats)
+          .values({
             organizationId: hub.organizationId,
+            unitId: hub.unitId,
             hubId: hub.id,
             version: input.hubVersion,
             lastSeenAt: now,
             metadata: { ...input.metadata, protocolVersion: input.protocolVersion },
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: hubHeartbeats.unitId,
+            set: {
+              organizationId: hub.organizationId,
+              hubId: hub.id,
+              version: input.hubVersion,
+              lastSeenAt: now,
+              metadata: { ...input.metadata, protocolVersion: input.protocolVersion },
+            },
+          });
 
-      if (input.acknowledgedCommandIds.length > 0) {
-        await tx
-          .update(hubCommands)
-          .set({ acknowledgedAt: now })
-          .where(
-            and(
-              eq(hubCommands.organizationId, hub.organizationId),
-              eq(hubCommands.unitId, hub.unitId),
-              eq(hubCommands.hubId, hub.id),
-              inArray(hubCommands.id, input.acknowledgedCommandIds),
-              isNull(hubCommands.acknowledgedAt),
-            ),
-          );
-      }
-      return hub;
-    });
-
-    const actorIds = [...new Set(input.events.map((event) => event.actorId))];
-    const actorRows =
-      actorIds.length === 0
-        ? []
-        : await this.database.db
-            .select({
-              identityId: memberships.identityId,
-              role: roleBindings.role,
-              unitId: roleBindings.unitId,
-            })
-            .from(memberships)
-            .leftJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        if (input.acknowledgedCommandIds.length > 0) {
+          await tx
+            .update(hubCommands)
+            .set({ acknowledgedAt: now })
             .where(
               and(
-                eq(memberships.organizationId, hub.organizationId),
-                eq(memberships.status, "active"),
-                inArray(memberships.identityId, actorIds),
+                eq(hubCommands.organizationId, hub.organizationId),
+                eq(hubCommands.unitId, hub.unitId),
+                eq(hubCommands.hubId, hub.id),
+                inArray(hubCommands.id, input.acknowledgedCommandIds),
+                isNull(hubCommands.acknowledgedAt),
               ),
             );
-    const allowedActors = new Set(
-      actorRows
-        .filter((row) => row.role !== null && (row.unitId === null || row.unitId === hub.unitId))
-        .map((row) => row.identityId),
+        }
+      },
     );
-    const deviceIds = [...new Set(input.events.map((event) => event.deviceId))];
-    const enrolledDevices =
-      deviceIds.length === 0
-        ? []
-        : await this.database.db
-            .select({
-              id: deviceEnrollments.id,
-              organizationId: deviceEnrollments.organizationId,
-              unitId: deviceEnrollments.unitId,
-              revokedAt: deviceEnrollments.revokedAt,
-            })
-            .from(deviceEnrollments)
-            .where(inArray(deviceEnrollments.id, deviceIds));
-    const devicesById = new Map(enrolledDevices.map((device) => [device.id, device]));
     const acceptedEventIds: string[] = [];
     const rejectedEvents: Array<{ id: string; code: string }> = [];
     const eventResults: Array<{
@@ -172,26 +136,15 @@ export class SyncService {
     }> = [];
 
     for (const event of input.events) {
-      const enrolledDevice = devicesById.get(event.deviceId);
-      const preconditionCode = !enrolledDevice
-        ? "DEVICE_NOT_ENROLLED"
-        : enrolledDevice.organizationId !== hub.organizationId ||
-            enrolledDevice.unitId !== hub.unitId
-          ? "DEVICE_SCOPE_DENIED"
-          : enrolledDevice.revokedAt !== null
-            ? "DEVICE_REVOKED"
-            : !allowedActors.has(event.actorId)
-              ? "ACTOR_SCOPE_DENIED"
-              : null;
       try {
         const outcome = await this.database.withTenantContext(
           {
-            source: preconditionCode === null ? "http" : "internal",
+            source: "internal",
             organizationId: hub.organizationId,
             unitId: hub.unitId,
-            actorIdentityId: preconditionCode === null ? event.actorId : null,
+            actorIdentityId: null,
           },
-          () => this.applyEnvelope(event, hub, fingerprintKeyring, preconditionCode),
+          () => this.applyEnvelope(event, hub, fingerprintKeyring),
         );
         const result = outcome.result as Record<string, unknown>;
         eventResults.push({ id: event.id, replayed: outcome.replayed, result });
@@ -216,27 +169,37 @@ export class SyncService {
     }
 
     const now = new Date();
-    const commands = await this.database.db
-      .select({
-        id: hubCommands.id,
-        type: hubCommands.type,
-        payload: hubCommands.payload,
-        createdAt: hubCommands.createdAt,
-        expiresAt: hubCommands.expiresAt,
-      })
-      .from(hubCommands)
-      .where(
-        and(
-          eq(hubCommands.organizationId, hub.organizationId),
-          eq(hubCommands.unitId, hub.unitId),
-          eq(hubCommands.hubId, hub.id),
-          isNull(hubCommands.acknowledgedAt),
-          gt(hubCommands.expiresAt, now),
-        ),
-      )
-      .orderBy(asc(hubCommands.createdAt))
-      .limit(100);
-    const snapshot = await this.snapshots.capture(hub.organizationId, hub.unitId);
+    const { commands, snapshot } = await this.database.withTenantContext(
+      {
+        source: "internal",
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        actorIdentityId: null,
+      },
+      async (tx) => ({
+        commands: await tx
+          .select({
+            id: hubCommands.id,
+            type: hubCommands.type,
+            payload: hubCommands.payload,
+            createdAt: hubCommands.createdAt,
+            expiresAt: hubCommands.expiresAt,
+          })
+          .from(hubCommands)
+          .where(
+            and(
+              eq(hubCommands.organizationId, hub.organizationId),
+              eq(hubCommands.unitId, hub.unitId),
+              eq(hubCommands.hubId, hub.id),
+              isNull(hubCommands.acknowledgedAt),
+              gt(hubCommands.expiresAt, now),
+            ),
+          )
+          .orderBy(asc(hubCommands.createdAt))
+          .limit(100),
+        snapshot: await this.snapshots.capture(hub.organizationId, hub.unitId),
+      }),
+    );
 
     return { acceptedEventIds, rejectedEvents, eventResults, commands, snapshot, serverTime: now };
   }
@@ -245,14 +208,13 @@ export class SyncService {
     event: NormalizedSyncEventInput,
     hub: { id: string; organizationId: string; unitId: string },
     fingerprintKeyring: CommandFingerprintKeyring,
-    preconditionCode: string | null,
   ) {
     const envelope = createCommandEnvelope(event, {
       organizationId: hub.organizationId,
       unitId: hub.unitId,
       receivedAt: new Date().toISOString(),
     });
-    const fingerprint = createCommandFingerprint(envelope, fingerprintKeyring);
+    let fingerprint = createCommandFingerprint(envelope, fingerprintKeyring);
     const scope = and(
       eq(commandInbox.organizationId, hub.organizationId),
       eq(commandInbox.unitId, hub.unitId),
@@ -278,25 +240,23 @@ export class SyncService {
         ),
       )
       .limit(1);
-    if (
-      existingReceipt &&
-      !verifyCommandFingerprint(
-        envelope,
-        {
-          keyVersion: existingReceipt.fingerprintKeyVersion,
-          digest: existingReceipt.fingerprint,
-        },
-        fingerprintKeyring,
-      )
-    ) {
-      return {
-        replayed: true,
-        result: { status: "rejected", code: this.idempotencyConflictCode(event) },
+    if (existingReceipt) {
+      const storedFingerprint = {
+        keyVersion: existingReceipt.fingerprintKeyVersion,
+        digest: existingReceipt.fingerprint,
       };
+      if (!verifyCommandFingerprint(envelope, storedFingerprint, fingerprintKeyring)) {
+        return {
+          replayed: true,
+          result: { status: "rejected", code: this.idempotencyConflictCode(event) },
+        };
+      }
+      fingerprint = storedFingerprint;
     }
     if (existingReceipt && existingReceipt.status !== "quarantined") {
       return { replayed: true, result: existingReceipt.result as Record<string, unknown> };
     }
+    const preconditionCode = await this.commandPrecondition(event, hub);
     const effectivePreconditionCode = existingReceipt?.preconditionCode ?? preconditionCode;
 
     const aggregateScope = and(
@@ -494,6 +454,35 @@ export class SyncService {
     return { replayed: existingReceipt !== undefined, result };
   }
 
+  private async commandPrecondition(
+    event: NormalizedSyncEventInput,
+    hub: { organizationId: string; unitId: string },
+  ) {
+    await this.database.db.execute(sql.raw("set local role giromesa_internal"));
+    const lockedDevices = await this.database.db.execute<{
+      device_id: string;
+      organization_id: string;
+      revoked_at: Date | null;
+      unit_id: string;
+    }>(sql`select * from public.giromesa_lock_command_device(${event.deviceId})`);
+    const lockedActors = await this.database.db.execute<{ authorized: boolean }>(
+      sql`select public.giromesa_lock_command_actor(
+        ${hub.organizationId}, ${hub.unitId}, ${event.actorId}
+      ) as authorized`,
+    );
+    await this.database.db.execute(sql.raw("set local role giromesa_app"));
+    const [device] = [...lockedDevices];
+    const [actor] = [...lockedActors];
+
+    if (!device) return "DEVICE_NOT_ENROLLED";
+    if (device.organization_id !== hub.organizationId || device.unit_id !== hub.unitId) {
+      return "DEVICE_SCOPE_DENIED";
+    }
+    if (device.revoked_at !== null) return "DEVICE_REVOKED";
+    if (actor?.authorized !== true) return "ACTOR_SCOPE_DENIED";
+    return null;
+  }
+
   private receiptValues(
     envelope: CommandEnvelope,
     fingerprint: CommandFingerprint,
@@ -577,7 +566,7 @@ export class SyncService {
       });
       return;
     }
-    await this.database.db
+    const transitionedReceipts = await this.database.db
       .update(commandInbox)
       .set({ status: result.status, result, preconditionCode, completedAt: now })
       .where(
@@ -587,9 +576,12 @@ export class SyncService {
           eq(commandInbox.commandId, envelope.commandId),
           eq(commandInbox.fingerprintKeyVersion, fingerprint.keyVersion),
           eq(commandInbox.fingerprint, fingerprint.digest),
+          eq(commandInbox.status, "quarantined"),
         ),
-      );
-    await this.database.db
+      )
+      .returning({ commandId: commandInbox.commandId });
+    if (transitionedReceipts.length !== 1) throw new Error("COMMAND_RECEIPT_TRANSITION_FAILED");
+    const recoveredQuarantines = await this.database.db
       .update(commandQuarantine)
       .set({ status: "recovered", recoveredAt: now })
       .where(
@@ -599,7 +591,9 @@ export class SyncService {
           eq(commandQuarantine.commandId, envelope.commandId),
           eq(commandQuarantine.status, "pending"),
         ),
-      );
+      )
+      .returning({ commandId: commandQuarantine.commandId });
+    if (recoveredQuarantines.length !== 1) throw new Error("COMMAND_QUARANTINE_TRANSITION_FAILED");
   }
 
   private deterministicRejection(error: unknown) {
