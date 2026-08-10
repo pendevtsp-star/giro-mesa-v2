@@ -1,5 +1,5 @@
 {
-  "id": "719bc542-358c-46dc-b672-06781e4e8b2c",
+  "id": "c0f2d1ca-c763-41bf-9a7b-f73bce834363",
   "prevId": "0967f074-0d67-46c5-b1c8-a5b0a2829a04",
   "version": "7",
   "dialect": "postgresql",
@@ -136,6 +136,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "fingerprint_key_version": {
+          "name": "fingerprint_key_version",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "fingerprint": {
           "name": "fingerprint",
           "type": "varchar(64)",
@@ -214,6 +220,12 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
+        },
+        "precondition_code": {
+          "name": "precondition_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
         },
         "result": {
           "name": "result",
@@ -341,19 +353,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "command_inbox_actor_identity_id_identities_id_fk": {
-          "name": "command_inbox_actor_identity_id_identities_id_fk",
-          "tableFrom": "command_inbox",
-          "tableTo": "identities",
-          "columnsFrom": [
-            "actor_identity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "command_inbox_organization_unit_fk": {
@@ -13483,7 +13482,7 @@
         "id": {
           "name": "id",
           "type": "uuid",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "organization_id": {
@@ -13567,6 +13566,12 @@
           "name": "operational_command_idempotency_unique",
           "columns": [
             {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "unit_id",
               "isExpression": false,
               "asc": true,
@@ -13649,7 +13654,16 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "operational_commands_organization_id_unit_id_id_pk": {
+          "name": "operational_commands_organization_id_unit_id_id_pk",
+          "columns": [
+            "organization_id",
+            "unit_id",
+            "id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

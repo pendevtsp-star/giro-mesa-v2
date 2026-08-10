@@ -13,7 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { identities, organizations, units } from "./schema.js";
+import { organizations, units } from "./schema.js";
 
 export const commandInboxStatus = pgEnum("command_inbox_status", [
   "applied",
@@ -42,10 +42,9 @@ export const commandInbox = pgTable(
     unitId: uuid("unit_id").notNull(),
     commandId: uuid("command_id").notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    fingerprintKeyVersion: varchar("fingerprint_key_version", { length: 32 }).notNull(),
     fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
-    actorIdentityId: uuid("actor_identity_id")
-      .notNull()
-      .references(() => identities.id),
+    actorIdentityId: uuid("actor_identity_id").notNull(),
     deviceId: uuid("device_id").notNull(),
     commandType: varchar("command_type", { length: 100 }).notNull(),
     aggregateType: varchar("aggregate_type", { length: 80 }).notNull(),
@@ -57,6 +56,7 @@ export const commandInbox = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     status: commandInboxStatus("status").notNull(),
+    preconditionCode: varchar("precondition_code", { length: 100 }),
     result: jsonb("result").$type<CommandResult>().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },

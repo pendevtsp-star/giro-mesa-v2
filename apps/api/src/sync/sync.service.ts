@@ -24,6 +24,14 @@ import {
 import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import { DatabaseService } from "../database/database.module.js";
+import { canonicalJson } from "./canonical-json.js";
+import {
+  type CommandFingerprint,
+  type CommandFingerprintKeyring,
+  createCommandFingerprint,
+  loadCommandFingerprintKeyring,
+  verifyCommandFingerprint,
+} from "./command-fingerprint.js";
 import { OperationalSnapshotService } from "./operational-snapshot.service.js";
 import {
   type NormalizedSyncEventInput,
@@ -34,14 +42,7 @@ import { SyncPilotService } from "./sync-pilot.service.js";
 
 const hashSyncKey = (value: string) => createHash("sha256").update(value).digest("hex");
 
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
-    .join(",")}}`;
-}
+export { canonicalJson } from "./canonical-json.js";
 
 export function redactOperationalSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactOperationalSecrets);
@@ -67,6 +68,7 @@ export class SyncService {
   async synchronize(syncKey: string | undefined, rawInput: SyncBatchInput) {
     if (!syncKey) throw this.invalidHubKey();
     const input = normalizeSyncBatch(rawInput);
+    const fingerprintKeyring = loadCommandFingerprintKeyring();
     const hub = await this.database.db.transaction(async (tx) => {
       const [hub] = await tx
         .select({
@@ -147,6 +149,20 @@ export class SyncService {
         .filter((row) => row.role !== null && (row.unitId === null || row.unitId === hub.unitId))
         .map((row) => row.identityId),
     );
+    const deviceIds = [...new Set(input.events.map((event) => event.deviceId))];
+    const enrolledDevices =
+      deviceIds.length === 0
+        ? []
+        : await this.database.db
+            .select({
+              id: deviceEnrollments.id,
+              organizationId: deviceEnrollments.organizationId,
+              unitId: deviceEnrollments.unitId,
+              revokedAt: deviceEnrollments.revokedAt,
+            })
+            .from(deviceEnrollments)
+            .where(inArray(deviceEnrollments.id, deviceIds));
+    const devicesById = new Map(enrolledDevices.map((device) => [device.id, device]));
     const acceptedEventIds: string[] = [];
     const rejectedEvents: Array<{ id: string; code: string }> = [];
     const eventResults: Array<{
@@ -156,24 +172,26 @@ export class SyncService {
     }> = [];
 
     for (const event of input.events) {
-      if (!allowedActors.has(event.actorId)) {
-        rejectedEvents.push({ id: event.id, code: "ACTOR_SCOPE_DENIED" });
-        eventResults.push({
-          id: event.id,
-          replayed: false,
-          result: { status: "rejected", code: "ACTOR_SCOPE_DENIED" },
-        });
-        continue;
-      }
+      const enrolledDevice = devicesById.get(event.deviceId);
+      const preconditionCode = !enrolledDevice
+        ? "DEVICE_NOT_ENROLLED"
+        : enrolledDevice.organizationId !== hub.organizationId ||
+            enrolledDevice.unitId !== hub.unitId
+          ? "DEVICE_SCOPE_DENIED"
+          : enrolledDevice.revokedAt !== null
+            ? "DEVICE_REVOKED"
+            : !allowedActors.has(event.actorId)
+              ? "ACTOR_SCOPE_DENIED"
+              : null;
       try {
         const outcome = await this.database.withTenantContext(
           {
-            source: "http",
+            source: preconditionCode === null ? "http" : "internal",
             organizationId: hub.organizationId,
             unitId: hub.unitId,
-            actorIdentityId: event.actorId,
+            actorIdentityId: preconditionCode === null ? event.actorId : null,
           },
-          () => this.applyEnvelope(event, hub),
+          () => this.applyEnvelope(event, hub, fingerprintKeyring, preconditionCode),
         );
         const result = outcome.result as Record<string, unknown>;
         eventResults.push({ id: event.id, replayed: outcome.replayed, result });
@@ -226,13 +244,15 @@ export class SyncService {
   private async applyEnvelope(
     event: NormalizedSyncEventInput,
     hub: { id: string; organizationId: string; unitId: string },
+    fingerprintKeyring: CommandFingerprintKeyring,
+    preconditionCode: string | null,
   ) {
     const envelope = createCommandEnvelope(event, {
       organizationId: hub.organizationId,
       unitId: hub.unitId,
       receivedAt: new Date().toISOString(),
     });
-    const fingerprint = this.envelopeFingerprint(envelope);
+    const fingerprint = createCommandFingerprint(envelope, fingerprintKeyring);
     const scope = and(
       eq(commandInbox.organizationId, hub.organizationId),
       eq(commandInbox.unitId, hub.unitId),
@@ -258,7 +278,17 @@ export class SyncService {
         ),
       )
       .limit(1);
-    if (existingReceipt && existingReceipt.fingerprint !== fingerprint) {
+    if (
+      existingReceipt &&
+      !verifyCommandFingerprint(
+        envelope,
+        {
+          keyVersion: existingReceipt.fingerprintKeyVersion,
+          digest: existingReceipt.fingerprint,
+        },
+        fingerprintKeyring,
+      )
+    ) {
       return {
         replayed: true,
         result: { status: "rejected", code: this.idempotencyConflictCode(event) },
@@ -267,6 +297,7 @@ export class SyncService {
     if (existingReceipt && existingReceipt.status !== "quarantined") {
       return { replayed: true, result: existingReceipt.result as Record<string, unknown> };
     }
+    const effectivePreconditionCode = existingReceipt?.preconditionCode ?? preconditionCode;
 
     const aggregateScope = and(
       eq(aggregateSequenceStates.organizationId, hub.organizationId),
@@ -296,7 +327,7 @@ export class SyncService {
         receivedSequence: event.aggregateSequence,
       } as const;
       await this.database.db.insert(commandInbox).values({
-        ...this.receiptValues(envelope, fingerprint),
+        ...this.receiptValues(envelope, fingerprint, effectivePreconditionCode),
         status: "quarantined",
         result,
       });
@@ -311,9 +342,23 @@ export class SyncService {
           expectedSequence,
           receivedSequence: event.aggregateSequence,
           lastCommandId: sequenceState?.lastCommandId ?? null,
+          preconditionCode: effectivePreconditionCode,
         },
       });
       return { replayed: false, result };
+    }
+
+    if (effectivePreconditionCode !== null) {
+      const result = { status: "rejected", code: effectivePreconditionCode } as const;
+      await this.advanceSequence(event, hub);
+      await this.completeReceipt(
+        existingReceipt !== undefined,
+        envelope,
+        fingerprint,
+        result,
+        effectivePreconditionCode,
+      );
+      return { replayed: existingReceipt !== undefined, result };
     }
 
     const redactedPayload = redactOperationalSecrets(event.payload) as Record<string, unknown>;
@@ -338,10 +383,11 @@ export class SyncService {
         .select()
         .from(operationalCommands)
         .where(
-          or(
-            eq(operationalCommands.id, event.commandId),
-            and(
-              eq(operationalCommands.unitId, hub.unitId),
+          and(
+            eq(operationalCommands.organizationId, hub.organizationId),
+            eq(operationalCommands.unitId, hub.unitId),
+            or(
+              eq(operationalCommands.id, event.commandId),
               eq(operationalCommands.idempotencyKey, event.idempotencyKey),
             ),
           ),
@@ -359,7 +405,7 @@ export class SyncService {
       const result = { status: "applied", effect: { legacyReplay: true } } as const;
       await this.advanceSequence(event, hub);
       await this.database.db.insert(commandInbox).values({
-        ...this.receiptValues(envelope, fingerprint),
+        ...this.receiptValues(envelope, fingerprint, null),
         status: "applied",
         result,
         completedAt: new Date(),
@@ -385,7 +431,13 @@ export class SyncService {
           ),
         );
       await this.advanceSequence(event, hub);
-      await this.completeReceipt(existingReceipt !== undefined, envelope, fingerprint, result);
+      await this.completeReceipt(
+        existingReceipt !== undefined,
+        envelope,
+        fingerprint,
+        result,
+        null,
+      );
       return { replayed: existingReceipt !== undefined, result };
     }
 
@@ -401,7 +453,7 @@ export class SyncService {
         ),
       );
     await this.advanceSequence(event, hub);
-    await this.completeReceipt(existingReceipt !== undefined, envelope, fingerprint, result);
+    await this.completeReceipt(existingReceipt !== undefined, envelope, fingerprint, result, null);
     await this.database.db.insert(auditEvents).values({
       organizationId: hub.organizationId,
       unitId: hub.unitId,
@@ -442,13 +494,18 @@ export class SyncService {
     return { replayed: existingReceipt !== undefined, result };
   }
 
-  private receiptValues(envelope: CommandEnvelope, fingerprint: string) {
+  private receiptValues(
+    envelope: CommandEnvelope,
+    fingerprint: CommandFingerprint,
+    preconditionCode: string | null,
+  ) {
     return {
       organizationId: envelope.organizationId,
       unitId: envelope.unitId,
       commandId: envelope.commandId,
       idempotencyKey: envelope.idempotencyKey,
-      fingerprint,
+      fingerprintKeyVersion: fingerprint.keyVersion,
+      fingerprint: fingerprint.digest,
       actorIdentityId: envelope.actorId,
       deviceId: envelope.deviceId,
       commandType: envelope.type,
@@ -460,12 +517,8 @@ export class SyncService {
       occurredAt: new Date(envelope.occurredAt),
       receivedAt: new Date(envelope.receivedAt),
       payload: redactOperationalSecrets(envelope.payload) as Record<string, unknown>,
+      preconditionCode,
     };
-  }
-
-  private envelopeFingerprint(envelope: CommandEnvelope) {
-    const { receivedAt: _receivedAt, ...stableEnvelope } = envelope;
-    return createHash("sha256").update(canonicalJson(stableEnvelope)).digest("hex");
   }
 
   private idempotencyConflictCode(event: NormalizedSyncEventInput) {
@@ -510,13 +563,14 @@ export class SyncService {
   private async completeReceipt(
     recovering: boolean,
     envelope: CommandEnvelope,
-    fingerprint: string,
+    fingerprint: CommandFingerprint,
     result: { status: "applied" | "rejected"; [key: string]: unknown },
+    preconditionCode: string | null,
   ) {
     const now = new Date();
     if (!recovering) {
       await this.database.db.insert(commandInbox).values({
-        ...this.receiptValues(envelope, fingerprint),
+        ...this.receiptValues(envelope, fingerprint, preconditionCode),
         status: result.status,
         result,
         completedAt: now,
@@ -525,13 +579,14 @@ export class SyncService {
     }
     await this.database.db
       .update(commandInbox)
-      .set({ status: result.status, result, completedAt: now })
+      .set({ status: result.status, result, preconditionCode, completedAt: now })
       .where(
         and(
           eq(commandInbox.organizationId, envelope.organizationId),
           eq(commandInbox.unitId, envelope.unitId),
           eq(commandInbox.commandId, envelope.commandId),
-          eq(commandInbox.fingerprint, fingerprint),
+          eq(commandInbox.fingerprintKeyVersion, fingerprint.keyVersion),
+          eq(commandInbox.fingerprint, fingerprint.digest),
         ),
       );
     await this.database.db

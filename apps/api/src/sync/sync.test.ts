@@ -13,6 +13,16 @@ describe("edge sync boundaries", () => {
     );
   });
 
+  it("orders composed and decomposed Unicode keys without locale-dependent equality", () => {
+    const composed = "\u00e9";
+    const decomposed = "e\u0301";
+    assert.equal(
+      canonicalJson({ [composed]: 1, [decomposed]: 2, z: 3 }),
+      canonicalJson({ z: 3, [decomposed]: 2, [composed]: 1 }),
+    );
+    assert.notEqual(composed, decomposed);
+  });
+
   it("rejects tenant scope supplied by the edge and oversized batches", () => {
     const base = { protocolVersion: 1, hubVersion: "2.0.0", events: [] };
     assert.equal(syncBatchSchema.safeParse(base).success, true);

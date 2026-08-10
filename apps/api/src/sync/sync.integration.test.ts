@@ -41,6 +41,12 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     context.skip("SYNC_DATABASE_URL not configured");
     return;
   }
+  const previousFingerprintVersion = process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION;
+  const previousFingerprintKeys = process.env.COMMAND_FINGERPRINT_KEYS;
+  process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION = "integration-v1";
+  process.env.COMMAND_FINGERPRINT_KEYS = JSON.stringify({
+    "integration-v1": Buffer.alloc(32, 7).toString("base64url"),
+  });
   process.env.DATABASE_URL = databaseUrl;
   const database = new DatabaseService();
   try {
@@ -111,6 +117,12 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
 
     const eventId = randomUUID();
     const terminalId = randomUUID();
+    await database.db.insert(deviceEnrollments).values({
+      id: terminalId,
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      label: "Terminal A",
+    });
     const event = {
       id: eventId,
       actorId: identity.id,
@@ -148,7 +160,10 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       events: [{ ...event, id: randomUUID(), type: "order.changed" }],
     });
     assert.equal(conflict.rejectedEvents[0]?.code, "IDEMPOTENCY_CONFLICT");
-    const crossTenant = await sync.synchronize(keyB, { ...batch, events: [event] });
+    const crossTenant = await sync.synchronize(keyB, {
+      ...batch,
+      events: [{ ...event, deviceId: hubB.id }],
+    });
     assert.equal(crossTenant.rejectedEvents[0]?.code, "ACTOR_SCOPE_DENIED");
 
     const [category] = await database.db
@@ -513,6 +528,11 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       }),
     );
   } finally {
+    if (previousFingerprintVersion === undefined)
+      delete process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION;
+    else process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION = previousFingerprintVersion;
+    if (previousFingerprintKeys === undefined) delete process.env.COMMAND_FINGERPRINT_KEYS;
+    else process.env.COMMAND_FINGERPRINT_KEYS = previousFingerprintKeys;
     await database.onModuleDestroy();
   }
 });

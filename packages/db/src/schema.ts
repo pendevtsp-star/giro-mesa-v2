@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -501,7 +502,7 @@ export const paymentEvents = pgTable(
 export const operationalCommands = pgTable(
   "operational_commands",
   {
-    id: uuid("id").primaryKey(),
+    id: uuid("id").notNull(),
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -520,7 +521,12 @@ export const operationalCommands = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("operational_command_idempotency_unique").on(table.unitId, table.idempotencyKey),
+    primaryKey({ columns: [table.organizationId, table.unitId, table.id] }),
+    uniqueIndex("operational_command_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
     index("operational_commands_unit_time_idx").on(table.unitId, table.occurredAt),
     foreignKey({
       name: "operational_commands_organization_unit_fk",

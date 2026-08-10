@@ -127,6 +127,7 @@ export class OperationsService {
       .from(operationalCommands)
       .where(
         and(
+          eq(operationalCommands.organizationId, organizationId),
           eq(operationalCommands.unitId, unitId),
           eq(operationalCommands.idempotencyKey, input.idempotencyKey),
         ),
