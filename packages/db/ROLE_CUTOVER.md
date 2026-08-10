@@ -7,8 +7,8 @@ the platform secret store. They must be `NOINHERIT`, `NOSUPERUSER`, and `NOBYPAS
 
 | Group role | Login | Scope |
 | --- | --- | --- |
-| `giromesa_app` | no | Explicit per-table verbs under transaction-local organization/unit context; outbox/audit are insert-only and append-only ledgers/events have no update/delete. |
-| `giromesa_identity` | no | Authentication tables, actor-scoped membership discovery, and new-organization bootstrap. |
+| `giromesa_app` | no | Explicit per-table verbs under transaction-local organization/unit context; outbox/audit are insert-only and append-only ledgers/events have no update/delete. Organization/member bootstrap is excluded. |
+| `giromesa_identity` | no | Authentication tables, actor-scoped membership discovery/invitation acceptance, and new-organization bootstrap. |
 | `giromesa_public` | no | Published commercial catalog, lead forms, approved global outbox topics, and public-menu scope resolution. |
 | `giromesa_internal` | no | Authorizes an internal-key request; tenant DML still runs as `giromesa_app` with the route organization. |
 | `giromesa_worker` | no | Outbox claim/ack and maintenance candidate discovery; tenant work returns to `giromesa_app`. |
@@ -21,6 +21,17 @@ The migration aborts if a newly tenant-scoped table is missing from the verb mat
 currently limited to `pos_product_stations`, the only destructive tenant operation used by the
 application; organizations, role bindings, charges, security events, financial movements and
 ledgers cannot be deleted by `giromesa_app`.
+
+The system-table audit maps current call sites independently by verb: `giromesa_app` can read and
+update organizations but cannot create them; memberships and role bindings are read-only;
+membership invitations are insert-only with column-level SELECT on the generated id required by
+`INSERT ... RETURNING`; onboarding records are read/update; trials are
+read/insert; units and public menus are read-only. Organization, legal-entity, unit, membership,
+role-binding and onboarding bootstrap inserts, plus membership/invitation acceptance updates, are
+owned by `giromesa_identity`. `billing_checkouts`, `provider_customers`, `subscriptions`,
+`legal_entities`, and the currently unused `charges` receive no `giromesa_app` privilege. Adding a
+production call site requires an explicit per-verb grant and a privilege assertion in the same
+change.
 
 ## Provisioning
 

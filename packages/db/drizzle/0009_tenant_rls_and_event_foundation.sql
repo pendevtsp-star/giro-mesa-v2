@@ -155,8 +155,8 @@ DECLARE
   tenant_table record;
   row_scope text;
   tenant_scope text;
-  app_read_insert_tables text[] := ARRAY[
-    'billing_checkouts', 'device_enrollments', 'growth_campaign_deliveries',
+  app_select_tables text[] := ARRAY[
+    'device_enrollments', 'growth_campaign_deliveries',
     'growth_coupon_redemptions', 'growth_coupons', 'growth_customer_consents',
     'growth_customer_segments', 'growth_customers', 'growth_delivery_dispatches',
     'growth_delivery_orders', 'growth_delivery_zones', 'growth_integrations',
@@ -164,7 +164,7 @@ DECLARE
     'growth_loyalty_programs', 'growth_marketing_campaigns', 'growth_marketing_opt_out_tokens',
     'growth_public_api_keys', 'growth_reservations', 'growth_unit_price_overrides',
     'growth_waitlist_entries', 'growth_webhook_endpoints', 'growth_webhook_publications',
-    'hub_commands', 'hub_heartbeats', 'legal_entities', 'management_accounts_payable',
+    'hub_commands', 'hub_heartbeats', 'management_accounts_payable',
     'management_accounts_receivable', 'management_cash_movements', 'management_cash_shifts',
     'management_commission_rules', 'management_commissions', 'management_idempotency',
     'management_inventory_event_lines', 'management_inventory_events',
@@ -176,15 +176,43 @@ DECLARE
     'management_recipe_versions', 'management_reconciliation_entries',
     'management_reconciliation_imports', 'management_schedules', 'management_stock_balances',
     'management_stock_locations', 'management_suppliers', 'management_time_entries',
-    'membership_invitations', 'memberships', 'onboarding_records', 'operational_commands',
+    'memberships', 'onboarding_records', 'operational_commands',
     'pos_allergens', 'pos_catalog_categories', 'pos_dining_rooms', 'pos_dining_tables',
     'pos_idempotency_receipts', 'pos_kds_ticket_items', 'pos_kds_tickets', 'pos_manager_pins',
     'pos_modifier_groups', 'pos_modifier_options', 'pos_operation_approvals',
     'pos_order_item_modifiers', 'pos_order_items', 'pos_orders', 'pos_product_allergens',
     'pos_product_availability', 'pos_product_modifier_groups', 'pos_product_prices',
     'pos_product_stations', 'pos_production_stations', 'pos_products', 'pos_recipe_components',
-    'pos_tab_events', 'pos_tabs', 'provider_customers', 'public_menus', 'subscriptions',
-    'trials', 'units'
+    'pos_tab_events', 'pos_tabs', 'public_menus', 'trials', 'units'
+  ];
+  app_insert_tables text[] := ARRAY[
+    'device_enrollments', 'growth_campaign_deliveries', 'growth_coupon_redemptions',
+    'growth_coupons', 'growth_customer_consents', 'growth_customer_segments',
+    'growth_customers', 'growth_delivery_dispatches', 'growth_delivery_orders',
+    'growth_delivery_zones', 'growth_integrations', 'growth_inventory_transfer_lines',
+    'growth_inventory_transfers', 'growth_loyalty_ledger', 'growth_loyalty_programs',
+    'growth_marketing_campaigns', 'growth_marketing_opt_out_tokens', 'growth_public_api_keys',
+    'growth_reservations', 'growth_unit_price_overrides', 'growth_waitlist_entries',
+    'growth_webhook_endpoints', 'growth_webhook_publications', 'hub_commands', 'hub_heartbeats',
+    'management_accounts_payable', 'management_accounts_receivable',
+    'management_cash_movements', 'management_cash_shifts', 'management_commission_rules',
+    'management_commissions', 'management_idempotency', 'management_inventory_event_lines',
+    'management_inventory_events', 'management_inventory_items',
+    'management_inventory_movements', 'management_payable_payments', 'management_people',
+    'management_purchase_order_items', 'management_purchase_orders',
+    'management_purchase_receipt_lines', 'management_purchase_receipts',
+    'management_receivable_lines', 'management_receivable_payments',
+    'management_recipe_components', 'management_recipe_versions',
+    'management_reconciliation_entries', 'management_reconciliation_imports',
+    'management_schedules', 'management_stock_balances', 'management_stock_locations',
+    'management_suppliers', 'management_time_entries', 'membership_invitations',
+    'operational_commands', 'pos_allergens', 'pos_catalog_categories', 'pos_dining_rooms',
+    'pos_dining_tables', 'pos_idempotency_receipts', 'pos_kds_ticket_items', 'pos_kds_tickets',
+    'pos_manager_pins', 'pos_modifier_groups', 'pos_modifier_options',
+    'pos_operation_approvals', 'pos_order_item_modifiers', 'pos_order_items', 'pos_orders',
+    'pos_product_allergens', 'pos_product_availability', 'pos_product_modifier_groups',
+    'pos_product_prices', 'pos_product_stations', 'pos_production_stations', 'pos_products',
+    'pos_recipe_components', 'pos_tab_events', 'pos_tabs', 'trials'
   ];
   app_update_tables text[] := ARRAY[
     'device_enrollments', 'growth_campaign_deliveries', 'growth_customers',
@@ -195,12 +223,15 @@ DECLARE
     'management_accounts_receivable', 'management_cash_shifts',
     'management_purchase_order_items', 'management_purchase_orders',
     'management_recipe_versions', 'management_reconciliation_entries',
-    'management_stock_balances', 'management_time_entries', 'membership_invitations',
-    'memberships', 'onboarding_records', 'operational_commands', 'pos_dining_tables',
+    'management_stock_balances', 'management_time_entries', 'onboarding_records',
+    'operational_commands', 'pos_dining_tables',
     'pos_kds_tickets', 'pos_manager_pins', 'pos_order_item_modifiers', 'pos_order_items',
     'pos_orders', 'pos_product_availability', 'pos_product_prices', 'pos_tabs'
   ];
   app_delete_tables text[] := ARRAY['pos_product_stations'];
+  app_no_privilege_tables text[] := ARRAY[
+    'billing_checkouts', 'legal_entities', 'provider_customers', 'subscriptions'
+  ];
 BEGIN
   FOR tenant_table IN
     SELECT
@@ -236,16 +267,28 @@ BEGIN
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table.table_name);
     IF tenant_table.table_name = 'audit_events' THEN
       EXECUTE 'GRANT INSERT ON public.audit_events TO giromesa_app';
-    ELSIF tenant_table.table_name = ANY(app_read_insert_tables) THEN
-      EXECUTE format('GRANT SELECT, INSERT ON public.%I TO giromesa_app', tenant_table.table_name);
     ELSE
-      RAISE EXCEPTION 'tenant privilege matrix is missing table %', tenant_table.table_name;
+      IF tenant_table.table_name = ANY(app_select_tables) THEN
+        EXECUTE format('GRANT SELECT ON public.%I TO giromesa_app', tenant_table.table_name);
+      END IF;
+      IF tenant_table.table_name = ANY(app_insert_tables) THEN
+        EXECUTE format('GRANT INSERT ON public.%I TO giromesa_app', tenant_table.table_name);
+      END IF;
     END IF;
     IF tenant_table.table_name = ANY(app_update_tables) THEN
       EXECUTE format('GRANT UPDATE ON public.%I TO giromesa_app', tenant_table.table_name);
     END IF;
     IF tenant_table.table_name = ANY(app_delete_tables) THEN
       EXECUTE format('GRANT DELETE ON public.%I TO giromesa_app', tenant_table.table_name);
+    END IF;
+    IF tenant_table.table_name <> 'audit_events'
+      AND NOT tenant_table.table_name = ANY(app_select_tables)
+      AND NOT tenant_table.table_name = ANY(app_insert_tables)
+      AND NOT tenant_table.table_name = ANY(app_update_tables)
+      AND NOT tenant_table.table_name = ANY(app_delete_tables)
+      AND NOT tenant_table.table_name = ANY(app_no_privilege_tables)
+    THEN
+      RAISE EXCEPTION 'tenant privilege matrix is missing table %', tenant_table.table_name;
     END IF;
     EXECUTE format(
       'GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO giromesa_legacy_transition',
@@ -267,9 +310,12 @@ BEGIN
 END
 $$;--> statement-breakpoint
 
+-- The tenant invite flow uses INSERT ... RETURNING id; it does not need table-wide invitation reads.
+GRANT SELECT (id) ON public.membership_invitations TO giromesa_app;--> statement-breakpoint
+
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.organizations FORCE ROW LEVEL SECURITY;--> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON public.organizations TO giromesa_app;--> statement-breakpoint
+GRANT SELECT, UPDATE ON public.organizations TO giromesa_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.organizations TO giromesa_legacy_transition;--> statement-breakpoint
 CREATE POLICY giromesa_legacy_transition ON public.organizations AS PERMISSIVE FOR ALL TO giromesa_legacy_transition
   USING (true) WITH CHECK (true);--> statement-breakpoint
@@ -291,7 +337,7 @@ CREATE POLICY giromesa_tenant_scope ON public.organizations AS PERMISSIVE FOR AL
 
 ALTER TABLE public.role_bindings ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.role_bindings FORCE ROW LEVEL SECURITY;--> statement-breakpoint
-GRANT SELECT, INSERT ON public.role_bindings TO giromesa_app;--> statement-breakpoint
+GRANT SELECT ON public.role_bindings TO giromesa_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.role_bindings TO giromesa_legacy_transition;--> statement-breakpoint
 CREATE POLICY giromesa_legacy_transition ON public.role_bindings AS PERMISSIVE FOR ALL TO giromesa_legacy_transition
   USING (true) WITH CHECK (true);--> statement-breakpoint
@@ -327,7 +373,6 @@ CREATE POLICY giromesa_tenant_scope ON public.role_bindings AS PERMISSIVE FOR AL
 
 ALTER TABLE public.charges ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.charges FORCE ROW LEVEL SECURITY;--> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON public.charges TO giromesa_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.charges TO giromesa_legacy_transition;--> statement-breakpoint
 CREATE POLICY giromesa_legacy_transition ON public.charges AS PERMISSIVE FOR ALL TO giromesa_legacy_transition
   USING (true) WITH CHECK (true);--> statement-breakpoint
@@ -400,9 +445,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
 TO giromesa_identity;--> statement-breakpoint
 GRANT SELECT ON public.memberships, public.role_bindings, public.organizations, public.units,
   public.membership_invitations TO giromesa_identity;--> statement-breakpoint
-GRANT INSERT, UPDATE ON public.membership_invitations TO giromesa_identity;--> statement-breakpoint
-GRANT SELECT, INSERT ON public.organizations, public.legal_entities, public.units,
+GRANT INSERT ON public.organizations, public.legal_entities, public.units,
   public.memberships, public.role_bindings, public.onboarding_records TO giromesa_identity;--> statement-breakpoint
+GRANT UPDATE ON public.memberships, public.membership_invitations TO giromesa_identity;--> statement-breakpoint
 GRANT INSERT ON public.audit_events, public.outbox_events TO giromesa_identity;--> statement-breakpoint
 
 CREATE POLICY giromesa_identity_scope ON public.memberships FOR SELECT TO giromesa_identity
