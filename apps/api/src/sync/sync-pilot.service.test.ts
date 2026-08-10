@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { DatabaseService } from "../database/database.module.js";
 import type { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
 import { stableOperationalId } from "./stable-operational-id.js";
-import type { SyncEventInput } from "./sync.schemas.js";
-import { SyncPilotService } from "./sync-pilot.service.js";
+import type { NormalizedSyncEventInput, SyncEventInput } from "./sync.schemas.js";
+import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const unitId = "22222222-2222-4222-8222-222222222222";
@@ -50,46 +51,105 @@ function event(type: string, action: string, data: Record<string, unknown>): Syn
   };
 }
 
+function orderedEvent(
+  type: string,
+  action: string,
+  data: Record<string, unknown>,
+  overrides: Partial<NormalizedSyncEventInput> = {},
+): NormalizedSyncEventInput {
+  const aggregateId = action === "open-tab" ? commandId : entityId;
+  return {
+    commandId,
+    id: commandId,
+    actorId,
+    deviceId,
+    idempotencyKey: `edge:${commandId}`,
+    type,
+    payload: { kind: "pilot.mutation", action, data },
+    aggregate: { type: "tab", id: aggregateId },
+    occupancyEpoch: "88888888-8888-4888-8888-888888888888",
+    resourceVersion: 1,
+    version: 1,
+    aggregateSequence: 1,
+    occurredAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function conflictDatabase(
+  states: Array<
+    undefined | { id?: string; occupancyEpoch?: string; resourceVersion?: number; status?: string }
+  >,
+): DatabaseService {
+  let stateIndex = 0;
+  return {
+    db: {
+      execute: async () => {
+        const state = states[stateIndex++];
+        if (!state) return [];
+        return [
+          {
+            id: state.id ?? entityId,
+            occupancy_epoch: state.occupancyEpoch ?? "88888888-8888-4888-8888-888888888888",
+            resource_version: state.resourceVersion ?? 1,
+            status: state.status ?? "open",
+          },
+        ];
+      },
+    },
+  } as unknown as DatabaseService;
+}
+
 describe("offline pilot replay", () => {
   it("routes every shift operation through the real POS service with stable generated ids", async () => {
     const calls: Call[] = [];
-    const service = new SyncPilotService(mockPilot(calls));
+    const service = new SyncPilotService(
+      mockPilot(calls),
+      conflictDatabase([
+        undefined,
+        { id: commandId },
+        ...Array.from({ length: 10 }, () => [{ id: entityId }, { id: entityId }]).flat(),
+      ]),
+    );
     const approval = {
       approverMembershipId: secondId,
       pin: "1234",
       reason: "Ajuste autorizado",
     };
     const cases = [
-      event("pos.tab.open_requested", "open-tab", {
-        body: { label: "Balcão", guestCount: 1 },
-      }),
-      event("pos.order.create_requested", "create-order", {
+      orderedEvent(
+        "pos.tab.open_requested",
+        "open-tab",
+        { body: { label: "Balcão", guestCount: 1 } },
+        { resourceVersion: 0, version: 0 },
+      ),
+      orderedEvent("pos.order.create_requested", "create-order", {
         tabId: entityId,
         body: { items: [{ productId: secondId, quantity: 1, modifierOptionIds: [] }] },
       }),
-      event("pos.order.send_requested", "send-order", { orderId: entityId }),
-      event("pos.tab.transfer_requested", "transfer-tab", {
+      orderedEvent("pos.order.send_requested", "send-order", { orderId: entityId }),
+      orderedEvent("pos.tab.transfer_requested", "transfer-tab", {
         tabId: entityId,
         body: { tableId: secondId, reason: "Troca solicitada" },
       }),
-      event("pos.tabs.merge_requested", "merge-tabs", {
+      orderedEvent("pos.tabs.merge_requested", "merge-tabs", {
         body: { targetTabId: entityId, sourceTabIds: [secondId] },
       }),
-      event("pos.tab.split_requested", "split-tab", {
+      orderedEvent("pos.tab.split_requested", "split-tab", {
         tabId: entityId,
         body: { label: "Conta separada", items: [{ orderItemId: secondId, quantity: 1 }] },
       }),
-      event("pos.tab.service_charge_requested", "service-charge", {
+      orderedEvent("pos.tab.service_charge_requested", "service-charge", {
         tabId: entityId,
         basisPoints: 1_000,
       }),
-      event("pos.tab.tip_requested", "tip", { tabId: entityId, tipCents: 500 }),
-      event("pos.item.discount_requested", "discount-item", {
+      orderedEvent("pos.tab.tip_requested", "tip", { tabId: entityId, tipCents: 500 }),
+      orderedEvent("pos.item.discount_requested", "discount-item", {
         itemId: entityId,
         body: { discountCents: 200, approval },
       }),
-      event("pos.item.cancel_requested", "cancel-item", { itemId: entityId, approval }),
-      event("pos.kds.transition_requested", "transition-kds", {
+      orderedEvent("pos.item.cancel_requested", "cancel-item", { itemId: entityId, approval }),
+      orderedEvent("pos.kds.transition_requested", "transition-kds", {
         ticketId: entityId,
         state: "preparing",
       }),
@@ -148,7 +208,7 @@ describe("offline pilot replay", () => {
 
   it("rejects a mismatched event type before calling POS", async () => {
     const calls: Call[] = [];
-    const service = new SyncPilotService(mockPilot(calls));
+    const service = new SyncPilotService(mockPilot(calls), conflictDatabase([]));
     await assert.rejects(() =>
       service.apply(
         event("pos.tab.tip_requested", "service-charge", {
@@ -159,5 +219,84 @@ describe("offline pilot replay", () => {
       ),
     );
     assert.equal(calls.length, 0);
+  });
+
+  it("rejects a same-epoch stale destructive command before calling POS", async () => {
+    const calls: Call[] = [];
+    const service = new SyncPilotService(
+      mockPilot(calls),
+      conflictDatabase([{ resourceVersion: 2 }]),
+    );
+    await assert.rejects(
+      () =>
+        service.apply(
+          orderedEvent("pos.tab.transfer_requested", "transfer-tab", {
+            tabId: entityId,
+            body: { tableId: secondId, reason: "Troca solicitada" },
+          }),
+          { organizationId, unitId },
+        ),
+      (error: unknown) =>
+        error instanceof PilotConflictException &&
+        error.decision.outcome === "reject" &&
+        error.decision.code === "RESOURCE_VERSION_CONFLICT",
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("quarantines an occupancy epoch mismatch for reconciliation", async () => {
+    const service = new SyncPilotService(
+      mockPilot([]),
+      conflictDatabase([{ occupancyEpoch: "99999999-9999-4999-8999-999999999999" }]),
+    );
+    await assert.rejects(
+      () =>
+        service.apply(
+          orderedEvent("pos.order.create_requested", "create-order", {
+            tabId: entityId,
+            body: { items: [{ productId: secondId, quantity: 1, modifierOptionIds: [] }] },
+          }),
+          { organizationId, unitId },
+        ),
+      (error: unknown) =>
+        error instanceof PilotConflictException &&
+        error.decision.outcome === "reconcile" &&
+        error.decision.code === "OCCUPANCY_EPOCH_MISMATCH",
+    );
+  });
+
+  it("keeps N-1 destructive commands behind the conservative legacy policy", async () => {
+    const calls: Call[] = [];
+    const service = new SyncPilotService(mockPilot(calls), conflictDatabase([{ id: entityId }]));
+    await assert.rejects(
+      () =>
+        service.apply(
+          event("pos.tab.transfer_requested", "transfer-tab", {
+            tabId: entityId,
+            body: { tableId: secondId, reason: "Troca solicitada" },
+          }),
+          { organizationId, unitId },
+        ),
+      (error: unknown) =>
+        error instanceof PilotConflictException &&
+        error.decision.code === "LEGACY_PRECONDITION_REQUIRED",
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("rejects unknown pilot commands instead of applying a no-op", async () => {
+    const service = new SyncPilotService(mockPilot([]), conflictDatabase([]));
+    await assert.rejects(
+      () =>
+        service.apply(
+          orderedEvent("pos.future.magic_requested", "future-magic", {}, {
+            aggregate: { type: "tab", id: entityId },
+          }),
+          { organizationId, unitId },
+        ),
+      (error: unknown) =>
+        error instanceof PilotConflictException &&
+        error.decision.code === "UNSUPPORTED_PILOT_COMMAND",
+    );
   });
 });

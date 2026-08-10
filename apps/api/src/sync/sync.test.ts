@@ -3,7 +3,8 @@ import { describe, it } from "node:test";
 import { stableOperationalId } from "./stable-operational-id.js";
 import { hubSyncKey } from "./sync.controller.js";
 import { normalizeSyncBatch, syncBatchSchema } from "./sync.schemas.js";
-import { canonicalJson, redactOperationalSecrets } from "./sync.service.js";
+import { canonicalJson, pilotConflictResult, redactOperationalSecrets } from "./sync.service.js";
+import { PilotConflictException } from "./sync-pilot.service.js";
 
 describe("edge sync boundaries", () => {
   it("canonicalizes JSON for idempotency without depending on property order", () => {
@@ -133,5 +134,26 @@ describe("edge sync boundaries", () => {
     });
     assert.equal(JSON.stringify(redacted).includes("1234"), false);
     assert.equal(JSON.stringify(redacted).includes("[redacted]"), true);
+  });
+
+  it("preserves reconciliation outcomes instead of flattening them into rejection", () => {
+    assert.deepEqual(
+      pilotConflictResult(
+        new PilotConflictException({
+          outcome: "reconcile",
+          code: "OCCUPANCY_EPOCH_MISMATCH",
+        }),
+      ),
+      { status: "quarantined", code: "OCCUPANCY_EPOCH_MISMATCH" },
+    );
+    assert.deepEqual(
+      pilotConflictResult(
+        new PilotConflictException({
+          outcome: "reject",
+          code: "RESOURCE_VERSION_CONFLICT",
+        }),
+      ),
+      { status: "rejected", code: "RESOURCE_VERSION_CONFLICT" },
+    );
   });
 });

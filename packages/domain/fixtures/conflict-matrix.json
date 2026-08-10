@@ -1,0 +1,102 @@
+[
+  {
+    "name": "current transfer applies",
+    "input": { "commandType": "pos.tab.transfer_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "apply", "code": "CURRENT_RESOURCE" }
+  },
+  {
+    "name": "same-epoch stale transfer rejects",
+    "input": { "commandType": "pos.tab.transfer_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 3, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "RESOURCE_VERSION_CONFLICT" }
+  },
+  {
+    "name": "stale order addition is explicitly commutative",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 3, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "apply", "code": "COMMUTATIVE_STALE_VERSION" }
+  },
+  {
+    "name": "occupancy epoch mismatch reconciles",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-old", "currentEpoch": "epoch-new", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reconcile", "code": "OCCUPANCY_EPOCH_MISMATCH" }
+  },
+  {
+    "name": "future resource version reconciles",
+    "input": { "commandType": "pos.item.cancel_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 6, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reconcile", "code": "RESOURCE_VERSION_AHEAD" }
+  },
+  {
+    "name": "terminal cancellation rejects",
+    "input": { "commandType": "pos.item.cancel_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "terminal" },
+    "expected": { "outcome": "reject", "code": "RESOURCE_TERMINAL" }
+  },
+  {
+    "name": "closing is outside pilot and rejects",
+    "input": { "commandType": "order.closed", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "UNSUPPORTED_PILOT_COMMAND" }
+  },
+  {
+    "name": "payment is outside pilot and rejects",
+    "input": { "commandType": "payment.completed", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "UNSUPPORTED_PILOT_COMMAND" }
+  },
+  {
+    "name": "price mutation is outside pilot and cannot reprice",
+    "input": { "commandType": "catalog.price_changed", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "UNSUPPORTED_PILOT_COMMAND" }
+  },
+  {
+    "name": "identical duplicate replays",
+    "input": { "commandType": "pos.tab.tip_requested", "delivery": "duplicate-identical", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "replay", "code": "IDENTICAL_COMMAND_REPLAY" }
+  },
+  {
+    "name": "divergent duplicate rejects",
+    "input": { "commandType": "pos.tab.tip_requested", "delivery": "duplicate-divergent", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "IDEMPOTENCY_KEY_REUSED" }
+  },
+  {
+    "name": "aggregate gap reconciles",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "gap", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reconcile", "code": "AGGREGATE_SEQUENCE_GAP" }
+  },
+  {
+    "name": "reordered aggregate reconciles",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "reordered", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reconcile", "code": "AGGREGATE_SEQUENCE_OUT_OF_ORDER" }
+  },
+  {
+    "name": "gap recovery applies when sequence becomes current",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "apply", "code": "CURRENT_RESOURCE" }
+  },
+  {
+    "name": "legacy order addition follows conservative commutative policy",
+    "input": { "commandType": "pos.order.create_requested", "delivery": "new", "protocol": "legacy", "commandEpoch": null, "currentEpoch": "epoch-a", "commandVersion": null, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "apply", "code": "LEGACY_COMMUTATIVE_ADD" }
+  },
+  {
+    "name": "legacy transfer requires ordered preconditions",
+    "input": { "commandType": "pos.tab.transfer_requested", "delivery": "new", "protocol": "legacy", "commandEpoch": null, "currentEpoch": "epoch-a", "commandVersion": null, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "LEGACY_PRECONDITION_REQUIRED" }
+  },
+  {
+    "name": "legacy open creates only a missing resource",
+    "input": { "commandType": "pos.tab.open_requested", "delivery": "new", "protocol": "legacy", "commandEpoch": null, "currentEpoch": null, "commandVersion": null, "currentVersion": null, "resourceState": "missing" },
+    "expected": { "outcome": "apply", "code": "LEGACY_SAFE_CREATE" }
+  },
+  {
+    "name": "ordered open creates at version zero",
+    "input": { "commandType": "pos.tab.open_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": null, "commandVersion": 0, "currentVersion": null, "resourceState": "missing" },
+    "expected": { "outcome": "apply", "code": "INITIAL_RESOURCE" }
+  },
+  {
+    "name": "unknown command rejects",
+    "input": { "commandType": "pos.future.magic_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "active" },
+    "expected": { "outcome": "reject", "code": "UNSUPPORTED_PILOT_COMMAND" }
+  },
+  {
+    "name": "terminal send order rejects",
+    "input": { "commandType": "pos.order.send_requested", "delivery": "new", "protocol": "ordered", "commandEpoch": "epoch-a", "currentEpoch": "epoch-a", "commandVersion": 4, "currentVersion": 4, "resourceState": "terminal" },
+    "expected": { "outcome": "reject", "code": "RESOURCE_TERMINAL" }
+  }
+]

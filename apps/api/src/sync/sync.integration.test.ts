@@ -51,7 +51,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
   const database = new DatabaseService();
   try {
     const pos = new PilotPosService(database, new ScopeService(database));
-    const pilot = new SyncPilotService(pos);
+    const pilot = new SyncPilotService(pos, database);
     const sync = new SyncService(database, pilot, new OperationalSnapshotService(database));
     const suffix = randomBytes(6).toString("hex");
     const [organizationA, organizationB] = await database.db
@@ -219,23 +219,33 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       .returning();
     assert.ok(transferTable);
 
-    const commandBase = {
+    const openId = randomUUID();
+    const occupancyEpoch = randomUUID();
+    const orderedCommand = (commandId: string, aggregateSequence: number, resourceVersion: number) => ({
+      commandId,
       actorId: identity.id,
       deviceId: terminalId,
-      version: 1,
+      aggregate: { type: "tab", id: openId },
+      occupancyEpoch,
+      resourceVersion,
+      aggregateSequence,
       occurredAt: new Date().toISOString(),
+    });
+    const orderedBatchBase = {
+      protocolVersion: 2 as const,
+      hubVersion: "2.0.0",
+      metadata: {},
+      acknowledgedCommandIds: [],
     };
-    const openId = randomUUID();
     const orderId = randomUUID();
     const sendId = randomUUID();
     const ticketId = stableOperationalId(sendId, "kds-ticket", station.id);
     const transitionId = randomUUID();
     const operationalBatch = {
-      ...batch,
+      ...orderedBatchBase,
       events: [
         {
-          ...commandBase,
-          id: openId,
+          ...orderedCommand(openId, 1, 0),
           idempotencyKey: `offline-open-${suffix}`,
           type: "pos.tab.open_requested",
           payload: {
@@ -245,8 +255,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: orderId,
+          ...orderedCommand(orderId, 2, 1),
           idempotencyKey: `offline-order-${suffix}`,
           type: "pos.order.create_requested",
           payload: {
@@ -261,8 +270,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: sendId,
+          ...orderedCommand(sendId, 3, 2),
           idempotencyKey: `offline-send-${suffix}`,
           type: "pos.order.send_requested",
           payload: {
@@ -272,8 +280,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: transitionId,
+          ...orderedCommand(transitionId, 4, 3),
           idempotencyKey: `offline-kds-${suffix}`,
           type: "pos.kds.transition_requested",
           payload: {
@@ -288,11 +295,11 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const appliedReplay = await sync.synchronize(keyA, operationalBatch);
     assert.deepEqual(
       applied.acceptedEventIds,
-      operationalBatch.events.map((item) => item.id),
+      operationalBatch.events.map((item) => item.commandId),
     );
     assert.deepEqual(
       appliedReplay.acceptedEventIds,
-      operationalBatch.events.map((item) => item.id),
+      operationalBatch.events.map((item) => item.commandId),
     );
     assert.equal(
       (await database.db.select().from(posTabs).where(eq(posTabs.id, openId))).length,
@@ -321,11 +328,10 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const discountId = randomUUID();
     const cancelId = randomUUID();
     const advancedBatch = {
-      ...batch,
+      ...orderedBatchBase,
       events: [
         {
-          ...commandBase,
-          id: transferId,
+          ...orderedCommand(transferId, 5, 4),
           idempotencyKey: `offline-transfer-${suffix}`,
           type: "pos.tab.transfer_requested",
           payload: {
@@ -338,8 +344,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: splitId,
+          ...orderedCommand(splitId, 6, 5),
           idempotencyKey: `offline-split-${suffix}`,
           type: "pos.tab.split_requested",
           payload: {
@@ -355,8 +360,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: mergeId,
+          ...orderedCommand(mergeId, 7, 6),
           idempotencyKey: `offline-merge-${suffix}`,
           type: "pos.tabs.merge_requested",
           payload: {
@@ -366,8 +370,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: serviceChargeId,
+          ...orderedCommand(serviceChargeId, 8, 7),
           idempotencyKey: `offline-service-${suffix}`,
           type: "pos.tab.service_charge_requested",
           payload: {
@@ -377,8 +380,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: tipId,
+          ...orderedCommand(tipId, 9, 8),
           idempotencyKey: `offline-tip-${suffix}`,
           type: "pos.tab.tip_requested",
           payload: {
@@ -388,8 +390,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: discountId,
+          ...orderedCommand(discountId, 10, 9),
           idempotencyKey: `offline-discount-${suffix}`,
           type: "pos.item.discount_requested",
           payload: {
@@ -409,8 +410,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           },
         },
         {
-          ...commandBase,
-          id: cancelId,
+          ...orderedCommand(cancelId, 11, 10),
           idempotencyKey: `offline-cancel-${suffix}`,
           type: "pos.item.cancel_requested",
           payload: {
@@ -432,11 +432,11 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const advancedReplay = await sync.synchronize(keyA, advancedBatch);
     assert.deepEqual(
       advanced.acceptedEventIds,
-      advancedBatch.events.map((item) => item.id),
+      advancedBatch.events.map((item) => item.commandId),
     );
     assert.deepEqual(
       advancedReplay.acceptedEventIds,
-      advancedBatch.events.map((item) => item.id),
+      advancedBatch.events.map((item) => item.commandId),
     );
     assert.equal(
       (await database.db.select().from(posTabs).where(eq(posTabs.id, splitId))).length,
@@ -473,11 +473,10 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     });
 
     const conflictResult = await sync.synchronize(keyA, {
-      ...batch,
+      ...orderedBatchBase,
       events: [
         {
-          ...commandBase,
-          id: randomUUID(),
+          ...orderedCommand(randomUUID(), 12, 11),
           idempotencyKey: `offline-conflict-${suffix}`,
           type: "pos.kds.transition_requested",
           payload: {

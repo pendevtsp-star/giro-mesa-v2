@@ -36,7 +36,7 @@ import {
   normalizeSyncBatch,
   type SyncBatchInput,
 } from "./sync.schemas.js";
-import { SyncPilotService } from "./sync-pilot.service.js";
+import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";
 
 const hashSyncKey = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -51,6 +51,19 @@ export function redactOperationalSecrets(value: unknown): unknown {
       key === "pin" ? "[redacted]" : redactOperationalSecrets(entry),
     ]),
   );
+}
+
+export function pilotConflictResult(error: unknown) {
+  if (!(error instanceof PilotConflictException)) return null;
+  switch (error.decision.outcome) {
+    case "reject":
+      return { status: "rejected", code: error.decision.code } as const;
+    case "reconcile":
+      return { status: "quarantined", code: error.decision.code } as const;
+    case "apply":
+    case "replay":
+      return null;
+  }
 }
 
 @Injectable()
@@ -377,7 +390,19 @@ export class SyncService {
     try {
       effect = await this.pilot.apply(event, hub);
     } catch (error) {
-      const code = this.deterministicRejection(error);
+      const matrixResult = pilotConflictResult(error);
+      if (matrixResult?.status === "quarantined") {
+        await this.quarantinePilotConflict(
+          existingReceipt !== undefined,
+          envelope,
+          fingerprint,
+          matrixResult,
+          event,
+          hub,
+        );
+        return { replayed: existingReceipt !== undefined, result: matrixResult };
+      }
+      const code = matrixResult?.code ?? this.deterministicRejection(error);
       if (!code) throw error;
       const result = { status: "rejected", code } as const;
       await this.database.db
@@ -452,6 +477,60 @@ export class SyncService {
       },
     });
     return { replayed: existingReceipt !== undefined, result };
+  }
+
+  private async quarantinePilotConflict(
+    recovering: boolean,
+    envelope: CommandEnvelope,
+    fingerprint: CommandFingerprint,
+    result: { status: "quarantined"; code: string },
+    event: NormalizedSyncEventInput,
+    hub: { organizationId: string; unitId: string },
+  ) {
+    const evidence = {
+      aggregate: event.aggregate,
+      occupancyEpoch: event.occupancyEpoch,
+      resourceVersion: event.resourceVersion,
+      aggregateSequence: event.aggregateSequence,
+      source: "conflict-matrix",
+    };
+    if (!recovering) {
+      await this.database.db.insert(commandInbox).values({
+        ...this.receiptValues(envelope, fingerprint, null),
+        status: "quarantined",
+        result,
+      });
+      await this.database.db.insert(commandQuarantine).values({
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        commandId: event.commandId,
+        reason: result.code,
+        evidence,
+      });
+      return;
+    }
+    await this.database.db
+      .update(commandInbox)
+      .set({ status: "quarantined", result, completedAt: null })
+      .where(
+        and(
+          eq(commandInbox.organizationId, hub.organizationId),
+          eq(commandInbox.unitId, hub.unitId),
+          eq(commandInbox.commandId, event.commandId),
+          eq(commandInbox.status, "quarantined"),
+        ),
+      );
+    await this.database.db
+      .update(commandQuarantine)
+      .set({ reason: result.code, evidence })
+      .where(
+        and(
+          eq(commandQuarantine.organizationId, hub.organizationId),
+          eq(commandQuarantine.unitId, hub.unitId),
+          eq(commandQuarantine.commandId, event.commandId),
+          eq(commandQuarantine.status, "pending"),
+        ),
+      );
   }
 
   private async commandPrecondition(
