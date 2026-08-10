@@ -68,8 +68,8 @@ services:
     <<: *web-service
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-site:${GIROMESA_IMAGE_TAG:-pilot}
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api-pilot.giromesa.com.br}
-      NEXT_PUBLIC_OPS_URL: ${NEXT_PUBLIC_OPS_URL:-https://app-pilot.giromesa.com.br}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.giromesa.com.br}
+      NEXT_PUBLIC_OPS_URL: ${NEXT_PUBLIC_OPS_URL:-https://app.giromesa.com.br}
       NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-true}
       NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
     depends_on:
@@ -87,7 +87,7 @@ services:
     <<: *web-service
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-customer:${GIROMESA_IMAGE_TAG:-pilot}
     environment:
-      NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-https://api-pilot.giromesa.com.br}
+      NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-https://api.giromesa.com.br}
       NEXT_PUBLIC_CUSTOMER_API_ENABLED: ${NEXT_PUBLIC_CUSTOMER_API_ENABLED:-true}
       NEXT_PUBLIC_DEMO_HUB_ACK: ${NEXT_PUBLIC_DEMO_HUB_ACK:-false}
       CUSTOMER_QA_DEMO_SLUG: ${CUSTOMER_QA_DEMO_SLUG:-demo}

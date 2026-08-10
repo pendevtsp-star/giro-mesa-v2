@@ -24,7 +24,7 @@ fi
 
 api=https://api.cloudflare.com/client/v4
 headers=(-H "Authorization: Bearer $token" -H "Content-Type: application/json")
-hosts=(pilot.giromesa.com.br menu-pilot.giromesa.com.br app-pilot.giromesa.com.br api-pilot.giromesa.com.br)
+hosts=(app.giromesa.com.br menu.giromesa.com.br api.giromesa.com.br)
 
 zone_response=$(curl --silent --show-error "${headers[@]}" "$api/zones/$zone_id")
 if [[ $(jq -r '.success // false' <<< "$zone_response") != true ]]; then
