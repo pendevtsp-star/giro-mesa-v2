@@ -1596,6 +1596,8 @@ export class PilotPosService {
           metadata: { from: ticket.status, to: input.state, orderId: ticket.orderId },
         });
         await tx.insert(outboxEvents).values({
+          organizationId,
+          unitId,
           topic: "pos.kds_transitioned",
           aggregateType: "kds_ticket",
           aggregateId: ticketId,
@@ -1881,6 +1883,8 @@ export class PilotPosService {
       metadata: payload,
     });
     await tx.insert(outboxEvents).values({
+      organizationId,
+      unitId,
       topic: `pos.${type}`,
       aggregateType: "tab",
       aggregateId: tabId,

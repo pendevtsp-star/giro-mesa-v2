@@ -814,3 +814,32 @@ export const growthIntegrations = pgTable(
     }).onDelete("restrict"),
   ],
 );
+
+// RLS is declared in Drizzle as well as in the hand-authored policy migration so
+// a later schema generation cannot silently remove the live tenant boundary.
+export const growthTenantTables = [
+  growthCustomers,
+  customerConsents,
+  marketingOptOutTokens,
+  loyaltyPrograms,
+  loyaltyLedger,
+  coupons,
+  couponRedemptions,
+  customerSegments,
+  marketingCampaigns,
+  campaignDeliveries,
+  reservations,
+  waitlistEntries,
+  deliveryZones,
+  deliveryOrders,
+  deliveryDispatches,
+  unitPriceOverrides,
+  inventoryTransfers,
+  inventoryTransferLines,
+  publicApiKeys,
+  webhookEndpoints,
+  webhookPublications,
+  growthIntegrations,
+] as const;
+
+for (const table of growthTenantTables) table.enableRLS();

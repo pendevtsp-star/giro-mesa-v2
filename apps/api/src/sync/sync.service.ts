@@ -268,6 +268,8 @@ export class SyncService {
         metadata: { type: event.type, deviceId: event.deviceId, hubId: hub.id },
       });
       await tx.insert(outboxEvents).values({
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
         topic: "operational.command_processed",
         aggregateType: "operational_command",
         aggregateId: event.id,

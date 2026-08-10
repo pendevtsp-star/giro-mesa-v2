@@ -21,9 +21,11 @@ import {
 } from "@nestjs/common";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { OrganizationsService } from "./organizations.service.js";
 
 @UseGuards(SessionGuard)
+@DatabaseContext("identity")
 @Controller(["api/v1/organizations", "v1/organizations"])
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}

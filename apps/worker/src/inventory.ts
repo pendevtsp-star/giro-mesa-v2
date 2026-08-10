@@ -212,6 +212,8 @@ async function recordIssue(
     .insert(outboxEvents)
     .values({
       id: issueId,
+      organizationId: request.organizationId,
+      unitId: request.unitId,
       topic: "management.inventory_attention_required",
       aggregateType: "inventory_consumption_issue",
       aggregateId: issueId,

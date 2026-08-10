@@ -8,9 +8,11 @@ import {
 } from "@giromesa/contracts";
 import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
 
+@DatabaseContext("public-menu")
 @Controller(["api/v1/public/menus", "public/v1/menus"])
 export class PublicMenuController {
   constructor(

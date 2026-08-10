@@ -188,6 +188,8 @@ export class ManagementService {
       .insert(auditEvents)
       .values({ organizationId, unitId, actorIdentityId, action, entityType, entityId, metadata });
     await tx.insert(outboxEvents).values({
+      organizationId,
+      unitId,
       topic: action,
       aggregateType: entityType,
       aggregateId: entityId,

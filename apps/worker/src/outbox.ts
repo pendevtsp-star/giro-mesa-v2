@@ -2,6 +2,9 @@ import {
   auditEvents,
   campaignDeliveries,
   createDatabase,
+  currentTenantDatabase,
+  type Database,
+  type DatabaseConnection,
   growthCustomers,
   identities,
   marketingCampaigns,
@@ -10,6 +13,8 @@ import {
   outboxEvents,
   webhookEndpoints,
   webhookPublications,
+  withTenantContext,
+  withWorkerContext,
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
 import { and, eq, sql } from "drizzle-orm";
@@ -27,6 +32,8 @@ export interface ClaimedOutboxEvent extends Record<string, unknown> {
   topic: string;
   aggregate_type: string;
   aggregate_id: string;
+  organization_id: string | null;
+  unit_id: string | null;
   payload: Record<string, unknown>;
   attempts: number;
 }
@@ -81,10 +88,18 @@ function activeExpiry(payload: Record<string, unknown>) {
 }
 
 export class OutboxWorker {
-  private readonly connection = createDatabase();
+  private readonly connection: DatabaseConnection;
+
+  constructor(connection: DatabaseConnection = createDatabase()) {
+    this.connection = connection;
+  }
+
+  private get db() {
+    return currentTenantDatabase() ?? this.connection.db;
+  }
 
   async runOnce(limit = 25) {
-    const rows = await this.connection.db.transaction(async (tx) => {
+    const rows = await withWorkerContext(this.connection, async (tx) => {
       const result = await tx.execute<ClaimedOutboxEvent>(sql`
         with claimed as (
           select id
@@ -100,7 +115,8 @@ export class OutboxWorker {
         set locked_at = now(), attempts = events.attempts + 1
         from claimed
         where events.id = claimed.id
-        returning events.id, events.topic, events.aggregate_type, events.aggregate_id, events.payload, events.attempts
+        returning events.id, events.organization_id, events.unit_id, events.topic,
+          events.aggregate_type, events.aggregate_id, events.payload, events.attempts
       `);
       return [...result];
     });
@@ -110,49 +126,57 @@ export class OutboxWorker {
   }
 
   async expireAccessWindows() {
-    return this.connection.db.transaction(async (tx) => {
-      const expiredTrials = await tx.execute<{ id: string }>(sql`
-        update organizations as organization
-        set billing_state = 'restricted',
-            billing_state_changed_at = now(),
-            operational_closure_until = now() + interval '12 hours',
-            updated_at = now()
-        from trials as trial
-        where trial.organization_id = organization.id
-          and organization.billing_state = 'trial_active'
+    const candidates = await withWorkerContext(this.connection, async (tx) => {
+      const rows = await tx.execute<{ id: string; reason: string }>(sql`
+        select organization.id,
+          case when organization.billing_state = 'trial_active'
+            then 'trial_expired' else 'grace_expired' end as reason
+        from organizations as organization
+        left join trials as trial on trial.organization_id = organization.id
+        where (
+          organization.billing_state = 'trial_active'
           and trial.ends_at <= now()
-        returning organization.id
+        ) or (
+          organization.billing_state = 'grace'
+          and organization.billing_state_changed_at <= now() - interval '7 days'
+        )
       `);
-      const expiredGrace = await tx.execute<{ id: string }>(sql`
-        update organizations
-        set billing_state = 'restricted',
-            billing_state_changed_at = now(),
-            operational_closure_until = now() + interval '12 hours',
-            updated_at = now()
-        where billing_state = 'grace'
-          and billing_state_changed_at <= now() - interval '7 days'
-        returning id
-      `);
-      const changed = [
-        ...[...expiredTrials].map((row) => ({ ...row, reason: "trial_expired" })),
-        ...[...expiredGrace].map((row) => ({ ...row, reason: "grace_expired" })),
-      ];
-      for (const item of changed) {
-        await tx.insert(auditEvents).values({
-          organizationId: item.id,
-          action: `billing.${item.reason}`,
-          entityType: "organization",
-          entityId: item.id,
-        });
-        await tx.insert(outboxEvents).values({
-          topic: "billing.state_changed",
-          aggregateType: "organization",
-          aggregateId: item.id,
-          payload: { organizationId: item.id, to: "restricted", event: item.reason },
-        });
-      }
-      return changed.length;
+      return [...rows];
     });
+    let changed = 0;
+    for (const item of candidates) {
+      changed += await withTenantContext(
+        this.connection,
+        { source: "job", organizationId: item.id },
+        async (tx) => {
+          const updated = await tx.execute<{ id: string }>(sql`
+            update organizations
+            set billing_state = 'restricted',
+                billing_state_changed_at = now(),
+                operational_closure_until = now() + interval '12 hours',
+                updated_at = now()
+            where id = ${item.id} and billing_state in ('trial_active', 'grace')
+            returning id
+          `);
+          if ([...updated].length === 0) return 0;
+          await tx.insert(auditEvents).values({
+            organizationId: item.id,
+            action: `billing.${item.reason}`,
+            entityType: "organization",
+            entityId: item.id,
+          });
+          await tx.insert(outboxEvents).values({
+            organizationId: item.id,
+            topic: "billing.state_changed",
+            aggregateType: "organization",
+            aggregateId: item.id,
+            payload: { organizationId: item.id, to: "restricted", event: item.reason },
+          });
+          return 1;
+        },
+      );
+    }
+    return changed;
   }
 
   async close() {
@@ -161,41 +185,51 @@ export class OutboxWorker {
 
   private async process(event: ClaimedOutboxEvent) {
     try {
-      await this.dispatch(event);
-      await this.connection.db.execute(
-        sql`update outbox_events set processed_at = now(), locked_at = null, last_error = null where id = ${event.id}`,
+      if (event.organization_id) {
+        await withTenantContext(
+          this.connection,
+          {
+            source: "job",
+            organizationId: event.organization_id,
+            unitId: event.unit_id,
+          },
+          () => this.dispatch(event),
+        );
+      } else {
+        await withWorkerContext(this.connection, () => this.dispatch(event));
+      }
+      await withWorkerContext(this.connection, (tx) =>
+        tx.execute(
+          sql`update outbox_events set processed_at = now(), locked_at = null, last_error = null where id = ${event.id}`,
+        ),
       );
     } catch (error) {
       const message =
         error instanceof Error ? error.message.slice(0, 2_000) : "Unknown worker error";
       if (error instanceof EmailDeliveryError && !error.retryable) {
-        await this.connection.db.transaction(async (tx) => {
+        await withWorkerContext(this.connection, async (tx) => {
           await tx.execute(sql`
             update outbox_events
             set processed_at = now(), locked_at = null, last_error = ${`DEAD_LETTER:${message}`}
             where id = ${event.id}
           `);
-          await tx.insert(auditEvents).values({
-            action: "outbox.delivery_dead_lettered",
-            entityType: "outbox_event",
-            entityId: event.id,
-            metadata: { topic: event.topic, code: error.code },
-          });
         });
         return;
       }
       const delaySeconds = retryDelaySeconds(event.attempts);
-      await this.connection.db.execute(sql`
-        update outbox_events
-        set locked_at = null, last_error = ${message}, available_at = now() + (${delaySeconds} * interval '1 second')
-        where id = ${event.id}
-      `);
+      await withWorkerContext(this.connection, (tx) =>
+        tx.execute(sql`
+          update outbox_events
+          set locked_at = null, last_error = ${message}, available_at = now() + (${delaySeconds} * interval '1 second')
+          where id = ${event.id}
+        `),
+      );
     }
   }
 
   private async dispatch(event: ClaimedOutboxEvent) {
     if (event.topic === "pos.order.sent") {
-      const result = await consumeOrderSentInventory(this.connection.db, event);
+      const result = await consumeOrderSentInventory(this.db as Database, event);
       if (result.retryRequired) {
         throw new InventoryConsumptionError(
           `INVENTORY_ATTENTION_RETRY:${result.issueCodes.join(",")}`,
@@ -238,7 +272,7 @@ export class OutboxWorker {
       throw new EmailDeliveryError("EMAIL_EVENT_CONTEXT_INVALID", false);
     }
     activeExpiry(event.payload);
-    const [identity] = await this.connection.db
+    const [identity] = await this.db
       .select({ displayName: identities.displayName, email: identities.email })
       .from(identities)
       .where(eq(identities.id, event.aggregate_id))
@@ -283,7 +317,7 @@ export class OutboxWorker {
       throw new EmailDeliveryError("EMAIL_EVENT_CONTEXT_INVALID", false);
     }
     activeExpiry(event.payload);
-    const [invitation] = await this.connection.db
+    const [invitation] = await this.db
       .select({
         acceptedAt: membershipInvitations.acceptedAt,
         email: membershipInvitations.email,
@@ -344,7 +378,7 @@ export class OutboxWorker {
     const campaignId = requiredUuid(event.payload, "campaignId");
     const customerId = requiredUuid(event.payload, "customerId");
     const requestedChannel = requiredString(event.payload, "channel");
-    const [row] = await this.connection.db
+    const [row] = await this.db
       .select({
         campaignChannel: marketingCampaigns.channel,
         campaignContent: marketingCampaigns.content,
@@ -393,7 +427,7 @@ export class OutboxWorker {
       throw new EmailDeliveryError("CAMPAIGN_CHANNEL_UNSUPPORTED", false);
     }
     if (!row.customerOptIn || row.customerArchivedAt || !row.customerEmail) {
-      await this.connection.db
+      await this.db
         .update(campaignDeliveries)
         .set({
           status: "skipped",
@@ -423,7 +457,7 @@ export class OutboxWorker {
     }
     const configuration = emailProviderConfiguration();
     const optOutUrl = `${configuration.appUrl}/cancelar-comunicacoes?token=${encodeURIComponent(optOutToken)}`;
-    await this.connection.db
+    await this.db
       .update(marketingCampaigns)
       .set({ status: "sending", updatedAt: new Date() })
       .where(and(eq(marketingCampaigns.id, campaignId), eq(marketingCampaigns.status, "queued")));
@@ -451,7 +485,7 @@ export class OutboxWorker {
         },
         { configuration },
       );
-      await this.connection.db
+      await this.db
         .update(campaignDeliveries)
         .set({
           status: "sent",
@@ -464,7 +498,7 @@ export class OutboxWorker {
       await this.finalizeCampaign(campaignId);
     } catch (error) {
       if (error instanceof EmailDeliveryError) {
-        await this.connection.db
+        await this.db
           .update(campaignDeliveries)
           .set({
             status: error.retryable ? "pending" : "failed",
@@ -479,7 +513,7 @@ export class OutboxWorker {
   }
 
   private async failCampaignDelivery(deliveryId: string, campaignId: string, code: string) {
-    await this.connection.db
+    await this.db
       .update(campaignDeliveries)
       .set({ status: "failed", errorCode: code, updatedAt: new Date() })
       .where(eq(campaignDeliveries.id, deliveryId));
@@ -487,7 +521,7 @@ export class OutboxWorker {
   }
 
   private async finalizeCampaign(campaignId: string) {
-    const [summary] = await this.connection.db
+    const [summary] = await this.db
       .select({
         failed: sql<number>`count(*) filter (where ${campaignDeliveries.status} = 'failed')`,
         pending: sql<number>`count(*) filter (where ${campaignDeliveries.status} = 'pending')`,
@@ -496,7 +530,7 @@ export class OutboxWorker {
       .where(eq(campaignDeliveries.campaignId, campaignId));
     if (!summary || Number(summary.pending) > 0) return;
     const failed = Number(summary.failed) > 0;
-    await this.connection.db
+    await this.db
       .update(marketingCampaigns)
       .set({
         status: failed ? "failed" : "sent",
@@ -514,7 +548,7 @@ export class OutboxWorker {
     ) {
       throw new WebhookDeliveryError("WEBHOOK_DELIVERY_CONTEXT_INVALID");
     }
-    const [publication] = await this.connection.db
+    const [publication] = await this.db
       .select({
         aggregateId: webhookPublications.aggregateId,
         aggregateType: webhookPublications.aggregateType,
@@ -532,7 +566,7 @@ export class OutboxWorker {
         ),
       )
       .limit(1);
-    const [endpoint] = await this.connection.db
+    const [endpoint] = await this.db
       .select({
         active: webhookEndpoints.active,
         eventTypes: webhookEndpoints.eventTypes,

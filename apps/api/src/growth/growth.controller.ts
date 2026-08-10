@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import {
   type ApiKeyInput,
   apiKeySchema,
@@ -456,6 +457,7 @@ export class GrowthPublicController {
   }
 }
 
+@DatabaseContext("public-menu")
 @Controller(["api/v1/public/menus/:slug", "public/v1/menus/:slug"])
 export class GrowthPublicMenuController {
   constructor(private readonly growth: GrowthService) {}

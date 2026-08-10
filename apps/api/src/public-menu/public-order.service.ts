@@ -477,6 +477,8 @@ export class PublicOrderService {
         },
       });
       await tx.insert(outboxEvents).values({
+        organizationId: menu.organizationId,
+        unitId: menu.unitId,
         topic: "pos.order.sent",
         aggregateType: "tab",
         aggregateId: tab.id,
@@ -489,6 +491,8 @@ export class PublicOrderService {
         },
       });
       await tx.insert(outboxEvents).values({
+        organizationId: menu.organizationId,
+        unitId: menu.unitId,
         topic: "growth.public_order_created",
         aggregateType: "growth_delivery_order",
         aggregateId: delivery.id,

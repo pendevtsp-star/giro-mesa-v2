@@ -26,7 +26,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { shapeOrganizationScopes } from "./organization-scopes.js";
 import { ScopeService } from "./scope.service.js";
@@ -48,6 +48,9 @@ export class OrganizationsService {
           .values({ ...input, billingState: "onboarding" })
           .returning();
         if (!organization) throw new Error("Organization was not created");
+        await tx.execute(
+          sql`select set_config('app.bootstrap_organization_id', ${organization.id}, true)`,
+        );
         const [legalEntity] = await tx
           .insert(legalEntities)
           .values({
@@ -85,6 +88,8 @@ export class OrganizationsService {
           entityId: organization.id,
         });
         await tx.insert(outboxEvents).values({
+          organizationId: organization.id,
+          unitId: unit.id,
           topic: "organization.created",
           aggregateType: "organization",
           aggregateId: organization.id,
@@ -252,6 +257,8 @@ export class OrganizationsService {
       .returning({ id: membershipInvitations.id });
     if (!invitation) throw new Error("Invitation was not created");
     await this.database.db.insert(outboxEvents).values({
+      organizationId,
+      unitId: input.unitId ?? null,
       topic: "membership.invited",
       aggregateType: "membership_invitation",
       aggregateId: invitation.id,

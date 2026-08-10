@@ -1,6 +1,6 @@
 {
-  "id": "2e979763-e57d-4343-aad2-73594b56e14e",
-  "prevId": "d2ae92da-ed70-45c0-b119-fd90aeca0726",
+  "id": "0967f074-0d67-46c5-b1c8-a5b0a2829a04",
+  "prevId": "2e979763-e57d-4343-aad2-73594b56e14e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -204,7 +204,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_coupon_redemptions": {
       "name": "growth_coupon_redemptions",
@@ -437,7 +437,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_coupons": {
       "name": "growth_coupons",
@@ -637,7 +637,7 @@
           "value": "\"growth_coupons\".\"type\" <> 'percentage' or \"growth_coupons\".\"value\" <= 10000"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_customer_consents": {
       "name": "growth_customer_consents",
@@ -802,7 +802,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_customer_segments": {
       "name": "growth_customer_segments",
@@ -906,7 +906,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_delivery_dispatches": {
       "name": "growth_delivery_dispatches",
@@ -1068,7 +1068,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_delivery_orders": {
       "name": "growth_delivery_orders",
@@ -1398,7 +1398,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_delivery_zones": {
       "name": "growth_delivery_zones",
@@ -1523,7 +1523,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_customers": {
       "name": "growth_customers",
@@ -1701,7 +1701,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_integrations": {
       "name": "growth_integrations",
@@ -1843,7 +1843,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_inventory_transfer_lines": {
       "name": "growth_inventory_transfer_lines",
@@ -1956,7 +1956,7 @@
           "value": "\"growth_inventory_transfer_lines\".\"quantity\" > 0"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_inventory_transfers": {
       "name": "growth_inventory_transfers",
@@ -2152,7 +2152,7 @@
           "value": "\"growth_inventory_transfers\".\"origin_unit_id\" <> \"growth_inventory_transfers\".\"destination_unit_id\""
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_loyalty_ledger": {
       "name": "growth_loyalty_ledger",
@@ -2439,7 +2439,7 @@
           "value": "\"growth_loyalty_ledger\".\"amount\" <> 0"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_loyalty_programs": {
       "name": "growth_loyalty_programs",
@@ -2567,7 +2567,7 @@
           "value": "\"growth_loyalty_programs\".\"minimum_order_cents\" >= 0"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_marketing_campaigns": {
       "name": "growth_marketing_campaigns",
@@ -2783,7 +2783,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_marketing_opt_out_tokens": {
       "name": "growth_marketing_opt_out_tokens",
@@ -2898,7 +2898,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_public_api_keys": {
       "name": "growth_public_api_keys",
@@ -3044,7 +3044,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_reservations": {
       "name": "growth_reservations",
@@ -3240,7 +3240,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_unit_price_overrides": {
       "name": "growth_unit_price_overrides",
@@ -3343,7 +3343,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_waitlist_entries": {
       "name": "growth_waitlist_entries",
@@ -3532,7 +3532,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_webhook_endpoints": {
       "name": "growth_webhook_endpoints",
@@ -3647,7 +3647,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.growth_webhook_publications": {
       "name": "growth_webhook_publications",
@@ -3746,7 +3746,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.management_accounts_payable": {
       "name": "management_accounts_payable",
@@ -13216,6 +13216,18 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_id": {
+          "name": "unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "topic": {
           "name": "topic",
           "type": "varchar(120)",
@@ -13301,9 +13313,72 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "outbox_organization_idx": {
+          "name": "outbox_organization_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "outbox_events_organization_id_organizations_id_fk": {
+          "name": "outbox_events_organization_id_organizations_id_fk",
+          "tableFrom": "outbox_events",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "outbox_events_unit_id_units_id_fk": {
+          "name": "outbox_events_unit_id_units_id_fk",
+          "tableFrom": "outbox_events",
+          "tableTo": "units",
+          "columnsFrom": [
+            "unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "outbox_events_organization_unit_fk": {
+          "name": "outbox_events_organization_unit_fk",
+          "tableFrom": "outbox_events",
+          "tableTo": "units",
+          "columnsFrom": [
+            "organization_id",
+            "unit_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

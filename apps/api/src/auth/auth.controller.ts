@@ -23,6 +23,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { AuthService } from "./auth.service.js";
 import {
   beginGoogleOAuth,
@@ -51,6 +52,7 @@ import {
   shortLivedAuthCookieOptions,
 } from "./session-cookie.js";
 
+@DatabaseContext("identity")
 @Controller(["api/v1/auth", "v1/auth", "public/v1/auth"])
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

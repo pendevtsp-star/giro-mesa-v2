@@ -160,6 +160,7 @@ export class OnboardingService {
         metadata: { planSlug: input.planSlug, endsAt: window.endsAt.toISOString() },
       });
       await tx.insert(outboxEvents).values({
+        organizationId,
         topic: "trial.activated",
         aggregateType: "trial",
         aggregateId: trial.id,

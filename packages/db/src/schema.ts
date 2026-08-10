@@ -553,6 +553,10 @@ export const outboxEvents = pgTable(
   "outbox_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "cascade" }),
     topic: varchar("topic", { length: 120 }).notNull(),
     aggregateType: varchar("aggregate_type", { length: 80 }).notNull(),
     aggregateId: varchar("aggregate_id", { length: 160 }).notNull(),
@@ -564,7 +568,15 @@ export const outboxEvents = pgTable(
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("outbox_pending_idx").on(table.processedAt, table.availableAt)],
+  (table) => [
+    index("outbox_pending_idx").on(table.processedAt, table.availableAt),
+    index("outbox_organization_idx").on(table.organizationId, table.createdAt),
+    foreignKey({
+      name: "outbox_events_organization_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
 );
 
 export const hubHeartbeats = pgTable(

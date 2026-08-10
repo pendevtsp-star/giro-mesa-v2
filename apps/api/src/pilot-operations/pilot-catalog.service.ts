@@ -300,6 +300,8 @@ export class PilotCatalogService {
         metadata: { priceCents: input.priceCents },
       });
       await tx.insert(outboxEvents).values({
+        organizationId,
+        unitId,
         topic: "pos.catalog_changed",
         aggregateType: "product",
         aggregateId: product.id,
@@ -376,6 +378,8 @@ export class PilotCatalogService {
         metadata: { priceCents: input.priceCents, available: input.available },
       });
       await tx.insert(outboxEvents).values({
+        organizationId,
+        unitId,
         topic: "pos.catalog_changed",
         aggregateType: "product",
         aggregateId: productId,

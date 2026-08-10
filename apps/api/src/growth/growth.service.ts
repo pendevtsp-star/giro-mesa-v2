@@ -147,7 +147,12 @@ export class GrowthService {
     aggregateId: string,
     payload: Record<string, unknown>,
   ) {
-    await tx.insert(outboxEvents).values({ topic, aggregateType, aggregateId, payload });
+    const organizationId =
+      typeof payload.organizationId === "string" ? payload.organizationId : null;
+    const unitId = typeof payload.unitId === "string" ? payload.unitId : null;
+    await tx
+      .insert(outboxEvents)
+      .values({ organizationId, unitId, topic, aggregateType, aggregateId, payload });
   }
 
   private async customer(organizationId: string, customerId: string) {

@@ -89,6 +89,7 @@ export class BillingService {
         metadata: { from: organization.state, to: next },
       });
       await tx.insert(outboxEvents).values({
+        organizationId,
         topic: "billing.state_changed",
         aggregateType: "organization",
         aggregateId: organizationId,
