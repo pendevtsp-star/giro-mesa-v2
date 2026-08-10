@@ -8,6 +8,7 @@ read_key() {
   local key=$1 line value
   line=$(grep -m1 -E "^${key}=" "$legacy_env" || true)
   value=${line#*=}
+  value=${value//$'\r'/}
   if [[ ${#value} -ge 2 && ${value:0:1} == '"' && ${value: -1} == '"' ]]; then
     value=${value:1:${#value}-2}
   fi
