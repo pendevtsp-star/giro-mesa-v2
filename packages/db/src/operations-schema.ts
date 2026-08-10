@@ -678,3 +678,32 @@ export const posIdempotencyReceipts = pgTable(
     }).onDelete("cascade"),
   ],
 );
+
+export const operationsTenantTables = [
+  posCatalogCategories,
+  posAllergens,
+  posModifierGroups,
+  posModifierOptions,
+  posProducts,
+  posProductAllergens,
+  posProductModifierGroups,
+  posRecipeComponents,
+  posProductionStations,
+  posProductPrices,
+  posProductAvailability,
+  posProductStations,
+  posDiningRooms,
+  posDiningTables,
+  posManagerPins,
+  posTabs,
+  posOrders,
+  posOrderItems,
+  posOrderItemModifiers,
+  posKdsTickets,
+  posKdsTicketItems,
+  posOperationApprovals,
+  posTabEvents,
+  posIdempotencyReceipts,
+] as const;
+
+for (const table of operationsTenantTables) table.enableRLS();

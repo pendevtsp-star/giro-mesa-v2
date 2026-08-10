@@ -64,6 +64,13 @@
       "when": 1786337359433,
       "tag": "0008_final-recipes-and-operations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786392589317,
+      "tag": "0009_tenant_rls_and_event_foundation",
+      "breakpoints": true
     }
   ]
 }

@@ -626,3 +626,29 @@ export const hubCommands = pgTable(
     }).onDelete("cascade"),
   ],
 );
+
+// Keep Drizzle's schema snapshot aligned with the RLS migration. Indirectly scoped
+// tables (role bindings and charges) are enforced through their tenant parent.
+export const baseTenantTables = [
+  organizations,
+  legalEntities,
+  units,
+  memberships,
+  roleBindings,
+  membershipInvitations,
+  deviceEnrollments,
+  onboardingRecords,
+  trials,
+  publicMenus,
+  providerCustomers,
+  billingCheckouts,
+  subscriptions,
+  charges,
+  operationalCommands,
+  auditEvents,
+  outboxEvents,
+  hubHeartbeats,
+  hubCommands,
+] as const;
+
+for (const table of baseTenantTables) table.enableRLS();

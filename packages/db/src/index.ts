@@ -9,12 +9,16 @@ export * from "./growth-schema.js";
 export * from "./management-schema.js";
 export * from "./operations-schema.js";
 export * from "./schema.js";
+export * from "./tenant-context.js";
 
 const schema = { ...baseSchema, ...operationsSchema, ...managementSchema, ...growthSchema };
 
-export function createDatabase(connectionString = process.env.DATABASE_URL) {
+export function createDatabase(
+  connectionString = process.env.DATABASE_URL,
+  options: { max?: number } = {},
+) {
   if (!connectionString) throw new Error("DATABASE_URL is required");
-  const client = postgres(connectionString, { max: 10, prepare: false });
+  const client = postgres(connectionString, { max: options.max ?? 10, prepare: false });
   const db = drizzle(client, { schema });
   return { client, db };
 }

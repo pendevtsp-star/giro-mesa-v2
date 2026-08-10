@@ -1240,3 +1240,36 @@ export const managementIdempotency = pgTable(
     }).onDelete("cascade"),
   ],
 );
+
+export const managementTenantTables = [
+  managementSuppliers,
+  managementStockLocations,
+  managementInventoryItems,
+  managementRecipeVersions,
+  managementRecipeComponents,
+  managementStockBalances,
+  managementInventoryEvents,
+  managementInventoryEventLines,
+  managementInventoryMovements,
+  managementPurchaseOrders,
+  managementPurchaseOrderItems,
+  managementPurchaseReceipts,
+  managementPurchaseReceiptLines,
+  managementAccountsPayable,
+  managementPayablePayments,
+  managementAccountsReceivable,
+  managementReceivableLines,
+  managementCashShifts,
+  managementCashMovements,
+  managementReceivablePayments,
+  managementReconciliationImports,
+  managementReconciliationEntries,
+  managementPeople,
+  managementSchedules,
+  managementTimeEntries,
+  managementCommissionRules,
+  managementCommissions,
+  managementIdempotency,
+] as const;
+
+for (const table of managementTenantTables) table.enableRLS();
