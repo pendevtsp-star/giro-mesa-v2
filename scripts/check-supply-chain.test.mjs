@@ -19,21 +19,26 @@ jobs:
       - run: echo done
 `;
 
-test("rejects GitHub secrets in inline Docker build args", () => {
-  const errors = validateWorkflowBuildArgs(
-    dockerBuildWorkflow("PUBLIC_VALUE=" + "${{" + " secrets.API_TOKEN }}"),
-  );
+const buildArgStyles = [
+  { name: "inline", value: (argument) => argument },
+  { name: "literal", value: (argument) => `|\n            ${argument}` },
+  { name: "folded", value: (argument) => `>\n            ${argument}` },
+  { name: "chomping", value: (argument) => `|-\n            ${argument}` },
+  { name: "sequence", value: (argument) => `\n            - ${argument}` },
+];
 
-  assert.deepEqual(errors, ["workflow Docker build args must not carry GitHub secrets"]);
-});
+for (const style of buildArgStyles) {
+  test(`rejects a GitHub secret in ${style.name} Docker build args`, () => {
+    const errors = validateWorkflowBuildArgs(
+      dockerBuildWorkflow(style.value("PUBLIC_VALUE=" + "${{" + " secrets.API_TOKEN }}")),
+    );
 
-test("rejects sensitive Docker build-arg names in folded, chomping, and list forms", () => {
-  const errors = validateWorkflowBuildArgs(
-    dockerBuildWorkflow(`>-
-            PUBLIC_VALUE=safe
-            - API_TOKEN=forbidden
-            - PASSWORD=also-forbidden`),
-  );
+    assert.deepEqual(errors, ["workflow Docker build args must not carry GitHub secrets"]);
+  });
 
-  assert.deepEqual(errors, ["workflow Docker build args must not use sensitive argument names"]);
-});
+  test(`rejects a sensitive name in ${style.name} Docker build args`, () => {
+    const errors = validateWorkflowBuildArgs(dockerBuildWorkflow(style.value("API_TOKEN=forbidden")));
+
+    assert.deepEqual(errors, ["workflow Docker build args must not use sensitive argument names"]);
+  });
+}
