@@ -11,7 +11,9 @@
     "dev": "node --env-file-if-exists=.env node_modules/turbo/bin/turbo run dev --parallel",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "turbo run test && node --test scripts/check-production-baseline.test.mjs",
+    "test:production-baseline": "node --test scripts/check-production-baseline.test.mjs",
+    "production:baseline": "node scripts/check-production-baseline.mjs",
     "test:e2e": "playwright test",
     "media:capture": "playwright test --config=playwright.media.config.ts",
     "integrations:check": "node --env-file-if-exists=.env scripts/check-integrations.mjs",
@@ -22,6 +24,15 @@
     "db:generate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:generate",
     "db:migrate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:migrate",
     "db:seed": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:seed"
+  },
+  "productionBaseline": {
+    "level": "not-assessed",
+    "artifact": "git:f85fd47d4d3113d21c57871968013e175c2d7a71",
+    "migration": "0008_final-recipes-and-operations",
+    "gateResults": {
+      "automated": "not-run",
+      "external": "not-run"
+    }
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
