@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  activateTrialSchema,
   contactRequestSchema,
   createOrganizationSchema,
   loginRequestSchema,
+  onboardingSelectionSchema,
   operationalCommandSchema,
   publicOrderSchema,
   registerRequestSchema,
@@ -156,5 +158,25 @@ describe("public contracts", () => {
       }).success,
       false,
     );
+  });
+
+  it("requires an explicit plan and unit selection before the activation contract", () => {
+    const unitId = crypto.randomUUID();
+    assert.deepEqual(
+      onboardingSelectionSchema.parse({ planSlug: "operacao", selectedUnitId: unitId }),
+      { planSlug: "operacao", selectedUnitId: unitId, reselect: false },
+    );
+    assert.equal(
+      onboardingSelectionSchema.safeParse({
+        planSlug: "operacao",
+        selectedUnitId: unitId,
+        browserVerified: true,
+      }).success,
+      false,
+    );
+    assert.deepEqual(activateTrialSchema.parse({}), {});
+    assert.deepEqual(activateTrialSchema.parse({ planSlug: "operacao" }), {
+      planSlug: "operacao",
+    });
   });
 });

@@ -145,9 +145,21 @@ export const updateOnboardingSchema = z
     "At least one checklist item is required",
   );
 
-export const activateTrialSchema = z.object({
-  planSlug: z.enum(["operacao", "crescimento", "rede"]),
-});
+export const onboardingSelectionSchema = z
+  .object({
+    planSlug: z.enum(["operacao", "crescimento", "rede"]),
+    selectedUnitId: idSchema,
+    /** Required only when replacing an existing, different selection. */
+    reselect: z.boolean().default(false),
+  })
+  .strict();
+
+export const activateTrialSchema = z
+  .object({
+    /** N-1 compatibility. The value must match the plan pinned before the saga starts. */
+    planSlug: z.enum(["operacao", "crescimento", "rede"]).optional(),
+  })
+  .strict();
 
 export const operationalCommandSchema = z.object({
   id: idSchema,
@@ -312,6 +324,7 @@ export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;
 export type InviteMembershipInput = z.infer<typeof inviteMembershipSchema>;
 export type AcceptMembershipInviteInput = z.infer<typeof acceptMembershipInviteSchema>;
 export type UpdateOnboardingInput = z.infer<typeof updateOnboardingSchema>;
+export type OnboardingSelectionInput = z.infer<typeof onboardingSelectionSchema>;
 export type ActivateTrialInput = z.infer<typeof activateTrialSchema>;
 export type OperationalCommandInput = z.infer<typeof operationalCommandSchema>;
 export type BillingEventInput = z.infer<typeof billingEventSchema>;

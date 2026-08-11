@@ -1268,6 +1268,38 @@ export interface paths {
     patch: operations["OnboardingController_update[1]"];
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/onboarding/selection": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["OnboardingController_select[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/onboarding/selection": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["OnboardingController_select[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/onboarding/activate": {
     parameters: {
       query?: never;
@@ -4512,6 +4544,119 @@ export interface components {
        */
       status: "already_verified";
     };
+    OnboardingPlanResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      slug: "operacao" | "crescimento" | "rede";
+      catalogVersion: number;
+      monthlyPriceCents: number;
+      annualPriceCents: number;
+      includedUnits: number;
+      entitlements: string[];
+    };
+    OnboardingSelectionResponse: {
+      /** Format: uuid */
+      selectedUnitId: string;
+      plan: components["schemas"]["OnboardingPlanResponse"];
+      revision: number;
+      /** Format: date-time */
+      selectedAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProvisioningSummaryResponse: {
+      /** Format: uuid */
+      id: string;
+      state: string;
+      checkpoint: string;
+      attempts: number;
+      lastErrorCode?: Record<string, never> | null;
+      /** Format: date-time */
+      nextRetryAt?: Record<string, never> | null;
+      /** Format: date-time */
+      completedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      failedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    OnboardingResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: date-time */
+      activatedAt?: Record<string, never> | null;
+      items: {
+        [key: string]: unknown;
+      };
+      ready: boolean;
+      missingItems: string[];
+      selection?: components["schemas"]["OnboardingSelectionResponse"] | null;
+      provisioning?: components["schemas"]["ProvisioningSummaryResponse"] | null;
+    };
+    OnboardingApiErrorResponse: {
+      statusCode: number;
+      code: string;
+      message: string;
+      details?: {
+        [key: string]: unknown;
+      };
+    };
+    TrialActivationResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      commercialPlanId: string;
+      /** Format: uuid */
+      provisioningRunId: string;
+      /** Format: uuid */
+      subscriptionId: string;
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+      /** @enum {string} */
+      state: "completed";
+      entitlements: string[];
+    };
+    ProvisioningStepResponse: {
+      step: string;
+      status: string;
+      attempts: number;
+      /** Format: date-time */
+      startedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      completedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      compensatedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProvisioningStatusResponse: {
+      /** Format: uuid */
+      id: string;
+      state: string;
+      checkpoint: string;
+      attempts: number;
+      lastErrorCode?: Record<string, never> | null;
+      /** Format: date-time */
+      nextRetryAt?: Record<string, never> | null;
+      /** Format: date-time */
+      completedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      failedAt?: Record<string, never> | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      steps: components["schemas"]["ProvisioningStepResponse"][];
+    };
   };
   responses: never;
   parameters: never;
@@ -6365,7 +6510,17 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6510,7 +6665,25 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6529,7 +6702,17 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6674,7 +6857,121 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_select[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          planSlug: "operacao" | "crescimento" | "rede";
+          /** Format: uuid */
+          selectedUnitId: string;
+          /** @default false */
+          reselect?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSelectionResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_select[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          planSlug: "operacao" | "crescimento" | "rede";
+          /** Format: uuid */
+          selectedUnitId: string;
+          /** @default false */
+          reselect?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSelectionResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6694,7 +6991,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          planSlug: "operacao" | "crescimento" | "rede";
+          planSlug?: "operacao" | "crescimento" | "rede";
         };
       };
     };
@@ -6703,7 +7000,33 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["TrialActivationResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6723,7 +7046,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          planSlug: "operacao" | "crescimento" | "rede";
+          planSlug?: "operacao" | "crescimento" | "rede";
         };
       };
     };
@@ -6732,7 +7055,33 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["TrialActivationResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6752,7 +7101,17 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ProvisioningStatusResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6772,7 +7131,17 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ProvisioningStatusResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };

@@ -405,17 +405,42 @@ export const commercialPlans = pgTable(
   ],
 );
 
-export const onboardingRecords = pgTable("onboarding_records", {
-  organizationId: uuid("organization_id")
-    .primaryKey()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  checklist: jsonb("checklist").$type<Record<string, unknown>>().notNull().default({}),
-  activatedAt: timestamp("activated_at", { withTimezone: true }),
-  activatedByIdentityId: uuid("activated_by_identity_id").references(() => identities.id, {
-    onDelete: "set null",
-  }),
-  ...timestamps,
-});
+export const onboardingRecords = pgTable(
+  "onboarding_records",
+  {
+    organizationId: uuid("organization_id")
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    checklist: jsonb("checklist").$type<Record<string, unknown>>().notNull().default({}),
+    selectedUnitId: uuid("selected_unit_id"),
+    selectedPlanId: uuid("selected_plan_id").references(() => commercialPlans.id),
+    selectedCatalogVersion: integer("selected_catalog_version"),
+    selectedPlanFingerprint: varchar("selected_plan_fingerprint", { length: 64 }),
+    selectedPlanSnapshot: jsonb("selected_plan_snapshot").$type<Record<string, unknown>>(),
+    selectedByIdentityId: uuid("selected_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    selectedAt: timestamp("selected_at", { withTimezone: true }),
+    selectionRevision: integer("selection_revision").notNull().default(0),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    activatedByIdentityId: uuid("activated_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: "onboarding_records_selected_unit_scope_fk",
+      columns: [table.organizationId, table.selectedUnitId],
+      foreignColumns: [units.organizationId, units.id],
+    }),
+    check("onboarding_selection_revision_check", sql`${table.selectionRevision} >= 0`),
+    check(
+      "onboarding_selection_complete_check",
+      sql`(${table.selectedUnitId} is null and ${table.selectedPlanId} is null and ${table.selectedCatalogVersion} is null and ${table.selectedPlanFingerprint} is null and ${table.selectedPlanSnapshot} is null and ${table.selectedByIdentityId} is null and ${table.selectedAt} is null) or (${table.selectedUnitId} is not null and ${table.selectedPlanId} is not null and ${table.selectedCatalogVersion} is not null and ${table.selectedPlanFingerprint} is not null and ${table.selectedPlanSnapshot} is not null and ${table.selectedByIdentityId} is not null and ${table.selectedAt} is not null and ${table.selectionRevision} > 0)`,
+    ),
+  ],
+);
 
 export const onboardingChecklistItems = pgTable(
   "onboarding_checklist_items",
@@ -462,6 +487,7 @@ export const provisioningRuns = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     planSlug: varchar("plan_slug", { length: 60 }).notNull(),
+    selectedUnitId: uuid("selected_unit_id"),
     pinnedPlanId: uuid("pinned_plan_id").references(() => commercialPlans.id),
     pinnedCatalogVersion: integer("pinned_catalog_version"),
     planFingerprint: varchar("plan_fingerprint", { length: 64 }),
@@ -489,6 +515,11 @@ export const provisioningRuns = pgTable(
     index("provisioning_runs_lease_idx").on(table.state, table.leaseExpiresAt),
     check("provisioning_runs_attempts_check", sql`${table.attempts} >= 0`),
     check("provisioning_runs_lease_version_check", sql`${table.leaseVersion} >= 0`),
+    foreignKey({
+      name: "provisioning_runs_selected_unit_scope_fk",
+      columns: [table.organizationId, table.selectedUnitId],
+      foreignColumns: [units.organizationId, units.id],
+    }),
   ],
 );
 

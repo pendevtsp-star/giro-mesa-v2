@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { readdir, readFile } from "node:fs/promises";
+import { createServer, request as httpRequest } from "node:http";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  auditEvents,
   commercialCatalogVersions,
   commercialPlans,
   createDatabase,
@@ -57,6 +61,41 @@ function applicationUrl(ownerUrl: string, user: string, password: string) {
 
 function errorContains(code: string) {
   return (error: unknown) => JSON.stringify(error).includes(code);
+}
+
+async function waitUntil(
+  predicate: () => Promise<boolean>,
+  timeoutMilliseconds: number,
+  label: string,
+) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMilliseconds: number, label: string) {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), timeoutMilliseconds);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 describe("durable onboarding provisioning", () => {
@@ -174,12 +213,30 @@ describe("durable onboarding provisioning", () => {
         active: true,
         publishedAt: new Date(),
       });
+    }
+    await invoke(
+      ownerIdentityId,
+      organizationId,
+      () =>
+        service?.select(ownerIdentityId, organizationId, {
+          planSlug: "operacao",
+          selectedUnitId: unitId,
+          reselect: false,
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    if (ready) {
       await invoke(
         ownerIdentityId,
         organizationId,
         () =>
           service?.update(ownerIdentityId, organizationId, {
             items: {
+              qr: {
+                status: "not_applicable",
+                waiverReason: "QR dispensado pelo proprietário até a configuração operacional.",
+                evidenceReference: `qr-waiver:${label}`,
+                evidence: { reason: "pilot_without_qr" },
+              },
               fiscalChoice: {
                 status: "verified",
                 evidenceReference: `fiscal-choice:${label}`,
@@ -235,6 +292,52 @@ describe("durable onboarding provisioning", () => {
     await owner.client.unsafe(`drop function if exists ${name}()`);
   }
 
+  async function installSleepTrigger(
+    table: "provisioning_runs" | "subscriptions",
+    organizationId: string,
+    name: string,
+    seconds: number,
+  ) {
+    if (!owner) throw new Error("owner unavailable");
+    await owner.client.unsafe(`
+      create function ${name}() returns trigger language plpgsql as $$
+      begin
+        if new.organization_id = '${organizationId}'::uuid then
+          perform pg_sleep(${seconds});
+        end if;
+        return new;
+      end
+      $$
+    `);
+    await owner.client.unsafe(`
+      create trigger ${name} before insert on ${table}
+      for each row execute function ${name}()
+    `);
+  }
+
+  async function assertForcedOverlap(timeoutMilliseconds = 4_000) {
+    if (!owner) throw new Error("owner unavailable");
+    const ownerConnection = owner;
+    await waitUntil(
+      async () => {
+        const [activity] = await ownerConnection.client<
+          { active: number; advisory_waits: number }[]
+        >`
+          select
+            count(*) filter (where state = 'active')::int active,
+            count(*) filter (where lower(coalesce(wait_event, '')) = 'advisory')::int advisory_waits
+          from pg_stat_activity
+          where datname = current_database()
+            and pid <> pg_backend_pid()
+            and (query like '%provisioning_runs%' or query like '%pg_advisory_xact_lock%')
+        `;
+        return Boolean(activity && activity.active >= 2 && activity.advisory_waits >= 1);
+      },
+      timeoutMilliseconds,
+      "forced onboarding overlap in pg_stat_activity",
+    );
+  }
+
   before(async () => {
     if (!integrationUrl || !admin) return;
     const migrations = (await readdir(migrationsDirectory))
@@ -242,6 +345,8 @@ describe("durable onboarding provisioning", () => {
       .sort();
     const provisioningMigration = migrations.find((file) => file.startsWith("0014_"));
     assert.equal(provisioningMigration, "0014_onboarding_provisioning.sql");
+    const selectionMigration = migrations.find((file) => file.startsWith("0015_"));
+    assert.equal(selectionMigration, "0015_onboarding_selection.sql");
 
     const freshUrl = new URL(integrationUrl);
     freshUrl.pathname = `/${freshDatabaseName}`;
@@ -270,7 +375,9 @@ describe("durable onboarding provisioning", () => {
     await admin.client.unsafe(`create database "${upgradeDatabaseName}"`);
     const migrator = createDatabase(databaseUrl.toString(), { max: 1 });
     try {
-      for (const file of migrations.filter((file) => file !== provisioningMigration)) {
+      for (const file of migrations.filter(
+        (file) => file !== provisioningMigration && file !== selectionMigration,
+      )) {
         await applyMigration(migrator.client, file);
       }
       const legacyOrganizationId = randomUUID();
@@ -283,6 +390,7 @@ describe("durable onboarding provisioning", () => {
         values (${legacyOrganizationId}, '{"business":true,"unit":true}'::jsonb)
       `;
       await applyMigration(migrator.client, provisioningMigration);
+      await applyMigration(migrator.client, selectionMigration);
       const backfill = await migrator.client<{ item: string; status: string; source: string }[]>`
         select item, status::text, source::text
         from onboarding_checklist_items
@@ -417,6 +525,231 @@ describe("durable onboarding provisioning", () => {
     assert.equal(run?.checkpoint, "requested");
   });
 
+  it("rejects browser-only KDS/print readiness and blocks QR without server evidence or owner waiver", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Readiness Proof");
+    await assert.rejects(
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.update(subject.ownerIdentityId, subject.organizationId, {
+            items: {
+              production: {
+                status: "verified",
+                evidenceReference: "browser-kds-check",
+                evidence: { mode: "kds", browserTested: true },
+              },
+            },
+          }) ?? Promise.reject(new Error("service unavailable")),
+      ),
+      errorContains("PRODUCTION_READINESS_NOT_VERIFIED"),
+    );
+    await owner.db
+      .update(onboardingChecklistItems)
+      .set({
+        status: "pending",
+        source: "system",
+        evidenceReference: null,
+        evidence: {},
+        actorIdentityId: null,
+        waiverReason: null,
+        verifiedAt: null,
+      })
+      .where(eq(onboardingChecklistItems.organizationId, subject.organizationId));
+    await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.update(subject.ownerIdentityId, subject.organizationId, {
+          items: {
+            qr: {
+              status: "verified",
+              evidenceReference: "browser-qr-check",
+              evidence: { browserTested: true },
+            },
+          },
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const onboarding = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(subject.ownerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(onboarding.items.qr?.status, "blocked");
+    assert.equal(onboarding.items.qr?.source, "system");
+    assert.deepEqual(onboarding.items.qr?.evidence, {
+      menuPublished: true,
+      tablesConfigured: true,
+      capabilitiesConfigured: false,
+      serverTestPassed: false,
+    });
+  });
+
+  it("pins plan/unit before the saga, exposes all 12 items and returns only allowlisted DTOs", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Projection");
+    const onboarding = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(subject.ownerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(Object.keys(onboarding.items).length, 12);
+    assert.equal(onboarding.items.plan?.status, "verified");
+    assert.equal(onboarding.selection?.selectedUnitId, subject.unitId);
+    const beforeRun = JSON.stringify(onboarding);
+    for (const forbidden of [
+      "leaseOwner",
+      "leaseExpiresAt",
+      "planFingerprint",
+      "planSnapshot",
+      "requestFingerprint",
+      '"response"',
+    ]) {
+      assert.equal(beforeRun.includes(forbidden), false);
+    }
+
+    const activated = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.activate(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          "projection-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const [stored] = await owner.db
+      .select()
+      .from(provisioningRuns)
+      .where(eq(provisioningRuns.organizationId, subject.organizationId));
+    assert.equal(stored?.selectedUnitId, subject.unitId);
+    assert.equal(stored?.pinnedPlanId, onboarding.selection?.plan.id);
+    assert.equal(stored?.pinnedCatalogVersion, onboarding.selection?.plan.catalogVersion);
+    const status = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.provisioningStatus(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          String(activated.provisioningRunId),
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const serialized = JSON.stringify(status);
+    for (const forbidden of [
+      "leaseOwner",
+      "leaseExpiresAt",
+      "planFingerprint",
+      "planSnapshot",
+      "requestFingerprint",
+      '"response"',
+      "resourceId",
+      'checkpoint":{',
+    ]) {
+      assert.equal(serialized.includes(forbidden), false);
+    }
+  });
+
+  it("requires explicit reselection and keeps immutable before/after audit history", async (context) => {
+    if (!owner || !service || !database)
+      return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Audit");
+    const secondUnitId = randomUUID();
+    await owner.db.insert(units).values({
+      id: secondUnitId,
+      organizationId: subject.organizationId,
+      name: "Audit Filial",
+    });
+    await assert.rejects(
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.select(subject.ownerIdentityId, subject.organizationId, {
+            planSlug: "operacao",
+            selectedUnitId: secondUnitId,
+            reselect: false,
+          }) ?? Promise.reject(new Error("service unavailable")),
+      ),
+      errorContains("ONBOARDING_RESELECT_REQUIRED"),
+    );
+    await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.select(subject.ownerIdentityId, subject.organizationId, {
+          planSlug: "operacao",
+          selectedUnitId: secondUnitId,
+          reselect: true,
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const selectedSecondUnit = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(subject.ownerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(selectedSecondUnit.selection?.selectedUnitId, secondUnitId);
+    assert.equal(selectedSecondUnit.items.unit?.status, "verified");
+    assert.equal(selectedSecondUnit.items.catalog?.status, "blocked");
+    assert.equal(selectedSecondUnit.items.tables?.status, "blocked");
+    assert.equal(selectedSecondUnit.items.cashier?.status, "blocked");
+    await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.update(subject.ownerIdentityId, subject.organizationId, {
+          items: {
+            training: {
+              status: "verified",
+              evidenceReference: "audit-training-repeat",
+              evidence: { completed: true, cohort: "B" },
+            },
+          },
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const history = await owner.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.organizationId, subject.organizationId));
+    assert.ok(history.length >= 4);
+    const updateEvent = history.find(
+      (event) =>
+        event.action === "onboarding.updated" &&
+        (event.metadata.after as Record<string, unknown> | undefined)?.training !== undefined,
+    );
+    assert.ok(updateEvent);
+    assert.ok(updateEvent.metadata.before);
+    assert.ok(updateEvent.metadata.after);
+    assert.equal(updateEvent.metadata.actorIdentityId, subject.ownerIdentityId);
+    assert.ok(updateEvent.metadata.occurredAt);
+    await assert.rejects(
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          database?.db
+            .update(auditEvents)
+            .set({ metadata: { overwritten: true } })
+            .where(eq(auditEvents.organizationId, subject.organizationId)) ??
+          Promise.reject(new Error("database unavailable")),
+      ),
+    );
+    const preserved = await owner.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.organizationId, subject.organizationId));
+    assert.equal(preserved.length, history.length);
+    assert.ok(preserved.every((event) => event.metadata.overwritten !== true));
+  });
+
   it("recovers after a committed checkpoint, starts the trial only in the final commit, and replays the response", async (context) => {
     if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
     const subject = await fixture("Recovery");
@@ -519,10 +852,124 @@ describe("durable onboarding provisioning", () => {
     );
   });
 
-  it("serializes distinct concurrent keys to one trial and one effect", async (context) => {
+  it("continues the commit after an HTTP socket abort and replays the stored response", {
+    timeout: 15_000,
+  }, async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Socket Abort");
+    const started = deferred<void>();
+    const finished = deferred<Record<string, unknown>>();
+    const server = createServer(async (_request, response) => {
+      started.resolve(undefined);
+      try {
+        const result = await invoke(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          () =>
+            service?.activate(
+              subject.ownerIdentityId,
+              subject.organizationId,
+              "socket-abort-key-0001",
+              {},
+            ) ?? Promise.reject(new Error("service unavailable")),
+        );
+        finished.resolve(result);
+        if (!response.destroyed) {
+          response.writeHead(201, { "Content-Type": "application/json" });
+          response.end(JSON.stringify(result));
+        }
+      } catch (error) {
+        finished.reject(error);
+        if (!response.destroyed) response.destroy(error as Error);
+      }
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const client = httpRequest({
+      hostname: "127.0.0.1",
+      port: address.port,
+      path: "/activate",
+      method: "POST",
+    });
+    client.on("error", () => undefined);
+    client.end("{}");
+    await withTimeout(started.promise, 2_000, "HTTP handler start");
+    client.destroy();
+    const committed = await withTimeout(finished.promise, 10_000, "commit after socket abort");
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    const replay = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.activate(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          "socket-abort-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    assert.deepEqual(replay, committed);
+    const [counts] = await owner.client<
+      { trials: number; subscriptions: number; outbox: number }[]
+    >`
+        select
+          (select count(*)::int from trials where organization_id = ${subject.organizationId}) trials,
+          (select count(*)::int from subscriptions where organization_id = ${subject.organizationId}) subscriptions,
+          (select count(*)::int from outbox_events where organization_id = ${subject.organizationId} and topic = 'trial.activated') outbox
+      `;
+    assert.deepEqual(counts, { trials: 1, subscriptions: 1, outbox: 1 });
+  });
+
+  it("forces overlapping same-key requests and replays one exact effect", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Same Key Concurrent");
+    const trigger = `task7_same_key_sleep_${suffix.slice(0, 8)}`;
+    await installSleepTrigger("provisioning_runs", subject.organizationId, trigger, 2);
+    const calls = [
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.activate(subject.ownerIdentityId, subject.organizationId, "same-key-0001", {}) ??
+          Promise.reject(new Error("service unavailable")),
+      ),
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.activate(subject.ownerIdentityId, subject.organizationId, "same-key-0001", {}) ??
+          Promise.reject(new Error("service unavailable")),
+      ),
+    ];
+    try {
+      await assertForcedOverlap();
+      const [left, right] = await withTimeout(Promise.all(calls), 12_000, "same-key overlap");
+      assert.deepEqual(left, right);
+    } finally {
+      await Promise.allSettled(calls);
+      await removeFailureTrigger("provisioning_runs", trigger);
+    }
+    const [counts] = await owner.client<
+      { trials: number; subscriptions: number; outbox: number }[]
+    >`
+      select
+        (select count(*)::int from trials where organization_id = ${subject.organizationId}) trials,
+        (select count(*)::int from subscriptions where organization_id = ${subject.organizationId}) subscriptions,
+        (select count(*)::int from outbox_events where organization_id = ${subject.organizationId} and topic = 'trial.activated') outbox
+    `;
+    assert.deepEqual(counts, { trials: 1, subscriptions: 1, outbox: 1 });
+  });
+
+  it("forces overlapping distinct keys to one trial and one effect", async (context) => {
     if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
     const subject = await fixture("Concurrent");
-    const results = await Promise.allSettled([
+    const trigger = `task7_distinct_sleep_${suffix.slice(0, 8)}`;
+    await installSleepTrigger("provisioning_runs", subject.organizationId, trigger, 2);
+    const calls = [
       invoke(
         subject.ownerIdentityId,
         subject.organizationId,
@@ -549,7 +996,15 @@ describe("durable onboarding provisioning", () => {
             },
           ) ?? Promise.reject(new Error("service unavailable")),
       ),
-    ]);
+    ];
+    let results: PromiseSettledResult<unknown>[] = [];
+    try {
+      await assertForcedOverlap();
+      results = await withTimeout(Promise.allSettled(calls), 12_000, "distinct-key overlap");
+    } finally {
+      await Promise.allSettled(calls);
+      await removeFailureTrigger("provisioning_runs", trigger);
+    }
     assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
     assert.equal(results.filter((result) => result.status === "rejected").length, 1);
     const [counts] = await owner.client<
@@ -563,46 +1018,112 @@ describe("durable onboarding provisioning", () => {
     assert.deepEqual(counts, { trials: 1, subscriptions: 1, outbox: 1 });
   });
 
-  it("resumes after a crash-equivalent failure at validation checkpoint", async (context) => {
-    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
-    const subject = await fixture("Checkpoint");
-    const trigger = `task7_subscription_fail_${suffix.slice(0, 10)}`;
-    await installFailureTrigger("subscriptions", subject.organizationId, trigger);
+  it("survives real backend termination, preserves the lease, then reclaims after expiry", {
+    timeout: 60_000,
+  }, async (context) => {
+    if (!owner || !service || !databaseUrl)
+      return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const ownerConnection = owner;
+    const subject = await fixture("Crash Worker");
+    const trigger = `task7_crash_sleep_${suffix.slice(0, 8)}`;
+    await installSleepTrigger("subscriptions", subject.organizationId, trigger, 8);
+    const workerUrl = fileURLToPath(new URL("./provisioning-crash-worker.js", import.meta.url));
+    const child = spawn(
+      process.execPath,
+      [
+        workerUrl,
+        databaseUrl.toString(),
+        subject.ownerIdentityId,
+        subject.organizationId,
+        "crash-worker-key-0001",
+      ],
+      { stdio: "ignore" },
+    );
     try {
-      await assert.rejects(
-        invoke(
-          subject.ownerIdentityId,
-          subject.organizationId,
-          () =>
-            service?.activate(
-              subject.ownerIdentityId,
-              subject.organizationId,
-              "checkpoint-key-0001",
-              {
-                planSlug: "operacao",
-              },
-            ) ?? Promise.reject(new Error("service unavailable")),
-        ),
-        errorContains("PROVISIONING_TRANSIENT_FAILURE"),
+      await waitUntil(
+        async () => {
+          const [run] = await ownerConnection.db
+            .select()
+            .from(provisioningRuns)
+            .where(eq(provisioningRuns.organizationId, subject.organizationId));
+          return Boolean(run?.checkpoint === "validated" && run.leaseOwner && run.leaseExpiresAt);
+        },
+        8_000,
+        "child checkpoint and lease",
+      );
+      const exited = once(child, "exit");
+      assert.equal(child.kill(), true);
+      await withTimeout(
+        exited.then(() => undefined),
+        5_000,
+        "crash worker exit",
       );
     } finally {
+      if (child.exitCode === null) child.kill();
       await removeFailureTrigger("subscriptions", trigger);
     }
-    const [interrupted] = await owner.db
+
+    const [orphaned] = await owner.db
       .select()
       .from(provisioningRuns)
       .where(eq(provisioningRuns.organizationId, subject.organizationId));
-    assert.equal(interrupted?.checkpoint, "validated");
-    assert.equal(interrupted?.state, "retryable_failed");
-    const resumed = await invoke(
-      subject.ownerIdentityId,
-      subject.organizationId,
-      () =>
-        service?.activate(subject.ownerIdentityId, subject.organizationId, "checkpoint-key-0001", {
-          planSlug: "operacao",
-        }) ?? Promise.reject(new Error("service unavailable")),
+    assert.equal(orphaned?.checkpoint, "validated");
+    assert.equal(orphaned?.state, "provisioning");
+    assert.ok(orphaned?.leaseOwner);
+    assert.ok(orphaned?.leaseExpiresAt && orphaned.leaseExpiresAt > new Date());
+    const leaseOwner = orphaned?.leaseOwner;
+    const attempts = orphaned?.attempts;
+    await assert.rejects(
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.activate(
+            subject.ownerIdentityId,
+            subject.organizationId,
+            "crash-worker-key-0001",
+            {},
+          ) ?? Promise.reject(new Error("service unavailable")),
+      ),
+      errorContains("PROVISIONING_IN_PROGRESS"),
+    );
+    const [notStolen] = await owner.db
+      .select()
+      .from(provisioningRuns)
+      .where(eq(provisioningRuns.organizationId, subject.organizationId));
+    assert.equal(notStolen?.leaseOwner, leaseOwner);
+    assert.equal(notStolen?.attempts, attempts);
+
+    const remaining = Math.max(
+      0,
+      (notStolen?.leaseExpiresAt?.getTime() ?? Date.now()) - Date.now() + 100,
+    );
+    await new Promise((resolve) => setTimeout(resolve, remaining));
+    const resumed = await withTimeout(
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.activate(
+            subject.ownerIdentityId,
+            subject.organizationId,
+            "crash-worker-key-0001",
+            {},
+          ) ?? Promise.reject(new Error("service unavailable")),
+      ),
+      10_000,
+      "post-expiry reclaim",
     );
     assert.equal(resumed.state, "completed");
+    const [counts] = await owner.client<
+      { trials: number; subscriptions: number; outbox: number }[]
+    >`
+        select
+          (select count(*)::int from trials where organization_id = ${subject.organizationId}) trials,
+          (select count(*)::int from subscriptions where organization_id = ${subject.organizationId}) subscriptions,
+          (select count(*)::int from outbox_events where organization_id = ${subject.organizationId} and topic = 'trial.activated') outbox
+      `;
+    assert.deepEqual(counts, { trials: 1, subscriptions: 1, outbox: 1 });
   });
 
   it("pins the plan and compensates provisional resources when that exact plan drifts", async (context) => {
@@ -664,6 +1185,12 @@ describe("durable onboarding provisioning", () => {
       .where(eq(subscriptionEntitlements.organizationId, subject.organizationId));
     assert.equal(run?.state, "compensated");
     assert.equal(run?.lastErrorCode, "PLAN_DRIFT");
+    assert.equal((run?.planSnapshot as Record<string, unknown> | null)?.monthlyPriceCents, 14_900);
+    assert.deepEqual((run?.planSnapshot as Record<string, unknown> | null)?.entitlements, [
+      "cashier",
+      "reports",
+      "salon",
+    ]);
     assert.equal(subscription?.state, "canceled");
     assert.ok(entitlements.length > 0 && entitlements.every((entry) => entry.state === "revoked"));
     assert.equal(
@@ -711,12 +1238,10 @@ describe("durable onboarding provisioning", () => {
           }) ?? Promise.reject(new Error("database unavailable")),
       ),
     );
-    await owner.db.insert(onboardingChecklistItems).values({
-      organizationId: tenantB.organizationId,
-      item: "training",
-      status: "in_progress",
-      source: "legacy_import",
-    });
+    await owner.db
+      .update(onboardingChecklistItems)
+      .set({ status: "in_progress", source: "legacy_import" })
+      .where(eq(onboardingChecklistItems.organizationId, tenantB.organizationId));
     await assert.rejects(
       invoke(
         tenantB.ownerIdentityId,
@@ -745,6 +1270,9 @@ describe("durable onboarding provisioning", () => {
         worker_runs: boolean;
         app_subscription_table_insert: boolean;
         app_subscription_run_column_insert: boolean;
+        app_selection_update: boolean;
+        worker_selection_update: boolean;
+        app_audit_update: boolean;
       }[]
     >`
       select
@@ -755,7 +1283,10 @@ describe("durable onboarding provisioning", () => {
         has_table_privilege('giromesa_app', 'provisioning_runs', 'select,insert,update') app_runs,
         has_table_privilege('giromesa_worker', 'provisioning_runs', 'select') worker_runs,
         has_table_privilege('giromesa_app', 'subscriptions', 'insert') app_subscription_table_insert,
-        has_column_privilege('giromesa_app', 'subscriptions', 'provisioning_run_id', 'insert') app_subscription_run_column_insert
+        has_column_privilege('giromesa_app', 'subscriptions', 'provisioning_run_id', 'insert') app_subscription_run_column_insert,
+        has_column_privilege('giromesa_app', 'onboarding_records', 'selected_plan_snapshot', 'update') app_selection_update,
+        has_column_privilege('giromesa_worker', 'onboarding_records', 'selected_plan_snapshot', 'update') worker_selection_update,
+        has_table_privilege('giromesa_app', 'audit_events', 'update') app_audit_update
     `;
     assert.deepEqual(privileges, {
       force_runs: true,
@@ -766,6 +1297,9 @@ describe("durable onboarding provisioning", () => {
       worker_runs: false,
       app_subscription_table_insert: false,
       app_subscription_run_column_insert: true,
+      app_selection_update: true,
+      worker_selection_update: false,
+      app_audit_update: false,
     });
   });
 });

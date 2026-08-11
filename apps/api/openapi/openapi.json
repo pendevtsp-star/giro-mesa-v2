@@ -3034,7 +3034,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3055,7 +3072,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3525,7 +3569,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3546,7 +3607,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4001,6 +4089,174 @@
         }
       }
     },
+    "/api/v1/organizations/{organizationId}/onboarding/selection": {
+      "put": {
+        "operationId": "OnboardingController_select[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingSelectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Onboarding"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planSlug": {
+                    "type": "string",
+                    "enum": [
+                      "operacao",
+                      "crescimento",
+                      "rede"
+                    ]
+                  },
+                  "selectedUnitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reselect": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "planSlug",
+                  "selectedUnitId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/onboarding/selection": {
+      "put": {
+        "operationId": "OnboardingController_select[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingSelectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Onboarding"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planSlug": {
+                    "type": "string",
+                    "enum": [
+                      "operacao",
+                      "crescimento",
+                      "rede"
+                    ]
+                  },
+                  "selectedUnitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reselect": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "planSlug",
+                  "selectedUnitId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}/onboarding/activate": {
       "post": {
         "operationId": "OnboardingController_activate[0]",
@@ -4025,7 +4281,44 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialActivationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4047,9 +4340,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "planSlug"
-                ]
+                "additionalProperties": false
               }
             }
           }
@@ -4080,7 +4371,44 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialActivationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4102,9 +4430,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "planSlug"
-                ]
+                "additionalProperties": false
               }
             }
           }
@@ -4134,7 +4460,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisioningStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4165,7 +4508,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisioningStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -19617,6 +19977,367 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "OnboardingPlanResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string",
+            "enum": [
+              "operacao",
+              "crescimento",
+              "rede"
+            ]
+          },
+          "catalogVersion": {
+            "type": "number"
+          },
+          "monthlyPriceCents": {
+            "type": "number"
+          },
+          "annualPriceCents": {
+            "type": "number"
+          },
+          "includedUnits": {
+            "type": "number"
+          },
+          "entitlements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "catalogVersion",
+          "monthlyPriceCents",
+          "annualPriceCents",
+          "includedUnits",
+          "entitlements"
+        ]
+      },
+      "OnboardingSelectionResponse": {
+        "type": "object",
+        "properties": {
+          "selectedUnitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/OnboardingPlanResponse"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "selectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "selectedUnitId",
+          "plan",
+          "revision",
+          "selectedAt",
+          "updatedAt"
+        ]
+      },
+      "ProvisioningSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "checkpoint": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "lastErrorCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "nextRetryAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "checkpoint",
+          "attempts",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "OnboardingResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "activatedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "missingItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selection": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingSelectionResponse"
+              }
+            ]
+          },
+          "provisioning": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProvisioningSummaryResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "organizationId",
+          "items",
+          "ready",
+          "missingItems"
+        ]
+      },
+      "OnboardingApiErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ]
+      },
+      "TrialActivationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commercialPlanId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provisioningRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subscriptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "entitlements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "commercialPlanId",
+          "provisioningRunId",
+          "subscriptionId",
+          "startsAt",
+          "endsAt",
+          "state",
+          "entitlements"
+        ]
+      },
+      "ProvisioningStepResponse": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "compensatedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "step",
+          "status",
+          "attempts",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ProvisioningStatusResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "checkpoint": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "lastErrorCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "nextRetryAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvisioningStepResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "checkpoint",
+          "attempts",
+          "createdAt",
+          "updatedAt",
+          "steps"
         ]
       }
     }

@@ -40,3 +40,33 @@ O onboarding agora usa evidencias normalizadas e uma saga persistida por organiz
 ## Concern conhecido
 
 `pnpm check` nao completa porque o lint integral encontra CRLF em arquivos preexistentes e fora da Task 7 (por exemplo `packages/domain/src/billing.ts`, `packages/domain/src/commercial.ts` e paginas do site). Esses arquivos nao foram reformatados para evitar um bulk rewrite fora de escopo. Typecheck, testes, build e lint focado alterado estao verdes. Nao houve push, deploy, provider real ou UI da Task 8.
+
+## Fix round 1
+
+### Correcoes aplicadas
+
+- A selecao explicita de plano e unidade agora antecede a saga. O endpoint `PUT /organizations/:organizationId/onboarding/selection` fixa ID, versao, snapshot, fingerprint e unidade, exige `reselect: true` para trocar uma selecao existente e marca `plan` como `verified`. A criacao do run copia esse pin atomicamente; a saga nunca volta a resolver o slug. O commit final revalida publicacao, fingerprint, snapshot, versao e unidade.
+- O readiness e deterministico para `selectedUnitId`: caixa, equipe, mesas, catalogo, QR e producao sao consultados no escopo dessa unidade. Producao `off` e uma escolha valida; `kds`, `print` e `both` so podem passar com capacidade, configuracao e teste persistidos no servidor. Como essa infraestrutura ainda nao existe, evidencias vindas do navegador sao recusadas. QR tambem exige menu, mesas, capacidades, configuracao e teste reais; enquanto ausentes, somente waiver de owner com motivo e trilha auditavel permite prosseguir.
+- O GET continua retornando os 12 itens coerentes. Ativacao consome a selecao persistida e mantem compatibilidade segura com payload legado, sem deixar um slug legado alterar um pin existente.
+- Toda selecao, waiver e alteracao de checklist grava evento append-only com `before`/`after` completos, motivo, fonte, evidencia, ator e horario. Grants de runtime negam `UPDATE`, `DELETE` e `TRUNCATE` em `audit_events`; o teste confirma que tentativa de sobrescrita nao apaga o historico.
+- `Idempotency-Key` passa pelo `ZodPipe`: header malformado retorna erro 400 tipado, nunca 500. OpenAPI publica respostas 200/201, erros, header e os dois aliases; clientes TypeScript e C# foram regenerados e retornam DTOs tipados em vez de `void`/`Stream`.
+- GET, status e activate usam projecoes allowlist. Lease owner, fingerprint, snapshot bruto, resposta armazenada, checkpoints internos e mensagem sensivel de erro nao saem da API; testes de blacklist cobrem respostas e clientes gerados.
+- Os testes artificiais foram substituidos por falhas observaveis: processo filho encerrado depois do checkpoint deixa lease orfao, retry antes de 30 s nao rouba e retry depois do expiry recupera; socket HTTP abortado perde apenas a resposta enquanto o commit termina; concorrencia same-key e distinct-key usa barreira PostgreSQL e `pg_stat_activity` para provar sobreposicao. Todos confirmam exatamente um trial, uma assinatura, um outbox e nenhuma compensacao duplicada.
+- A migration aditiva `0015_onboarding_selection` cria os pins persistidos, FKs tenant-scoped, checks, RLS/grants e endurece a imutabilidade da auditoria.
+
+### Gates do fix
+
+- PostgreSQL 17: integracao Task 7 **11/11**, incluindo fresh migrations e upgrade `0013 -> 0014 -> 0015`, crash real, socket abort, concorrencia forcada, pin drift, RLS e grants.
+- PostgreSQL 16 descartavel: o mesmo gate **11/11**; o container temporario foi removido ao final.
+- `pnpm test`: **12/12 tasks**; API total **120** quando o banco do gate esta disponivel e skips de integracao permanecem explicitos sem env.
+- `pnpm typecheck`: **12/12 tasks**.
+- `pnpm build`: **8/8 tasks**.
+- Biome focado nos arquivos alterados, geracao OpenAPI/TypeScript/C# e `git diff --check`: **verdes**.
+- `pnpm lint` integral continua vermelho apenas pelo baseline de formatacao/CRLF fora deste patch em site, ops, domain e db; nenhum desses arquivos foi reformatado em massa.
+
+### Self-review
+
+- O pin e copiado na mesma transacao que cria o run e e comparado novamente antes do commit; replay da mesma chave devolve o trial original mesmo apos reselecao posterior.
+- As projecoes publicas foram revisadas por allowlist e os testes recusam os nomes internos conhecidos.
+- Nao existem failpoints de producao: crash, espera e barreiras vivem somente no harness de integracao.
+- Nao houve push, deploy, provider real nem expansao para a UI da Task 8.

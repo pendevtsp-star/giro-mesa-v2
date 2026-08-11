@@ -5,44 +5,41 @@ using Microsoft.Kiota.Abstractions.Serialization;
 using System.Collections.Generic;
 using System.IO;
 using System;
-namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate
+namespace GiroMesa.ApiClient.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class ActivatePostRequestBody : IParsable
+    public partial class OnboardingResponse_selection : global::GiroMesa.ApiClient.Models.OnboardingSelectionResponse, IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>The planSlug property</summary>
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody_planSlug? PlanSlug { get; set; }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.OnboardingResponse_selection"/></returns>
         /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-        public static global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody CreateFromDiscriminatorValue(IParseNode parseNode)
+        public static new global::GiroMesa.ApiClient.Models.OnboardingResponse_selection CreateFromDiscriminatorValue(IParseNode parseNode)
         {
             if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-            return new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody();
+            return new global::GiroMesa.ApiClient.Models.OnboardingResponse_selection();
         }
         /// <summary>
         /// The deserialization information for the current model
         /// </summary>
         /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
-        public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+        public override IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
         {
-            return new Dictionary<string, Action<IParseNode>>
+            return new Dictionary<string, Action<IParseNode>>(base.GetFieldDeserializers())
             {
-                { "planSlug", n => { PlanSlug = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody_planSlug>(); } },
             };
         }
         /// <summary>
         /// Serializes information the current object
         /// </summary>
         /// <param name="writer">Serialization writer to use to serialize this model</param>
-        public virtual void Serialize(ISerializationWriter writer)
+        public override void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody_planSlug>("planSlug", PlanSlug);
+            base.Serialize(writer);
         }
     }
 }

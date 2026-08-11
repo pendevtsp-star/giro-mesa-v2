@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { ActivateTrialInput, UpdateOnboardingInput } from "@giromesa/contracts";
+import type {
+  ActivateTrialInput,
+  OnboardingSelectionInput,
+  UpdateOnboardingInput,
+} from "@giromesa/contracts";
 import {
   auditEvents,
   commercialCatalogVersions,
@@ -77,6 +81,7 @@ type PlanSnapshot = {
 };
 
 type ProvisioningRun = typeof provisioningRuns.$inferSelect;
+type OnboardingRecord = typeof onboardingRecords.$inferSelect;
 type DatabaseExecutor = Database | TenantTransaction;
 
 class ProvisioningError extends Error {
@@ -124,6 +129,18 @@ function planSnapshot(row: {
   entitlements: string[];
 }): PlanSnapshot {
   return { ...row, entitlements: [...row.entitlements].sort() };
+}
+
+function publicPlan(snapshot: PlanSnapshot) {
+  return {
+    id: snapshot.id,
+    slug: snapshot.slug,
+    catalogVersion: snapshot.catalogVersion,
+    monthlyPriceCents: snapshot.monthlyPriceCents,
+    annualPriceCents: snapshot.annualPriceCents,
+    includedUnits: snapshot.includedUnits,
+    entitlements: snapshot.entitlements,
+  };
 }
 
 function isPostgresCode(error: unknown, ...codes: string[]) {
@@ -226,10 +243,14 @@ export class OnboardingService {
   private async revalidateSystemChecklist(
     tx: DatabaseExecutor,
     organizationId: string,
+    selectedUnitId: string | null,
     pinnedPlan?: PlanSnapshot,
   ) {
     await this.ensureChecklistRows(tx, organizationId);
-    const [business, activeUnits] = await Promise.all([
+    if (selectedUnitId) {
+      await tx.execute(sql`select set_config('app.current_unit_id', ${selectedUnitId}, true)`);
+    }
+    const [business, selectedUnits] = await Promise.all([
       tx
         .select({ id: organizations.id })
         .from(organizations)
@@ -238,13 +259,15 @@ export class OnboardingService {
       tx
         .select({ id: units.id })
         .from(units)
-        .where(and(eq(units.organizationId, organizationId), eq(units.active, true)))
-        .limit(2),
+        .where(
+          and(
+            eq(units.organizationId, organizationId),
+            selectedUnitId ? eq(units.id, selectedUnitId) : sql`false`,
+            eq(units.active, true),
+          ),
+        )
+        .limit(1),
     ]);
-    const readinessUnitId = activeUnits[0]?.id;
-    if (readinessUnitId) {
-      await tx.execute(sql`select set_config('app.current_unit_id', ${readinessUnitId}, true)`);
-    }
     const [catalog, tables, team, qr, cashier] = await Promise.all([
       tx
         .select({ id: posProducts.id })
@@ -256,20 +279,37 @@ export class OnboardingService {
             eq(posProductPrices.productId, posProducts.id),
           ),
         )
-        .where(and(eq(posProducts.organizationId, organizationId), eq(posProducts.active, true)))
+        .where(
+          and(
+            eq(posProducts.organizationId, organizationId),
+            selectedUnitId ? eq(posProductPrices.unitId, selectedUnitId) : sql`false`,
+            eq(posProducts.active, true),
+          ),
+        )
         .limit(1),
       tx
         .select({ id: posDiningTables.id })
         .from(posDiningTables)
         .where(
-          and(eq(posDiningTables.organizationId, organizationId), eq(posDiningTables.active, true)),
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            selectedUnitId ? eq(posDiningTables.unitId, selectedUnitId) : sql`false`,
+            eq(posDiningTables.active, true),
+          ),
         )
         .limit(1),
       tx
-        .select({ id: memberships.identityId })
+        .selectDistinct({ id: memberships.identityId })
         .from(memberships)
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
         .where(
-          and(eq(memberships.organizationId, organizationId), eq(memberships.status, "active")),
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            selectedUnitId
+              ? sql`(${roleBindings.unitId} is null or ${roleBindings.unitId} = ${selectedUnitId}::uuid)`
+              : sql`false`,
+          ),
         )
         .limit(2),
       tx
@@ -278,6 +318,7 @@ export class OnboardingService {
         .where(
           and(
             eq(publicMenus.organizationId, organizationId),
+            selectedUnitId ? eq(publicMenus.unitId, selectedUnitId) : sql`false`,
             eq(publicMenus.active, true),
             isNotNull(publicMenus.publishedAt),
           ),
@@ -292,6 +333,9 @@ export class OnboardingService {
             eq(memberships.organizationId, organizationId),
             eq(memberships.status, "active"),
             eq(roleBindings.role, "cashier"),
+            selectedUnitId
+              ? sql`(${roleBindings.unitId} is null or ${roleBindings.unitId} = ${selectedUnitId}::uuid)`
+              : sql`false`,
           ),
         )
         .limit(1),
@@ -308,10 +352,11 @@ export class OnboardingService {
       tx,
       organizationId,
       "unit",
-      activeUnits.length > 0,
-      `organization:${organizationId}:units`,
+      selectedUnits.length === 1,
+      selectedUnitId ? `unit:${selectedUnitId}` : `organization:${organizationId}:unit-selection`,
       {
-        activeUnits: activeUnits.length,
+        selectedUnitId,
+        selectedUnitActive: selectedUnits.length === 1,
       },
     );
     await this.setSystemEvidence(
@@ -319,21 +364,21 @@ export class OnboardingService {
       organizationId,
       "catalog",
       catalog.length > 0,
-      `organization:${organizationId}:catalog`,
+      selectedUnitId ? `unit:${selectedUnitId}:catalog` : `organization:${organizationId}:catalog`,
     );
     await this.setSystemEvidence(
       tx,
       organizationId,
       "tables",
       tables.length > 0,
-      `organization:${organizationId}:tables`,
+      selectedUnitId ? `unit:${selectedUnitId}:tables` : `organization:${organizationId}:tables`,
     );
     await this.setSystemEvidence(
       tx,
       organizationId,
       "team",
       team.length >= 2,
-      `organization:${organizationId}:team`,
+      selectedUnitId ? `unit:${selectedUnitId}:team` : `organization:${organizationId}:team`,
       {
         activeMembersObserved: team.length,
       },
@@ -342,16 +387,55 @@ export class OnboardingService {
       tx,
       organizationId,
       "qr",
-      qr.length > 0,
-      `organization:${organizationId}:qr`,
+      false,
+      selectedUnitId ? `unit:${selectedUnitId}:qr-readiness` : `organization:${organizationId}:qr`,
+      {
+        menuPublished: qr.length > 0,
+        tablesConfigured: tables.length > 0,
+        capabilitiesConfigured: false,
+        serverTestPassed: false,
+      },
     );
     await this.setSystemEvidence(
       tx,
       organizationId,
       "cashier",
       cashier.length > 0,
-      `organization:${organizationId}:cashier`,
+      selectedUnitId ? `unit:${selectedUnitId}:cashier` : `organization:${organizationId}:cashier`,
     );
+    const [production] = await tx
+      .select({
+        status: onboardingChecklistItems.status,
+        source: onboardingChecklistItems.source,
+        evidence: onboardingChecklistItems.evidence,
+      })
+      .from(onboardingChecklistItems)
+      .where(
+        and(
+          eq(onboardingChecklistItems.organizationId, organizationId),
+          eq(onboardingChecklistItems.item, "production"),
+        ),
+      )
+      .limit(1);
+    if (
+      production?.status === "verified" &&
+      !(production.source === "actor_attestation" && production.evidence.mode === "off")
+    ) {
+      await this.setSystemEvidence(
+        tx,
+        organizationId,
+        "production",
+        false,
+        selectedUnitId
+          ? `unit:${selectedUnitId}:production-readiness`
+          : `organization:${organizationId}:production-readiness`,
+        {
+          configured: false,
+          serverTestPassed: false,
+          requestedMode: production.evidence.mode ?? null,
+        },
+      );
+    }
     if (pinnedPlan) {
       await this.setSystemEvidence(
         tx,
@@ -363,6 +447,14 @@ export class OnboardingService {
           catalogVersion: pinnedPlan.catalogVersion,
           slug: pinnedPlan.slug,
         },
+      );
+    } else {
+      await this.setSystemEvidence(
+        tx,
+        organizationId,
+        "plan",
+        false,
+        `organization:${organizationId}:plan-selection`,
       );
     }
   }
@@ -388,6 +480,49 @@ export class OnboardingService {
     ) as Partial<Record<ChecklistItem, ChecklistEvidence>>;
   }
 
+  private provisioningProjection(run: ProvisioningRun | undefined) {
+    if (!run) return null;
+    return {
+      id: run.id,
+      state: run.state,
+      checkpoint: run.checkpoint,
+      attempts: run.attempts,
+      lastErrorCode: run.lastErrorCode,
+      nextRetryAt: run.nextRetryAt,
+      completedAt: run.completedAt,
+      failedAt: run.failedAt,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+    };
+  }
+
+  private selectionProjection(record: OnboardingRecord, plan: PlanSnapshot | null) {
+    if (!record.selectedUnitId || !plan || !record.selectedAt) return null;
+    return {
+      selectedUnitId: record.selectedUnitId,
+      plan: publicPlan(plan),
+      revision: record.selectionRevision,
+      selectedAt: record.selectedAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+
+  private onboardingProjection(
+    record: OnboardingRecord,
+    checklist: Partial<Record<ChecklistItem, ChecklistEvidence>>,
+    plan: PlanSnapshot | null,
+    provisioning?: ProvisioningRun,
+  ) {
+    return {
+      organizationId: record.organizationId,
+      activatedAt: record.activatedAt,
+      items: checklist,
+      ...activationReadiness(checklist),
+      selection: this.selectionProjection(record, plan),
+      provisioning: this.provisioningProjection(provisioning),
+    };
+  }
+
   async get(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
     const [record] = await this.database.db
@@ -402,16 +537,135 @@ export class OnboardingService {
       });
     }
     await this.ensureChecklistRows(this.database.db, organizationId);
-    await this.revalidateSystemChecklist(this.database.db, organizationId);
+    const selectedPlan = await this.exactSelectedPlan(this.database.db, record);
+    await this.revalidateSystemChecklist(
+      this.database.db,
+      organizationId,
+      record.selectedUnitId,
+      selectedPlan ?? undefined,
+    );
     const checklist = await this.checklist(this.database.db, organizationId);
-    const readiness = activationReadiness(checklist);
     const [provisioning] = await this.database.db
       .select()
       .from(provisioningRuns)
       .where(eq(provisioningRuns.organizationId, organizationId))
       .orderBy(desc(provisioningRuns.createdAt))
       .limit(1);
-    return { ...record, items: checklist, ...readiness, provisioning: provisioning ?? null };
+    return this.onboardingProjection(record, checklist, selectedPlan, provisioning);
+  }
+
+  async select(identityId: string, organizationId: string, input: OnboardingSelectionInput) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
+    return this.durable(identityId, organizationId, async (tx) => {
+      await this.organizationLock(tx, organizationId);
+      const [record] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!record) throw new NotFoundException();
+      if (record.activatedAt) {
+        throw new ConflictException({
+          code: "ONBOARDING_ALREADY_ACTIVATED",
+          message: "O onboarding já foi ativado.",
+        });
+      }
+      const [live] = await tx
+        .select({ id: provisioningRuns.id })
+        .from(provisioningRuns)
+        .where(
+          and(
+            eq(provisioningRuns.organizationId, organizationId),
+            ne(provisioningRuns.state, "terminal_failed"),
+            ne(provisioningRuns.state, "compensated"),
+          ),
+        )
+        .limit(1);
+      if (live) {
+        throw new ConflictException({
+          code: "PROVISIONING_IN_PROGRESS",
+          message: "A seleção não pode mudar durante o provisionamento.",
+        });
+      }
+      const [selectedUnit] = await tx
+        .select({ id: units.id })
+        .from(units)
+        .where(
+          and(
+            eq(units.organizationId, organizationId),
+            eq(units.id, input.selectedUnitId),
+            eq(units.active, true),
+          ),
+        )
+        .limit(1);
+      if (!selectedUnit) {
+        throw new BadRequestException({
+          code: "INVALID_ONBOARDING_UNIT",
+          message: "Selecione uma unidade ativa desta organização.",
+        });
+      }
+      const plan = await this.publishedPlan(tx, input.planSlug);
+      if (!plan) {
+        throw new BadRequestException({
+          code: "PLAN_NOT_AVAILABLE",
+          message: "O plano selecionado não está publicado.",
+        });
+      }
+      const beforePlan = await this.exactSelectedPlan(tx, record);
+      const sameSelection =
+        record.selectedUnitId === input.selectedUnitId &&
+        record.selectedPlanId === plan.id &&
+        record.selectedPlanFingerprint === fingerprint(plan);
+      if (sameSelection) return this.selectionProjection(record, beforePlan);
+      if (record.selectedPlanId && !input.reselect) {
+        throw new ConflictException({
+          code: "ONBOARDING_RESELECT_REQUIRED",
+          message: "Confirme explicitamente a troca do plano ou da unidade.",
+        });
+      }
+      const now = new Date();
+      const before = this.selectionProjection(record, beforePlan);
+      const [updated] = await tx
+        .update(onboardingRecords)
+        .set({
+          selectedUnitId: input.selectedUnitId,
+          selectedPlanId: plan.id,
+          selectedCatalogVersion: plan.catalogVersion,
+          selectedPlanSnapshot: plan,
+          selectedPlanFingerprint: fingerprint(plan),
+          selectedByIdentityId: identityId,
+          selectedAt: now,
+          selectionRevision: record.selectionRevision + 1,
+          updatedAt: now,
+        })
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .returning();
+      if (!updated) throw new Error("Onboarding selection was not stored");
+      await this.revalidateSystemChecklist(tx, organizationId, input.selectedUnitId, plan);
+      const after = this.selectionProjection(updated, plan);
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId: input.selectedUnitId,
+        actorIdentityId: identityId,
+        action: before ? "onboarding.selection_reselected" : "onboarding.selection_selected",
+        entityType: "onboarding_selection",
+        entityId: organizationId,
+        occurredAt: now,
+        metadata: {
+          before,
+          after,
+          reason: before ? "explicit_reselection" : "initial_selection",
+          source: "owner_selection",
+          evidence: {
+            unit: `unit:${input.selectedUnitId}`,
+            plan: `commercial-plan:${plan.id}:catalog:${plan.catalogVersion}`,
+          },
+          actorIdentityId: identityId,
+          occurredAt: now.toISOString(),
+        },
+      });
+      return after;
+    });
   }
 
   async update(identityId: string, organizationId: string, input: UpdateOnboardingInput) {
@@ -432,6 +686,7 @@ export class OnboardingService {
       });
     }
     await this.ensureChecklistRows(this.database.db, organizationId);
+    const beforeChecklist = await this.checklist(this.database.db, organizationId);
     const now = new Date();
     const legacy = input.checklist ?? {};
     for (const [item, value] of Object.entries(legacy)) {
@@ -488,11 +743,17 @@ export class OnboardingService {
       }
       if (ATTESTED_ITEMS.has(item) && requested.status === "verified") {
         const evidence = requested.evidence ?? {};
+        if (item === "production" && ["kds", "print", "both"].includes(String(evidence.mode))) {
+          throw new BadRequestException({
+            code: "PRODUCTION_READINESS_NOT_VERIFIED",
+            message:
+              "KDS e impressão só podem ser ativados após configuração e teste comprovados pelo servidor.",
+          });
+        }
         const valid =
           (item === "fiscalChoice" &&
             ["disabled", "focus", "external"].includes(String(evidence.choice))) ||
-          (item === "production" &&
-            ["kds", "print", "both", "off"].includes(String(evidence.mode))) ||
+          (item === "production" && evidence.mode === "off") ||
           ((item === "training" || item === "rehearsal") && evidence.completed === true);
         if (!valid || !requested.evidenceReference) {
           throw new BadRequestException({
@@ -544,7 +805,13 @@ export class OnboardingService {
       .update(onboardingRecords)
       .set({ checklist: { ...record.checklist, ...legacy }, updatedAt: now })
       .where(eq(onboardingRecords.organizationId, organizationId));
-    await this.revalidateSystemChecklist(this.database.db, organizationId);
+    const refreshedPlan = await this.exactSelectedPlan(this.database.db, record);
+    await this.revalidateSystemChecklist(
+      this.database.db,
+      organizationId,
+      record.selectedUnitId,
+      refreshedPlan ?? undefined,
+    );
     const checklist = await this.checklist(this.database.db, organizationId);
     await this.database.db.insert(auditEvents).values({
       organizationId,
@@ -552,16 +819,25 @@ export class OnboardingService {
       action: "onboarding.updated",
       entityType: "onboarding",
       entityId: organizationId,
+      occurredAt: now,
       metadata: {
-        changedItems: [...Object.keys(legacy), ...Object.keys(input.items ?? {})],
+        before: beforeChecklist,
+        after: checklist,
+        reason: "onboarding_checklist_update",
+        source: "owner_or_manager_input",
+        evidence: {
+          requested: input,
+        },
+        actorIdentityId: identityId,
+        occurredAt: now.toISOString(),
       },
     });
-    return {
+    const updatedRecord = {
       ...record,
       checklist: { ...record.checklist, ...legacy },
-      items: checklist,
-      ...activationReadiness(checklist),
+      updatedAt: now,
     };
+    return this.onboardingProjection(updatedRecord, checklist, refreshedPlan);
   }
 
   private async publishedPlan(tx: TenantTransaction, slug: string): Promise<PlanSnapshot | null> {
@@ -587,8 +863,17 @@ export class OnboardingService {
     return plan ? planSnapshot(plan) : null;
   }
 
-  private async exactPinnedPlan(tx: TenantTransaction, run: ProvisioningRun) {
-    if (!run.pinnedPlanId || !run.planSnapshot || !run.planFingerprint) return null;
+  private async exactPlan(
+    tx: DatabaseExecutor,
+    pin: {
+      planId: string | null;
+      catalogVersion: number | null;
+      snapshot: Record<string, unknown> | null;
+      fingerprint: string | null;
+    },
+  ) {
+    if (!pin.planId || !pin.snapshot || !pin.fingerprint || pin.catalogVersion === null)
+      return null;
     const [plan] = await tx
       .select({
         id: commercialPlans.id,
@@ -607,15 +892,35 @@ export class OnboardingService {
       )
       .where(
         and(
-          eq(commercialPlans.id, run.pinnedPlanId),
+          eq(commercialPlans.id, pin.planId),
           eq(commercialCatalogVersions.status, "published"),
+          eq(commercialCatalogVersions.version, pin.catalogVersion),
         ),
       )
       .limit(1);
     if (!plan) return null;
     const snapshot = planSnapshot(plan);
-    if (fingerprint(snapshot) !== run.planFingerprint) return null;
+    if (fingerprint(snapshot) !== pin.fingerprint || fingerprint(pin.snapshot) !== pin.fingerprint)
+      return null;
     return snapshot;
+  }
+
+  private exactPinnedPlan(tx: DatabaseExecutor, run: ProvisioningRun) {
+    return this.exactPlan(tx, {
+      planId: run.pinnedPlanId,
+      catalogVersion: run.pinnedCatalogVersion,
+      snapshot: run.planSnapshot,
+      fingerprint: run.planFingerprint,
+    });
+  }
+
+  private exactSelectedPlan(tx: DatabaseExecutor, record: OnboardingRecord) {
+    return this.exactPlan(tx, {
+      planId: record.selectedPlanId,
+      catalogVersion: record.selectedCatalogVersion,
+      snapshot: record.selectedPlanSnapshot,
+      fingerprint: record.selectedPlanFingerprint,
+    });
   }
 
   private async requireOwnerInTransaction(
@@ -651,7 +956,7 @@ export class OnboardingService {
     idempotencyKey: string,
     input: ActivateTrialInput,
   ) {
-    const requestFingerprint = fingerprint({ planSlug: input.planSlug });
+    const requestFingerprint = fingerprint({ planSlug: input.planSlug ?? null });
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
       const [sameKey] = await tx
@@ -672,6 +977,30 @@ export class OnboardingService {
           });
         }
         return sameKey;
+      }
+      const [selection] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!selection?.selectedUnitId) {
+        throw new BadRequestException({
+          code: "ONBOARDING_SELECTION_REQUIRED",
+          message: "Selecione e confirme a unidade e o plano antes de iniciar a ativação.",
+        });
+      }
+      const selectedPlan = await this.exactSelectedPlan(tx, selection);
+      if (!selectedPlan) {
+        throw new ConflictException({
+          code: "PLAN_DRIFT",
+          message: "A seleção comercial mudou; faça uma nova seleção explícita.",
+        });
+      }
+      if (input.planSlug && input.planSlug !== selectedPlan.slug) {
+        throw new ConflictException({
+          code: "ONBOARDING_PLAN_MISMATCH",
+          message: "O plano do cliente legado não corresponde à seleção confirmada.",
+        });
       }
       const [live] = await tx
         .select()
@@ -703,7 +1032,12 @@ export class OnboardingService {
           organizationId,
           idempotencyKey,
           requestFingerprint,
-          planSlug: input.planSlug,
+          planSlug: selectedPlan.slug,
+          selectedUnitId: selection.selectedUnitId,
+          pinnedPlanId: selectedPlan.id,
+          pinnedCatalogVersion: selectedPlan.catalogVersion,
+          planSnapshot: selectedPlan,
+          planFingerprint: fingerprint(selectedPlan),
         })
         .returning();
       if (!created) throw new Error("Provisioning run was not created");
@@ -874,19 +1208,22 @@ export class OnboardingService {
           "terminal",
         );
       }
-      const pinned = run.pinnedPlanId
-        ? await this.exactPinnedPlan(tx, run)
-        : await this.publishedPlan(tx, run.planSlug);
-      if (!pinned) {
+      if (!run.selectedUnitId || !run.pinnedPlanId || !run.planSnapshot || !run.planFingerprint) {
         throw new ProvisioningError(
-          run.pinnedPlanId ? "PLAN_DRIFT" : "PLAN_NOT_AVAILABLE",
-          run.pinnedPlanId
-            ? "A versão selecionada do plano mudou ou deixou de estar publicada."
-            : "Plano selecionado indisponível.",
+          "PROVISIONING_CHECKPOINT_INVALID",
+          "A seleção deve existir antes do início do provisionamento.",
           "terminal",
         );
       }
-      await this.revalidateSystemChecklist(tx, organizationId, pinned);
+      const pinned = await this.exactPinnedPlan(tx, run);
+      if (!pinned) {
+        throw new ProvisioningError(
+          "PLAN_DRIFT",
+          "A versão selecionada do plano mudou ou deixou de estar publicada.",
+          "terminal",
+        );
+      }
+      await this.revalidateSystemChecklist(tx, organizationId, run.selectedUnitId, pinned);
       const checklist = await this.checklist(tx, organizationId);
       const readiness = activationReadiness(checklist);
       if (!readiness.ready) {
@@ -909,10 +1246,6 @@ export class OnboardingService {
       const [updated] = await tx
         .update(provisioningRuns)
         .set({
-          pinnedPlanId: pinned.id,
-          pinnedCatalogVersion: pinned.catalogVersion,
-          planSnapshot: pinned,
-          planFingerprint: fingerprint(pinned),
           state: "provisioning",
           checkpoint: "validated",
           updatedAt: new Date(),
@@ -1037,7 +1370,14 @@ export class OnboardingService {
           "terminal",
         );
       }
-      await this.revalidateSystemChecklist(tx, organizationId, pinned);
+      if (!run.selectedUnitId) {
+        throw new ProvisioningError(
+          "PROVISIONING_CHECKPOINT_INVALID",
+          "A unidade selecionada não está disponível.",
+          "terminal",
+        );
+      }
+      await this.revalidateSystemChecklist(tx, organizationId, run.selectedUnitId, pinned);
       const checklist = await this.checklist(tx, organizationId);
       const readiness = activationReadiness(checklist);
       if (!readiness.ready) {
@@ -1424,7 +1764,16 @@ export class OnboardingService {
       .limit(1);
     if (!run) throw new NotFoundException();
     const steps = await this.database.db
-      .select()
+      .select({
+        step: provisioningSteps.step,
+        status: provisioningSteps.status,
+        attempts: provisioningSteps.attempts,
+        startedAt: provisioningSteps.startedAt,
+        completedAt: provisioningSteps.completedAt,
+        compensatedAt: provisioningSteps.compensatedAt,
+        createdAt: provisioningSteps.createdAt,
+        updatedAt: provisioningSteps.updatedAt,
+      })
       .from(provisioningSteps)
       .where(
         and(
@@ -1432,6 +1781,6 @@ export class OnboardingService {
           eq(provisioningSteps.provisioningRunId, runId),
         ),
       );
-    return { ...run, steps };
+    return { ...this.provisioningProjection(run), steps };
   }
 }
