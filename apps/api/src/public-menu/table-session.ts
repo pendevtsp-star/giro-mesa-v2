@@ -153,7 +153,7 @@ export class TableSessionCodec {
 export class TableSessionService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly codec = new TableSessionCodec(),
+    private readonly codec: TableSessionCodec,
   ) {}
 
   async issue(slug: string, qrToken: string, requestSource: string) {
