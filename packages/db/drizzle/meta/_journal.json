@@ -120,6 +120,13 @@
       "when": 1786450000000,
       "tag": "0017_public_menu_branding",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786451000000,
+      "tag": "0018_operational_map",
+      "breakpoints": true
     }
   ]
 }

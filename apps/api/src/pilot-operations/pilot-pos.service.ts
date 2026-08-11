@@ -25,9 +25,16 @@ import {
   posTabEvents,
   posTabs,
   roleBindings,
+  tableOccupancies,
+  tableOccupancyEvents,
   units,
 } from "@giromesa/db";
-import { billingAccess } from "@giromesa/domain";
+import {
+  billingAccess,
+  type TableOccupancyCommand,
+  TableOccupancyTransitionError,
+  transitionTableOccupancy,
+} from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
@@ -384,6 +391,22 @@ export class PilotPosService {
           })
           .returning();
         if (!tab) throw new Error("Tab insert did not return a row");
+        const [occupancy] = input.tableId
+          ? await tx
+              .insert(tableOccupancies)
+              .values({
+                organizationId,
+                unitId,
+                tableId: input.tableId,
+                tabId: tab.id,
+                assignedIdentityId: identityId,
+                state: "open",
+                occupancyEpoch: tab.occupancyEpoch,
+                guestCount: input.guestCount,
+                openedAt: new Date(),
+              })
+              .returning()
+          : [undefined];
         if (input.tableId) {
           await tx
             .update(posDiningTables)
@@ -400,7 +423,7 @@ export class PilotPosService {
           tableId: input.tableId,
           guestCount: input.guestCount,
         });
-        return { tab };
+        return { tab, occupancy };
       },
     );
   }
@@ -1879,6 +1902,121 @@ export class PilotPosService {
         response: stored,
       });
       return { ...stored, idempotentReplay: false };
+    });
+  }
+
+  async transitionOccupancy(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    occupancyId: string,
+    idempotencyKey: string,
+    command: TableOccupancyCommand,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
+    const hash = requestHash("occupancy.transition", command);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from ${tableOccupancies} where id = ${occupancyId} for update`);
+      const [replay] = await tx
+        .select({
+          requestHash: tableOccupancyEvents.requestHash,
+          after: tableOccupancyEvents.after,
+        })
+        .from(tableOccupancyEvents)
+        .where(
+          and(
+            eq(tableOccupancyEvents.organizationId, organizationId),
+            eq(tableOccupancyEvents.unitId, unitId),
+            eq(tableOccupancyEvents.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (replay) {
+        if (replay.requestHash !== hash)
+          throw new ConflictException({
+            code: "IDEMPOTENCY_KEY_REUSED",
+            message: "A chave idempotente já foi usada com outro conteúdo.",
+          });
+        return { occupancy: replay.after, idempotentReplay: true };
+      }
+      const [current] = await tx
+        .select()
+        .from(tableOccupancies)
+        .where(
+          and(
+            eq(tableOccupancies.organizationId, organizationId),
+            eq(tableOccupancies.unitId, unitId),
+            eq(tableOccupancies.id, occupancyId),
+          ),
+        )
+        .limit(1);
+      if (!current)
+        throw new NotFoundException({
+          code: "OCCUPANCY_NOT_FOUND",
+          message: "Ocupação não encontrada.",
+        });
+      let next: ReturnType<typeof transitionTableOccupancy>;
+      try {
+        next = transitionTableOccupancy(
+          {
+            state: current.state,
+            occupancyEpoch: current.occupancyEpoch,
+            resourceVersion: current.resourceVersion,
+            tableId: current.tableId,
+            groupId: current.groupId,
+          },
+          command,
+        );
+      } catch (error) {
+        if (error instanceof TableOccupancyTransitionError)
+          throw new ConflictException({ code: error.code, message: error.message });
+        throw error;
+      }
+      const now = new Date();
+      const [updated] = await tx
+        .update(tableOccupancies)
+        .set({
+          state: next.state,
+          occupancyEpoch: next.occupancyEpoch,
+          resourceVersion: next.resourceVersion,
+          tableId: next.tableId,
+          groupId: next.groupId,
+          openedAt: next.state === "open" && current.openedAt === null ? now : current.openedAt,
+          closedAt: next.state === "closed" ? now : null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(tableOccupancies.id, occupancyId),
+            eq(tableOccupancies.occupancyEpoch, current.occupancyEpoch),
+            eq(tableOccupancies.resourceVersion, current.resourceVersion),
+          ),
+        )
+        .returning();
+      if (!updated)
+        throw new ConflictException({
+          code: "OCCUPANCY_VERSION_CONFLICT",
+          message: "A ocupação mudou em outro terminal.",
+        });
+      await tx.insert(tableOccupancyEvents).values({
+        organizationId,
+        unitId,
+        occupancyId,
+        occupancyEpoch: current.occupancyEpoch,
+        sequence: next.resourceVersion,
+        type: command.type,
+        actorIdentityId: identityId,
+        idempotencyKey,
+        requestHash: hash,
+        before: current,
+        after: updated,
+      });
+      return { occupancy: updated, idempotentReplay: false };
     });
   }
 

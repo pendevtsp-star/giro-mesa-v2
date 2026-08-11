@@ -16,7 +16,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { identities, memberships, organizations, units } from "./schema.js";
+import { deviceEnrollments, identities, memberships, organizations, units } from "./schema.js";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -53,6 +53,24 @@ export const posKdsStatus = pgEnum("pos_kds_status", [
 ]);
 export const posTableStatus = pgEnum("pos_table_status", ["available", "occupied", "reserved"]);
 export const posApprovalAction = pgEnum("pos_approval_action", ["discount", "cancel"]);
+export const layoutVersionState = pgEnum("layout_version_state", ["draft", "published"]);
+export const serviceShiftState = pgEnum("service_shift_state", [
+  "scheduled",
+  "open",
+  "handoff",
+  "closed",
+]);
+export const tableOccupancyState = pgEnum("table_occupancy_state", [
+  "reserved",
+  "open",
+  "paying",
+  "closed",
+]);
+export const salonExceptionState = pgEnum("salon_exception_state", [
+  "open",
+  "acknowledged",
+  "resolved",
+]);
 
 export const posCatalogCategories = pgTable(
   "pos_catalog_categories",
@@ -685,6 +703,394 @@ export const posIdempotencyReceipts = pgTable(
   ],
 );
 
+export const serviceAreas = pgTable(
+  "service_areas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    roomId: uuid("room_id").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    code: varchar("code", { length: 60 }).notNull(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    unique("service_areas_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("service_areas_room_code_unique").on(table.roomId, table.code),
+    foreignKey({
+      name: "service_areas_room_scope_fk",
+      columns: [table.organizationId, table.unitId, table.roomId],
+      foreignColumns: [posDiningRooms.organizationId, posDiningRooms.unitId, posDiningRooms.id],
+    }).onDelete("cascade"),
+    check("service_areas_resource_version_check", sql`${table.resourceVersion} >= 0`),
+  ],
+);
+
+export const tableLayoutVersions = pgTable(
+  "table_layout_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    roomId: uuid("room_id").notNull(),
+    version: integer("version").notNull(),
+    state: layoutVersionState("state").notNull().default("draft"),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_layout_versions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("table_layout_versions_room_version_unique").on(table.roomId, table.version),
+    foreignKey({
+      name: "table_layout_versions_room_scope_fk",
+      columns: [table.organizationId, table.unitId, table.roomId],
+      foreignColumns: [posDiningRooms.organizationId, posDiningRooms.unitId, posDiningRooms.id],
+    }).onDelete("restrict"),
+    check("table_layout_versions_version_check", sql`${table.version} > 0`),
+    check("table_layout_versions_resource_check", sql`${table.resourceVersion} >= 0`),
+  ],
+);
+
+export const tableLayoutNodes = pgTable(
+  "table_layout_nodes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    layoutVersionId: uuid("layout_version_id").notNull(),
+    tableId: uuid("table_id").notNull(),
+    areaId: uuid("area_id"),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    rotation: integer("rotation").notNull().default(0),
+    zIndex: integer("z_index").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_layout_nodes_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("table_layout_nodes_layout_table_unique").on(table.layoutVersionId, table.tableId),
+    foreignKey({
+      name: "table_layout_nodes_version_scope_fk",
+      columns: [table.organizationId, table.unitId, table.layoutVersionId],
+      foreignColumns: [
+        tableLayoutVersions.organizationId,
+        tableLayoutVersions.unitId,
+        tableLayoutVersions.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "table_layout_nodes_table_scope_fk",
+      columns: [table.organizationId, table.unitId, table.tableId],
+      foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_layout_nodes_area_scope_fk",
+      columns: [table.organizationId, table.unitId, table.areaId],
+      foreignColumns: [serviceAreas.organizationId, serviceAreas.unitId, serviceAreas.id],
+    }).onDelete("restrict"),
+    check(
+      "table_layout_nodes_geometry_check",
+      sql`${table.x} >= 0 and ${table.y} >= 0 and ${table.width} between 1 and 10000 and ${table.height} between 1 and 10000 and ${table.x} + ${table.width} <= 10000 and ${table.y} + ${table.height} <= 10000`,
+    ),
+    check("table_layout_nodes_rotation_check", sql`${table.rotation} between -180 and 180`),
+  ],
+);
+
+export const serviceShifts = pgTable(
+  "service_shifts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    state: serviceShiftState("state").notNull().default("scheduled"),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    openedByIdentityId: uuid("opened_by_identity_id").references(() => identities.id),
+    closedByIdentityId: uuid("closed_by_identity_id").references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("service_shifts_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("service_shifts_one_live_unit_unique")
+      .on(table.unitId)
+      .where(sql`${table.state} in ('open', 'handoff')`),
+    foreignKey({
+      name: "service_shifts_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check("service_shifts_resource_check", sql`${table.resourceVersion} >= 0`),
+    check("service_shifts_time_check", sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`),
+  ],
+);
+
+export const areaAssignments = pgTable(
+  "area_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    shiftId: uuid("shift_id").notNull(),
+    areaId: uuid("area_id").notNull(),
+    primaryIdentityId: uuid("primary_identity_id").notNull().references(() => identities.id),
+    supportIdentityId: uuid("support_identity_id").references(() => identities.id),
+    fallbackRole: varchar("fallback_role", { length: 30 }).notNull().default("manager"),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    unique("area_assignments_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("area_assignments_shift_area_unique").on(table.shiftId, table.areaId),
+    foreignKey({
+      name: "area_assignments_shift_scope_fk",
+      columns: [table.organizationId, table.unitId, table.shiftId],
+      foreignColumns: [serviceShifts.organizationId, serviceShifts.unitId, serviceShifts.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "area_assignments_area_scope_fk",
+      columns: [table.organizationId, table.unitId, table.areaId],
+      foreignColumns: [serviceAreas.organizationId, serviceAreas.unitId, serviceAreas.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableGroups = pgTable(
+  "table_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull().defaultRandom(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdByIdentityId: uuid("created_by_identity_id").notNull().references(() => identities.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_groups_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("table_groups_epoch_unique").on(table.occupancyEpoch),
+    foreignKey({
+      name: "table_groups_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableOccupancies = pgTable(
+  "table_occupancies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    tableId: uuid("table_id").notNull(),
+    groupId: uuid("group_id"),
+    tabId: uuid("tab_id"),
+    reservationId: uuid("reservation_id"),
+    assignedIdentityId: uuid("assigned_identity_id").references(() => identities.id),
+    state: tableOccupancyState("state").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull().defaultRandom(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    guestCount: integer("guest_count").notNull().default(1),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_occupancies_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    unique("table_occupancies_scope_epoch_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.occupancyEpoch,
+    ),
+    uniqueIndex("table_occupancies_one_live_table_unique")
+      .on(table.organizationId, table.unitId, table.tableId)
+      .where(sql`${table.state} in ('reserved', 'open', 'paying')`),
+    foreignKey({
+      name: "table_occupancies_table_scope_fk",
+      columns: [table.organizationId, table.unitId, table.tableId],
+      foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_occupancies_group_scope_fk",
+      columns: [table.organizationId, table.unitId, table.groupId],
+      foreignColumns: [tableGroups.organizationId, tableGroups.unitId, tableGroups.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_occupancies_tab_scope_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("restrict"),
+    check("table_occupancies_resource_check", sql`${table.resourceVersion} >= 0`),
+    check("table_occupancies_guest_count_check", sql`${table.guestCount} > 0`),
+    check(
+      "table_occupancies_closed_at_check",
+      sql`(${table.state} = 'closed') = (${table.closedAt} is not null)`,
+    ),
+  ],
+);
+
+export const tableGroupMembers = pgTable(
+  "table_group_members",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    groupId: uuid("group_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.groupId, table.occupancyId] }),
+    foreignKey({
+      name: "table_group_members_group_scope_fk",
+      columns: [table.organizationId, table.unitId, table.groupId],
+      foreignColumns: [tableGroups.organizationId, tableGroups.unitId, tableGroups.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "table_group_members_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [
+        tableOccupancies.organizationId,
+        tableOccupancies.unitId,
+        tableOccupancies.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableOccupancyEvents = pgTable(
+  "table_occupancy_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull(),
+    sequence: integer("sequence").notNull(),
+    type: varchar("type", { length: 60 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id").notNull().references(() => identities.id),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    before: jsonb("before").$type<Record<string, unknown>>().notNull(),
+    after: jsonb("after").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("table_occupancy_events_sequence_unique").on(table.occupancyId, table.sequence),
+    uniqueIndex("table_occupancy_events_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "table_occupancy_events_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [
+        tableOccupancies.organizationId,
+        tableOccupancies.unitId,
+        tableOccupancies.id,
+      ],
+    }).onDelete("restrict"),
+    check("table_occupancy_events_sequence_check", sql`${table.sequence} > 0`),
+  ],
+);
+
+export const serviceIncidents = pgTable(
+  "service_incidents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    occupancyId: uuid("occupancy_id"),
+    tableId: uuid("table_id"),
+    type: varchar("type", { length: 60 }).notNull(),
+    summary: varchar("summary", { length: 300 }).notNull(),
+    state: varchar("state", { length: 20 }).notNull().default("open"),
+    reportedByIdentityId: uuid("reported_by_identity_id").notNull().references(() => identities.id),
+    resolvedByIdentityId: uuid("resolved_by_identity_id").references(() => identities.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("service_incidents_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    foreignKey({
+      name: "service_incidents_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const staffPresenceLeases = pgTable(
+  "staff_presence_leases",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    identityId: uuid("identity_id").notNull().references(() => identities.id),
+    deviceId: uuid("device_id").notNull(),
+    leaseEpoch: uuid("lease_epoch").notNull().defaultRandom(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.identityId, table.deviceId] }),
+    foreignKey({
+      name: "staff_presence_device_scope_fk",
+      columns: [table.organizationId, table.unitId, table.deviceId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const salonExceptions = pgTable(
+  "salon_exceptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    occupancyId: uuid("occupancy_id"),
+    tableId: uuid("table_id"),
+    code: varchar("code", { length: 80 }).notNull(),
+    severity: varchar("severity", { length: 20 }).notNull(),
+    state: salonExceptionState("state").notNull().default("open"),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    acknowledgedByIdentityId: uuid("acknowledged_by_identity_id").references(() => identities.id),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("salon_exceptions_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    index("salon_exceptions_open_idx").on(table.organizationId, table.unitId, table.state),
+    foreignKey({
+      name: "salon_exceptions_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const operationsTenantTables = [
   posCatalogCategories,
   posAllergens,
@@ -710,6 +1116,18 @@ export const operationsTenantTables = [
   posOperationApprovals,
   posTabEvents,
   posIdempotencyReceipts,
+  serviceAreas,
+  tableLayoutVersions,
+  tableLayoutNodes,
+  serviceShifts,
+  areaAssignments,
+  tableGroups,
+  tableOccupancies,
+  tableGroupMembers,
+  tableOccupancyEvents,
+  serviceIncidents,
+  staffPresenceLeases,
+  salonExceptions,
 ] as const;
 
 for (const table of operationsTenantTables) table.enableRLS();
