@@ -2516,6 +2516,166 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[0]"];
+    put?: never;
+    post: operations["PlatformController_propose[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[1]"];
+    put?: never;
+    post: operations["PlatformController_propose[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory": {
     parameters: {
       query?: never;
@@ -4791,6 +4951,110 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
+    };
+    PlatformCountsResponse: {
+      organizations: number;
+      active: number;
+      attention: number;
+    };
+    PlatformAccessResponse: {
+      permissions: string[];
+      stepUp: boolean;
+      /** Format: date-time */
+      stepUpExpiresAt: string | null;
+    };
+    PlatformOverviewResponse: {
+      counts: components["schemas"]["PlatformCountsResponse"];
+      access: components["schemas"]["PlatformAccessResponse"];
+    };
+    PlatformOrganizationResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantContextResponse: {
+      organization: components["schemas"]["PlatformOrganizationResponse"];
+      units: components["schemas"]["PlatformUnitResponse"][];
+      /** Format: uuid */
+      selectedUnitId: string | null;
+    };
+    PlatformProjectionResponse: {
+      /** @enum {string} */
+      resource:
+        | "tenant"
+        | "plan"
+        | "entitlements"
+        | "users"
+        | "onboarding"
+        | "billing"
+        | "integrations"
+        | "incidents"
+        | "audit"
+        | "leads"
+        | "support";
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      /** @description Sanitized rows for the selected tenant and resource. */
+      items: Record<string, never>[];
+      nextCursor: string | null;
+    };
+    PlatformActionPayloadResponse: {
+      expectedState: string;
+      restoreTo?: string;
+    };
+    PlatformActionResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** @enum {string} */
+      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      /** @enum {string} */
+      targetType: "organization" | "membership";
+      /** Format: uuid */
+      targetId: string;
+      /** Format: uuid */
+      requestedByIdentityId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+      /** @enum {string} */
+      status: "pending" | "approved" | "executed" | "rejected" | "expired" | "failed";
+      version: number;
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: uuid */
+      decidedByIdentityId?: string;
+      /** Format: date-time */
+      decidedAt?: string;
+      failureCode?: string;
+    };
+    PlatformActionPageResponse: {
+      items: components["schemas"]["PlatformActionResponse"][];
+      nextCursor: string | null;
+    };
+    PlatformProposalRequest: {
+      /** @enum {string} */
+      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      /** Format: uuid */
+      targetId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+    };
+    PlatformDecisionRequest: {
+      expectedVersion: number;
     };
   };
   responses: never;
@@ -10477,7 +10741,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
       };
     };
   };
@@ -10494,7 +10760,321 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[0]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[1]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
       };
     };
   };

@@ -12541,7 +12541,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOverviewResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12555,7 +12562,622 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{organizationId}/context": {
+      "get": {
+        "operationId": "PlatformController_context[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantContextResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/context": {
+      "get": {
+        "operationId": "PlatformController_context[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantContextResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{organizationId}/resources/{resource}": {
+      "get": {
+        "operationId": "PlatformController_projection[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformProjectionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/resources/{resource}": {
+      "get": {
+        "operationId": "PlatformController_projection[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformProjectionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{organizationId}/actions": {
+      "get": {
+        "operationId": "PlatformController_actions[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionPageResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformController_propose[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformProposalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/actions": {
+      "get": {
+        "operationId": "PlatformController_actions[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionPageResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformController_propose[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformProposalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+      "post": {
+        "operationId": "PlatformController_approve[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+      "post": {
+        "operationId": "PlatformController_approve[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+      "post": {
+        "operationId": "PlatformController_reject[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+      "post": {
+        "operationId": "PlatformController_reject[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActionResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22665,6 +23287,358 @@
           "createdAt",
           "updatedAt",
           "steps"
+        ]
+      },
+      "PlatformCountsResponse": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attention": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "organizations",
+          "active",
+          "attention"
+        ]
+      },
+      "PlatformAccessResponse": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stepUp": {
+            "type": "boolean"
+          },
+          "stepUpExpiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "permissions",
+          "stepUp",
+          "stepUpExpiresAt"
+        ]
+      },
+      "PlatformOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/PlatformCountsResponse"
+          },
+          "access": {
+            "$ref": "#/components/schemas/PlatformAccessResponse"
+          }
+        },
+        "required": [
+          "counts",
+          "access"
+        ]
+      },
+      "PlatformOrganizationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "billingState": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "billingState",
+          "updatedAt"
+        ]
+      },
+      "PlatformUnitResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active",
+          "timezone"
+        ]
+      },
+      "PlatformTenantContextResponse": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/PlatformOrganizationResponse"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUnitResponse"
+            }
+          },
+          "selectedUnitId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "organization",
+          "units",
+          "selectedUnitId"
+        ]
+      },
+      "PlatformProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "plan",
+              "entitlements",
+              "users",
+              "onboarding",
+              "billing",
+              "integrations",
+              "incidents",
+              "audit",
+              "leads",
+              "support"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "items": {
+            "description": "Sanitized rows for the selected tenant and resource.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "resource",
+          "availability",
+          "items",
+          "nextCursor"
+        ]
+      },
+      "PlatformActionPayloadResponse": {
+        "type": "object",
+        "properties": {
+          "expectedState": {
+            "type": "string"
+          },
+          "restoreTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedState"
+        ]
+      },
+      "PlatformActionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tenant.suspend",
+              "tenant.restore",
+              "membership.disable",
+              "membership.restore"
+            ]
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "organization",
+              "membership"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedByIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PlatformActionPayloadResponse"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "executed",
+              "rejected",
+              "expired",
+              "failed"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedByIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "action",
+          "targetType",
+          "targetId",
+          "requestedByIdentityId",
+          "justification",
+          "payload",
+          "status",
+          "version",
+          "requestedAt",
+          "expiresAt"
+        ]
+      },
+      "PlatformActionPageResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformActionResponse"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "PlatformProposalRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "tenant.suspend",
+              "tenant.restore",
+              "membership.disable",
+              "membership.restore"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PlatformActionPayloadResponse"
+          }
+        },
+        "required": [
+          "action",
+          "targetId",
+          "justification",
+          "payload"
+        ]
+      },
+      "PlatformDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
         ]
       }
     }

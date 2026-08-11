@@ -1,8 +1,132 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiOkResponse,
+  ApiProperty,
+} from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/session.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { PlatformAdminGuard } from "./platform.guard.js";
 import { PlatformService } from "./platform.service.js";
+
+const platformActions = [
+  "tenant.suspend",
+  "tenant.restore",
+  "membership.disable",
+  "membership.restore",
+] as const;
+
+class PlatformCountsResponse {
+  @ApiProperty({ type: "integer", minimum: 0 }) declare organizations: number;
+  @ApiProperty({ type: "integer", minimum: 0 }) declare active: number;
+  @ApiProperty({ type: "integer", minimum: 0 }) declare attention: number;
+}
+
+class PlatformAccessResponse {
+  @ApiProperty({ type: [String] }) declare permissions: string[];
+  @ApiProperty() declare stepUp: boolean;
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
+  declare stepUpExpiresAt: string | null;
+}
+
+class PlatformOverviewResponse {
+  @ApiProperty({ type: () => PlatformCountsResponse }) declare counts: PlatformCountsResponse;
+  @ApiProperty({ type: () => PlatformAccessResponse }) declare access: PlatformAccessResponse;
+}
+
+class PlatformOrganizationResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty() declare name: string;
+  @ApiProperty() declare billingState: string;
+  @ApiProperty({ format: "date-time" }) declare updatedAt: string;
+}
+
+class PlatformUnitResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty() declare name: string;
+  @ApiProperty() declare active: boolean;
+  @ApiProperty() declare timezone: string;
+}
+
+class PlatformTenantContextResponse {
+  @ApiProperty({ type: () => PlatformOrganizationResponse })
+  declare organization: PlatformOrganizationResponse;
+  @ApiProperty({ type: () => [PlatformUnitResponse] }) declare units: PlatformUnitResponse[];
+  @ApiProperty({ nullable: true, type: String, format: "uuid" }) declare selectedUnitId:
+    | string
+    | null;
+}
+
+class PlatformProjectionResponse {
+  @ApiProperty({
+    enum: [
+      "tenant",
+      "plan",
+      "entitlements",
+      "users",
+      "onboarding",
+      "billing",
+      "integrations",
+      "incidents",
+      "audit",
+      "leads",
+      "support",
+    ],
+  })
+  declare resource: string;
+  @ApiProperty({ enum: ["available", "unavailable"] }) declare availability: string;
+  @ApiProperty({ required: false }) declare reasonCode?: string;
+  @ApiProperty({
+    type: [Object],
+    description: "Sanitized rows for the selected tenant and resource.",
+  })
+  declare items: Array<Record<string, unknown>>;
+  @ApiProperty({ nullable: true, type: String }) declare nextCursor: string | null;
+}
+
+class PlatformActionPayloadResponse {
+  @ApiProperty() declare expectedState: string;
+  @ApiProperty({ required: false }) declare restoreTo?: string;
+}
+
+class PlatformActionResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty({ format: "uuid" }) declare organizationId: string;
+  @ApiProperty({ enum: platformActions }) declare action: string;
+  @ApiProperty({ enum: ["organization", "membership"] }) declare targetType: string;
+  @ApiProperty({ format: "uuid" }) declare targetId: string;
+  @ApiProperty({ format: "uuid" }) declare requestedByIdentityId: string;
+  @ApiProperty({ minLength: 20, maxLength: 500 }) declare justification: string;
+  @ApiProperty({ type: () => PlatformActionPayloadResponse })
+  declare payload: PlatformActionPayloadResponse;
+  @ApiProperty({ enum: ["pending", "approved", "executed", "rejected", "expired", "failed"] })
+  declare status: string;
+  @ApiProperty({ type: "integer", minimum: 1 }) declare version: number;
+  @ApiProperty({ format: "date-time" }) declare requestedAt: string;
+  @ApiProperty({ format: "date-time" }) declare expiresAt: string;
+  @ApiProperty({ required: false, format: "uuid" }) declare decidedByIdentityId?: string;
+  @ApiProperty({ required: false, format: "date-time" }) declare decidedAt?: string;
+  @ApiProperty({ required: false }) declare failureCode?: string;
+}
+
+class PlatformActionPageResponse {
+  @ApiProperty({ type: () => [PlatformActionResponse] }) declare items: PlatformActionResponse[];
+  @ApiProperty({ nullable: true, type: String }) declare nextCursor: string | null;
+}
+
+class PlatformProposalRequest {
+  @ApiProperty({ enum: platformActions }) declare action: string;
+  @ApiProperty({ format: "uuid" }) declare targetId: string;
+  @ApiProperty({ minLength: 20, maxLength: 500 }) declare justification: string;
+  @ApiProperty({ type: () => PlatformActionPayloadResponse })
+  declare payload: PlatformActionPayloadResponse;
+}
+
+class PlatformDecisionRequest {
+  @ApiProperty({ type: "integer", minimum: 1 }) declare expectedVersion: number;
+}
 
 @UseGuards(SessionGuard, PlatformAdminGuard)
 @Controller(["api/v1/platform", "v1/platform"])
@@ -10,11 +134,13 @@ export class PlatformController {
   constructor(private readonly platform: PlatformService) {}
 
   @Get("overview")
+  @ApiOkResponse({ type: PlatformOverviewResponse })
   overview(@Req() request: AuthenticatedRequest) {
     return this.platform.overview(request.auth);
   }
 
   @Get("tenants/:organizationId/context")
+  @ApiOkResponse({ type: PlatformTenantContextResponse })
   context(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,
@@ -24,6 +150,7 @@ export class PlatformController {
   }
 
   @Get("tenants/:organizationId/resources/:resource")
+  @ApiOkResponse({ type: PlatformProjectionResponse })
   projection(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,
@@ -40,6 +167,7 @@ export class PlatformController {
   }
 
   @Get("tenants/:organizationId/actions")
+  @ApiOkResponse({ type: PlatformActionPageResponse })
   actions(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,
@@ -53,6 +181,9 @@ export class PlatformController {
   }
 
   @Post("tenants/:organizationId/actions")
+  @ApiHeader({ name: "idempotency-key", required: true })
+  @ApiBody({ type: PlatformProposalRequest })
+  @ApiCreatedResponse({ type: PlatformActionResponse })
   propose(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,
@@ -63,6 +194,9 @@ export class PlatformController {
   }
 
   @Post("tenants/:organizationId/actions/:proposalId/approve")
+  @ApiHeader({ name: "idempotency-key", required: true })
+  @ApiBody({ type: PlatformDecisionRequest })
+  @ApiOkResponse({ type: PlatformActionResponse })
   approve(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,
@@ -80,6 +214,9 @@ export class PlatformController {
   }
 
   @Post("tenants/:organizationId/actions/:proposalId/reject")
+  @ApiHeader({ name: "idempotency-key", required: true })
+  @ApiBody({ type: PlatformDecisionRequest })
+  @ApiOkResponse({ type: PlatformActionResponse })
   reject(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,

@@ -267,6 +267,10 @@ function onboardingPath(organizationId: string, resource = ""): string {
   return `/v1/organizations/${encodeURIComponent(organizationId)}/onboarding${suffix}`;
 }
 
+function platformTenantPath(organizationId: string, resource: string): string {
+  return `/v1/platform/tenants/${encodeURIComponent(organizationId)}/${resource}`;
+}
+
 async function idempotentRequest<T>(
   path: string,
   method: "POST" | "PUT",
@@ -365,6 +369,70 @@ export const api = {
   },
   platform: {
     overview: () => request<unknown>("/v1/platform/overview"),
+    context: (organizationId: string, unitId?: string) =>
+      request<unknown>(
+        `${platformTenantPath(organizationId, "context")}${unitId ? `?unitId=${encodeURIComponent(unitId)}` : ""}`,
+      ),
+    projection: (
+      organizationId: string,
+      resource: string,
+      options: { unitId?: string; cursor?: string; limit?: number } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (options.unitId) query.set("unitId", options.unitId);
+      if (options.cursor) query.set("cursor", options.cursor);
+      if (options.limit) query.set("limit", String(options.limit));
+      const suffix = query.size > 0 ? `?${query}` : "";
+      return request<unknown>(
+        `${platformTenantPath(organizationId, `resources/${encodeURIComponent(resource)}`)}${suffix}`,
+      );
+    },
+    actions: (organizationId: string) =>
+      request<unknown>(platformTenantPath(organizationId, "actions")),
+    propose: (
+      organizationId: string,
+      body: unknown,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(platformTenantPath(organizationId, "actions"), {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(body),
+      }),
+    approve: (
+      organizationId: string,
+      proposalId: string,
+      expectedVersion: number,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(
+        platformTenantPath(
+          organizationId,
+          `actions/${encodeURIComponent(proposalId)}/approve`,
+        ),
+        {
+          method: "POST",
+          headers: { "idempotency-key": idempotencyKey },
+          body: JSON.stringify({ expectedVersion }),
+        },
+      ),
+    reject: (
+      organizationId: string,
+      proposalId: string,
+      expectedVersion: number,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(
+        platformTenantPath(
+          organizationId,
+          `actions/${encodeURIComponent(proposalId)}/reject`,
+        ),
+        {
+          method: "POST",
+          headers: { "idempotency-key": idempotencyKey },
+          body: JSON.stringify({ expectedVersion }),
+        },
+      ),
   },
   management: {
     inventory: (organizationId: string, unitId: string) =>
