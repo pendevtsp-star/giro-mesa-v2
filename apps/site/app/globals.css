@@ -152,6 +152,10 @@ summary:focus-visible {
   color: var(--lime);
   font-size: 17px;
 }
+.logo-mark .gm-icon {
+  width: 18px;
+  height: 18px;
+}
 .desktop-nav {
   display: flex;
   gap: 28px;

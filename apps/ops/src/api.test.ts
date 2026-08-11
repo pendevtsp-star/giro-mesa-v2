@@ -124,7 +124,7 @@ describe("fronteira runtime da API de onboarding", () => {
       ),
     );
 
-    const pending = withPwaMutation(() => api.logout());
+    const pending = withPwaMutation((context) => api.logout(context));
     expect(getPwaMutationCount()).toBe(1);
     finish?.(new Response(null, { status: 204 }));
     await pending;

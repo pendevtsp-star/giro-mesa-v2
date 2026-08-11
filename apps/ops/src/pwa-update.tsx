@@ -2,28 +2,20 @@ import {
   beginPwaMutation,
   endPwaMutation,
   getPwaMutationCount,
+  requestPwaActivation,
   subscribePwaMutations,
   withPwaMutation,
 } from "@giromesa/ui/pwa-mutation";
 import { useEffect, useRef, useState } from "react";
 
-export { beginPwaMutation, endPwaMutation, withPwaMutation };
+export { beginPwaMutation, endPwaMutation, requestPwaActivation, withPwaMutation };
 
 const DATABASE_NAME = "giromesa-ops-pwa";
 const DATABASE_VERSION = 2;
 const METADATA_STORE = "runtime-metadata";
 const RECORD_SCHEMA_VERSION = 2;
 
-type WaitingWorker = { postMessage(message: { type: string }): void };
 type PwaRecord = { key: string; schemaVersion: number; expiresAt: number };
-type ActivationResult = "activated" | "blocked" | "unavailable";
-
-export function requestPwaActivation(waiting?: WaitingWorker | null): ActivationResult {
-  if (!waiting) return "unavailable";
-  if (getPwaMutationCount() > 0) return "blocked";
-  waiting.postMessage({ type: "SKIP_WAITING" });
-  return "activated";
-}
 
 export function retainFreshPwaRecords<T extends PwaRecord>(records: T[], now = Date.now()): T[] {
   return records.filter(

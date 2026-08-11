@@ -969,7 +969,7 @@ function OperationalApp({
       if (replaying) return;
       replaying = true;
       setSyncState("syncing");
-      const remaining = await withPwaMutation(() =>
+      const replay = () =>
         replayOperationalQueue(
           {
             organizationId: session.organizationId,
@@ -977,8 +977,8 @@ function OperationalApp({
             actorId: session.identityId,
           },
           runtime,
-        ),
-      );
+        );
+      const remaining = runtime.embedded ? await withPwaMutation(replay) : await replay();
       replaying = false;
       if (cancelled) return;
       setQueuedCommands(remaining);
@@ -1007,7 +1007,7 @@ function OperationalApp({
   const dispatchPilot = useCallback<PilotDispatcher>(
     async (type, payload, execute) => {
       try {
-        const result = await withPwaMutation(() =>
+        const dispatch = () =>
           dispatchOperationalMutation({
             scope: {
               organizationId: session.organizationId,
@@ -1018,8 +1018,8 @@ function OperationalApp({
             type,
             payload,
             execute,
-          }),
-        );
+          });
+        const result = runtime.embedded ? await withPwaMutation(dispatch) : await dispatch();
         setRuntimeError(null);
         return result;
       } catch (error) {

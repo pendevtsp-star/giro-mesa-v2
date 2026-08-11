@@ -246,7 +246,7 @@ export function MenuExperience({
     if (!apiUrl || !apiEnabled) return false;
     setPendingCommand(type);
     try {
-      return await withCustomerPwaMutation(async () => {
+      return await withCustomerPwaMutation(async (context) => {
         const response = await customerFetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
           {
@@ -257,6 +257,7 @@ export function MenuExperience({
             },
             body: JSON.stringify({ type, payload }),
           },
+          context,
         );
         const result: unknown = await response.json();
         if (!response.ok || !isCommandAccepted(result)) {
@@ -325,7 +326,7 @@ export function MenuExperience({
     setOrderAttempt(attempt);
     setPendingCommand("public_order");
     try {
-      await withCustomerPwaMutation(async () => {
+      await withCustomerPwaMutation(async (context) => {
         const response = await customerFetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/orders`,
           {
@@ -333,6 +334,7 @@ export function MenuExperience({
             headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
             body: serialized,
           },
+          context,
         );
         const payload: unknown = await response.json();
         const receipt = readPublicOrderReceipt(payload);
@@ -593,7 +595,7 @@ export function MenuExperience({
       </section>
       <footer className="menu-footer">
         <b>
-          <span>G</span> GiroMesa
+          <Icon name="platform" /> GiroMesa
         </b>
         <p>Cardápio digital · valores em reais</p>
         <a href="/privacidade">Privacidade</a> · <a href="/preferencias">Comunicações</a>

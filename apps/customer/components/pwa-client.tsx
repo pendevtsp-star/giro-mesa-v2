@@ -2,6 +2,7 @@
 
 import {
   getPwaMutationCount,
+  requestPwaActivation,
   subscribePwaMutations,
   withPwaMutation,
 } from "@giromesa/ui/pwa-mutation";
@@ -63,9 +64,8 @@ export function PwaClient() {
   }, []);
 
   function activate() {
-    if (!waiting || mutationCount > 0) return;
+    if (requestPwaActivation(waiting) !== "activated") return;
     activationRequested.current = true;
-    waiting.postMessage({ type: "SKIP_WAITING" });
   }
 
   return (
