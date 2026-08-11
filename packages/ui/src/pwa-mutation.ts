@@ -15,8 +15,17 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const listeners = new Set<MutationListener>();
 const activeContexts = new Set<PwaMutationContext>();
 let activeMutations = 0;
+let activationPending = false;
+
+export class PwaActivationInProgressError extends Error {
+  constructor() {
+    super("A atualização do aplicativo já está em andamento.");
+    this.name = "PwaActivationInProgressError";
+  }
+}
 
 export function beginPwaMutation() {
+  if (activationPending) throw new PwaActivationInProgressError();
   activeMutations += 1;
   notifyMutationListeners();
 }
@@ -28,6 +37,14 @@ export function endPwaMutation() {
 
 export function getPwaMutationCount() {
   return activeMutations;
+}
+
+export function isPwaActivationPending() {
+  return activationPending;
+}
+
+export function cancelPwaActivation() {
+  activationPending = false;
 }
 
 export function subscribePwaMutations(listener: MutationListener) {
@@ -74,8 +91,14 @@ export function createPwaFetch(
 
 export function requestPwaActivation(waiting?: WaitingWorker | null): ActivationResult {
   if (!waiting) return "unavailable";
-  if (getPwaMutationCount() > 0) return "blocked";
-  waiting.postMessage({ type: "SKIP_WAITING" });
+  if (activationPending || getPwaMutationCount() > 0) return "blocked";
+  activationPending = true;
+  try {
+    waiting.postMessage({ type: "SKIP_WAITING" });
+  } catch {
+    activationPending = false;
+    return "unavailable";
+  }
   return "activated";
 }
 

@@ -146,6 +146,15 @@ Os dois achados Important e o achado Minor restantes foram fechados no commit `5
 
 O aviso do Next sobre LCP durante captura full-page permanece limitado ao percurso artificial por imagens abaixo da dobra; nenhum provider, push ou deploy foi executado.
 
+## Fechamento independente da corrida de ativação
+
+A revisão final do integrador encontrou uma janela TOCTOU residual: uma nova mutação ainda podia começar depois de `requestPwaActivation` consultar o contador e enviar `SKIP_WAITING`, mas antes de `controllerchange` recarregar a página. O helper compartilhado agora adquire um latch global antes de enviar a mensagem ao worker. Enquanto a ativação estiver pendente, `beginPwaMutation` e `withPwaMutation` falham fechado; se `postMessage` falhar sincronamente, o latch é liberado.
+
+- Novo teste prova que nenhuma mutação começa entre `SKIP_WAITING` e reload e que o contador permanece zero.
+- Novo teste prova rollback do latch quando o worker não aceita a mensagem.
+- UI focada: 9/9; Ops: 68/68.
+- O cancelamento exportado existe para recuperação controlada/testes; a aplicação não libera o latch após ter solicitado uma ativação válida.
+
 ## Fechamento
 
 Os commits de produto e de remediação permanecem recuperáveis, e o commit final registra este relatório. A branch foi mantida no worktree isolado para integração pelo responsável da trilha.

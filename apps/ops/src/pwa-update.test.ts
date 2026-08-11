@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   beginPwaMutation,
+  cancelPwaActivation,
   endPwaMutation,
   requestPwaActivation,
   retainFreshPwaRecords,
@@ -26,6 +27,7 @@ describe("coordenação de update da PWA operacional", () => {
 
     expect(requestPwaActivation(waiting)).toBe("activated");
     expect(waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+    cancelPwaActivation();
   });
 
   it("mantém o contador consistente mesmo quando o comando falha", async () => {
@@ -37,6 +39,7 @@ describe("coordenação de update da PWA operacional", () => {
 
     const waiting = { postMessage: vi.fn() };
     expect(requestPwaActivation(waiting)).toBe("activated");
+    cancelPwaActivation();
   });
 
   it("remove metadados expirados e de schema legado durante a migração", () => {
@@ -59,5 +62,6 @@ describe("coordenação de update da PWA operacional", () => {
     expect(requestPwaActivation(waiting)).toBe("blocked");
     endPwaMutation();
     expect(requestPwaActivation(waiting)).toBe("activated");
+    cancelPwaActivation();
   });
 });

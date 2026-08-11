@@ -1,5 +1,6 @@
 import {
   beginPwaMutation,
+  cancelPwaActivation,
   endPwaMutation,
   getPwaMutationCount,
   requestPwaActivation,
@@ -8,7 +9,13 @@ import {
 } from "@giromesa/ui/pwa-mutation";
 import { useEffect, useRef, useState } from "react";
 
-export { beginPwaMutation, endPwaMutation, requestPwaActivation, withPwaMutation };
+export {
+  beginPwaMutation,
+  cancelPwaActivation,
+  endPwaMutation,
+  requestPwaActivation,
+  withPwaMutation,
+};
 
 const DATABASE_NAME = "giromesa-ops-pwa";
 const DATABASE_VERSION = 2;

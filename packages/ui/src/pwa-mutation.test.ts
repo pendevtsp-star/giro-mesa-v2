@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   beginPwaMutation,
+  cancelPwaActivation,
   createPwaFetch,
   endPwaMutation,
   getPwaMutationCount,
+  isPwaActivationPending,
+  PwaActivationInProgressError,
   requestPwaActivation,
   subscribePwaMutations,
   withPwaMutation,
@@ -94,5 +97,33 @@ describe("fronteira compartilhada de mutações PWA", () => {
     expect(waiting.postMessage).not.toHaveBeenCalled();
     endPwaMutation();
     expect(requestPwaActivation(waiting)).toBe("activated");
+    cancelPwaActivation();
+  });
+
+  it("fecha a janela entre SKIP_WAITING e o reload contra novas mutações", async () => {
+    const waiting = { postMessage: vi.fn() };
+    expect(requestPwaActivation(waiting)).toBe("activated");
+    expect(isPwaActivationPending()).toBe(true);
+    expect(() => beginPwaMutation()).toThrow(PwaActivationInProgressError);
+    expect(() => withPwaMutation(async () => new Response(null, { status: 204 }))).toThrow(
+      PwaActivationInProgressError,
+    );
+    expect(getPwaMutationCount()).toBe(0);
+
+    cancelPwaActivation();
+    await expect(
+      withPwaMutation(async () => new Response(null, { status: 204 })),
+    ).resolves.toBeInstanceOf(Response);
+    expect(getPwaMutationCount()).toBe(0);
+  });
+
+  it("libera o latch quando o postMessage falha antes da ativação", () => {
+    const waiting = {
+      postMessage: vi.fn(() => {
+        throw new Error("worker indisponível");
+      }),
+    };
+    expect(requestPwaActivation(waiting)).toBe("unavailable");
+    expect(isPwaActivationPending()).toBe(false);
   });
 });
