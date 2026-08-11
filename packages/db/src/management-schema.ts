@@ -345,6 +345,7 @@ export const fiscalDocuments = pgTable(
       .notNull()
       .references(() => identities.id),
     attemptCount: integer("attempt_count").notNull().default(0),
+    version: integer("version").notNull().default(1),
     authorizedAt: timestamp("authorized_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     ...timestamps,
@@ -364,6 +365,7 @@ export const fiscalDocuments = pgTable(
     }).onDelete("restrict"),
     check("fiscal_documents_total_check", sql`${table.totalCents} > 0`),
     check("fiscal_documents_attempt_check", sql`${table.attemptCount} >= 0`),
+    check("fiscal_documents_version_check", sql`${table.version} > 0`),
   ],
 );
 

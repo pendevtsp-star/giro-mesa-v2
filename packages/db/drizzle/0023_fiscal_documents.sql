@@ -15,6 +15,7 @@ CREATE TABLE "fiscal_documents" (
   "request_hash" varchar(64) NOT NULL,
   "actor_identity_id" uuid NOT NULL,
   "attempt_count" integer DEFAULT 0 NOT NULL,
+  "version" integer DEFAULT 1 NOT NULL,
   "authorized_at" timestamp with time zone,
   "cancelled_at" timestamp with time zone,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE "fiscal_documents" (
   CONSTRAINT "fiscal_documents_scope_id_unique" UNIQUE("organization_id", "unit_id", "id"),
   CONSTRAINT "fiscal_documents_total_check" CHECK ("total_cents" > 0),
   CONSTRAINT "fiscal_documents_attempt_check" CHECK ("attempt_count" >= 0),
+  CONSTRAINT "fiscal_documents_version_check" CHECK ("version" > 0),
   CONSTRAINT "fiscal_documents_status_check" CHECK ("status" IN ('pending','submitted','authorized','rejected','cancelled'))
 );
 --> statement-breakpoint

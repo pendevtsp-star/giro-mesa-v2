@@ -21,10 +21,14 @@ const SENSITIVE_FISCAL_KEY =
   /(?:^|_)(?:pan|card_number|cvv|cvc|cid|track_?1|track_?2|track_data|pin|password|passphrase|secret|token|api_key|access_key|private_key)(?:$|_)/i;
 const CARD_CANDIDATE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
 const TRACK_DATA = /(?:%B\d{12,19}\^|;\d{12,19}=)/i;
-const SECRET_VALUE = /(?:\bBearer\s+[A-Za-z0-9._~+/=-]{12,}|\bsk_(?:live|test)_[A-Za-z0-9]{12,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/i;
+const SECRET_VALUE =
+  /(?:\bBearer\s+[A-Za-z0-9._~+/=-]{12,}|\bsk_(?:live|test)_[A-Za-z0-9]{12,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/i;
 
 function normalizedKey(key: string) {
-  return key.replaceAll(/([a-z])([A-Z])/g, "$1_$2").replaceAll(/[^a-z0-9]+/gi, "_").toLowerCase();
+  return key
+    .replaceAll(/([a-z])([A-Z])/g, "$1_$2")
+    .replaceAll(/[^a-z0-9]+/gi, "_")
+    .toLowerCase();
 }
 
 function passesLuhn(digits: string) {
@@ -178,13 +182,16 @@ export class FiscalService {
       await this.event(tx, document, null, "pending", "created", identityId);
       return { document, replay: false };
     });
-    if (prepared.replay) return { ...this.dto(prepared.document), idempotentReplay: true };
+    if (prepared.replay) {
+      const resumed = await this.resume(prepared.document, identityId);
+      return { ...resumed, idempotentReplay: true };
+    }
     return this.submit(prepared.document, identityId);
   }
 
   async retry(identityId: string, organizationId: string, unitId: string, documentId: string) {
     await this.requireRole(identityId, organizationId, unitId);
-    const document = await this.find(organizationId, unitId, documentId);
+    let document = await this.find(organizationId, unitId, documentId);
     if (document.status === "authorized" || document.status === "cancelled")
       throw new ConflictException({
         code: "FISCAL_DOCUMENT_TERMINAL",
@@ -194,19 +201,67 @@ export class FiscalService {
       const lookedUp = await this.adapter.lookup(document.documentReference);
       if (lookedUp.status !== "pending") return this.apply(document, lookedUp, identityId);
     }
-    const pending = await this.database.db.transaction(async (tx) => {
-      const from = document.status;
-      const next = transitionFiscalDocument(from, "retry");
-      const [updated] = await tx
-        .update(fiscalDocuments)
-        .set({ status: next, updatedAt: new Date() })
-        .where(eq(fiscalDocuments.id, document.id))
-        .returning();
-      if (!updated) throw new Error("Fiscal retry update returned no row.");
-      await this.event(tx, updated, from, next, "retry", identityId);
-      return updated;
-    });
-    return this.submit(pending, identityId);
+    if (document.status === "rejected") {
+      document = await this.database.db.transaction(async (tx) => {
+        const current = await this.lockDocument(tx, organizationId, unitId, documentId);
+        if (current.status !== "rejected") return current;
+        const next = transitionFiscalDocument(current.status, "retry");
+        const [updated] = await tx
+          .update(fiscalDocuments)
+          .set({ status: next, version: current.version + 1, updatedAt: new Date() })
+          .where(
+            and(
+              eq(fiscalDocuments.id, current.id),
+              eq(fiscalDocuments.version, current.version),
+              eq(fiscalDocuments.status, current.status),
+            ),
+          )
+          .returning();
+        if (!updated) throw new ConflictException({ code: "FISCAL_VERSION_CONFLICT" });
+        await this.event(tx, updated, current.status, next, "retry", identityId);
+        return updated;
+      });
+    }
+    return this.submit(document, identityId);
+  }
+
+  private async resume(document: typeof fiscalDocuments.$inferSelect, identityId: string) {
+    if (document.status === "pending" || document.status === "submitted") {
+      if (document.status === "submitted" && document.documentReference) {
+        const lookedUp = await this.adapter.lookup(document.documentReference);
+        if (lookedUp.status !== "pending") return this.apply(document, lookedUp, identityId);
+      }
+      return this.submit(document, identityId);
+    }
+    return this.dto(document);
+  }
+
+  private async lockDocument(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    documentId: string,
+  ) {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`fiscal-document:${organizationId}:${unitId}:${documentId}`}))`,
+    );
+    const [document] = await tx
+      .select()
+      .from(fiscalDocuments)
+      .where(
+        and(
+          eq(fiscalDocuments.organizationId, organizationId),
+          eq(fiscalDocuments.unitId, unitId),
+          eq(fiscalDocuments.id, documentId),
+        ),
+      )
+      .limit(1);
+    if (!document)
+      throw new NotFoundException({
+        code: "FISCAL_DOCUMENT_NOT_FOUND",
+        message: "Documento fiscal não encontrado nesta unidade.",
+      });
+    return document;
   }
 
   async cancel(
@@ -231,14 +286,28 @@ export class FiscalService {
     const result = await this.adapter.cancel(document.documentReference, reason.trim());
     if (result.status !== "cancelled") return this.dto(document);
     return this.database.db.transaction(async (tx) => {
-      const next = transitionFiscalDocument(document.status, "cancel");
+      const current = await this.lockDocument(tx, organizationId, unitId, documentId);
+      if (current.status === "cancelled") return this.dto(current);
+      if (current.status !== "authorized") return this.dto(current);
+      const next = transitionFiscalDocument(current.status, "cancel");
       const [updated] = await tx
         .update(fiscalDocuments)
-        .set({ status: next, cancelledAt: new Date(), updatedAt: new Date() })
-        .where(eq(fiscalDocuments.id, document.id))
+        .set({
+          status: next,
+          version: current.version + 1,
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(fiscalDocuments.id, current.id),
+            eq(fiscalDocuments.version, current.version),
+            eq(fiscalDocuments.status, current.status),
+          ),
+        )
         .returning();
-      if (!updated) throw new Error("Fiscal cancel update returned no row.");
-      await this.event(tx, updated, document.status, next, "cancel", identityId, undefined, {
+      if (!updated) throw new ConflictException({ code: "FISCAL_VERSION_CONFLICT" });
+      await this.event(tx, updated, current.status, next, "cancel", identityId, undefined, {
         reason: reason.trim(),
       });
       return this.dto(updated);
@@ -247,16 +316,36 @@ export class FiscalService {
 
   private async submit(document: typeof fiscalDocuments.$inferSelect, identityId: string) {
     const submitted = await this.database.db.transaction(async (tx) => {
-      const next = transitionFiscalDocument(document.status, "submit");
+      const current = await this.lockDocument(
+        tx,
+        document.organizationId,
+        document.unitId,
+        document.id,
+      );
+      if (current.status === "submitted") return current;
+      if (current.status !== "pending") return current;
+      const next = transitionFiscalDocument(current.status, "submit");
       const [updated] = await tx
         .update(fiscalDocuments)
-        .set({ status: next, attemptCount: document.attemptCount + 1, updatedAt: new Date() })
-        .where(eq(fiscalDocuments.id, document.id))
+        .set({
+          status: next,
+          attemptCount: current.attemptCount + 1,
+          version: current.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(fiscalDocuments.id, current.id),
+            eq(fiscalDocuments.version, current.version),
+            eq(fiscalDocuments.status, current.status),
+          ),
+        )
         .returning();
-      if (!updated) throw new Error("Fiscal submit update returned no row.");
-      await this.event(tx, updated, document.status, next, "submit", identityId);
+      if (!updated) throw new ConflictException({ code: "FISCAL_VERSION_CONFLICT" });
+      await this.event(tx, updated, current.status, next, "submit", identityId);
       return updated;
     });
+    if (submitted.status !== "submitted") return this.dto(submitted);
     let result: FiscalAdapterResult;
     try {
       result = await this.adapter.issue({
@@ -277,23 +366,41 @@ export class FiscalService {
     result: FiscalAdapterResult,
     identityId: string,
   ) {
-    if (result.status === "pending") {
-      const [updated] = await this.database.db
-        .update(fiscalDocuments)
-        .set({
-          documentReference: result.documentReference,
-          lastErrorCode: result.errorCode ?? "FISCAL_PENDING",
-          updatedAt: new Date(),
-        })
-        .where(eq(fiscalDocuments.id, document.id))
-        .returning();
-      if (!updated) throw new Error("Fiscal pending update returned no row.");
-      return this.dto(updated);
-    }
-    if (result.status !== "authorized" && result.status !== "rejected") return this.dto(document);
     return this.database.db.transaction(async (tx) => {
+      const current = await this.lockDocument(
+        tx,
+        document.organizationId,
+        document.unitId,
+        document.id,
+      );
+      if (current.status !== "submitted" || current.attemptCount !== document.attemptCount) {
+        return this.dto(current);
+      }
+      if (result.status === "pending") {
+        const [updated] = await tx
+          .update(fiscalDocuments)
+          .set({
+            documentReference: result.documentReference ?? current.documentReference,
+            lastErrorCode: result.errorCode ?? "FISCAL_PENDING",
+            version: current.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(fiscalDocuments.id, current.id),
+              eq(fiscalDocuments.version, current.version),
+              eq(fiscalDocuments.status, current.status),
+            ),
+          )
+          .returning();
+        if (!updated) throw new ConflictException({ code: "FISCAL_VERSION_CONFLICT" });
+        return this.dto(updated);
+      }
+      if (result.status !== "authorized" && result.status !== "rejected") {
+        return this.dto(current);
+      }
       const event = result.status === "authorized" ? "authorize" : "reject";
-      const next = transitionFiscalDocument(document.status, event);
+      const next = transitionFiscalDocument(current.status, event);
       const [updated] = await tx
         .update(fiscalDocuments)
         .set({
@@ -301,12 +408,19 @@ export class FiscalService {
           documentReference: result.documentReference,
           lastErrorCode: result.errorCode,
           authorizedAt: next === "authorized" ? new Date() : null,
+          version: current.version + 1,
           updatedAt: new Date(),
         })
-        .where(eq(fiscalDocuments.id, document.id))
+        .where(
+          and(
+            eq(fiscalDocuments.id, current.id),
+            eq(fiscalDocuments.version, current.version),
+            eq(fiscalDocuments.status, current.status),
+          ),
+        )
         .returning();
-      if (!updated) throw new Error("Fiscal result update returned no row.");
-      await this.event(tx, updated, document.status, next, event, identityId, result.errorCode);
+      if (!updated) throw new ConflictException({ code: "FISCAL_VERSION_CONFLICT" });
+      await this.event(tx, updated, current.status, next, event, identityId, result.errorCode);
       return this.dto(updated);
     });
   }
