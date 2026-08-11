@@ -2,6 +2,7 @@ import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
+import { KdsBoard, type KdsBoardTicket } from "./kds-board";
 import { type PilotDispatcher, type PilotLoader, pilotMutation } from "./operational-dispatch";
 import { formatMoney } from "./rules";
 import { SalonMap, type SalonMapTable, type SalonTableStatus } from "./salon-map";
@@ -639,7 +640,8 @@ function RealSalonWorkspace({
                     {busy ? "Abrindo…" : "Abrir comanda"}
                   </Button>
                 </Card>
-              )}
+              )
+            }
           />
         );
       }}
@@ -1454,23 +1456,6 @@ function TabWorkspace({
   );
 }
 
-const nextKdsState: Record<
-  KdsTicket["status"],
-  "preparing" | "ready" | "done" | "canceled" | null
-> = {
-  pending: "preparing",
-  preparing: "ready",
-  ready: "done",
-  done: null,
-  canceled: null,
-};
-
-const kdsActionLabel: Partial<Record<KdsTicket["status"], string>> = {
-  pending: "Iniciar preparo",
-  preparing: "Marcar pronto",
-  ready: "Concluir retirada",
-};
-
 export function RealKdsPage({ scope }: { scope: PilotScope }) {
   const remote = useRemote(
     scope,
@@ -1493,84 +1478,60 @@ export function RealKdsPage({ scope }: { scope: PilotScope }) {
               description="Nenhum ticket ativo foi retornado pelo servidor."
             />
           );
+        const boardTickets: KdsBoardTicket[] = activeTickets.map((ticket) => {
+          const rows = data.items.filter((row) => row.ticketId === ticket.id);
+          const createdAt = ticket.createdAt ? new Date(ticket.createdAt).getTime() : Date.now();
+          return {
+            id: ticket.id,
+            reference: `Pedido ${ticket.orderId.slice(0, 6).toUpperCase()}`,
+            station: `Estação ${ticket.stationId.slice(0, 6).toUpperCase()}`,
+            status: ticket.status as KdsBoardTicket["status"],
+            elapsedMinutes: Math.max(0, Math.floor((Date.now() - createdAt) / 60_000)),
+            priority: rows.some(({ item }) => /alerg|urgente|prioridade/i.test(item.notes ?? "")),
+            items: rows.map(({ item }) => ({
+              id: item.id,
+              label: `${item.quantity}× ${item.productName}`,
+              notes: item.notes ?? undefined,
+            })),
+          };
+        });
         return (
           <div>
-            <div className="kds-summary">
-              <Badge tone="warning">
-                {activeTickets.filter((ticket) => ticket.status === "pending").length} aguardando
-              </Badge>
-              <Badge tone="info">
-                {activeTickets.filter((ticket) => ticket.status === "preparing").length} em preparo
-              </Badge>
-              <Badge tone="success">
-                {activeTickets.filter((ticket) => ticket.status === "ready").length} prontos
-              </Badge>
-            </div>
             {feedback && (
               <p className="field-error" role="status">
                 {feedback}
               </p>
             )}
-            <div className="real-kds-grid">
-              {activeTickets.map((ticket) => {
-                const items = data.items.filter((row) => row.ticketId === ticket.id);
-                const next = nextKdsState[ticket.status];
-                return (
-                  <Card className={`real-kds-card real-kds-card--${ticket.status}`} key={ticket.id}>
-                    <div className="section-title">
-                      <strong>Ticket {ticket.id.slice(0, 6)}</strong>
-                      <Badge tone={statusTone(ticket.status)}>{ticket.status}</Badge>
-                    </div>
-                    <small>Estação {ticket.stationId.slice(0, 6)}</small>
-                    <ul>
-                      {items.map(({ item }) => (
-                        <li key={item.id}>
-                          <strong>{item.quantity}×</strong> {item.productName}
-                          {item.notes && <small>{item.notes}</small>}
-                        </li>
-                      ))}
-                    </ul>
-                    {next && (
-                      <Button
-                        disabled={busyId === ticket.id}
-                        onClick={async () => {
-                          setBusyId(ticket.id);
-                          setFeedback("");
-                          try {
-                            await scope.dispatch(
-                              "pos.kds.transition_requested",
-                              pilotMutation("transition-kds", {
-                                ticketId: ticket.id,
-                                state: next,
-                              }),
-                              (key) =>
-                                api.pilot.transitionKds(
-                                  scope.organizationId,
-                                  scope.unitId,
-                                  ticket.id,
-                                  next,
-                                  key,
-                                ),
-                            );
-                            remote.retry();
-                          } catch (error) {
-                            setFeedback(
-                              error instanceof Error
-                                ? error.message
-                                : "A transição não foi confirmada.",
-                            );
-                          } finally {
-                            setBusyId("");
-                          }
-                        }}
-                      >
-                        {busyId === ticket.id ? "Confirmando…" : kdsActionLabel[ticket.status]}
-                      </Button>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
+            <KdsBoard
+              busyId={busyId}
+              deviceState={feedback ? "degraded" : navigator.onLine ? "online" : "offline"}
+              onAdvance={async (ticket, next) => {
+                setBusyId(ticket.id);
+                setFeedback("");
+                try {
+                  await scope.dispatch(
+                    "pos.kds.transition_requested",
+                    pilotMutation("transition-kds", { ticketId: ticket.id, state: next }),
+                    (key) =>
+                      api.pilot.transitionKds(
+                        scope.organizationId,
+                        scope.unitId,
+                        ticket.id,
+                        next,
+                        key,
+                      ),
+                  );
+                  remote.retry();
+                } catch (error) {
+                  setFeedback(
+                    error instanceof Error ? error.message : "A transição não foi confirmada.",
+                  );
+                } finally {
+                  setBusyId("");
+                }
+              }}
+              tickets={boardTickets}
+            />
           </div>
         );
       }}
