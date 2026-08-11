@@ -7,13 +7,20 @@ const name = z.string().trim().min(1).max(160);
 const quantity = z
   .union([z.string().trim(), z.number().finite()])
   .refine(
-    (value) => /^-?\d+(\.\d{1,3})?$/.test(String(value)),
-    "Use no máximo três casas decimais.",
+    (value) => /^-?\d+(\.\d{1,6})?$/.test(String(value)),
+    "Use no máximo seis casas decimais.",
   );
 const positiveQuantity = quantity.refine(
   (value) => Number(value) > 0,
   "A quantidade deve ser positiva.",
 );
+const preciseQuantity = z
+  .union([z.string().trim(), z.number().finite()])
+  .transform((value) => String(value))
+  .refine((value) => /^\d+(\.\d{1,6})?$/.test(value) && Number(value) > 0, {
+    message: "Use até seis casas decimais e valor positivo.",
+  });
+const dimensionalUnit = z.enum(["mg", "g", "kg", "ml", "l", "unit", "dozen"]);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const instant = z.string().datetime({ offset: true });
 
@@ -33,21 +40,31 @@ export const inventoryItemSchema = z.object({
   productId: id.optional(),
   name,
   sku: z.string().trim().min(1).max(80).optional(),
-  unit: z.string().trim().min(1).max(20),
+  unit: dimensionalUnit,
+  dimension: z.enum(["mass", "volume", "count"]).optional(),
   minimumQuantity: quantity.refine((value) => Number(value) >= 0).default("0"),
   allowNegative: z.boolean().default(false),
 });
 
 export const recipeConfigurationSchema = z.object({
   productId: id,
+  yieldQuantity: preciseQuantity.optional(),
+  yieldUnit: dimensionalUnit.optional(),
   components: z
     .array(
-      z.object({
-        inventoryItemId: id,
-        locationId: id,
-        quantityMilli: z.number().int().positive().max(1_000_000_000),
-        lossBasisPoints: z.number().int().min(0).max(9_999).default(0),
-      }),
+      z
+        .object({
+          inventoryItemId: id,
+          locationId: id,
+          quantity: preciseQuantity.optional(),
+          unit: dimensionalUnit.optional(),
+          quantityMilli: z.number().int().positive().max(1_000_000_000).optional(),
+          lossBasisPoints: z.number().int().min(0).max(9_999).default(0),
+        })
+        .refine(
+          (component) => component.quantity !== undefined || component.quantityMilli !== undefined,
+          { message: "Informe quantity ou quantityMilli." },
+        ),
     )
     .min(1)
     .max(500),

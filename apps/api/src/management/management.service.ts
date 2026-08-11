@@ -35,6 +35,7 @@ import {
   posOrders,
   posProducts,
 } from "@giromesa/db";
+import { convertQuantity, parseQuantity, type QuantityUnit } from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
@@ -320,6 +321,13 @@ export class ManagementService {
     input: InventoryItemInput,
   ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    const parsedUnit = parseQuantity("1", input.unit as QuantityUnit);
+    if (input.dimension && input.dimension !== parsedUnit.dimension) {
+      throw new BadRequestException({
+        code: "INVENTORY_DIMENSION_MISMATCH",
+        message: "A dimensão informada não corresponde à unidade do item.",
+      });
+    }
     return this.database.db.transaction(async (tx) => {
       if (input.productId) await this.requireProduct(tx, organizationId, input.productId);
       const id = randomUUID();
@@ -330,6 +338,7 @@ export class ManagementService {
           organizationId,
           unitId,
           ...input,
+          dimension: parsedUnit.dimension,
           minimumQuantity: String(input.minimumQuantity),
         })
         .returning();
@@ -415,7 +424,11 @@ export class ManagementService {
         const locationIds = [...new Set(input.components.map((component) => component.locationId))];
         const [items, locations] = await Promise.all([
           tx
-            .select({ id: managementInventoryItems.id })
+            .select({
+              id: managementInventoryItems.id,
+              unit: managementInventoryItems.unit,
+              dimension: managementInventoryItems.dimension,
+            })
             .from(managementInventoryItems)
             .where(
               and(
@@ -478,18 +491,66 @@ export class ManagementService {
           unitId,
           productId: input.productId,
           version,
+          yieldQuantity: input.yieldQuantity ?? "1",
+          yieldUnit: input.yieldUnit ?? "unit",
           validFrom,
           createdByIdentityId: identityId,
         });
-        await tx.insert(managementRecipeComponents).values(
-          input.components.map((component) => ({
+        const itemById = new Map(items.map((item) => [item.id, item]));
+        const normalizedComponents = input.components.map((component) => {
+          const item = itemById.get(component.inventoryItemId);
+          if (!item) throw new Error("Validated inventory item disappeared.");
+          const componentUnit = (component.unit ?? item.unit) as QuantityUnit;
+          const parsedInput =
+            component.quantity !== undefined
+              ? parseQuantity(component.quantity, componentUnit)
+              : {
+                  atoms: BigInt(component.quantityMilli ?? 0) * 1_000n,
+                  unit: componentUnit,
+                  dimension: item.dimension,
+                };
+          if (parsedInput.dimension !== item.dimension) {
+            throw new BadRequestException({
+              code: "RECIPE_DIMENSION_MISMATCH",
+              message: "A unidade do componente não corresponde à dimensão do item.",
+            });
+          }
+          const parsed = convertQuantity(parsedInput, item.unit as QuantityUnit, "up");
+          const legacyMilli = Number((parsed.atoms + 999n) / 1_000n);
+          if (
+            !Number.isSafeInteger(legacyMilli) ||
+            legacyMilli <= 0 ||
+            legacyMilli > 1_000_000_000
+          ) {
+            throw new BadRequestException({
+              code: "RECIPE_QUANTITY_OUT_OF_RANGE",
+              message: "A quantidade do componente excede o limite suportado.",
+            });
+          }
+          if (
+            component.quantity !== undefined &&
+            component.quantityMilli !== undefined &&
+            component.quantityMilli !== legacyMilli
+          ) {
+            throw new BadRequestException({
+              code: "RECIPE_QUANTITY_MISMATCH",
+              message: "quantity e quantityMilli representam valores diferentes.",
+            });
+          }
+          return {
             id: randomUUID(),
             organizationId,
             unitId,
             recipeVersionId,
-            ...component,
-          })),
-        );
+            inventoryItemId: component.inventoryItemId,
+            locationId: component.locationId,
+            quantityMilli: legacyMilli,
+            quantityMicros: parsed.atoms,
+            unit: item.unit,
+            lossBasisPoints: component.lossBasisPoints,
+          };
+        });
+        await tx.insert(managementRecipeComponents).values(normalizedComponents);
         await this.record(
           tx,
           identityId,
@@ -505,7 +566,13 @@ export class ManagementService {
           productId: input.productId,
           version,
           validFrom: validFrom.toISOString(),
-          components: input.components,
+          components: normalizedComponents.map((component) => ({
+            inventoryItemId: component.inventoryItemId,
+            locationId: component.locationId,
+            quantityMicros: component.quantityMicros.toString(),
+            unit: component.unit,
+            lossBasisPoints: component.lossBasisPoints,
+          })),
         };
       },
     );
@@ -772,7 +839,7 @@ export class ManagementService {
           });
         const totalCents = input.items.reduce(
           (sum, item) =>
-            sum + Math.round((quantityToMilli(item.quantity) * item.unitCostCents) / 1_000),
+            sum + Math.round((quantityToMilli(item.quantity) * item.unitCostCents) / 1_000_000),
           0,
         );
         const purchaseOrderId = randomUUID();
@@ -793,7 +860,9 @@ export class ManagementService {
             inventoryItemId: item.inventoryItemId,
             quantity: String(item.quantity),
             unitCostCents: item.unitCostCents,
-            totalCents: Math.round((quantityToMilli(item.quantity) * item.unitCostCents) / 1_000),
+            totalCents: Math.round(
+              (quantityToMilli(item.quantity) * item.unitCostCents) / 1_000_000,
+            ),
           })),
         );
         await this.record(
@@ -1033,7 +1102,7 @@ export class ManagementService {
                     resultingMilli,
                 )
               : item.unitCostCents;
-          const lineTotalCents = Math.round((quantityMilli * item.unitCostCents) / 1_000);
+          const lineTotalCents = Math.round((quantityMilli * item.unitCostCents) / 1_000_000);
           const receiptLineId = randomUUID();
           await tx.insert(managementPurchaseReceiptLines).values({
             id: receiptLineId,

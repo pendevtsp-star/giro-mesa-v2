@@ -10,6 +10,7 @@ import {
   posOrderItems,
   posOrders,
 } from "@giromesa/db";
+import { applyYield, formatQuantity, parseQuantity, type QuantityUnit } from "@giromesa/domain";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,6 +192,63 @@ export function recipeConsumptionMilli(
   return (netMilli * 10_000n + yieldBasisPoints - 1n) / yieldBasisPoints;
 }
 
+function quantityToMicros(quantity: string) {
+  if (!/^-?\d+(?:\.\d{1,6})?$/.test(quantity)) {
+    throw new InventoryConsumptionError("INVENTORY_QUANTITY_INVALID");
+  }
+  const negative = quantity.startsWith("-");
+  const unsigned = negative ? quantity.slice(1) : quantity;
+  const [whole = "0", fraction = ""] = unsigned.split(".");
+  const micros = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+  return negative ? -micros : micros;
+}
+
+function microsToQuantity(micros: bigint) {
+  const negative = micros < 0n;
+  const absolute = negative ? -micros : micros;
+  return `${negative ? "-" : ""}${absolute / 1_000_000n}.${String(absolute % 1_000_000n).padStart(6, "0")}`;
+}
+
+function recipeConsumptionMicros(
+  quantityMicros: bigint,
+  orderQuantity: number,
+  lossBasisPoints: number,
+) {
+  if (
+    quantityMicros <= 0n ||
+    !Number.isInteger(orderQuantity) ||
+    orderQuantity <= 0 ||
+    !Number.isInteger(lossBasisPoints) ||
+    lossBasisPoints < 0 ||
+    lossBasisPoints >= 10_000
+  ) {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_LOSS_INVALID");
+  }
+  const netMicros = quantityMicros * BigInt(orderQuantity);
+  const yieldBasisPoints = BigInt(10_000 - lossBasisPoints);
+  return (netMicros * 10_000n + yieldBasisPoints - 1n) / yieldBasisPoints;
+}
+
+export function recipeConsumptionQuantity(
+  quantity: string,
+  unit: QuantityUnit,
+  orderQuantity: number,
+  yieldBasisPoints: number,
+) {
+  if (!Number.isSafeInteger(orderQuantity) || orderQuantity <= 0) {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
+  }
+  const component = parseQuantity(quantity, unit);
+  if (component.atoms <= 0n) {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
+  }
+  const required = applyYield(
+    { ...component, atoms: component.atoms * BigInt(orderQuantity) },
+    yieldBasisPoints,
+  );
+  return { quantity: formatQuantity(required), unit: required.unit, dimension: required.dimension };
+}
+
 function addAllocation(allocations: Allocation[], balance: BalanceState, quantityMilli: bigint) {
   if (quantityMilli <= 0n) return;
   const existing = allocations.find((allocation) => allocation.balance.id === balance.id);
@@ -208,7 +266,7 @@ async function recordIssue(
   const issueId = deterministicUuid(
     `inventory-issue:${request.organizationId}:${request.unitId}:${request.orderId}:${issue.orderItemId}:${issue.componentId ?? "order"}:${issue.inventoryItemId ?? "unmapped"}:${issue.code}`,
   );
-  const inserted = await tx
+  await tx
     .insert(outboxEvents)
     .values({
       id: issueId,
@@ -232,25 +290,26 @@ async function recordIssue(
         unitId: request.unitId,
       },
     })
-    .onConflictDoNothing()
-    .returning({ id: outboxEvents.id });
-  if (inserted.length === 0) return;
-  await tx.insert(auditEvents).values({
-    id: deterministicUuid(`audit:${issueId}`),
-    action: "management.inventory.consumption-attention-required",
-    actorIdentityId,
-    entityId: request.orderId,
-    entityType: "order",
-    metadata: {
-      code: issue.code,
-      componentId: issue.componentId ?? null,
-      inventoryItemId: issue.inventoryItemId ?? null,
-      orderItemId: issue.orderItemId,
-      policy: issue.policy,
-    },
-    organizationId: request.organizationId,
-    unitId: request.unitId,
-  });
+    .onConflictDoNothing();
+  await tx
+    .insert(auditEvents)
+    .values({
+      id: deterministicUuid(`audit:${issueId}`),
+      action: "management.inventory.consumption-attention-required",
+      actorIdentityId,
+      entityId: request.orderId,
+      entityType: "order",
+      metadata: {
+        code: issue.code,
+        componentId: issue.componentId ?? null,
+        inventoryItemId: issue.inventoryItemId ?? null,
+        orderItemId: issue.orderItemId,
+        policy: issue.policy,
+      },
+      organizationId: request.organizationId,
+      unitId: request.unitId,
+    })
+    .onConflictDoNothing();
 }
 
 export async function consumeOrderSentInventory(
@@ -291,13 +350,6 @@ export async function consumeOrderSentInventory(
     const completionAuditId = deterministicUuid(
       `inventory-order-completed:${request.organizationId}:${request.unitId}:${request.orderId}`,
     );
-    const [completed] = await tx
-      .select({ id: auditEvents.id })
-      .from(auditEvents)
-      .where(eq(auditEvents.id, completionAuditId))
-      .limit(1);
-    if (completed) return { issueCodes: [], movementCount: 0, retryRequired: false };
-
     const orderItems = await tx
       .select({
         id: posOrderItems.id,
@@ -325,7 +377,7 @@ export async function consumeOrderSentInventory(
           locationId: managementRecipeComponents.locationId,
           lossBasisPoints: managementRecipeComponents.lossBasisPoints,
           productId: managementRecipeVersions.productId,
-          quantityMilli: managementRecipeComponents.quantityMilli,
+          quantityMicros: managementRecipeComponents.quantityMicros,
           recipeVersionId: managementRecipeVersions.id,
           recipeVersion: managementRecipeVersions.version,
         })
@@ -414,7 +466,7 @@ export async function consumeOrderSentInventory(
           locationId: null,
           orderItemId: orderItem.id,
           productId: orderItem.productId,
-          requiredMilli: BigInt(orderItem.quantity) * 1_000n,
+          requiredMilli: BigInt(orderItem.quantity) * 1_000_000n,
           recipeVersionId: null,
           sourceId,
           sourceType: DIRECT_SOURCE_TYPE,
@@ -434,8 +486,8 @@ export async function consumeOrderSentInventory(
         }
         let requiredMilli: bigint;
         try {
-          requiredMilli = recipeConsumptionMilli(
-            component.quantityMilli,
+          requiredMilli = recipeConsumptionMicros(
+            component.quantityMicros,
             orderItem.quantity,
             component.lossBasisPoints,
           );
@@ -519,8 +571,8 @@ export async function consumeOrderSentInventory(
           if (existing) return existing;
           const state = {
             ...row,
-            originalMilli: quantityToMilli(row.quantity),
-            virtualMilli: quantityToMilli(row.quantity),
+            originalMilli: quantityToMicros(row.quantity),
+            virtualMilli: quantityToMicros(row.quantity),
           };
           balancesById.set(row.id, state);
           return state;
@@ -534,7 +586,7 @@ export async function consumeOrderSentInventory(
           inventoryItemId: task.inventoryItem.id,
           orderItemId: task.orderItemId,
           policy: "block_and_retry",
-          requiredQuantity: milliToQuantity(task.requiredMilli),
+          requiredQuantity: microsToQuantity(task.requiredMilli),
           unit: task.inventoryItem.unit,
         });
         continue;
@@ -548,11 +600,11 @@ export async function consumeOrderSentInventory(
         blockingIssues.push({
           code: "INVENTORY_STOCK_INSUFFICIENT",
           componentId: task.componentId,
-          currentQuantity: milliToQuantity(availableMilli),
+          currentQuantity: microsToQuantity(availableMilli),
           inventoryItemId: task.inventoryItem.id,
           orderItemId: task.orderItemId,
           policy: "block_and_retry",
-          requiredQuantity: milliToQuantity(task.requiredMilli),
+          requiredQuantity: microsToQuantity(task.requiredMilli),
           unit: task.inventoryItem.unit,
         });
         continue;
@@ -578,11 +630,11 @@ export async function consumeOrderSentInventory(
         warnings.push({
           code: "INVENTORY_STOCK_NEGATIVE_ALLOWED",
           componentId: task.componentId,
-          currentQuantity: milliToQuantity(availableMilli),
+          currentQuantity: microsToQuantity(availableMilli),
           inventoryItemId: task.inventoryItem.id,
           orderItemId: task.orderItemId,
           policy: "deduct_and_alert",
-          requiredQuantity: milliToQuantity(task.requiredMilli),
+          requiredQuantity: microsToQuantity(task.requiredMilli),
           unit: task.inventoryItem.unit,
         });
       }
@@ -609,7 +661,7 @@ export async function consumeOrderSentInventory(
             inventoryItemId: plan.task.inventoryItem.id,
             locationId: allocation.balance.locationId,
             organizationId: request.organizationId,
-            quantityDelta: milliToQuantity(-allocation.quantityMilli),
+            quantityDelta: microsToQuantity(-allocation.quantityMilli),
             sourceId: plan.task.sourceId,
             sourceType: plan.task.sourceType,
             type: "order_consumption",
@@ -625,11 +677,11 @@ export async function consumeOrderSentInventory(
       const taskBalanceKey = `${plan.task.inventoryItem.id}:${plan.task.locationId ?? "*"}`;
       const states = balanceStates.get(taskBalanceKey) ?? [];
       const resultingMilli = states.reduce((total, balance) => total + balance.virtualMilli, 0n);
-      if (resultingMilli < quantityToMilli(plan.task.inventoryItem.minimumQuantity)) {
+      if (resultingMilli < quantityToMicros(plan.task.inventoryItem.minimumQuantity)) {
         warnings.push({
           code: "INVENTORY_STOCK_LOW",
           componentId: plan.task.componentId,
-          currentQuantity: milliToQuantity(resultingMilli),
+          currentQuantity: microsToQuantity(resultingMilli),
           inventoryItemId: plan.task.inventoryItem.id,
           orderItemId: plan.task.orderItemId,
           policy: "notify_only",
@@ -642,7 +694,7 @@ export async function consumeOrderSentInventory(
       if (balance.virtualMilli === balance.originalMilli) continue;
       const updated = await tx.execute<{ id: string }>(sql`
           update management_stock_balances
-          set quantity = ${milliToQuantity(balance.virtualMilli)}::numeric,
+          set quantity = ${microsToQuantity(balance.virtualMilli)}::numeric,
               version = version + 1,
               updated_at = now()
           where id = ${balance.id}::uuid
@@ -669,7 +721,7 @@ export async function consumeOrderSentInventory(
       await recordIssue(tx, event, request, order.createdByIdentityId, issue);
     }
     const movementCount = plans.reduce((total, plan) => total + plan.allocations.length, 0);
-    const [completion] = await tx
+    await tx
       .insert(auditEvents)
       .values({
         action: "management.inventory.order-consumed",
@@ -689,14 +741,12 @@ export async function consumeOrderSentInventory(
                 .filter((id): id is string => Boolean(id)),
             ),
           ],
-          unitConversionPolicy: "explicit_inventory_item_and_location_no_conversion",
+          unitConversionPolicy: "dimension_safe_fixed_precision_explicit_conversion",
         },
         organizationId: request.organizationId,
         unitId: request.unitId,
       })
-      .onConflictDoNothing()
-      .returning({ id: auditEvents.id });
-    if (!completion) throw new InventoryConsumptionError("INVENTORY_COMPLETION_CONFLICT");
+      .onConflictDoNothing();
     return {
       issueCodes: [...new Set(uniqueWarnings.map((issue) => issue.code))],
       movementCount,

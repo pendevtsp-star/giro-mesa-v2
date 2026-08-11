@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   date,
@@ -10,6 +11,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -353,11 +355,7 @@ export const fiscalDocuments = pgTable(
       table.unitId,
       table.idempotencyKey,
     ),
-    index("fiscal_documents_sale_idx").on(
-      table.organizationId,
-      table.unitId,
-      table.saleReference,
-    ),
+    index("fiscal_documents_sale_idx").on(table.organizationId, table.unitId, table.saleReference),
     foreignKey({
       name: "fiscal_documents_unit_fk",
       columns: [table.organizationId, table.unitId],
@@ -458,7 +456,12 @@ export const managementInventoryItems = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     sku: varchar("sku", { length: 80 }),
     unit: varchar("unit", { length: 20 }).notNull(),
-    minimumQuantity: numeric("minimum_quantity", { precision: 16, scale: 3 })
+    dimension: varchar("dimension", { length: 16 })
+      .$type<"mass" | "volume" | "count">()
+      .notNull()
+      .default("count"),
+    quantityScale: smallint("quantity_scale").notNull().default(6),
+    minimumQuantity: numeric("minimum_quantity", { precision: 20, scale: 6 })
       .notNull()
       .default("0"),
     allowNegative: boolean("allow_negative").notNull().default(false),
@@ -487,6 +490,11 @@ export const managementInventoryItems = pgTable(
       foreignColumns: [posProducts.organizationId, posProducts.id],
     }).onDelete("restrict"),
     check("management_inventory_items_minimum_check", sql`${table.minimumQuantity} >= 0`),
+    check(
+      "management_inventory_items_dimension_check",
+      sql`${table.dimension} in ('mass','volume','count')`,
+    ),
+    check("management_inventory_items_scale_check", sql`${table.quantityScale} = 6`),
   ],
 );
 
@@ -498,6 +506,8 @@ export const managementRecipeVersions = pgTable(
     unitId: uuid("unit_id").notNull(),
     productId: uuid("product_id").notNull(),
     version: integer("version").notNull(),
+    yieldQuantity: numeric("yield_quantity", { precision: 20, scale: 6 }).notNull().default("1"),
+    yieldUnit: varchar("yield_unit", { length: 20 }).notNull().default("unit"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }),
     createdByIdentityId: uuid("created_by_identity_id")
@@ -531,6 +541,7 @@ export const managementRecipeVersions = pgTable(
       foreignColumns: [posProducts.organizationId, posProducts.id],
     }).onDelete("restrict"),
     check("management_recipe_version_positive_check", sql`${table.version} > 0`),
+    check("management_recipe_version_yield_check", sql`${table.yieldQuantity} > 0`),
     check(
       "management_recipe_version_window_check",
       sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`,
@@ -548,6 +559,8 @@ export const managementRecipeComponents = pgTable(
     inventoryItemId: uuid("inventory_item_id").notNull(),
     locationId: uuid("location_id").notNull(),
     quantityMilli: integer("quantity_milli").notNull(),
+    quantityMicros: bigint("quantity_micros", { mode: "bigint" }).notNull(),
+    unit: varchar("unit", { length: 20 }).notNull(),
     lossBasisPoints: integer("loss_basis_points").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -585,9 +598,57 @@ export const managementRecipeComponents = pgTable(
       ],
     }).onDelete("restrict"),
     check("management_recipe_component_quantity_check", sql`${table.quantityMilli} > 0`),
+    check("management_recipe_component_micros_check", sql`${table.quantityMicros} > 0`),
     check(
       "management_recipe_component_loss_check",
       sql`${table.lossBasisPoints} between 0 and 9999`,
+    ),
+  ],
+);
+
+export const managementUnitConversions = pgTable(
+  "management_unit_conversions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    fromUnit: varchar("from_unit", { length: 20 }).notNull(),
+    toUnit: varchar("to_unit", { length: 20 }).notNull(),
+    dimension: varchar("dimension", { length: 16 }).$type<"mass" | "volume" | "count">().notNull(),
+    numerator: bigint("numerator", { mode: "bigint" }).notNull(),
+    denominator: bigint("denominator", { mode: "bigint" }).notNull(),
+    rounding: varchar("rounding", { length: 16 })
+      .$type<"exact" | "up" | "down" | "half_up">()
+      .notNull()
+      .default("exact"),
+    validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_unit_conversions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_unit_conversions_active_unique")
+      .on(table.organizationId, table.unitId, table.fromUnit, table.toUnit)
+      .where(sql`${table.validUntil} is null`),
+    foreignKey({
+      name: "management_unit_conversions_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "management_unit_conversions_ratio_check",
+      sql`${table.numerator} > 0 and ${table.denominator} > 0`,
+    ),
+    check(
+      "management_unit_conversions_window_check",
+      sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`,
     ),
   ],
 );
@@ -600,7 +661,7 @@ export const managementStockBalances = pgTable(
     unitId: uuid("unit_id").notNull(),
     locationId: uuid("location_id").notNull(),
     inventoryItemId: uuid("inventory_item_id").notNull(),
-    quantity: numeric("quantity", { precision: 16, scale: 3 }).notNull().default("0"),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull().default("0"),
     averageCostCents: integer("average_cost_cents"),
     version: integer("version").notNull().default(1),
     ...timestamps,
@@ -685,9 +746,9 @@ export const managementInventoryEventLines = pgTable(
     eventId: uuid("event_id").notNull(),
     locationId: uuid("location_id").notNull(),
     inventoryItemId: uuid("inventory_item_id").notNull(),
-    previousQuantity: numeric("previous_quantity", { precision: 16, scale: 3 }).notNull(),
-    quantityDelta: numeric("quantity_delta", { precision: 16, scale: 3 }).notNull(),
-    resultingQuantity: numeric("resulting_quantity", { precision: 16, scale: 3 }).notNull(),
+    previousQuantity: numeric("previous_quantity", { precision: 20, scale: 6 }).notNull(),
+    quantityDelta: numeric("quantity_delta", { precision: 20, scale: 6 }).notNull(),
+    resultingQuantity: numeric("resulting_quantity", { precision: 20, scale: 6 }).notNull(),
   },
   (table) => [
     foreignKey({
@@ -722,7 +783,7 @@ export const managementInventoryMovements = pgTable(
     locationId: uuid("location_id").notNull(),
     inventoryItemId: uuid("inventory_item_id").notNull(),
     type: varchar("type", { length: 32 }).notNull(),
-    quantityDelta: numeric("quantity_delta", { precision: 16, scale: 3 }).notNull(),
+    quantityDelta: numeric("quantity_delta", { precision: 20, scale: 6 }).notNull(),
     unitCostCents: integer("unit_cost_cents"),
     sourceType: varchar("source_type", { length: 48 }).notNull(),
     sourceId: uuid("source_id").notNull(),
@@ -820,8 +881,8 @@ export const managementPurchaseOrderItems = pgTable(
     unitId: uuid("unit_id").notNull(),
     purchaseOrderId: uuid("purchase_order_id").notNull(),
     inventoryItemId: uuid("inventory_item_id").notNull(),
-    quantity: numeric("quantity", { precision: 16, scale: 3 }).notNull(),
-    receivedQuantity: numeric("received_quantity", { precision: 16, scale: 3 })
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    receivedQuantity: numeric("received_quantity", { precision: 20, scale: 6 })
       .notNull()
       .default("0"),
     unitCostCents: integer("unit_cost_cents").notNull(),
@@ -921,7 +982,7 @@ export const managementPurchaseReceiptLines = pgTable(
     purchaseOrderItemId: uuid("purchase_order_item_id").notNull(),
     inventoryItemId: uuid("inventory_item_id").notNull(),
     locationId: uuid("location_id").notNull(),
-    quantity: numeric("quantity", { precision: 16, scale: 3 }).notNull(),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
     unitCostCents: integer("unit_cost_cents").notNull(),
     totalCents: integer("total_cents").notNull(),
   },

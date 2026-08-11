@@ -6,6 +6,7 @@ import {
   parseOrderSentPayload,
   quantityToMilli,
   recipeConsumptionMilli,
+  recipeConsumptionQuantity,
 } from "./inventory.js";
 
 const payload = {
@@ -41,5 +42,13 @@ describe("order inventory consumption rules", () => {
         error instanceof InventoryConsumptionError &&
         error.message === "INVENTORY_RECIPE_LOSS_INVALID",
     );
+  });
+
+  it("keeps six-decimal dimensional precision for versioned technical sheets", () => {
+    assert.deepEqual(recipeConsumptionQuantity("0.333333", "l", 3, 9_000), {
+      quantity: "1.111110",
+      unit: "l",
+      dimension: "volume",
+    });
   });
 });

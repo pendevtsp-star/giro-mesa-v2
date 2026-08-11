@@ -185,8 +185,9 @@ export class OutboxWorker {
 
   private async process(event: ClaimedOutboxEvent) {
     try {
+      let deferredError: InventoryConsumptionError | null = null;
       if (event.organization_id) {
-        await withTenantContext(
+        deferredError = await withTenantContext(
           this.connection,
           {
             source: "job",
@@ -196,8 +197,9 @@ export class OutboxWorker {
           () => this.dispatch(event),
         );
       } else {
-        await withWorkerContext(this.connection, () => this.dispatch(event));
+        deferredError = await withWorkerContext(this.connection, () => this.dispatch(event));
       }
+      if (deferredError) throw deferredError;
       await withWorkerContext(this.connection, (tx) =>
         tx.execute(
           sql`update outbox_events set processed_at = now(), locked_at = null, last_error = null where id = ${event.id}`,
@@ -231,33 +233,34 @@ export class OutboxWorker {
     if (event.topic === "pos.order.sent") {
       const result = await consumeOrderSentInventory(this.db as Database, event);
       if (result.retryRequired) {
-        throw new InventoryConsumptionError(
+        return new InventoryConsumptionError(
           `INVENTORY_ATTENTION_RETRY:${result.issueCodes.join(",")}`,
         );
       }
-      return;
+      return null;
     }
     if (event.topic === "growth.webhook_delivery_requested") {
       await this.deliverWebhookEvent(event);
-      return;
+      return null;
     }
     if (event.topic === "auth.password_reset_requested") {
       await this.deliverPasswordReset(event);
-      return;
+      return null;
     }
     if (event.topic === "auth.email_verification_requested") {
       await this.deliverEmailVerification(event);
-      return;
+      return null;
     }
     if (event.topic === "membership.invited") {
       await this.deliverMembershipInvite(event);
-      return;
+      return null;
     }
     if (event.topic === "growth.campaign_delivery_requested") {
       await this.deliverCampaignEmail(event);
-      return;
+      return null;
     }
     // Internal domain events are acknowledged here; dedicated consumers are added only with a real use case.
+    return null;
   }
 
   private outboxEncryptionKey() {

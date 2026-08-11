@@ -206,6 +206,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         inventoryItemId: inventoryA.id,
         locationId: locationA.id,
         quantityMilli: 250,
+        quantityMicros: 250_000n,
+        unit: "kg",
         lossBasisPoints: 1_000,
       },
       {
@@ -215,6 +217,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         inventoryItemId: inventoryA.id,
         locationId: locationA.id,
         quantityMilli: 400,
+        quantityMicros: 400_000n,
+        unit: "kg",
         lossBasisPoints: 0,
       },
     ]);
@@ -245,6 +249,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
       .values({
         aggregateId: tab.id,
         aggregateType: "tab",
+        organizationId: organizationA.id,
+        unitId: unitA.id,
         availableAt: new Date("1970-01-01T00:00:00.000Z"),
         createdAt: new Date("1970-01-01T00:00:00.000Z"),
         payload: {
@@ -281,8 +287,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         .where(eq(managementStockBalances.id, balanceB.id))
         .limit(1),
     ]);
-    assert.equal(updatedA[0]?.quantity, "9.444");
-    assert.equal(untouchedB[0]?.quantity, "20.000");
+    assert.equal(updatedA[0]?.quantity, "9.444444");
+    assert.equal(untouchedB[0]?.quantity, "20.000000");
 
     const movementsAfterSend = await database.db
       .select()
@@ -295,7 +301,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         ),
       );
     assert.equal(movementsAfterSend.length, 1);
-    assert.equal(movementsAfterSend[0]?.quantityDelta, "-0.556");
+    assert.equal(movementsAfterSend[0]?.quantityDelta, "-0.555556");
 
     await database.db
       .update(outboxEvents)
@@ -335,7 +341,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
           eq(managementInventoryMovements.type, "order_consumption"),
         ),
       );
-    assert.equal(balanceAfterReplay[0]?.quantity, "9.444");
+    assert.equal(balanceAfterReplay[0]?.quantity, "9.444444");
     assert.equal(movementsAfterReplay.length, 1);
     assert.equal(tenantBMovements.length, 0);
 
@@ -372,6 +378,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
       .values({
         aggregateId: tab.id,
         aggregateType: "tab",
+        organizationId: organizationA.id,
+        unitId: unitA.id,
         availableAt: new Date("1970-01-02T00:00:00.000Z"),
         createdAt: new Date("1970-01-02T00:00:00.000Z"),
         payload: {
@@ -404,7 +412,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
       blockedEvent[0]?.lastError,
       "INVENTORY_ATTENTION_RETRY:INVENTORY_STOCK_INSUFFICIENT",
     );
-    assert.equal(blockedBalance[0]?.quantity, "0.100");
+    assert.equal(blockedBalance[0]?.quantity, "0.100000");
 
     const alerts = (
       await database.db
@@ -414,7 +422,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
     ).filter((event) => event.payload.orderId === insufficientOrder.id);
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0]?.payload.policy, "block_and_retry");
-    assert.equal(alerts[0]?.payload.requiredQuantity, "0.800");
+    assert.equal(alerts[0]?.payload.requiredQuantity, "0.800000");
 
     await database.db
       .update(outboxEvents)
