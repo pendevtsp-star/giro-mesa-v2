@@ -13,7 +13,19 @@ import {
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { SimulatorPaymentAdapter } from "./adapters/simulator.adapter.js";
 import { PaymentsService } from "./payments.service.js";
+
+function hasCode(expected: string) {
+  return (error: unknown) => {
+    const response = (error as { getResponse?: () => unknown }).getResponse?.();
+    return (
+      typeof response === "object" &&
+      response !== null &&
+      (response as { code?: string }).code === expected
+    );
+  };
+}
 
 it("persists a balanced append-only ledger with idempotency and tenant scope", async (context) => {
   const databaseUrl = process.env.PAYMENTS_DATABASE_URL;
@@ -146,6 +158,45 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
       new Set(visibleToA.map((entry) => entry.organizationId)),
       new Set([organization.id]),
     );
+
+    const simulator = new SimulatorPaymentAdapter();
+    simulator.setScenario("payment-attempt-unknown", "unknown_then_authorized");
+    const uncertainPayments = new PaymentsService(database, new ScopeService(database), simulator);
+    const intent = await uncertainPayments.createPaymentIntent(
+      identity.id,
+      organization.id,
+      unit.id,
+      "payment-intent-0001",
+      { sourceType: "order", sourceId: randomUUID(), amountCents: 2_500 },
+    );
+    const unknown = await uncertainPayments.executePaymentAttempt(
+      identity.id,
+      organization.id,
+      unit.id,
+      "payment-attempt-unknown",
+      { intentId: intent.intentId, amountCents: 2_500, method: "credit" },
+    );
+    assert.equal(unknown.status, "unknown");
+    assert.equal(unknown.reviewRequired, true);
+    await assert.rejects(
+      () =>
+        uncertainPayments.executePaymentAttempt(
+          identity.id,
+          organization.id,
+          unit.id,
+          "payment-attempt-blocked",
+          { intentId: intent.intentId, amountCents: 2_500, method: "credit" },
+        ),
+      hasCode("PAYMENT_OUTCOME_UNKNOWN"),
+    );
+    const reconciled = await uncertainPayments.reconcilePaymentAttempt(
+      identity.id,
+      organization.id,
+      unit.id,
+      unknown.attemptId,
+    );
+    assert.equal(reconciled.status, "authorized");
+    assert.equal(reconciled.intentStatus, "paid");
     await assert.rejects(() =>
       database.db
         .update(financialLedgerTransactions)

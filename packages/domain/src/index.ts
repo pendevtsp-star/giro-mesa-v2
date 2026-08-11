@@ -3,6 +3,7 @@ export * from "./command-envelope.js";
 export * from "./commercial.js";
 export * from "./conflict-matrix.js";
 export * from "./money-ledger.js";
+export * from "./payment-adapter.js";
 export * from "./onboarding.js";
 export * from "./permissions.js";
 export * from "./secret-envelope.js";

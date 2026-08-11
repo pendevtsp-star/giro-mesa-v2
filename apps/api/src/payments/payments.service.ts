@@ -1,9 +1,20 @@
-import { type Database, financialLedgerEntries, financialLedgerTransactions } from "@giromesa/db";
 import {
+  type Database,
+  financialLedgerEntries,
+  financialLedgerTransactions,
+  paymentAttempts,
+  paymentIntents,
+  paymentProviderEvents,
+} from "@giromesa/db";
+import {
+  assertSafePaymentPayload,
+  canStartPaymentAttempt,
   createLedgerPosting,
   type MoneyComponent,
   type MoneyLedgerEntry,
   type MoneyLedgerKind,
+  normalizeAdapterResult,
+  type PaymentAdapterResult,
   reverseLedgerPosting,
 } from "@giromesa/domain";
 import {
@@ -12,11 +23,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { managementRequestHash } from "../management/management.rules.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { SimulatorPaymentAdapter } from "./adapters/simulator.adapter.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type PostableKind = Exclude<MoneyLedgerKind, "reversal">;
@@ -29,12 +42,15 @@ export type PostLedgerInput = {
 };
 
 const LEDGER_ROLES = ["owner", "manager", "finance", "cashier"] as const;
+const REVIEW_ROLES = ["owner", "manager", "finance"] as const;
 
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    @Optional()
+    private readonly paymentAdapter: SimulatorPaymentAdapter = new SimulatorPaymentAdapter(),
   ) {}
 
   private async requireLedgerRole(identityId: string, organizationId: string, unitId: string) {
@@ -58,6 +74,27 @@ export class PaymentsService {
     }
   }
 
+  private async requireReviewRole(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    const roles = await this.scope.requireOrganizationRole(
+      identityId,
+      organizationId,
+      REVIEW_ROLES,
+    );
+    if (
+      !roles.some(
+        (role) =>
+          REVIEW_ROLES.includes(role.role as (typeof REVIEW_ROLES)[number]) &&
+          (role.unitId === null || role.unitId === unitId),
+      )
+    ) {
+      throw new ForbiddenException({
+        code: "PAYMENT_REVIEW_ROLE_DENIED",
+        message: "A revisão manual exige gestão financeira nesta unidade.",
+      });
+    }
+  }
+
   private normalizedKey(idempotencyKey: string) {
     const key = idempotencyKey.trim();
     if (key.length < 8 || key.length > 160) {
@@ -67,6 +104,499 @@ export class PaymentsService {
       });
     }
     return key;
+  }
+
+  async createPaymentIntent(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: { sourceType: string; sourceId: string; amountCents: number },
+  ) {
+    await this.requireLedgerRole(identityId, organizationId, unitId);
+    assertSafePaymentPayload(input);
+    if (
+      !Number.isSafeInteger(input.amountCents) ||
+      input.amountCents <= 0 ||
+      input.sourceType.trim().length === 0 ||
+      input.sourceType.length > 48 ||
+      input.sourceId.trim().length === 0 ||
+      input.sourceId.length > 160
+    ) {
+      throw new BadRequestException({
+        code: "INVALID_PAYMENT_INTENT",
+        message: "A intenção exige origem e valor positivo em centavos inteiros.",
+      });
+    }
+    const key = this.normalizedKey(idempotencyKey);
+    const requestHash = managementRequestHash("payment-intent", input);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`payment-intent:${organizationId}:${unitId}:${key}`}))`,
+      );
+      const [existing] = await tx
+        .select()
+        .from(paymentIntents)
+        .where(
+          and(
+            eq(paymentIntents.organizationId, organizationId),
+            eq(paymentIntents.unitId, unitId),
+            eq(paymentIntents.idempotencyKey, key),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        if (existing.requestHash !== requestHash)
+          throw new ConflictException({
+            code: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+            message: "A chave já foi usada com outra intenção de pagamento.",
+          });
+        return {
+          intentId: existing.id,
+          amountCents: existing.amountCents,
+          capturedCents: existing.capturedCents,
+          status: existing.status,
+          idempotentReplay: true,
+        };
+      }
+      const [created] = await tx
+        .insert(paymentIntents)
+        .values({
+          organizationId,
+          unitId,
+          sourceType: input.sourceType.trim(),
+          sourceId: input.sourceId.trim(),
+          amountCents: input.amountCents,
+          idempotencyKey: key,
+          requestHash,
+        })
+        .returning();
+      if (!created) throw new Error("Payment intent insert returned no row.");
+      return {
+        intentId: created.id,
+        amountCents: created.amountCents,
+        capturedCents: created.capturedCents,
+        status: created.status,
+        idempotentReplay: false,
+      };
+    });
+  }
+
+  async executePaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: { intentId: string; amountCents: number; method: string; terminalId?: string },
+  ) {
+    await this.requireLedgerRole(identityId, organizationId, unitId);
+    assertSafePaymentPayload(input);
+    if (
+      !Number.isSafeInteger(input.amountCents) ||
+      input.amountCents <= 0 ||
+      input.method.trim().length === 0
+    ) {
+      throw new BadRequestException({
+        code: "INVALID_PAYMENT_ATTEMPT",
+        message: "A tentativa exige método e valor positivo em centavos inteiros.",
+      });
+    }
+    const key = this.normalizedKey(idempotencyKey);
+    const requestHash = managementRequestHash("payment-attempt", input);
+    const prepared = await this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`payment-attempt:${organizationId}:${unitId}:${key}`}))`,
+      );
+      const [existing] = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.organizationId, organizationId),
+            eq(paymentAttempts.unitId, unitId),
+            eq(paymentAttempts.idempotencyKey, key),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        if (existing.requestHash !== requestHash)
+          throw new ConflictException({
+            code: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+            message: "A chave já foi usada com outra tentativa de pagamento.",
+          });
+        return { attempt: existing, replay: true };
+      }
+      await tx.execute(
+        sql`select id from payment_intents where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.intentId}::uuid for update`,
+      );
+      const [intent] = await tx
+        .select()
+        .from(paymentIntents)
+        .where(
+          and(
+            eq(paymentIntents.organizationId, organizationId),
+            eq(paymentIntents.unitId, unitId),
+            eq(paymentIntents.id, input.intentId),
+          ),
+        )
+        .limit(1);
+      if (!intent)
+        throw new NotFoundException({
+          code: "PAYMENT_INTENT_NOT_FOUND",
+          message: "Intenção de pagamento não encontrada nesta unidade.",
+        });
+      if (intent.status === "paid" || intent.status === "cancelled")
+        throw new ConflictException({
+          code: "PAYMENT_INTENT_CLOSED",
+          message: "A intenção não aceita novas tentativas.",
+        });
+      if (input.amountCents > intent.amountCents - intent.capturedCents)
+        throw new ConflictException({
+          code: "PAYMENT_EXCEEDS_REMAINING",
+          message: "A tentativa excede o saldo da intenção.",
+        });
+      const previous = await tx
+        .select({ status: paymentAttempts.status, amountCents: paymentAttempts.amountCents })
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.organizationId, organizationId),
+            eq(paymentAttempts.unitId, unitId),
+            eq(paymentAttempts.intentId, input.intentId),
+          ),
+        );
+      if (!canStartPaymentAttempt(previous, input.amountCents))
+        throw new ConflictException({
+          code: "PAYMENT_OUTCOME_UNKNOWN",
+          message: "Consulte ou reconcilie a tentativa incerta antes de tentar novamente.",
+        });
+      const [attempt] = await tx
+        .insert(paymentAttempts)
+        .values({
+          organizationId,
+          unitId,
+          intentId: input.intentId,
+          terminalId: input.terminalId,
+          adapter: this.paymentAdapter.name,
+          amountCents: input.amountCents,
+          status: "processing",
+          idempotencyKey: key,
+          requestHash,
+        })
+        .returning();
+      if (!attempt) throw new Error("Payment attempt insert returned no row.");
+      return { attempt, replay: false };
+    });
+    if (prepared.replay) return this.describeAttempt(prepared.attempt, true);
+
+    let result: PaymentAdapterResult;
+    try {
+      result = await this.paymentAdapter.execute({
+        attemptId: prepared.attempt.id,
+        idempotencyKey: key,
+        amountCents: input.amountCents,
+        method: input.method.trim().toLowerCase(),
+        ...(input.terminalId ? { terminalReference: input.terminalId } : {}),
+      });
+    } catch {
+      result = { status: "unknown", errorCode: "ADAPTER_EXECUTION_UNCERTAIN" };
+    }
+    return this.applyAttemptResult(
+      organizationId,
+      unitId,
+      prepared.attempt.id,
+      normalizeAdapterResult(result),
+    );
+  }
+
+  async reconcilePaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+  ) {
+    await this.requireLedgerRole(identityId, organizationId, unitId);
+    const [attempt] = await this.database.db
+      .select()
+      .from(paymentAttempts)
+      .where(
+        and(
+          eq(paymentAttempts.organizationId, organizationId),
+          eq(paymentAttempts.unitId, unitId),
+          eq(paymentAttempts.id, attemptId),
+        ),
+      )
+      .limit(1);
+    if (!attempt)
+      throw new NotFoundException({
+        code: "PAYMENT_ATTEMPT_NOT_FOUND",
+        message: "Tentativa de pagamento não encontrada nesta unidade.",
+      });
+    if (attempt.status !== "unknown" && attempt.status !== "processing") {
+      return this.describeAttempt(attempt, true);
+    }
+    if (!attempt.providerReference) {
+      return this.applyAttemptResult(organizationId, unitId, attempt.id, {
+        status: "unknown",
+        errorCode: "MANUAL_REVIEW_REQUIRED",
+        reviewRequired: true,
+        nextAction: "lookup_or_reconcile",
+      });
+    }
+    let result: PaymentAdapterResult;
+    try {
+      result = await this.paymentAdapter.lookup(attempt.providerReference);
+    } catch {
+      result = {
+        status: "unknown",
+        providerReference: attempt.providerReference,
+        errorCode: "ADAPTER_LOOKUP_UNCERTAIN",
+      };
+    }
+    return this.applyAttemptResult(
+      organizationId,
+      unitId,
+      attempt.id,
+      normalizeAdapterResult(result),
+    );
+  }
+
+  async resolvePaymentAttemptManually(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+    input: { status: "authorized" | "declined"; reason: string },
+  ) {
+    await this.requireReviewRole(identityId, organizationId, unitId);
+    assertSafePaymentPayload(input);
+    if (input.reason.trim().length < 10 || input.reason.length > 240) {
+      throw new BadRequestException({
+        code: "PAYMENT_REVIEW_REASON_REQUIRED",
+        message: "A revisão manual exige justificativa de 10 a 240 caracteres.",
+      });
+    }
+    const eventId = `manual-${managementRequestHash("payment-manual-review", {
+      attemptId,
+      actor: identityId,
+      ...input,
+    }).slice(0, 48)}`;
+    await this.database.db
+      .insert(paymentProviderEvents)
+      .values({
+        organizationId,
+        unitId,
+        attemptId,
+        adapter: "manual-review",
+        providerEventId: eventId,
+        outcome: input.status,
+        safePayload: { actorIdentityId: identityId, reason: input.reason.trim() },
+      })
+      .onConflictDoNothing();
+    return this.applyAttemptResult(
+      organizationId,
+      unitId,
+      attemptId,
+      normalizeAdapterResult({ status: input.status }),
+    );
+  }
+
+  async handleProviderCallback(
+    organizationId: string,
+    unitId: string,
+    input: {
+      attemptId: string;
+      providerEventId: string;
+      status: "authorized" | "declined" | "unknown";
+      providerReference?: string;
+      amountCents?: number;
+      safePayload?: Record<string, unknown>;
+    },
+  ) {
+    assertSafePaymentPayload(input);
+    if (input.providerEventId.trim().length === 0 || input.providerEventId.length > 160) {
+      throw new BadRequestException({
+        code: "INVALID_PROVIDER_EVENT",
+        message: "O callback exige identificador de evento do provedor.",
+      });
+    }
+    const [inserted] = await this.database.db
+      .insert(paymentProviderEvents)
+      .values({
+        organizationId,
+        unitId,
+        attemptId: input.attemptId,
+        adapter: this.paymentAdapter.name,
+        providerEventId: input.providerEventId.trim(),
+        outcome: input.status,
+        safePayload: input.safePayload ?? {},
+      })
+      .onConflictDoNothing()
+      .returning({ id: paymentProviderEvents.id });
+    if (!inserted) {
+      const [attempt] = await this.database.db
+        .select()
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.organizationId, organizationId),
+            eq(paymentAttempts.unitId, unitId),
+            eq(paymentAttempts.id, input.attemptId),
+          ),
+        )
+        .limit(1);
+      if (!attempt)
+        throw new NotFoundException({
+          code: "PAYMENT_ATTEMPT_NOT_FOUND",
+          message: "Tentativa de pagamento não encontrada nesta unidade.",
+        });
+      return this.describeAttempt(attempt, true);
+    }
+    return this.applyAttemptResult(
+      organizationId,
+      unitId,
+      input.attemptId,
+      normalizeAdapterResult({
+        status: input.status,
+        ...(input.providerReference ? { providerReference: input.providerReference } : {}),
+        ...(input.amountCents !== undefined ? { amountCents: input.amountCents } : {}),
+      }),
+    );
+  }
+
+  private async describeAttempt(
+    attempt: typeof paymentAttempts.$inferSelect,
+    idempotentReplay: boolean,
+  ) {
+    const [intent] = await this.database.db
+      .select({ status: paymentIntents.status })
+      .from(paymentIntents)
+      .where(eq(paymentIntents.id, attempt.intentId))
+      .limit(1);
+    return {
+      attemptId: attempt.id,
+      intentId: attempt.intentId,
+      status: attempt.status,
+      intentStatus: intent?.status ?? "pending",
+      amountCents: attempt.amountCents,
+      providerReference: attempt.providerReference,
+      reviewRequired: attempt.reviewRequired,
+      nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
+      idempotentReplay,
+    };
+  }
+
+  private async applyAttemptResult(
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+    result: ReturnType<typeof normalizeAdapterResult>,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attemptId}::uuid for update`,
+      );
+      const [attempt] = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.organizationId, organizationId),
+            eq(paymentAttempts.unitId, unitId),
+            eq(paymentAttempts.id, attemptId),
+          ),
+        )
+        .limit(1);
+      if (!attempt) throw new Error("Payment attempt disappeared during reconciliation.");
+      if (attempt.status === "authorized" || attempt.status === "declined") {
+        const [intent] = await tx
+          .select({ status: paymentIntents.status })
+          .from(paymentIntents)
+          .where(eq(paymentIntents.id, attempt.intentId))
+          .limit(1);
+        return {
+          attemptId: attempt.id,
+          intentId: attempt.intentId,
+          status: attempt.status,
+          intentStatus: intent?.status ?? "pending",
+          amountCents: attempt.amountCents,
+          providerReference: attempt.providerReference,
+          reviewRequired: attempt.reviewRequired,
+          nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
+          idempotentReplay: true,
+        };
+      }
+      const amountMatches =
+        result.amountCents === undefined || result.amountCents === attempt.amountCents;
+      const status = amountMatches ? result.status : "unknown";
+      const reviewRequired = status === "unknown";
+      const reviewReason = amountMatches
+        ? reviewRequired
+          ? (result.errorCode ?? "PAYMENT_OUTCOME_UNKNOWN")
+          : null
+        : "ADAPTER_AMOUNT_MISMATCH";
+      let intentStatus: "pending" | "partially_paid" | "paid" | "cancelled" = "pending";
+      if (status === "authorized") {
+        await tx.execute(
+          sql`select id from payment_intents where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attempt.intentId}::uuid for update`,
+        );
+        const [intent] = await tx
+          .select()
+          .from(paymentIntents)
+          .where(eq(paymentIntents.id, attempt.intentId))
+          .limit(1);
+        if (!intent) throw new Error("Payment intent disappeared during reconciliation.");
+        const capturedCents = intent.capturedCents + attempt.amountCents;
+        if (!Number.isSafeInteger(capturedCents) || capturedCents > intent.amountCents)
+          throw new ConflictException({
+            code: "PAYMENT_CAPTURE_EXCEEDS_INTENT",
+            message: "A captura conciliada excederia o valor da intenção.",
+          });
+        intentStatus = capturedCents === intent.amountCents ? "paid" : "partially_paid";
+        await tx
+          .update(paymentIntents)
+          .set({
+            capturedCents,
+            status: intentStatus,
+            version: intent.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentIntents.id, intent.id));
+      } else {
+        const [intent] = await tx
+          .select({ status: paymentIntents.status })
+          .from(paymentIntents)
+          .where(eq(paymentIntents.id, attempt.intentId))
+          .limit(1);
+        intentStatus = intent?.status ?? "pending";
+      }
+      const [updated] = await tx
+        .update(paymentAttempts)
+        .set({
+          status,
+          providerReference: result.providerReference ?? attempt.providerReference,
+          reviewRequired,
+          reviewReason,
+          lastLookupAt: attempt.status === "unknown" ? new Date() : attempt.lastLookupAt,
+          resolvedAt: status === "unknown" ? null : new Date(),
+          version: attempt.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(paymentAttempts.id, attempt.id))
+        .returning();
+      if (!updated) throw new Error("Payment attempt update returned no row.");
+      return {
+        attemptId: updated.id,
+        intentId: updated.intentId,
+        status: updated.status,
+        intentStatus,
+        amountCents: updated.amountCents,
+        providerReference: updated.providerReference,
+        reviewRequired: updated.reviewRequired,
+        nextAction: updated.reviewRequired ? "lookup_or_reconcile" : "none",
+        idempotentReplay: false,
+      };
+    });
   }
 
   private async persist(
