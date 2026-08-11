@@ -119,7 +119,9 @@ export function parseAuthenticatedAccess(
       },
     ];
   });
-  if (!organizations.length && !platformAdmin) throw new InvalidSessionPayloadError();
+  if (!organizations.length && !platformAdmin && (memberships.length > 0 || rows.length > 0)) {
+    throw new InvalidSessionPayloadError();
+  }
   return { identity: { id: identityId, email, displayName }, organizations, platformAdmin };
 }
 

@@ -1,5 +1,5 @@
 import { Badge, Button, Card, EmptyState, Progress, VisuallyHidden } from "@giromesa/ui";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import {
   ApiClientError,
   api,
@@ -55,6 +55,7 @@ import {
   RealPeoplePage,
   RealPurchasesPage,
 } from "./management";
+import { OnboardingPage } from "./onboarding";
 import {
   dispatchOperationalMutation,
   loadOperationalResource,
@@ -105,8 +106,9 @@ const browserRuntime: DeviceContext = {
   platform: "web",
 };
 
-const navItems: { route: RouteId; label: string; icon: string }[] = [
+const navItems: { route: RouteId; label: string; icon: ReactNode }[] = [
   { route: "dashboard", label: "Visão geral", icon: "⌂" },
+  { route: "onboarding", label: "Configurar operação", icon: <OnboardingNavIcon /> },
   { route: "salon", label: "Salão", icon: "◫" },
   { route: "counter", label: "Balcão", icon: "＋" },
   { route: "catalog", label: "Cardápio", icon: "▦" },
@@ -123,6 +125,14 @@ const navItems: { route: RouteId; label: string; icon: string }[] = [
   { route: "platform", label: "Plataforma", icon: "◎" },
   { route: "alerts", label: "Alertas", icon: "!" },
 ];
+
+function OnboardingNavIcon() {
+  return (
+    <svg aria-hidden="true" className="nav-icon__svg" viewBox="0 0 24 24">
+      <path d="M5 4h14v16H5V4Zm4 0V2h6v2M8 9h8M8 13h5M8 17h4" />
+    </svg>
+  );
+}
 
 function rejectedEventCount(payload: unknown): number {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return 0;
@@ -205,6 +215,7 @@ export function App() {
           source={scopeSource}
           onBack={() => setScopeSource(null)}
           onComplete={setSession}
+          onSourceChange={setScopeSource}
         />
       );
     }
@@ -592,10 +603,12 @@ function ScopeScreen({
   source,
   onBack,
   onComplete,
+  onSourceChange,
 }: {
   source: ScopeSource;
   onBack: () => void;
   onComplete: (session: Session) => void;
+  onSourceChange: (source: ScopeSource) => void;
 }) {
   const [organizationId, setOrganizationId] = useState(
     source.organizations[0]?.organization.id ?? "",
@@ -623,6 +636,16 @@ function ScopeScreen({
   useEffect(() => {
     setUnitId(firstAccessibleUnitId);
   }, [firstAccessibleUnitId]);
+
+  if (source.organizations.length === 0) {
+    return (
+      <FirstOrganizationSetup
+        identityName={source.identityName}
+        onBack={onBack}
+        onCreated={onSourceChange}
+      />
+    );
+  }
 
   return (
     <main className="scope-screen">
@@ -720,6 +743,121 @@ function ScopeScreen({
   );
 }
 
+function FirstOrganizationSetup({
+  identityName,
+  onBack,
+  onCreated,
+}: {
+  identityName: string;
+  onBack: () => void;
+  onCreated: (source: ScopeSource) => void;
+}) {
+  const [legalName, setLegalName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [document, setDocument] = useState("");
+  const [unitName, setUnitName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.createOrganization({
+        legalName,
+        tradeName,
+        document: document.replace(/\D/g, ""),
+        unitName,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
+      });
+      const access = await loadAuthenticatedAccess();
+      onCreated(toScopeSource(access));
+    } catch (caught) {
+      if (caught instanceof ApiClientError && caught.status === 401) onBack();
+      setError(
+        caught instanceof ApiClientError
+          ? caught.message
+          : "Não foi possível criar a organização e a unidade.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="scope-screen">
+      <div className="scope-screen__header">
+        <Brand />
+        <Button variant="ghost" onClick={onBack}>
+          Sair
+        </Button>
+      </div>
+      <Card className="scope-card scope-card--first-organization">
+        <Badge tone="success">Identidade verificada</Badge>
+        <h1>Prepare sua primeira unidade</h1>
+        <p className="muted">
+          Olá, {identityName}. A organização e a unidade serão criadas juntas no servidor; o trial
+          ainda não começa nesta etapa.
+        </p>
+        <form className="form-stack" onSubmit={submit}>
+          <label>
+            Razão social
+            <input
+              autoComplete="organization"
+              maxLength={160}
+              minLength={2}
+              onChange={(event) => setLegalName(event.target.value)}
+              required
+              value={legalName}
+            />
+          </label>
+          <label>
+            Nome do estabelecimento
+            <input
+              maxLength={120}
+              minLength={2}
+              onChange={(event) => setTradeName(event.target.value)}
+              required
+              value={tradeName}
+            />
+          </label>
+          <label>
+            CNPJ
+            <input
+              autoComplete="off"
+              inputMode="numeric"
+              maxLength={18}
+              onChange={(event) => setDocument(event.target.value)}
+              pattern="[0-9./-]*"
+              required
+              value={document}
+            />
+          </label>
+          <label>
+            Nome da primeira unidade
+            <input
+              maxLength={120}
+              minLength={2}
+              onChange={(event) => setUnitName(event.target.value)}
+              required
+              value={unitName}
+            />
+          </label>
+          {error && (
+            <p className="auth-message auth-message--error" role="alert">
+              {error}
+            </p>
+          )}
+          <Button disabled={submitting || document.replace(/\D/g, "").length !== 14} type="submit">
+            {submitting ? "Criando organização..." : "Criar organização e unidade"}
+          </Button>
+        </form>
+      </Card>
+    </main>
+  );
+}
+
 function Avatar({ profile }: { profile: Profile }) {
   return (
     <span className="avatar" aria-hidden="true">
@@ -796,7 +934,7 @@ function OperationalApp({
   }, [runtime.embedded, session.demo, session.platformAdmin]);
 
   useEffect(() => {
-    if (!canAccess(session.profile, route)) {
+    if (!canAccess(session.profile, route) && route !== "onboarding") {
       window.location.hash = routeHref(session.platformAdmin ? "platform" : "dashboard");
     }
     setNavOpen(false);
@@ -965,6 +1103,7 @@ function OperationalApp({
               className={route === item.route ? "active" : ""}
               href={routeHref(item.route)}
               key={item.route}
+              onClick={() => setNavOpen(false)}
             >
               <span aria-hidden="true" className="nav-icon">
                 {item.icon}
@@ -1125,6 +1264,8 @@ function OperationalApp({
             dispatchPilot={dispatchPilot}
             loadPilot={loadPilot}
             onCommand={recordLocalCommand}
+            onSessionChange={onSessionChange}
+            onUnauthorized={onLogout}
             profile={session.profile}
             route={route}
             refreshToken={scopeRevision}
@@ -1156,6 +1297,10 @@ const pageMeta: Record<RouteId, { title: string; description: string }> = {
   dashboard: {
     title: "Visão geral",
     description: "O que precisa da sua atenção agora.",
+  },
+  onboarding: {
+    title: "Configurar operação",
+    description: "Do primeiro acesso a uma unidade verificável, sem iniciar o trial antes da hora.",
   },
   salon: {
     title: "Salão",
@@ -1239,6 +1384,8 @@ function PageContent({
   tickets,
   setTickets,
   onCommand,
+  onSessionChange,
+  onUnauthorized,
 }: {
   dispatchPilot: PilotDispatcher;
   loadPilot: PilotLoader;
@@ -1251,6 +1398,8 @@ function PageContent({
   tickets: KitchenTicket[];
   setTickets: (tickets: KitchenTicket[]) => void;
   onCommand: CommandRecorder;
+  onSessionChange: (session: Session) => void;
+  onUnauthorized: () => void;
 }) {
   const managementScope = {
     organizationId: session.organizationId,
@@ -1270,6 +1419,24 @@ function PageContent({
         <Dashboard profile={profile} tables={tables} tickets={tickets} />
       ) : (
         <RealDashboard scope={managementScope} />
+      );
+    case "onboarding":
+      return (
+        <OnboardingPage
+          onUnauthorized={onUnauthorized}
+          onUnitSelected={(selectedUnitId) => {
+            const selectedUnit = session.organization.units.find(
+              (unit) => unit.id === selectedUnitId,
+            );
+            if (selectedUnit) {
+              onSessionChange({ ...session, unit: selectedUnit, unitId: selectedUnit.id });
+            }
+          }}
+          organizationId={session.organizationId}
+          profileId={session.profile.id}
+          unitId={session.unitId}
+          units={session.organization.units}
+        />
       );
     case "salon":
       return session.demo ? (
@@ -1403,6 +1570,16 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Use os indicadores como atalhos para a área correspondente.",
       "Dados reais são atualizados por evento ou pela atualização periódica de segurança.",
     ],
+  },
+  onboarding: {
+    title: "Concluir a configuração operacional",
+    steps: [
+      "Siga os quatro blocos e use cada atalho para configurar o recurso na tela correta.",
+      "Retorne ao onboarding e atualize o status; somente o servidor confirma cada requisito.",
+      "Depois dos 12 requisitos, o proprietário confirma e inicia o trial uma única vez.",
+    ],
+    warning:
+      "KDS, impressão, QR e fiscal não ficam prontos sem evidência real ou dispensa permitida.",
   },
   salon: {
     title: "Atender uma mesa",

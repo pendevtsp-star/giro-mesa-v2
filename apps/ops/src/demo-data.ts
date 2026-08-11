@@ -20,6 +20,7 @@ export const profiles: Profile[] = [
     pin: "1024",
     permissions: [
       ...basePermissions,
+      "onboarding.manage",
       "salon.operate",
       "counter.operate",
       "catalog.manage",
@@ -44,6 +45,7 @@ export const profiles: Profile[] = [
     pin: "2468",
     permissions: [
       ...basePermissions,
+      "onboarding.manage",
       "salon.operate",
       "counter.operate",
       "catalog.manage",

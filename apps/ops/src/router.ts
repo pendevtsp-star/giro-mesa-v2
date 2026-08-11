@@ -2,6 +2,7 @@ import type { RouteId } from "./domain";
 
 export const routeIds: RouteId[] = [
   "dashboard",
+  "onboarding",
   "salon",
   "counter",
   "catalog",

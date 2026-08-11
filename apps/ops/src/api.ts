@@ -1,8 +1,115 @@
 import type {
+  ApiComponents,
   ApiError,
+  ApiOperations,
   LoginInput,
   OperationalCommandInput,
 } from "../../../packages/contracts/src/index";
+
+export type CreateOrganizationInput = ApiOperations["OrganizationsController_create[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingUpdateInput = ApiOperations["OnboardingController_update[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionInput = ApiOperations["OnboardingController_select[1]"]["requestBody"]["content"]["application/json"];
+export type TrialActivationInput = ApiOperations["OnboardingController_activate[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionResponse = ApiComponents["schemas"]["OnboardingSelectionResponse"];
+export type TrialActivationResponse = ApiComponents["schemas"]["TrialActivationResponse"];
+export type ProvisioningState =
+  | "requested"
+  | "validating"
+  | "provisioning"
+  | "activating"
+  | "publishing"
+  | "retryable_failed"
+  | "compensating"
+  | "compensated"
+  | "terminal_failed"
+  | "completed";
+export type ChecklistStatus =
+  | "pending"
+  | "in_progress"
+  | "verified"
+  | "blocked"
+  | "not_applicable";
+export type ChecklistSource =
+  | "system"
+  | "actor_attestation"
+  | "authorized_waiver"
+  | "legacy_import";
+export type ChecklistItem =
+  | "business"
+  | "unit"
+  | "plan"
+  | "fiscalChoice"
+  | "catalog"
+  | "tables"
+  | "team"
+  | "qr"
+  | "production"
+  | "cashier"
+  | "training"
+  | "rehearsal";
+
+export interface OnboardingChecklistEvidence {
+  status: ChecklistStatus;
+  source: ChecklistSource;
+  evidenceReference?: string | null;
+  evidence?: Record<string, string | number | boolean | string[] | null>;
+  actorIdentityId?: string | null;
+  verifiedAt?: string | null;
+  waiverReason?: string | null;
+}
+
+export interface ProvisioningSummary {
+  id: string;
+  state: ProvisioningState;
+  checkpoint: string;
+  attempts: number;
+  lastErrorCode?: string | null;
+  nextRetryAt?: string | null;
+  completedAt?: string | null;
+  failedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProvisioningStatus extends ProvisioningSummary {
+  steps: Array<{
+    step: string;
+    status: string;
+    attempts: number;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    compensatedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+export type OnboardingResponse = Omit<
+  ApiComponents["schemas"]["OnboardingResponse"],
+  "activatedAt" | "items" | "provisioning"
+> & {
+  activatedAt: string | null;
+  items: Partial<Record<ChecklistItem, OnboardingChecklistEvidence>>;
+  provisioning: ProvisioningSummary | null;
+};
+
+export interface CreatedOrganizationResponse {
+  organization: {
+    id: string;
+    legalName: string;
+    tradeName: string;
+    document: string;
+    billingState: string;
+  };
+  unit: { id: string; organizationId: string; name: string; timezone: string; active: boolean };
+}
+
+export interface OnboardingErrorDetails {
+  provisioningRunId?: string;
+  missingItems?: string[];
+  fieldErrors?: Record<string, string[]>;
+  formErrors?: string[];
+}
 
 export interface ApiHealth {
   status: "ok";
@@ -36,6 +143,7 @@ export class ApiClientError extends Error {
     readonly status: number,
     readonly code: string,
     readonly retryable: boolean,
+    readonly details?: OnboardingErrorDetails,
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -61,12 +169,20 @@ export function resolveSecurityUrl(
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), 8_000);
+  const externalSignal = init.signal;
+  let timedOut = false;
+  const relayAbort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener("abort", relayAbort, { once: true });
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 8_000);
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       ...init,
       credentials: "include",
-      signal: init.signal ?? controller.signal,
+      signal: controller.signal,
       headers: {
         accept: "application/json",
         ...(init.body ? { "content-type": "application/json" } : {}),
@@ -80,13 +196,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         response.status,
         body?.code ?? "API_REQUEST_FAILED",
         response.status >= 500 || response.status === 429,
+        safeErrorDetails(body?.details),
       );
     }
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof ApiClientError) throw error;
-    const timedOut = error instanceof DOMException && error.name === "AbortError";
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError" &&
+      externalSignal?.aborted &&
+      !timedOut
+    ) {
+      throw error;
+    }
     throw new ApiClientError(
       timedOut ? "A API demorou mais que o esperado." : "Não foi possível alcançar a API.",
       0,
@@ -95,7 +219,37 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   } finally {
     globalThis.clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", relayAbort);
   }
+}
+
+function safeErrorDetails(value: unknown): OnboardingErrorDetails | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  const details: OnboardingErrorDetails = {};
+  if (typeof candidate.provisioningRunId === "string") {
+    details.provisioningRunId = candidate.provisioningRunId;
+  }
+  if (Array.isArray(candidate.missingItems)) {
+    details.missingItems = candidate.missingItems.filter(
+      (item): item is string => typeof item === "string",
+    );
+  }
+  if (candidate.fieldErrors && typeof candidate.fieldErrors === "object") {
+    details.fieldErrors = Object.fromEntries(
+      Object.entries(candidate.fieldErrors as Record<string, unknown>).flatMap(([key, messages]) =>
+        Array.isArray(messages)
+          ? [[key, messages.filter((message): message is string => typeof message === "string")]]
+          : [],
+      ),
+    );
+  }
+  if (Array.isArray(candidate.formErrors)) {
+    details.formErrors = candidate.formErrors.filter(
+      (message): message is string => typeof message === "string",
+    );
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 async function safeJson<T>(response: Response): Promise<T | null> {
@@ -134,6 +288,11 @@ function pilotPath(organizationId: string, unitId: string, resource: string): st
 
 function growthPath(organizationId: string, resource: string): string {
   return `/v1/organizations/${encodeURIComponent(organizationId)}/growth/${resource}`;
+}
+
+function onboardingPath(organizationId: string, resource = ""): string {
+  const suffix = resource ? `/${resource}` : "";
+  return `/v1/organizations/${encodeURIComponent(organizationId)}/onboarding${suffix}`;
 }
 
 async function idempotentRequest<T>(
@@ -184,6 +343,40 @@ export const api = {
   logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
+  createOrganization: (body: CreateOrganizationInput) =>
+    request<CreatedOrganizationResponse>("/v1/organizations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  onboarding: {
+    get: (organizationId: string) =>
+      request<OnboardingResponse>(onboardingPath(organizationId)),
+    update: (organizationId: string, body: OnboardingUpdateInput) =>
+      request<OnboardingResponse>(onboardingPath(organizationId), {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    select: (organizationId: string, body: OnboardingSelectionInput) =>
+      request<OnboardingSelectionResponse>(onboardingPath(organizationId, "selection"), {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    activate: (
+      organizationId: string,
+      body: TrialActivationInput,
+      idempotencyKey: string,
+    ) =>
+      request<TrialActivationResponse>(onboardingPath(organizationId, "activate"), {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(body),
+      }),
+    provisioning: (organizationId: string, runId: string, signal?: AbortSignal) =>
+      request<ProvisioningStatus>(
+        onboardingPath(organizationId, `provisioning/${encodeURIComponent(runId)}`),
+        { signal },
+      ),
+  },
   platform: {
     overview: () => request<unknown>("/v1/platform/overview"),
   },

@@ -2,6 +2,7 @@ import type { CartItem, Permission, Profile, RouteId, TicketStatus } from "./dom
 
 export const routePermissions: Record<RouteId, Permission> = {
   dashboard: "dashboard.view",
+  onboarding: "onboarding.manage",
   salon: "salon.operate",
   counter: "counter.operate",
   catalog: "catalog.manage",

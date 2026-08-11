@@ -11,6 +11,7 @@ export type ProfileId =
 
 export type Permission =
   | "dashboard.view"
+  | "onboarding.manage"
   | "salon.operate"
   | "counter.operate"
   | "catalog.manage"
@@ -29,6 +30,7 @@ export type Permission =
 
 export type RouteId =
   | "dashboard"
+  | "onboarding"
   | "salon"
   | "counter"
   | "catalog"
