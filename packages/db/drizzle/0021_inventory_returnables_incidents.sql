@@ -128,12 +128,15 @@ CREATE TABLE "management_incidents" (
   "evidence" jsonb DEFAULT '[]'::jsonb NOT NULL,
   "amount_cents" integer,
   "payroll_action" boolean DEFAULT false NOT NULL,
+  "idempotency_key" varchar(160) NOT NULL,
+  "request_hash" varchar(64) NOT NULL,
   "reporter_identity_id" uuid NOT NULL,
   "approver_identity_id" uuid,
   "occurred_at" timestamp with time zone NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "management_incidents_scope_id_unique" UNIQUE("organization_id", "unit_id", "id"),
+  CONSTRAINT "management_incidents_idempotency_unique" UNIQUE("organization_id", "unit_id", "idempotency_key"),
   CONSTRAINT "management_incidents_status_check" CHECK ("status" IN ('reported','under_review','approved','rejected','closed')),
   CONSTRAINT "management_incidents_amount_check" CHECK ("amount_cents" IS NULL OR "amount_cents" >= 0),
   CONSTRAINT "management_incidents_no_payroll_check" CHECK ("payroll_action" = false)
@@ -147,8 +150,11 @@ CREATE TABLE "management_incident_events" (
   "from_status" varchar(24),
   "to_status" varchar(24) NOT NULL,
   "neutral_note" text,
+  "idempotency_key" varchar(160) NOT NULL,
+  "request_hash" varchar(64) NOT NULL,
   "actor_identity_id" uuid NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  ,CONSTRAINT "management_incident_events_idempotency_unique" UNIQUE("organization_id", "unit_id", "idempotency_key")
 );
 --> statement-breakpoint
 ALTER TABLE "management_returnable_assets" ADD CONSTRAINT "management_returnable_assets_unit_fk" FOREIGN KEY ("organization_id", "unit_id") REFERENCES "public"."units"("organization_id", "id") ON DELETE restrict;

@@ -8,6 +8,7 @@ import { TenantContextInterceptor } from "./database/tenant-context.interceptor.
 import { FiscalModule } from "./fiscal/fiscal.module.js";
 import { GrowthModule } from "./growth/growth.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { IncidentsModule } from "./incidents/incidents.module.js";
 import { ManagementModule } from "./management/management.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
@@ -25,6 +26,7 @@ import { SyncModule } from "./sync/sync.module.js";
     DatabaseModule,
     FiscalModule,
     HealthModule,
+    IncidentsModule,
     CatalogModule,
     AuthModule,
     OrganizationsModule,

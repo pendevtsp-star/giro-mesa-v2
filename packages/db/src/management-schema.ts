@@ -814,6 +814,90 @@ export const managementReturnableMovements = pgTable(
   ],
 );
 
+export const managementIncidents = pgTable(
+  "management_incidents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    incidentType: varchar("incident_type", { length: 48 }).notNull(),
+    status: varchar("status", { length: 24 })
+      .$type<"reported" | "under_review" | "approved" | "rejected" | "closed">()
+      .notNull()
+      .default("reported"),
+    neutralSummary: text("neutral_summary").notNull(),
+    evidence: jsonb("evidence").$type<Record<string, unknown>[]>().notNull().default([]),
+    amountCents: integer("amount_cents"),
+    payrollAction: boolean("payroll_action").notNull().default(false),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    reporterIdentityId: uuid("reporter_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    approverIdentityId: uuid("approver_identity_id").references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_incidents_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    unique("management_incidents_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "management_incidents_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check(
+      "management_incidents_status_check",
+      sql`${table.status} in ('reported','under_review','approved','rejected','closed')`,
+    ),
+    check(
+      "management_incidents_amount_check",
+      sql`${table.amountCents} is null or ${table.amountCents} >= 0`,
+    ),
+    check("management_incidents_no_payroll_check", sql`${table.payrollAction} = false`),
+  ],
+);
+
+export const managementIncidentEvents = pgTable(
+  "management_incident_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    incidentId: uuid("incident_id").notNull(),
+    event: varchar("event", { length: 32 }).notNull(),
+    fromStatus: varchar("from_status", { length: 24 }),
+    toStatus: varchar("to_status", { length: 24 }).notNull(),
+    neutralNote: text("neutral_note"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_incident_events_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "management_incident_events_incident_fk",
+      columns: [table.organizationId, table.unitId, table.incidentId],
+      foreignColumns: [
+        managementIncidents.organizationId,
+        managementIncidents.unitId,
+        managementIncidents.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const managementStockBalances = pgTable(
   "management_stock_balances",
   {
