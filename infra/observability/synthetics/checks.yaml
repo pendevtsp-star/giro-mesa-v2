@@ -1,0 +1,26 @@
+version: 1
+defaults:
+  interval: 60s
+  timeout: 5s
+  retries: 1
+  emitSignal: giromesa.synthetic.check
+checks:
+  - id: api-health
+    baseUrlEnv: API_URL
+    method: GET
+    path: /health
+    expectedStatus: 200
+    owner: platform-oncall
+  - id: public-menu
+    baseUrlEnv: API_URL
+    method: GET
+    pathTemplate: /api/v1/public/menus/${SYNTHETIC_MENU_SLUG}
+    expectedStatus: 200
+    fixtureEnv: SYNTHETIC_MENU_SLUG
+    owner: operations-oncall
+  - id: ops-shell
+    baseUrlEnv: OPS_APP_URL
+    method: GET
+    path: /
+    expectedStatus: 200
+    owner: platform-oncall

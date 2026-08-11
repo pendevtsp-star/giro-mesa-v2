@@ -1,0 +1,51 @@
+version: 1
+alerts:
+  - id: api-availability-fast-burn
+    signal: http.server.request.duration
+    condition: error_budget_burn_rate > 14.4
+    window: 5m
+    severity: sev1
+    owner: platform-oncall
+    runbook: docs/runbooks/incident-response.md#api-availability
+  - id: api-availability-slow-burn
+    signal: http.server.request.duration
+    condition: error_budget_burn_rate > 6
+    window: 1h
+    severity: sev2
+    owner: platform-oncall
+    runbook: docs/runbooks/incident-response.md#api-availability
+  - id: api-read-p95
+    signal: http.server.request.duration
+    condition: p95_read_ms >= 300
+    window: 10m
+    severity: sev2
+    owner: platform-oncall
+    runbook: docs/runbooks/incident-response.md#latencia
+  - id: api-write-p95
+    signal: http.server.request.duration
+    condition: p95_write_ms >= 500
+    window: 10m
+    severity: sev2
+    owner: platform-oncall
+    runbook: docs/runbooks/incident-response.md#latencia
+  - id: worker-failure-rate
+    signal: giromesa.worker.jobs.failed
+    condition: failure_rate >= 0.001
+    window: 10m
+    severity: sev2
+    owner: operations-oncall
+    runbook: docs/runbooks/incident-response.md#worker
+  - id: cardinality-overflow
+    signal_attribute: telemetry.cardinality_overflow_count
+    condition: sum > 0
+    window: 5m
+    severity: sev3
+    owner: platform-oncall
+    runbook: docs/runbooks/incident-response.md#cardinalidade
+  - id: synthetic-critical-path
+    signal: giromesa.synthetic.check
+    condition: consecutive_failures >= 3
+    window: 5m
+    severity: sev1
+    owner: operations-oncall
+    runbook: docs/runbooks/incident-response.md#synthetics
