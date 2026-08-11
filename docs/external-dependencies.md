@@ -15,6 +15,7 @@ O código deve continuar funcional em modo demonstrativo e falhar de forma segur
 | Contabilidade e folha | fornecedores escolhidos, contratos de API e mapeamento contábil | API pública/webhooks disponíveis; nenhum fornecedor presumido |
 | Piloto | empresa, rede, impressoras, produtos, mesas, equipe e dados fiscais | tenant demonstrativo |
 | Hub em produção | certificado TLS local, instalador, provisionamento e cofre de segredos | SQLCipher, replay e reconciliação validados localmente |
+| Backup/DR | object storage versionado com object-lock, cofre para HMAC, agenda a cada 5 min, alertas e infraestrutura isolada de restore | scripts fail-closed e ensaio local; RPO/RTO reais ainda não homologados |
 | Geocodificação | provedor e chave para converter endereço em coordenadas | endereço, região, taxa e pedido mínimo validados; ponto-no-polígono bloqueado |
 
 Documentos jurídicos e procedimentos LGPD são modelos técnicos e exigem revisão profissional antes da publicação comercial.
