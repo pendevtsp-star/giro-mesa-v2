@@ -1,4 +1,13 @@
+import {
+  beginPwaMutation,
+  endPwaMutation,
+  getPwaMutationCount,
+  subscribePwaMutations,
+  withPwaMutation,
+} from "@giromesa/ui/pwa-mutation";
 import { useEffect, useRef, useState } from "react";
+
+export { beginPwaMutation, endPwaMutation, withPwaMutation };
 
 const DATABASE_NAME = "giromesa-ops-pwa";
 const DATABASE_VERSION = 2;
@@ -9,31 +18,9 @@ type WaitingWorker = { postMessage(message: { type: string }): void };
 type PwaRecord = { key: string; schemaVersion: number; expiresAt: number };
 type ActivationResult = "activated" | "blocked" | "unavailable";
 
-let activeMutations = 0;
-const mutationListeners = new Set<(count: number) => void>();
-
-export function beginPwaMutation() {
-  activeMutations += 1;
-  notifyMutationListeners();
-}
-
-export function endPwaMutation() {
-  activeMutations = Math.max(0, activeMutations - 1);
-  notifyMutationListeners();
-}
-
-export async function withPwaMutation<T>(work: () => Promise<T>): Promise<T> {
-  beginPwaMutation();
-  try {
-    return await work();
-  } finally {
-    endPwaMutation();
-  }
-}
-
 export function requestPwaActivation(waiting?: WaitingWorker | null): ActivationResult {
   if (!waiting) return "unavailable";
-  if (activeMutations > 0) return "blocked";
+  if (getPwaMutationCount() > 0) return "blocked";
   waiting.postMessage({ type: "SKIP_WAITING" });
   return "activated";
 }
@@ -58,12 +45,12 @@ export async function clearPwaRuntimeState() {
 export function PwaUpdate() {
   const [online, setOnline] = useState(() => navigator.onLine);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-  const [mutationCount, setMutationCount] = useState(activeMutations);
+  const [mutationCount, setMutationCount] = useState(getPwaMutationCount);
   const [activationBlocked, setActivationBlocked] = useState(false);
   const activationRequested = useRef(false);
 
   useEffect(() => {
-    mutationListeners.add(setMutationCount);
+    const unsubscribeMutations = subscribePwaMutations(setMutationCount);
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
     window.addEventListener("online", onOnline);
@@ -72,7 +59,7 @@ export function PwaUpdate() {
     void preparePwaStorage();
     if (!("serviceWorker" in navigator)) {
       return () => {
-        mutationListeners.delete(setMutationCount);
+        unsubscribeMutations();
         window.removeEventListener("online", onOnline);
         window.removeEventListener("offline", onOffline);
       };
@@ -102,7 +89,7 @@ export function PwaUpdate() {
 
     return () => {
       disposed = true;
-      mutationListeners.delete(setMutationCount);
+      unsubscribeMutations();
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
@@ -143,10 +130,6 @@ export function PwaUpdate() {
       )}
     </>
   );
-}
-
-function notifyMutationListeners() {
-  for (const listener of mutationListeners) listener(activeMutations);
 }
 
 async function preparePwaStorage() {

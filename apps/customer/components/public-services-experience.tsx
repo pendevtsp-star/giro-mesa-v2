@@ -9,6 +9,7 @@ import {
   readCouponValidation,
   resolveMutationAttempt,
 } from "../lib/public-contracts";
+import { customerFetch } from "../lib/pwa-fetch";
 
 type MutationKind = "reservation" | "waitlist";
 type Message = { tone: "success" | "warning"; text: string } | null;
@@ -42,7 +43,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy(kind);
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/${path}`,
         {
           method: "POST",
@@ -130,7 +131,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy("coupon");
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/coupons/validate`,
         {
           method: "POST",

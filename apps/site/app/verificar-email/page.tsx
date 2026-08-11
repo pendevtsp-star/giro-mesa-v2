@@ -7,6 +7,7 @@ import {
   buildEmailVerificationRequest,
   consumeEmailVerificationFragment,
 } from "../../lib/email-verification";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 type VerificationState =
   | "waiting"
@@ -55,7 +56,7 @@ export default function VerifyEmailPage() {
       setState("invalid");
       return;
     }
-    void fetch(request.url, request.init)
+    void siteFetch(request.url, request.init)
       .then(async (response) => {
         if (!response.ok) throw new Error("invalid verification");
         return (await response.json()) as {
@@ -98,7 +99,7 @@ export default function VerifyEmailPage() {
     if (!apiUrl) return;
     setMessage("Validando o segundo fator.");
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/mfa/challenge/verify`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/mfa/challenge/verify`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -122,7 +123,7 @@ export default function VerifyEmailPage() {
     }
     setMessage("Enviando uma nova mensagem, se a conta estiver pendente.");
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/email-verification/request`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/email-verification/request`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -1,3 +1,4 @@
+import { createPwaFetch } from "@giromesa/ui/pwa-mutation";
 import type {
   ApiError,
   ApiOperations,
@@ -94,6 +95,7 @@ export class ApiClientError extends Error {
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replace(/\/$/, "");
+const pwaFetch = createPwaFetch();
 
 export function resolveSecurityUrl(
   rawSiteUrl = import.meta.env.VITE_SITE_URL ?? "http://localhost:3100",
@@ -122,7 +124,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     controller.abort();
   }, 8_000);
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
+    const response = await pwaFetch(`${baseUrl}${path}`, {
       ...init,
       credentials: "include",
       signal: controller.signal,

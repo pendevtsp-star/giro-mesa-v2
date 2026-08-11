@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function CreateAccountPage() {
   const [message, setMessage] = useState("");
@@ -56,7 +57,7 @@ export default function CreateAccountPage() {
       termsAccepted: true,
     };
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/register`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/register`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

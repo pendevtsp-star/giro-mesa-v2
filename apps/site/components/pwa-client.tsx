@@ -1,30 +1,23 @@
 "use client";
 
+import {
+  getPwaMutationCount,
+  subscribePwaMutations,
+  withPwaMutation,
+} from "@giromesa/ui/pwa-mutation";
 import { useEffect, useRef, useState } from "react";
 
-let activeMutations = 0;
-const listeners = new Set<(count: number) => void>();
-
-export async function withSitePwaMutation<T>(work: () => Promise<T>): Promise<T> {
-  activeMutations += 1;
-  for (const listener of listeners) listener(activeMutations);
-  try {
-    return await work();
-  } finally {
-    activeMutations = Math.max(0, activeMutations - 1);
-    for (const listener of listeners) listener(activeMutations);
-  }
-}
+export { withPwaMutation as withSitePwaMutation };
 
 export function PwaClient() {
   const [online, setOnline] = useState(true);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-  const [mutationCount, setMutationCount] = useState(activeMutations);
+  const [mutationCount, setMutationCount] = useState(getPwaMutationCount);
   const activationRequested = useRef(false);
 
   useEffect(() => {
     setOnline(navigator.onLine);
-    listeners.add(setMutationCount);
+    const unsubscribeMutations = subscribePwaMutations(setMutationCount);
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
     window.addEventListener("online", onOnline);
@@ -32,7 +25,7 @@ export function PwaClient() {
 
     if (!("serviceWorker" in navigator)) {
       return () => {
-        listeners.delete(setMutationCount);
+        unsubscribeMutations();
         window.removeEventListener("online", onOnline);
         window.removeEventListener("offline", onOffline);
       };
@@ -62,7 +55,7 @@ export function PwaClient() {
 
     return () => {
       disposed = true;
-      listeners.delete(setMutationCount);
+      unsubscribeMutations();
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);

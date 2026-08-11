@@ -23,6 +23,7 @@ import {
   readPublicOrderOptions,
   readPublicOrderReceipt,
 } from "../lib/public-order";
+import { customerFetch } from "../lib/pwa-fetch";
 import { withCustomerPwaMutation } from "./pwa-client";
 
 type HubState = "checking" | "online" | "offline";
@@ -104,7 +105,7 @@ export function MenuExperience({
         return;
       }
       try {
-        const response = await fetch(
+        const response = await customerFetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/hub-status`,
           { cache: "no-store" },
         );
@@ -246,7 +247,7 @@ export function MenuExperience({
     setPendingCommand(type);
     try {
       return await withCustomerPwaMutation(async () => {
-        const response = await fetch(
+        const response = await customerFetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
           {
             method: "POST",
@@ -325,7 +326,7 @@ export function MenuExperience({
     setPendingCommand("public_order");
     try {
       await withCustomerPwaMutation(async () => {
-        const response = await fetch(
+        const response = await customerFetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/orders`,
           {
             method: "POST",

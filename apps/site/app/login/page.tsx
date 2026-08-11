@@ -5,6 +5,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
 import { buildMfaProof, readMfaChallenge } from "../../lib/mfa";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +43,7 @@ export default function LoginPage() {
     }
     const data = new FormData(event.currentTarget);
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/login`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +86,7 @@ export default function LoginPage() {
     const data = new FormData(event.currentTarget);
     const value = String(data.get("mfaProof") ?? "").trim();
     try {
-      const response = await fetch(
+      const response = await siteFetch(
         `${apiUrl}/v1/auth/${oauthMfa ? "mfa/oauth/verify" : "mfa/challenge/verify"}`,
         {
           method: "POST",

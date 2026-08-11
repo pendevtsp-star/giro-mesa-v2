@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { siteFetch } from "../lib/pwa-fetch";
 import { withSitePwaMutation } from "./pwa-client";
 
 type PlanSlug = "operacao" | "crescimento" | "rede";
@@ -42,7 +43,7 @@ export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
               privacyAccepted: form.has("consent"),
             };
       const response = await withSitePwaMutation(() =>
-        fetch(endpoint, {
+        siteFetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

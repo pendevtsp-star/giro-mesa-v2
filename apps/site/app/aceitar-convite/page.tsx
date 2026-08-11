@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { resolveOpsUrl } from "../../lib/auth-navigation";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function AcceptInvitationPage() {
   const [token, setToken] = useState("");
@@ -24,7 +25,7 @@ export default function AcceptInvitationPage() {
     }
     setMessage("Validando convite…");
     try {
-      const response = await fetch(`${apiUrl}/v1/organizations/membership-invitations/accept`, {
+      const response = await siteFetch(`${apiUrl}/v1/organizations/membership-invitations/accept`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
