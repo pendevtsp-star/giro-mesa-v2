@@ -469,6 +469,13 @@ function snapshotIdentity(snapshot: OnboardingResponse | null, scopeKey: string)
   ].join(":");
 }
 
+function pollingIdentity(snapshot: OnboardingResponse | null, scopeKey: string) {
+  if (!snapshot?.provisioning) return null;
+  return [scopeKey, snapshot.selection?.revision ?? "unselected", snapshot.provisioning.id].join(
+    ":",
+  );
+}
+
 type RefreshOutcome =
   | { status: "applied"; requestOrder: number; snapshot: OnboardingResponse }
   | { status: "failed" | "ignored"; requestOrder: number };
@@ -509,6 +516,7 @@ export function OnboardingPage({
     typeof document === "undefined" ? true : document.visibilityState === "visible",
   );
   const [pollAttempt, setPollAttempt] = useState(0);
+  const [pollSuppression, setPollSuppression] = useState<string | null>(null);
   const [pollPaused, setPollPaused] = useState(false);
   const [error, setError] = useState<ErrorGuidance | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -522,6 +530,7 @@ export function OnboardingPage({
   const refreshControllerRef = useRef<AbortController | null>(null);
   const pollControllerRef = useRef<AbortController | null>(null);
   const lockedRef = useRef(false);
+  const pollSuppressionRef = useRef<string | null>(null);
 
   const showError = useCallback(
     (caught: unknown, action?: string) => {
@@ -562,11 +571,13 @@ export function OnboardingPage({
       expectedGeneration: number,
       expectedScope: string,
       requestOrder: number,
+      clearPollingSuppression = false,
     ) => {
       if (
         generationRef.current !== expectedGeneration ||
         scopeKeyRef.current !== expectedScope ||
-        snapshotRequestOrderRef.current !== requestOrder
+        snapshotRequestOrderRef.current !== requestOrder ||
+        next.organizationId !== organizationId
       ) {
         return false;
       }
@@ -581,6 +592,12 @@ export function OnboardingPage({
       }
       const previousIdentity = snapshotIdentity(snapshotRef.current, expectedScope);
       const nextIdentity = snapshotIdentity(next, expectedScope);
+      const previousPollingIdentity = pollingIdentity(snapshotRef.current, expectedScope);
+      const nextPollingIdentity = pollingIdentity(next, expectedScope);
+      if (clearPollingSuppression || previousPollingIdentity !== nextPollingIdentity) {
+        pollSuppressionRef.current = null;
+        setPollSuppression(null);
+      }
       if (previousIdentity !== nextIdentity) {
         pollControllerRef.current?.abort();
         setPollAttempt(0);
@@ -622,9 +639,10 @@ export function OnboardingPage({
         ) {
           return { status: "ignored", requestOrder };
         }
-        return applySnapshot(next, expectedGeneration, expectedScope, requestOrder)
-          ? { status: "applied", requestOrder, snapshot: next }
-          : { status: "ignored", requestOrder };
+        if (!applySnapshot(next, expectedGeneration, expectedScope, requestOrder, true)) {
+          return { status: "ignored", requestOrder };
+        }
+        return { status: "applied", requestOrder, snapshot: next };
       } catch (caught) {
         if (
           !isAbortError(caught) &&
@@ -633,12 +651,24 @@ export function OnboardingPage({
           generationRef.current === expectedGeneration &&
           scopeKeyRef.current === expectedScope
         ) {
-          showError(caught);
           const currentRun = snapshotRef.current?.provisioning;
+          const currentPollingIdentity = pollingIdentity(snapshotRef.current, expectedScope);
+          if (
+            caught instanceof ApiClientError &&
+            !caught.retryable &&
+            currentPollingIdentity &&
+            currentRun &&
+            shouldPollProvisioning({ online: true, visible: true, state: currentRun.state })
+          ) {
+            pollSuppressionRef.current = currentPollingIdentity;
+            setPollSuppression(currentPollingIdentity);
+          }
+          showError(caught);
           if (
             caught instanceof ApiClientError &&
             caught.retryable &&
             !lockedRef.current &&
+            pollSuppressionRef.current !== currentPollingIdentity &&
             currentRun &&
             shouldPollProvisioning({ online: true, visible: true, state: currentRun.state })
           ) {
@@ -674,6 +704,8 @@ export function OnboardingPage({
     setLoading(authorized);
     setBusy(false);
     lockedRef.current = false;
+    pollSuppressionRef.current = null;
+    setPollSuppression(null);
     setLocked(false);
     setPollAttempt(0);
     setPollPaused(false);
@@ -704,6 +736,10 @@ export function OnboardingPage({
     const run = snapshot?.provisioning;
     if (!run || locked || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
     if (!shouldPollProvisioning({ online, visible, state: run.state })) return undefined;
+    const expectedPollingIdentity = pollingIdentity(snapshot, scopeKey);
+    if (!expectedPollingIdentity || pollSuppression === expectedPollingIdentity) {
+      return undefined;
+    }
     const controller = new AbortController();
     pollControllerRef.current?.abort();
     pollControllerRef.current = controller;
@@ -723,6 +759,7 @@ export function OnboardingPage({
           snapshotRequestOrderRef.current !== requestOrder ||
           generationRef.current !== expectedGeneration ||
           scopeKeyRef.current !== expectedScope ||
+          status.id !== expectedRunId ||
           current?.provisioning?.id !== expectedRunId ||
           (current.selection?.revision ?? null) !== expectedRevision
         ) {
@@ -748,6 +785,10 @@ export function OnboardingPage({
           snapshotRef.current?.provisioning?.id === expectedRunId &&
           (snapshotRef.current.selection?.revision ?? null) === expectedRevision
         ) {
+          if (caught instanceof ApiClientError && !caught.retryable) {
+            pollSuppressionRef.current = expectedPollingIdentity;
+            setPollSuppression(expectedPollingIdentity);
+          }
           showError(caught);
           if (caught instanceof ApiClientError && caught.retryable && !lockedRef.current) {
             setPollAttempt((attempt) => attempt + 1);
@@ -766,7 +807,9 @@ export function OnboardingPage({
     organizationId,
     pollAttempt,
     pollPaused,
+    pollSuppression,
     refresh,
+    scopeKey,
     showError,
     snapshot,
     visible,
@@ -904,6 +947,8 @@ export function OnboardingPage({
     const expectedScope = scopeKeyRef.current;
     const sequence = ++mutationSequenceRef.current;
     const requestOrder = ++snapshotRequestOrderRef.current;
+    pollSuppressionRef.current = null;
+    setPollSuppression(null);
     pollControllerRef.current?.abort();
     setBusy(true);
     setError(null);
@@ -934,6 +979,7 @@ export function OnboardingPage({
         return;
       }
       if (caught instanceof ApiClientError && caught.details?.provisioningRunId) {
+        const failedRunId = caught.details.provisioningRunId;
         const recovery = await refresh(expectedGeneration, expectedScope);
         if (
           sequence !== mutationSequenceRef.current ||
@@ -943,12 +989,17 @@ export function OnboardingPage({
         ) {
           return;
         }
-        if (recovery.status === "applied") {
-          if (snapshotResolvedSuccessfully(recovery.snapshot)) return;
-          if (snapshotFailedTerminally(recovery.snapshot)) {
-            showError(caught, "Tentar novamente");
-            return;
-          }
+        if (
+          recovery.status !== "applied" ||
+          recovery.snapshot.organizationId !== organizationId ||
+          recovery.snapshot.provisioning?.id !== failedRunId
+        ) {
+          return;
+        }
+        if (snapshotResolvedSuccessfully(recovery.snapshot)) return;
+        if (snapshotFailedTerminally(recovery.snapshot)) {
+          showError(caught, "Tentar novamente");
+          return;
         }
       }
       showError(caught);

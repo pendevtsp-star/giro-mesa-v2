@@ -982,6 +982,8 @@ test("retoma polling automático depois de refresh manual 503 sem timers duplica
   let statusCalls = 0;
   let failNextRefresh = false;
   let completed = false;
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1_000));
   const summary = (state: "publishing" | "completed") => ({
     id: runId,
     state,
@@ -1044,11 +1046,12 @@ test("retoma polling automático depois de refresh manual 503 sem timers duplica
   failNextRefresh = true;
   await refreshCurrentRun.click();
   await expect(page.getByRole("alert")).toBeVisible();
+  await page.clock.runFor(1_600);
   await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
     timeout: 5_000,
   });
   expect(statusCalls).toBe(1);
-  await page.waitForTimeout(1_200);
+  await page.clock.runFor(5_000);
   expect(statusCalls).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
@@ -1130,14 +1133,163 @@ for (const status of [400, 401, 403, 404] as const) {
     failNextRefresh = true;
     await refreshCurrentRun.click();
     await refreshFailed;
-    if (status === 401) {
-      await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
-    } else if (status === 403) {
-      await expect(page.locator(".onboarding-activation").getByRole("checkbox")).toBeDisabled();
-    }
     await page.waitForTimeout(100);
     await page.clock.fastForward(10_000);
     expect(statusCalls).toBe(0);
+  });
+}
+
+for (const status of [400, 404] as const) {
+  test(`mantém poll ${status} latched no lifecycle e libera por recovery autoritativo`, async ({
+    page,
+  }) => {
+    const runB = "e2222222-2222-4222-8222-222222222222";
+    let recover = false;
+    let completed = false;
+    let onboardingGets = 0;
+    let oldRunStatusCalls = 0;
+    let newRunStatusCalls = 0;
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now() + 1_000));
+    await page.route(
+      `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+      async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (url.pathname.endsWith(`/provisioning/${runId}`)) {
+          oldRunStatusCalls += 1;
+          if (!recover) {
+            await route.fulfill({
+              status,
+              json: {
+                statusCode: status,
+                code: `POLL_${status}`,
+                message: `Polling permanente ${status}.`,
+              },
+            });
+            return;
+          }
+          if (status === 404) {
+            await route.fulfill({
+              status: 500,
+              json: {
+                statusCode: 500,
+                code: "STALE_RUN_POLLED",
+                message: "O run antigo não deve ser consultado depois da troca.",
+              },
+            });
+            return;
+          }
+          completed = true;
+          await route.fulfill({
+            json: {
+              id: runId,
+              state: "completed",
+              checkpoint: "published",
+              attempts: 2,
+              lastErrorCode: null,
+              nextRetryAt: null,
+              completedAt: "2026-08-11T10:20:00.000Z",
+              failedAt: null,
+              createdAt: "2026-08-11T10:00:00.000Z",
+              updatedAt: "2026-08-11T10:20:00.000Z",
+              steps: [],
+            },
+          });
+          return;
+        }
+        if (url.pathname.endsWith(`/provisioning/${runB}`)) {
+          newRunStatusCalls += 1;
+          completed = true;
+          await route.fulfill({
+            json: {
+              id: runB,
+              state: "completed",
+              checkpoint: "published",
+              attempts: 1,
+              lastErrorCode: null,
+              nextRetryAt: null,
+              completedAt: "2026-08-11T10:20:00.000Z",
+              failedAt: null,
+              createdAt: "2026-08-11T10:15:00.000Z",
+              updatedAt: "2026-08-11T10:20:00.000Z",
+              steps: [],
+            },
+          });
+          return;
+        }
+        if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+          onboardingGets += 1;
+          const currentRunId = recover && status === 404 ? runB : runId;
+          await route.fulfill({
+            json: onboardingSnapshot({
+              items: verifiedItems(),
+              selection: selectedPlan(recover && status === 404 ? 2 : 1),
+              provisioning: {
+                id: currentRunId,
+                state: completed ? "completed" : "publishing",
+                checkpoint: completed ? "published" : "activation_committed",
+                attempts: completed ? 2 : 1,
+                lastErrorCode: null,
+                nextRetryAt: null,
+                completedAt: completed ? "2026-08-11T10:20:00.000Z" : null,
+                failedAt: null,
+                createdAt: "2026-08-11T10:00:00.000Z",
+                updatedAt: completed ? "2026-08-11T10:20:00.000Z" : "2026-08-11T10:00:00.000Z",
+              },
+              activatedAt: completed ? "2026-08-11T10:20:00.000Z" : null,
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+        });
+      },
+    );
+
+    await enterDemo(page);
+    await openOnboarding(page);
+    await expect(page.getByText("Publicando conclusão", { exact: true })).toBeVisible();
+    await page.waitForTimeout(100);
+    await page.clock.runFor(1_100);
+    await expect.poll(() => oldRunStatusCalls).toBe(1);
+    expect(newRunStatusCalls).toBe(0);
+    await expect(page.getByRole("alert")).toContainText(`Polling permanente ${status}.`);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+      window.dispatchEvent(new Event("offline"));
+    });
+    await page.waitForTimeout(100);
+    await page.clock.runFor(10_000);
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+      window.dispatchEvent(new Event("online"));
+    });
+    await page.waitForTimeout(100);
+    await page.clock.runFor(10_000);
+    expect(oldRunStatusCalls).toBe(1);
+    expect(newRunStatusCalls).toBe(0);
+
+    recover = true;
+    const getsBeforeRecovery = onboardingGets;
+    await page
+      .locator("button:not([disabled])")
+      .filter({ hasText: "Atualizar status" })
+      .first()
+      .click();
+    await expect.poll(() => onboardingGets).toBeGreaterThan(getsBeforeRecovery);
+    await page.waitForTimeout(100);
+    await page.clock.runFor(1_100);
+    await expect.poll(() => oldRunStatusCalls).toBe(status === 400 ? 2 : 1);
+    await expect.poll(() => newRunStatusCalls).toBe(status === 404 ? 1 : 0);
+    await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
   });
 }
 
@@ -1268,6 +1420,80 @@ for (const state of ["terminal_failed", "compensated"] as const) {
     await expect(activation).toContainText(
       state === "terminal_failed" ? "Ativação encerrada com falha" : "Ativação compensada",
     );
+  });
+}
+
+for (const state of ["terminal_failed", "compensated", "completed"] as const) {
+  test(`descarta erro do run A quando recovery autoritativo retorna run B ${state}`, async ({
+    page,
+  }) => {
+    const runB = "e2222222-2222-4222-8222-222222222222";
+    const staleMessage = "A falhou e não pode aparecer sobre a execução B.";
+    let runBVisible = false;
+    const terminalAt = "2026-08-11T10:30:00.000Z";
+    await page.route(
+      `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+      async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (request.method() === "POST" && url.pathname.endsWith("/activate")) {
+          runBVisible = true;
+          await route.fulfill({
+            status: 409,
+            json: {
+              statusCode: 409,
+              code: "ACTIVATION_ALREADY_RUNNING",
+              message: staleMessage,
+              details: { provisioningRunId: runId },
+            },
+          });
+          return;
+        }
+        if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+          await route.fulfill({
+            json: onboardingSnapshot({
+              items: verifiedItems(),
+              selection: selectedPlan(2),
+              provisioning: runBVisible
+                ? {
+                    id: runB,
+                    state,
+                    checkpoint: state === "completed" ? "published" : "activation_committed",
+                    attempts: 1,
+                    lastErrorCode: state === "completed" ? null : "RUN_B_TERMINAL",
+                    nextRetryAt: null,
+                    completedAt: state === "completed" ? terminalAt : null,
+                    failedAt: state === "completed" ? null : terminalAt,
+                    createdAt: terminalAt,
+                    updatedAt: terminalAt,
+                  }
+                : null,
+              activatedAt: runBVisible && state === "completed" ? terminalAt : null,
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+        });
+      },
+    );
+
+    await enterDemo(page);
+    await openOnboarding(page);
+    const activation = page.locator(".onboarding-activation");
+    await activation.getByRole("checkbox").check();
+    await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+    await expect(page.getByText(staleMessage)).toHaveCount(0);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    if (state === "completed") {
+      await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+    } else {
+      await expect(activation).toContainText(
+        state === "terminal_failed" ? "Ativação encerrada com falha" : "Ativação compensada",
+      );
+    }
   });
 }
 

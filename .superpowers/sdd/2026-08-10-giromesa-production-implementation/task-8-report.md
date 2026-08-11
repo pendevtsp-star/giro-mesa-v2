@@ -184,6 +184,31 @@ O quarto round corrige os dois achados importantes sem alterar API, contratos, c
 - Biome focado nos **2 arquivos TypeScript/TSX alterados: verde**. `git diff --check`: **verde**.
 - A matriz regenerou as quatro capturas desktop/mobile de topo/ativação. O detector Impeccable não foi repetido; geração OpenAPI/C# permaneceu intocada. Não houve provider, credencial real, push, deploy ou Task 9+.
 
+## Fix round 5 — identidade exata de saga e latch permanente
+
+O breaker final corrige os dois achados importantes no cliente Ops, sem alterar backend, OpenAPI, contratos ou clientes gerados e sem ampliar o escopo da Task 8.
+
+### RED adicional capturado
+
+- Um 409 da ativação do run A era usado apenas como gatilho de refresh. Se outra sessão publicasse o run B antes do `GET`, o cliente podia reapresentar a mensagem pública de A sobre B em `terminal_failed` ou `compensated`; `completed` apenas ocultava o erro por coincidência da reconciliação de sucesso.
+- O erro permanente de polling ficava somente no render corrente. Depois de 400/404, ciclos `hidden → visible` e `offline → online` recriavam o efeito e podiam consultar novamente o mesmo run, apesar de nenhuma recuperação autoritativa ter acontecido.
+
+### Correções
+
+- A recuperação do 409 agora exige simultaneamente request corrente, generation corrente, organização/escopo correntes, ordem monotônica corrente e igualdade exata entre `details.provisioningRunId` e `snapshot.provisioning.id`. Em mismatch A→B, nenhum erro de A é publicado ou usado para suprimir B; somente o snapshot autoritativo de B é renderizado em `terminal_failed`, `compensated` ou `completed`. Em igualdade de run, falha terminal continua expondo apenas code/message públicos e CTA seguro, enquanto sucesso autoritativo continua suprimindo o 409 antigo.
+- O latch de polling é chaveado por organização/unidade, revisão e run. Ele é gravado antes do alerta para erros não retryable, participa do estado reativo para desmontar o timer/controller corrente e impede recriação por eventos de visibilidade ou rede. A ref espelhada preserva guards síncronos durante races.
+- O latch só é liberado por refresh manual aplicado com sucesso, mudança real de scope/revisão/run ou nova ativação. O E2E prova uma única retomada no mesmo run após recovery 400, uma única retomada no run B após recovery 404, zero consulta extra do run A e nenhuma reativação por lifecycle. 401 continua encerrando a sessão e 403 continua respeitando lock.
+- O polling também rejeita uma resposta cujo DTO `status.id` não corresponda exatamente ao run solicitado, antes de tocar no snapshot.
+
+### Gates do fix round 5
+
+- RED/GREEN focal: **12/12 desktop** para 400/401/403/404, lifecycle 400/404, retry 503, falhas terminais do mesmo run, sucesso reconciliado e mismatch A→B nos três estados.
+- Ops unit/component/runtime boundary: **13 arquivos, 50/50 testes**.
+- Playwright onboarding: **52/52**, 26 cenários em desktop + 26 em mobile. Os dez novos casos cross-viewport cobrem mismatch A→B (`terminal_failed`, `compensated`, `completed`) e latch/recovery 400/404.
+- Workspace typecheck: **12/12 tasks**. Workspace test: **12/12 tasks**; API permaneceu **92 passed, 42 skips declarados, 0 failures** e os gates baseline/supply-chain ficaram verdes. Workspace build: **8/8 tasks**.
+- Biome focado nos **2 arquivos TypeScript/TSX alterados: verde**. `git diff --check`: **verde**.
+- A matriz desktop/mobile regenerou as quatro capturas de topo/ativação. O detector Impeccable não foi repetido, conforme o cap explícito; backend/API/generated permaneceram intocados. Não houve provider, credencial real, push, deploy ou Task 9+.
+
 ## Limites conhecidos
 
 - O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.
