@@ -52,14 +52,18 @@ function checksum(value: unknown) {
 
 function relativeLuminance(hex: string) {
   const rgb = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  const weights = [0.2126, 0.7152, 0.0722];
   return rgb
     .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
-    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index]!, 0);
+    .reduce((sum, channel, index) => sum + channel * (weights[index] ?? 0), 0);
 }
 
 function contrast(left: string, right: string) {
-  const [bright, dark] = [relativeLuminance(left), relativeLuminance(right)].sort((a, b) => b - a);
-  return (bright! + 0.05) / (dark! + 0.05);
+  const leftLuminance = relativeLuminance(left);
+  const rightLuminance = relativeLuminance(right);
+  const bright = Math.max(leftLuminance, rightLuminance);
+  const dark = Math.min(leftLuminance, rightLuminance);
+  return (bright + 0.05) / (dark + 0.05);
 }
 
 function assertDraft(input: PublicMenuDraftInput) {

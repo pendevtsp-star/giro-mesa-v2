@@ -60,7 +60,7 @@ export class PublicMediaController {
       throw new NotFoundException({ code: "MEDIA_NOT_FOUND", message: "Imagem não encontrada." });
     reply.header("Content-Type", asset.mimeType);
     reply.header("Cache-Control", "public, max-age=31536000, immutable");
-    reply.header("ETag", `\"${asset.sha256}\"`);
+    reply.header("ETag", `"${asset.sha256}"`);
     return asset.bytes;
   }
 }
