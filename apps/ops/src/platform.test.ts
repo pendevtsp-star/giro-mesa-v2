@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiClientError } from "./api";
 import {
   InvalidPlatformPayloadError,
+  LatestPlatformRequest,
   parsePlatformActionPage,
   parsePlatformOverview,
   parsePlatformProjection,
@@ -12,6 +13,21 @@ import {
 const organizationId = "a1111111-1111-4111-8111-111111111111";
 
 describe("backoffice seguro", () => {
+  it("aborta a leitura anterior e aceita somente o epoch mais recente", () => {
+    const requests = new LatestPlatformRequest();
+    const first = requests.begin();
+    const second = requests.begin();
+
+    expect(first.signal.aborted).toBe(true);
+    expect(requests.isCurrent(first.epoch)).toBe(false);
+    expect(second.signal.aborted).toBe(false);
+    expect(requests.isCurrent(second.epoch)).toBe(true);
+
+    requests.invalidate();
+    expect(second.signal.aborted).toBe(true);
+    expect(requests.isCurrent(second.epoch)).toBe(false);
+  });
+
   it("valida a visão agregada sem aceitar listas cross-tenant", () => {
     expect(
       parsePlatformOverview({

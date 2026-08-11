@@ -368,15 +368,16 @@ export const api = {
       ),
   },
   platform: {
-    overview: () => request<unknown>("/v1/platform/overview"),
-    context: (organizationId: string, unitId?: string) =>
+    overview: (signal?: AbortSignal) => request<unknown>("/v1/platform/overview", { signal }),
+    context: (organizationId: string, unitId?: string, signal?: AbortSignal) =>
       request<unknown>(
         `${platformTenantPath(organizationId, "context")}${unitId ? `?unitId=${encodeURIComponent(unitId)}` : ""}`,
+        { signal },
       ),
     projection: (
       organizationId: string,
       resource: string,
-      options: { unitId?: string; cursor?: string; limit?: number } = {},
+      options: { unitId?: string; cursor?: string; limit?: number; signal?: AbortSignal } = {},
     ) => {
       const query = new URLSearchParams();
       if (options.unitId) query.set("unitId", options.unitId);
@@ -385,10 +386,11 @@ export const api = {
       const suffix = query.size > 0 ? `?${query}` : "";
       return request<unknown>(
         `${platformTenantPath(organizationId, `resources/${encodeURIComponent(resource)}`)}${suffix}`,
+        { signal: options.signal },
       );
     },
-    actions: (organizationId: string) =>
-      request<unknown>(platformTenantPath(organizationId, "actions")),
+    actions: (organizationId: string, signal?: AbortSignal) =>
+      request<unknown>(platformTenantPath(organizationId, "actions"), { signal }),
     propose: (
       organizationId: string,
       body: unknown,

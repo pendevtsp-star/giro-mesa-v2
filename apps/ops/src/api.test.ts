@@ -115,6 +115,33 @@ describe("fronteira runtime da API de onboarding", () => {
 describe("fronteira HTTP do backoffice", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("encaminha cancelamento para leituras tenant-scoped da plataforma", async () => {
+    const observedSignals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        const observedSignal = init?.signal;
+        if (observedSignal) observedSignals.push(observedSignal);
+        return new Promise<Response>((_resolve, reject) => {
+          observedSignal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("The operation was aborted.", "AbortError")),
+            { once: true },
+          );
+        });
+      }),
+    );
+    const controller = new AbortController();
+    const pending = api.platform.projection(organizationId, "tenant", {
+      signal: controller.signal,
+    });
+
+    expect(observedSignals[0]?.aborted).toBe(false);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(observedSignals[0]?.aborted).toBe(true);
+  });
+
   it("envia proposta e aprovação com escopo codificado e idempotência explícita", async () => {
     const fetchMock = vi
       .fn()

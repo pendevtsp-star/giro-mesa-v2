@@ -27,7 +27,11 @@ type ActionRow = {
 
 async function installPlatformFixture(
   page: Page,
-  options: { privileged: boolean; withExternalProposal?: boolean },
+  options: {
+    privileged: boolean;
+    withExternalProposal?: boolean;
+    projectionDelays?: Partial<Record<string, number>>;
+  },
 ) {
   const permissions = options.privileged
     ? [
@@ -113,6 +117,8 @@ async function installPlatformFixture(
     }
     if (path.includes(`/v1/platform/tenants/${organizationId}/resources/`)) {
       const resource = decodeURIComponent(path.split("/").at(-1) ?? "");
+      const delay = options.projectionDelays?.[resource] ?? 0;
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       if (["incidents", "leads", "support"].includes(resource)) {
         await route.fulfill({
           json: {
@@ -132,7 +138,12 @@ async function installPlatformFixture(
           items: [
             {
               id: organizationId,
-              name: "Bar Aurora",
+              name:
+                resource === "tenant"
+                  ? "Tenant lento"
+                  : resource === "plan"
+                    ? "Plano atual"
+                    : "Bar Aurora",
               billingState: "active",
               updatedAt: now,
               units: [{ id: unitId, name: "Unidade Centro", active: true }],
@@ -290,4 +301,19 @@ test("executa somente aprovação alheia e impede autoaprovação", async ({ pag
   });
   await expect(own.getByText("Aguardando aprovação")).toBeVisible();
   await expect(own.getByRole("button", { name: "Aprovar e executar" })).toBeDisabled();
+});
+
+test("mantem somente a projection da selecao mais recente", async ({ page }) => {
+  await installPlatformFixture(page, {
+    privileged: false,
+    projectionDelays: { tenant: 300 },
+  });
+  await openTenant(page);
+
+  await page.getByRole("tab", { name: "Plano" }).click();
+  const panel = page.getByRole("tabpanel");
+  await expect(panel).toContainText("Plano atual");
+  await page.waitForTimeout(400);
+  await expect(panel).toContainText("Plano atual");
+  await expect(panel).not.toContainText("Tenant lento");
 });

@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { ApiClientError, api } from "./api";
@@ -110,6 +111,32 @@ export class InvalidPlatformPayloadError extends Error {
     super("A API retornou o backoffice em formato inesperado.");
     this.name = "InvalidPlatformPayloadError";
   }
+}
+
+export class LatestPlatformRequest {
+  private controller: AbortController | null = null;
+  private epoch = 0;
+
+  begin() {
+    this.controller?.abort();
+    this.controller = new AbortController();
+    this.epoch += 1;
+    return { epoch: this.epoch, signal: this.controller.signal };
+  }
+
+  isCurrent(epoch: number) {
+    return epoch === this.epoch && this.controller?.signal.aborted === false;
+  }
+
+  invalidate() {
+    this.controller?.abort();
+    this.controller = null;
+    this.epoch += 1;
+  }
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function record(value: unknown): Row {
@@ -469,14 +496,26 @@ export function RealPlatformPage({
   const [restoreTo, setRestoreTo] = useState("active");
   const [justification, setJustification] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const overviewRequests = useRef(new LatestPlatformRequest());
+  const contextRequests = useRef(new LatestPlatformRequest());
+  const projectionRequests = useRef(new LatestPlatformRequest());
+  const actionRequests = useRef(new LatestPlatformRequest());
+  const tenantScopeEpoch = useRef(0);
 
   const loadOverview = useCallback(() => {
+    const request = overviewRequests.current.begin();
     setOverview({ status: "loading" });
     api.platform
-      .overview()
+      .overview(request.signal)
       .then(parsePlatformOverview)
-      .then((data) => setOverview({ status: "ready", data }))
-      .catch((error: unknown) => setOverview({ status: "error", error }));
+      .then((data) => {
+        if (overviewRequests.current.isCurrent(request.epoch))
+          setOverview({ status: "ready", data });
+      })
+      .catch((error: unknown) => {
+        if (overviewRequests.current.isCurrent(request.epoch) && !isAbortError(error))
+          setOverview({ status: "error", error });
+      });
   }, []);
 
   useEffect(() => {
@@ -484,26 +523,72 @@ export function RealPlatformPage({
     loadOverview();
   }, [loadOverview, refreshToken]);
 
-  const loadActions = useCallback((organizationId: string) => {
+  useEffect(
+    () => () => {
+      tenantScopeEpoch.current += 1;
+      overviewRequests.current.invalidate();
+      contextRequests.current.invalidate();
+      projectionRequests.current.invalidate();
+      actionRequests.current.invalidate();
+    },
+    [],
+  );
+
+  const loadActions = useCallback((organizationId: string, expectedScope?: number) => {
+    const scope = expectedScope ?? tenantScopeEpoch.current;
+    if (scope !== tenantScopeEpoch.current) return Promise.resolve();
+    const request = actionRequests.current.begin();
     setActions({ status: "loading" });
     return api.platform
-      .actions(organizationId)
+      .actions(organizationId, request.signal)
       .then(parsePlatformActionPage)
-      .then((data) => setActions({ status: "ready", data }))
-      .catch((error: unknown) => setActions({ status: "error", error }));
+      .then((data) => {
+        if (scope === tenantScopeEpoch.current && actionRequests.current.isCurrent(request.epoch))
+          setActions({ status: "ready", data });
+      })
+      .catch((error: unknown) => {
+        if (
+          scope === tenantScopeEpoch.current &&
+          actionRequests.current.isCurrent(request.epoch) &&
+          !isAbortError(error)
+        )
+          setActions({ status: "error", error });
+      });
   }, []);
 
   const loadProjection = useCallback(
-    (organizationId: string, resource: PlatformResource, selectedUnitId?: string) => {
+    (
+      organizationId: string,
+      resource: PlatformResource,
+      selectedUnitId?: string,
+      expectedScope?: number,
+    ) => {
+      const scope = expectedScope ?? tenantScopeEpoch.current;
+      if (scope !== tenantScopeEpoch.current) return Promise.resolve();
+      const request = projectionRequests.current.begin();
       setProjection({ status: "loading" });
       return api.platform
         .projection(organizationId, resource, {
           unitId: selectedUnitId || undefined,
           limit: 50,
+          signal: request.signal,
         })
         .then(parsePlatformProjection)
-        .then((data) => setProjection({ status: "ready", data }))
-        .catch((error: unknown) => setProjection({ status: "error", error }));
+        .then((data) => {
+          if (
+            scope === tenantScopeEpoch.current &&
+            projectionRequests.current.isCurrent(request.epoch)
+          )
+            setProjection({ status: "ready", data });
+        })
+        .catch((error: unknown) => {
+          if (
+            scope === tenantScopeEpoch.current &&
+            projectionRequests.current.isCurrent(request.epoch) &&
+            !isAbortError(error)
+          )
+            setProjection({ status: "error", error });
+        });
     },
     [],
   );
@@ -512,19 +597,35 @@ export function RealPlatformPage({
     event?.preventDefault();
     const organizationId = tenantInput.trim();
     if (!organizationId) return;
+    const scope = tenantScopeEpoch.current + 1;
+    tenantScopeEpoch.current = scope;
+    const request = contextRequests.current.begin();
+    projectionRequests.current.invalidate();
+    actionRequests.current.invalidate();
     setContext({ status: "loading" });
+    setProjection({ status: "idle" });
+    setActions({ status: "idle" });
     setMutationError(null);
     try {
-      const data = parsePlatformTenantContext(await api.platform.context(organizationId));
+      const data = parsePlatformTenantContext(
+        await api.platform.context(organizationId, undefined, request.signal),
+      );
+      if (scope !== tenantScopeEpoch.current || !contextRequests.current.isCurrent(request.epoch))
+        return;
       setContext({ status: "ready", data });
       setTargetId(data.organization.id);
       setUnitId("");
       await Promise.all([
-        loadProjection(data.organization.id, selectedResource),
-        loadActions(data.organization.id),
+        loadProjection(data.organization.id, selectedResource, undefined, scope),
+        loadActions(data.organization.id, scope),
       ]);
     } catch (error) {
-      setContext({ status: "error", error });
+      if (
+        scope === tenantScopeEpoch.current &&
+        contextRequests.current.isCurrent(request.epoch) &&
+        !isAbortError(error)
+      )
+        setContext({ status: "error", error });
     }
   }
 
@@ -562,13 +663,15 @@ export function RealPlatformPage({
   async function submitProposal(event: FormEvent) {
     event.preventDefault();
     if (!activeContext || !canPropose) return;
+    const scope = tenantScopeEpoch.current;
+    const organizationId = activeContext.organization.id;
     setMutating(true);
     setMutationError(null);
     try {
       const payload =
         action === "tenant.restore" ? { expectedState: "suspended", restoreTo } : { expectedState };
       await api.platform.propose(
-        activeContext.organization.id,
+        organizationId,
         {
           action,
           targetId: needsMembershipTarget ? targetId.trim() : activeContext.organization.id,
@@ -577,14 +680,15 @@ export function RealPlatformPage({
         },
         crypto.randomUUID(),
       );
+      if (scope !== tenantScopeEpoch.current) return;
       setJustification("");
       setConfirmed(false);
       await Promise.all([
-        loadActions(activeContext.organization.id),
-        loadProjection(activeContext.organization.id, selectedResource, unitId),
+        loadActions(organizationId, scope),
+        loadProjection(organizationId, selectedResource, unitId, scope),
       ]);
     } catch (error) {
-      setMutationError(error);
+      if (scope === tenantScopeEpoch.current && !isAbortError(error)) setMutationError(error);
     } finally {
       setMutating(false);
     }
@@ -592,33 +696,32 @@ export function RealPlatformPage({
 
   async function decide(item: PlatformAction, command: "approve" | "reject") {
     if (!activeContext) return;
+    const scope = tenantScopeEpoch.current;
+    const organizationId = activeContext.organization.id;
     setMutating(true);
     setMutationError(null);
     try {
       if (command === "approve")
-        await api.platform.approve(
-          activeContext.organization.id,
-          item.id,
-          item.version,
-          crypto.randomUUID(),
-        );
-      else
-        await api.platform.reject(
-          activeContext.organization.id,
-          item.id,
-          item.version,
-          crypto.randomUUID(),
-        );
+        await api.platform.approve(organizationId, item.id, item.version, crypto.randomUUID());
+      else await api.platform.reject(organizationId, item.id, item.version, crypto.randomUUID());
+      if (scope !== tenantScopeEpoch.current) return;
+      const contextRequest = contextRequests.current.begin();
       await Promise.all([
-        loadActions(activeContext.organization.id),
-        loadProjection(activeContext.organization.id, selectedResource, unitId),
+        loadActions(organizationId, scope),
+        loadProjection(organizationId, selectedResource, unitId, scope),
         api.platform
-          .context(activeContext.organization.id, unitId || undefined)
+          .context(organizationId, unitId || undefined, contextRequest.signal)
           .then(parsePlatformTenantContext)
-          .then((data) => setContext({ status: "ready", data })),
+          .then((data) => {
+            if (
+              scope === tenantScopeEpoch.current &&
+              contextRequests.current.isCurrent(contextRequest.epoch)
+            )
+              setContext({ status: "ready", data });
+          }),
       ]);
     } catch (error) {
-      setMutationError(error);
+      if (scope === tenantScopeEpoch.current && !isAbortError(error)) setMutationError(error);
     } finally {
       setMutating(false);
     }
@@ -633,7 +736,8 @@ export function RealPlatformPage({
     const currentIndex = resources.indexOf(resource);
     let nextIndex: number | undefined;
     if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % resources.length;
-    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + resources.length) % resources.length;
+    if (event.key === "ArrowLeft")
+      nextIndex = (currentIndex - 1 + resources.length) % resources.length;
     if (event.key === "Home") nextIndex = 0;
     if (event.key === "End") nextIndex = resources.length - 1;
     if (nextIndex === undefined) return;
