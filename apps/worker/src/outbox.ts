@@ -26,6 +26,7 @@ import {
 } from "./email.js";
 import { consumeOrderSentInventory, InventoryConsumptionError } from "./inventory.js";
 import { WorkerObservability } from "./observability.js";
+import { failPrivacyRequest, processPrivacyRequest } from "./privacy.js";
 import { deliverWebhook, parseWebhookDeliveryRequest, WebhookDeliveryError } from "./webhook.js";
 
 export interface ClaimedOutboxEvent extends Record<string, unknown> {
@@ -201,20 +202,27 @@ export class OutboxWorker {
   private async process(event: ClaimedOutboxEvent) {
     try {
       let deferredError: InventoryConsumptionError | null = null;
-      if (event.organization_id) {
-        deferredError = await withTenantContext(
-          this.connection,
-          {
-            source: "job",
-            organizationId: event.organization_id,
-            unitId: event.unit_id,
-          },
-          () => observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
-        );
+      if (event.topic === "privacy.request.processing") {
+        deferredError =
+          (await withWorkerContext(this.connection, () =>
+            observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
+          )) ?? null;
+      } else if (event.organization_id) {
+        deferredError =
+          (await withTenantContext(
+            this.connection,
+            {
+              source: "job",
+              organizationId: event.organization_id,
+              unitId: event.unit_id,
+            },
+            () => observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
+          )) ?? null;
       } else {
-        deferredError = await withWorkerContext(this.connection, () =>
-          observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
-        );
+        deferredError =
+          (await withWorkerContext(this.connection, () =>
+            observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
+          )) ?? null;
       }
       if (deferredError) throw deferredError;
       await withWorkerContext(this.connection, (tx) =>
@@ -223,6 +231,20 @@ export class OutboxWorker {
         ),
       );
     } catch (error) {
+      if (event.topic === "privacy.request.processing") {
+        await withWorkerContext(this.connection, (tx) =>
+          failPrivacyRequest(tx as unknown as Database, event),
+        );
+        await withWorkerContext(this.connection, (tx) =>
+          tx.execute(sql`
+            update outbox_events
+            set processed_at = now(), locked_at = null,
+                last_error = 'DEAD_LETTER:PRIVACY_PROCESSING_FAILED'
+            where id = ${event.id}
+          `),
+        );
+        return;
+      }
       const message =
         error instanceof Error ? error.message.slice(0, 2_000) : "Unknown worker error";
       if (error instanceof EmailDeliveryError && !error.retryable) {
@@ -247,6 +269,10 @@ export class OutboxWorker {
   }
 
   private async dispatch(event: ClaimedOutboxEvent) {
+    if (event.topic === "privacy.request.processing") {
+      await processPrivacyRequest(this.db as Database, event);
+      return;
+    }
     if (event.topic === "pos.order.sent") {
       const result = await consumeOrderSentInventory(this.db as Database, event);
       if (result.retryRequired) {

@@ -9,5 +9,6 @@ export * from "./payment-adapter.js";
 export * from "./permissions.js";
 export * from "./quantities.js";
 export * from "./remuneration-rules.js";
+export * from "./privacy.js";
 export * from "./secret-envelope.js";
 export * from "./table-occupancy.js";

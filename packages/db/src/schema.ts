@@ -88,6 +88,28 @@ export const subscriptionEntitlementState = pgEnum("subscription_entitlement_sta
   "active",
   "revoked",
 ]);
+export const privacyRequestType = pgEnum("privacy_request_type", [
+  "access_export",
+  "correction",
+  "anonymization",
+  "deletion",
+]);
+export const privacyRequestState = pgEnum("privacy_request_state", [
+  "verification_pending",
+  "approval_pending",
+  "processing",
+  "partial",
+  "completed",
+  "rejected",
+  "failed",
+]);
+export const privacyStepStatus = pgEnum("privacy_step_status", [
+  "pending",
+  "processing",
+  "completed",
+  "blocked",
+  "failed",
+]);
 
 export const identities = pgTable(
   "identities",
@@ -138,6 +160,7 @@ export const authSessions = pgTable(
       .references(() => identities.id, { onDelete: "cascade" }),
     tokenHash: varchar("token_hash", { length: 64 }).notNull(),
     trustedDevice: boolean("trusted_device").notNull().default(false),
+    mfaVerifiedAt: timestamp("mfa_verified_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -145,6 +168,101 @@ export const authSessions = pgTable(
   (table) => [
     uniqueIndex("auth_sessions_token_hash_unique").on(table.tokenHash),
     index("auth_sessions_identity_idx").on(table.identityId),
+  ],
+);
+
+export const privacyRequests = pgTable(
+  "privacy_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    subjectIdentityId: uuid("subject_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    requesterIdentityId: uuid("requester_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    type: privacyRequestType("type").notNull(),
+    state: privacyRequestState("state").notNull().default("verification_pending"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    requestPayload: jsonb("request_payload").$type<Record<string, unknown>>().notNull().default({}),
+    requiredDomains: jsonb("required_domains").$type<string[]>().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lastErrorCode: varchar("last_error_code", { length: 80 }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("privacy_requests_scope_id_unique").on(table.organizationId, table.id),
+    uniqueIndex("privacy_requests_org_key_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    index("privacy_requests_subject_time_idx").on(
+      table.organizationId,
+      table.subjectIdentityId,
+      table.createdAt,
+    ),
+    index("privacy_requests_state_time_idx").on(table.state, table.updatedAt),
+    check("privacy_requests_attempts_check", sql`${table.attempts} >= 0`),
+    check(
+      "privacy_requests_subject_check",
+      sql`${table.subjectIdentityId} = ${table.requesterIdentityId}`,
+    ),
+  ],
+);
+
+export const privacyRequestSteps = pgTable(
+  "privacy_request_steps",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    domain: varchar("domain", { length: 80 }).notNull(),
+    mandatory: boolean("mandatory").notNull().default(true),
+    status: privacyStepStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    reasonCode: varchar("reason_code", { length: 80 }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.requestId, table.domain] }),
+    foreignKey({
+      name: "privacy_request_steps_scope_fk",
+      columns: [table.organizationId, table.requestId],
+      foreignColumns: [privacyRequests.organizationId, privacyRequests.id],
+    }).onDelete("cascade"),
+    check("privacy_request_steps_attempts_check", sql`${table.attempts} >= 0`),
+  ],
+);
+
+export const privacyExports = pgTable(
+  "privacy_exports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    subjectIdentityId: uuid("subject_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    encryptedPayload: text("encrypted_payload").notNull(),
+    iv: varchar("iv", { length: 24 }).notNull(),
+    authTag: varchar("auth_tag", { length: 32 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    downloadedAt: timestamp("downloaded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("privacy_exports_request_unique").on(table.organizationId, table.requestId),
+    foreignKey({
+      name: "privacy_exports_request_scope_fk",
+      columns: [table.organizationId, table.requestId],
+      foreignColumns: [privacyRequests.organizationId, privacyRequests.id],
+    }).onDelete("cascade"),
   ],
 );
 

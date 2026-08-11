@@ -4084,6 +4084,230 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/privacy/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_list[0]"];
+    put?: never;
+    post: operations["PrivacyController_create[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_list[1]"];
+    put?: never;
+    post: operations["PrivacyController_create[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_get[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_get[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/verify-subject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_verify[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/verify-subject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_verify[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_retry[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_retry[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_reject[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_reject[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/export-download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_download[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/export-download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_download[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory": {
     parameters: {
       query?: never;
@@ -7050,6 +7274,103 @@ export interface components {
     };
     PlatformDecisionRequest: {
       expectedVersion: number;
+    };
+    PrivacyStepResponse: {
+      /** @enum {string} */
+      domain:
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups";
+      mandatory: boolean;
+      /** @enum {string} */
+      status: "pending" | "processing" | "completed" | "blocked" | "failed";
+      reasonCode: Record<string, never> | null;
+      /** Format: int32 */
+      attempts: number;
+    };
+    PrivacyRequestStatusResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      type: "access_export" | "correction" | "anonymization" | "deletion";
+      /** @enum {string} */
+      state:
+        | "verification_pending"
+        | "approval_pending"
+        | "processing"
+        | "partial"
+        | "completed"
+        | "rejected"
+        | "failed";
+      /** Format: int32 */
+      attempts: number;
+      lastErrorCode: Record<string, never> | null;
+      /** Format: date-time */
+      verifiedAt: string | null;
+      /** Format: date-time */
+      approvedAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      steps: components["schemas"]["PrivacyStepResponse"][];
+    };
+    PrivacyExportIdentityResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      displayName: string;
+      /** Format: date-time */
+      emailVerifiedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PrivacyExportMembershipResponse: {
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      organizationId: string;
+      status: string;
+      role: Record<string, never> | null;
+      /** Format: uuid */
+      unitId: Record<string, never> | null;
+    };
+    PrivacyExportDataResponse: {
+      identity: components["schemas"]["PrivacyExportIdentityResponse"];
+      organizationMemberships: components["schemas"]["PrivacyExportMembershipResponse"][];
+    };
+    PrivacyExportResponse: {
+      /**
+       * Format: int32
+       * @enum {integer}
+       */
+      schemaVersion: 1;
+      /** Format: uuid */
+      requestId: string;
+      /** Format: date-time */
+      generatedAt: string;
+      partial: boolean;
+      blockedDomains: (
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups"
+      )[];
+      data: components["schemas"]["PrivacyExportDataResponse"];
     };
     RemunerationController_createRule_0__request_recursive:
       | components["schemas"]["RemunerationController_createRule_0__request_recursive_constant"]
@@ -15987,6 +16308,422 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_list[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
+      };
+    };
+  };
+  "PrivacyController_create[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "access_export";
+            }
+          | {
+              /** @enum {string} */
+              type: "correction";
+              corrections: {
+                displayName: string;
+              };
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "anonymization";
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "deletion";
+              reason: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_list[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
+      };
+    };
+  };
+  "PrivacyController_create[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "access_export";
+            }
+          | {
+              /** @enum {string} */
+              type: "correction";
+              corrections: {
+                displayName: string;
+              };
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "anonymization";
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "deletion";
+              reason: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_get[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_get[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_verify[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_verify[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_approve[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_approve[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_retry[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_retry[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_reject[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_reject[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_download[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_download[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
         };
       };
     };

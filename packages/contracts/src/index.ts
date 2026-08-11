@@ -539,6 +539,23 @@ export const publicMenuSlugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 export const idempotencyKeySchema = z.string().trim().min(8).max(160);
 
+const privacyReasonSchema = z.string().trim().min(10).max(500);
+export const privacyRequestSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("access_export") }).strict(),
+  z
+    .object({
+      type: z.literal("correction"),
+      corrections: z.object({ displayName: z.string().trim().min(2).max(120) }).strict(),
+      reason: privacyReasonSchema,
+    })
+    .strict(),
+  z.object({ type: z.literal("anonymization"), reason: privacyReasonSchema }).strict(),
+  z.object({ type: z.literal("deletion"), reason: privacyReasonSchema }).strict(),
+]);
+export const privacyDecisionSchema = z
+  .object({ reason: privacyReasonSchema.optional() })
+  .strict();
+
 const publicOrderAddressSchema = z
   .object({
     street: z.string().trim().min(2).max(160),
@@ -632,6 +649,8 @@ export type PublicOrderInput = z.infer<typeof publicOrderSchema>;
 export type RegisterRequestInput = z.infer<typeof registerRequestSchema>;
 export type LoginRequestInput = z.infer<typeof loginRequestSchema>;
 export type TrialApplicationRequestInput = z.infer<typeof trialApplicationRequestSchema>;
+export type PrivacyRequestInput = z.infer<typeof privacyRequestSchema>;
+export type PrivacyDecisionInput = z.infer<typeof privacyDecisionSchema>;
 
 export interface PublicCommercialPlan {
   slug: "operacao" | "crescimento" | "rede";
