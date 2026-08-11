@@ -13,6 +13,10 @@ it("links verified Google subjects without duplicating identities", async (conte
     return;
   }
   process.env.DATABASE_URL = databaseUrl;
+  const previousEmailProvider = process.env.EMAIL_PROVIDER_ENABLED;
+  const previousOutboxKey = process.env.OUTBOX_ENCRYPTION_KEY;
+  process.env.EMAIL_PROVIDER_ENABLED = "true";
+  process.env.OUTBOX_ENCRYPTION_KEY = randomBytes(32).toString("base64");
   const database = new DatabaseService();
   const createdIdentityIds: string[] = [];
   try {
@@ -51,22 +55,28 @@ it("links verified Google subjects without duplicating identities", async (conte
       displayName: "Local Owner",
       password: "a-secure-local-password",
     });
-    createdIdentityIds.push(local.identity.id);
+    assert.equal(local.verificationRequired, true);
+    const [localIdentity] = await database.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, local.email));
+    assert.ok(localIdentity);
+    createdIdentityIds.push(localIdentity.id);
     const linkedLocal = await auth.authenticateGoogle(
       {
         subject: `local-subject-${suffix}`,
-        email: local.identity.email,
+        email: local.email,
         displayName: "Local Owner",
       },
       "login",
     );
-    assert.equal("token" in linkedLocal && linkedLocal.identity.id, local.identity.id);
+    assert.equal("token" in linkedLocal && linkedLocal.identity.id, localIdentity.id);
     assert.equal(
       (
         await database.db
           .select()
           .from(passwordCredentials)
-          .where(eq(passwordCredentials.identityId, local.identity.id))
+          .where(eq(passwordCredentials.identityId, localIdentity.id))
       ).length,
       1,
     );
@@ -91,11 +101,15 @@ it("links verified Google subjects without duplicating identities", async (conte
       .select({ id: authSessions.id })
       .from(authSessions)
       .where(inArray(authSessions.identityId, createdIdentityIds));
-    assert.equal(sessions.length, 4);
+    assert.equal(sessions.length, 3);
   } finally {
     if (createdIdentityIds.length > 0) {
       await database.db.delete(identities).where(inArray(identities.id, createdIdentityIds));
     }
     await database.onModuleDestroy();
+    if (previousEmailProvider === undefined) delete process.env.EMAIL_PROVIDER_ENABLED;
+    else process.env.EMAIL_PROVIDER_ENABLED = previousEmailProvider;
+    if (previousOutboxKey === undefined) delete process.env.OUTBOX_ENCRYPTION_KEY;
+    else process.env.OUTBOX_ENCRYPTION_KEY = previousOutboxKey;
   }
 });

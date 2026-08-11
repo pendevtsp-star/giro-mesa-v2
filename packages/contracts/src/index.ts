@@ -58,6 +58,8 @@ export const confirmPasswordResetSchema = z.object({
   token: z.string().min(32).max(200),
   password: z.string().min(12).max(128),
 });
+export const requestEmailVerificationSchema = z.object({ email: emailSchema });
+export const verifyEmailSchema = z.object({ token: z.string().min(32).max(200) });
 
 export const createOrganizationSchema = z.object({
   legalName: z.string().trim().min(2).max(160),
@@ -259,6 +261,8 @@ export type PublicRegisterInput = z.infer<typeof publicRegisterSchema>;
 export type PublicLoginInput = z.infer<typeof publicLoginSchema>;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchema>;
+export type RequestEmailVerificationInput = z.infer<typeof requestEmailVerificationSchema>;
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;
 export type InviteMembershipInput = z.infer<typeof inviteMembershipSchema>;

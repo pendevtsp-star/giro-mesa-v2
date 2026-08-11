@@ -125,6 +125,39 @@ export const passwordResetTokens = pgTable(
   (table) => [uniqueIndex("password_reset_token_hash_unique").on(table.tokenHash)],
 );
 
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => identities.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("email_verification_token_hash_unique").on(table.tokenHash),
+    index("email_verification_tokens_identity_created_idx").on(table.identityId, table.createdAt),
+  ],
+);
+
+export const emailVerificationRequests = pgTable(
+  "email_verification_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    emailHash: varchar("email_hash", { length: 64 }).notNull(),
+    identityId: uuid("identity_id").references(() => identities.id, { onDelete: "set null" }),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("email_verification_requests_email_time_idx").on(table.emailHash, table.requestedAt),
+    index("email_verification_requests_identity_time_idx").on(table.identityId, table.requestedAt),
+  ],
+);
+
 export const mfaFactors = pgTable("mfa_factors", {
   identityId: uuid("identity_id")
     .primaryKey()

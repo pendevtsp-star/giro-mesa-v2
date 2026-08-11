@@ -245,6 +245,10 @@ export class OutboxWorker {
       await this.deliverPasswordReset(event);
       return;
     }
+    if (event.topic === "auth.email_verification_requested") {
+      await this.deliverEmailVerification(event);
+      return;
+    }
     if (event.topic === "membership.invited") {
       await this.deliverMembershipInvite(event);
       return;
@@ -307,6 +311,59 @@ export class OutboxWorker {
         text: `Olá, ${identity.displayName}.\n\nUse o link abaixo para redefinir sua senha do GiroMesa. Ele expira em 30 minutos.\n\n${actionUrl}\n\nSe você não fez esta solicitação, ignore esta mensagem.`,
         idempotencyKey: `password-reset/${event.id}`,
         tags: [{ name: "message_type", value: "password_reset" }],
+      },
+      { configuration },
+    );
+  }
+
+  private async deliverEmailVerification(event: ClaimedOutboxEvent) {
+    if (
+      event.aggregate_type !== "identity" ||
+      event.aggregate_id !== requiredUuid(event.payload, "identityId")
+    ) {
+      throw new EmailDeliveryError("EMAIL_EVENT_CONTEXT_INVALID", false);
+    }
+    activeExpiry(event.payload);
+    const [identity] = await this.db
+      .select({
+        displayName: identities.displayName,
+        email: identities.email,
+        emailVerifiedAt: identities.emailVerifiedAt,
+      })
+      .from(identities)
+      .where(eq(identities.id, event.aggregate_id))
+      .limit(1);
+    if (!identity) throw new EmailDeliveryError("EMAIL_RECIPIENT_NOT_FOUND", false);
+    if (identity.emailVerifiedAt) return;
+    let token: string;
+    try {
+      token = decryptSecret(
+        requiredEnvelope(event.payload, "verificationTokenEnvelope"),
+        this.outboxEncryptionKey(),
+        `email-verification:${event.aggregate_id}:${event.id}`,
+      );
+    } catch (error) {
+      if (error instanceof EmailDeliveryError) throw error;
+      throw new EmailDeliveryError("EMAIL_SECRET_DECRYPTION_FAILED", false);
+    }
+    const configuration = emailProviderConfiguration();
+    const actionUrl = `${configuration.appUrl}/verificar-email?token=${encodeURIComponent(token)}`;
+    await deliverEmail(
+      {
+        to: identity.email,
+        subject: "Confirme seu e-mail no GiroMesa",
+        html: emailHtml({
+          title: "Confirme seu e-mail",
+          greeting: `Olá, ${identity.displayName}.`,
+          body: "Confirme seu endereço para proteger a conta e continuar a configuração do GiroMesa. O link expira em 24 horas.",
+          actionLabel: "Verificar e-mail",
+          actionUrl,
+          footer:
+            "Se você não criou esta conta, ignore esta mensagem. O link funciona uma única vez.",
+        }),
+        text: `Olá, ${identity.displayName}.\n\nConfirme seu e-mail para continuar a configuração do GiroMesa. O link expira em 24 horas e funciona uma única vez.\n\n${actionUrl}\n\nSe você não criou esta conta, ignore esta mensagem.`,
+        idempotencyKey: `email-verification/${event.id}`,
+        tags: [{ name: "message_type", value: "email_verification" }],
       },
       { configuration },
     );

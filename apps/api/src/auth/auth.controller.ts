@@ -5,8 +5,12 @@ import {
   loginRequestSchema,
   publicRegisterSchema,
   type RegisterRequestInput,
+  type RequestEmailVerificationInput,
   type RequestPasswordResetInput,
+  requestEmailVerificationSchema,
   requestPasswordResetSchema,
+  type VerifyEmailInput,
+  verifyEmailSchema,
 } from "@giromesa/contracts";
 import {
   Body,
@@ -58,14 +62,31 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
-  async register(
-    @Body(new ZodPipe(publicRegisterSchema)) body: RegisterRequestInput,
+  async register(@Body(new ZodPipe(publicRegisterSchema)) body: RegisterRequestInput) {
+    return this.authService.register(body);
+  }
+
+  @HttpCode(202)
+  @Post("email-verification/request")
+  requestEmailVerification(
+    @Body(new ZodPipe(requestEmailVerificationSchema)) body: RequestEmailVerificationInput,
+  ) {
+    return this.authService.requestEmailVerification(body);
+  }
+
+  @HttpCode(200)
+  @Post("email-verification/confirm")
+  async verifyEmail(
+    @Body(new ZodPipe(verifyEmailSchema)) body: VerifyEmailInput,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = await this.authService.register(body);
-    reply.setCookie(SESSION_COOKIE_NAME, result.token, sessionCookieOptions(result.expiresAt));
-    const { token: _token, ...browserResult } = result;
-    return browserResult;
+    const result = await this.authService.verifyEmail(body);
+    if (result.status === "verified") {
+      reply.setCookie(SESSION_COOKIE_NAME, result.token, sessionCookieOptions(result.expiresAt));
+      const { token: _token, ...browserResult } = result;
+      return browserResult;
+    }
+    return result;
   }
 
   @HttpCode(200)

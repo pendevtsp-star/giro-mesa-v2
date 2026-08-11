@@ -131,10 +131,10 @@ describe("tenant context boundary", () => {
       values (${unitA}, ${organizationA}, 'Unit A'), (${unitB}, ${organizationB}, 'Unit B')
     `;
     await owner`
-      insert into identities (id, email, display_name)
+      insert into identities (id, email, display_name, email_verified_at)
       values
-        (${identityA}, ${`tenant-a-${suffix}@example.test`}, 'Tenant A'),
-        (${identityB}, ${`tenant-b-${suffix}@example.test`}, 'Tenant B')
+        (${identityA}, ${`tenant-a-${suffix}@example.test`}, 'Tenant A', now()),
+        (${identityB}, ${`tenant-b-${suffix}@example.test`}, 'Tenant B', now())
     `;
     await owner`
       insert into memberships (id, identity_id, organization_id, status)

@@ -1,13 +1,17 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type {
   ConfirmPasswordResetInput,
   LoginInput,
   RegisterInput,
+  RequestEmailVerificationInput,
   RequestPasswordResetInput,
+  VerifyEmailInput,
 } from "@giromesa/contracts";
 import {
   auditEvents,
   authSessions,
+  emailVerificationRequests,
+  emailVerificationTokens,
   identities,
   memberships,
   mfaChallenges,
@@ -20,6 +24,7 @@ import {
 } from "@giromesa/db";
 import { encryptionKey, encryptSecret } from "@giromesa/domain";
 import {
+  BadRequestException,
   ConflictException,
   HttpException,
   Injectable,
@@ -27,7 +32,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import * as argon2 from "argon2";
-import { and, desc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { isPlatformAdminEmail } from "../platform/platform-access.js";
 import type { GoogleAuthIntent, GoogleProfile } from "./google-oauth.js";
@@ -54,15 +59,16 @@ export interface AuthContext {
 }
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
+const EMAIL_VERIFICATION_ACCEPTED = Object.freeze({ accepted: true as const });
 
 @Injectable()
 export class AuthService {
   constructor(private readonly database: DatabaseService) {}
 
   async register(input: RegisterInput) {
+    const encryption = this.emailVerificationEncryption();
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
-    const token = randomBytes(32).toString("base64url");
-    const expiresAt = this.sessionExpiration(false);
     try {
       return await this.database.db.transaction(async (tx) => {
         const [identity] = await tx
@@ -71,16 +77,6 @@ export class AuthService {
           .returning();
         if (!identity) throw new Error("Identity was not created");
         await tx.insert(passwordCredentials).values({ identityId: identity.id, passwordHash });
-        const [session] = await tx
-          .insert(authSessions)
-          .values({
-            identityId: identity.id,
-            tokenHash: tokenHash(token),
-            trustedDevice: false,
-            expiresAt,
-          })
-          .returning({ id: authSessions.id });
-        if (!session) throw new Error("Registration session was not created");
         await tx.insert(auditEvents).values({
           actorIdentityId: identity.id,
           action: "identity.registered",
@@ -94,16 +90,11 @@ export class AuthService {
           aggregateId: identity.id,
           payload: { identityId: identity.id },
         });
-        await tx.insert(auditEvents).values({
-          actorIdentityId: identity.id,
-          action: "auth.registration_login",
-          entityType: "session",
-          entityId: session.id,
-        });
+        await this.enqueueEmailVerification(identity, encryption);
         return {
-          token,
-          expiresAt,
-          identity: { id: identity.id, email: identity.email, displayName: identity.displayName },
+          accepted: true as const,
+          email: identity.email,
+          verificationRequired: true as const,
         };
       });
     } catch (error) {
@@ -135,6 +126,13 @@ export class AuthService {
       });
     }
 
+    if (!record.identity.emailVerifiedAt) {
+      throw new UnauthorizedException({
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        message: "Verifique seu e-mail antes de entrar.",
+      });
+    }
+
     return this.beginIdentitySession(record.identity, input.trustedDevice, "auth.login");
   }
 
@@ -156,6 +154,12 @@ export class AuthService {
         .limit(1);
       if (linked) {
         if (linked.identity.disabledAt) throw new UnauthorizedException();
+        if (!linked.identity.emailVerifiedAt) {
+          await tx
+            .update(identities)
+            .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(identities.id, linked.identity.id), isNull(identities.emailVerifiedAt)));
+        }
         return {
           id: linked.identity.id,
           email: linked.identity.email,
@@ -220,6 +224,123 @@ export class AuthService {
       return { id: identity.id, email: identity.email, displayName: identity.displayName };
     });
     return this.beginIdentitySession(identity, false, "auth.google_login");
+  }
+
+  async requestEmailVerification(input: RequestEmailVerificationInput) {
+    const encryption = this.emailVerificationEncryption();
+    const email = input.email.trim().toLowerCase();
+    const identity = { id: "", email, displayName: "" };
+    await this.enqueueEmailVerification(identity, encryption, true);
+    return EMAIL_VERIFICATION_ACCEPTED;
+  }
+
+  async verifyEmail(input: VerifyEmailInput) {
+    const suppliedHash = tokenHash(input.token);
+    return this.database.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ identityId: emailVerificationTokens.identityId })
+        .from(emailVerificationTokens)
+        .where(eq(emailVerificationTokens.tokenHash, suppliedHash))
+        .limit(1);
+      if (!candidate) throw this.invalidEmailVerification();
+
+      const [identityForLock] = await tx
+        .select({ email: identities.email })
+        .from(identities)
+        .where(eq(identities.id, candidate.identityId))
+        .limit(1);
+      if (!identityForLock) throw this.invalidEmailVerification();
+      const emailHash = tokenHash(identityForLock.email.trim().toLowerCase());
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
+      );
+
+      const [record] = await tx
+        .select({ token: emailVerificationTokens, identity: identities })
+        .from(emailVerificationTokens)
+        .innerJoin(identities, eq(identities.id, emailVerificationTokens.identityId))
+        .where(eq(emailVerificationTokens.tokenHash, suppliedHash))
+        .limit(1);
+      if (!record || record.identity.disabledAt) throw this.invalidEmailVerification();
+      if (record.identity.emailVerifiedAt) return { status: "already_verified" as const };
+      if (record.token.usedAt || record.token.revokedAt || record.token.expiresAt <= new Date()) {
+        throw this.invalidEmailVerification();
+      }
+
+      const [claimed] = await tx
+        .update(emailVerificationTokens)
+        .set({ usedAt: new Date() })
+        .where(
+          and(
+            eq(emailVerificationTokens.id, record.token.id),
+            isNull(emailVerificationTokens.usedAt),
+            isNull(emailVerificationTokens.revokedAt),
+            gt(emailVerificationTokens.expiresAt, new Date()),
+          ),
+        )
+        .returning({ identityId: emailVerificationTokens.identityId });
+      if (!claimed) throw this.invalidEmailVerification();
+
+      const verifiedAt = new Date();
+      const [verified] = await tx
+        .update(identities)
+        .set({ emailVerifiedAt: verifiedAt, updatedAt: verifiedAt })
+        .where(
+          and(
+            eq(identities.id, record.identity.id),
+            isNull(identities.emailVerifiedAt),
+            isNull(identities.disabledAt),
+          ),
+        )
+        .returning({ id: identities.id });
+      if (!verified) throw this.invalidEmailVerification();
+      await tx
+        .update(emailVerificationTokens)
+        .set({ revokedAt: verifiedAt })
+        .where(
+          and(
+            eq(emailVerificationTokens.identityId, record.identity.id),
+            isNull(emailVerificationTokens.usedAt),
+            isNull(emailVerificationTokens.revokedAt),
+          ),
+        );
+
+      await tx
+        .update(authSessions)
+        .set({ revokedAt: verifiedAt })
+        .where(
+          and(eq(authSessions.identityId, record.identity.id), isNull(authSessions.revokedAt)),
+        );
+
+      const token = randomBytes(32).toString("base64url");
+      const expiresAt = this.sessionExpiration(false);
+      const [session] = await tx
+        .insert(authSessions)
+        .values({
+          identityId: record.identity.id,
+          tokenHash: tokenHash(token),
+          trustedDevice: false,
+          expiresAt,
+        })
+        .returning({ id: authSessions.id });
+      if (!session) throw new Error("Verification session was not created");
+      await tx.insert(auditEvents).values({
+        actorIdentityId: record.identity.id,
+        action: "auth.email_verified",
+        entityType: "identity",
+        entityId: record.identity.id,
+      });
+      return {
+        status: "verified" as const,
+        token,
+        expiresAt,
+        identity: {
+          id: record.identity.id,
+          email: record.identity.email,
+          displayName: record.identity.displayName,
+        },
+      };
+    });
   }
 
   async verifyMfaChallenge(input: {
@@ -514,6 +635,7 @@ export class AuthService {
           isNull(authSessions.revokedAt),
           gt(authSessions.expiresAt, new Date()),
           isNull(identities.disabledAt),
+          isNotNull(identities.emailVerifiedAt),
         ),
       )
       .limit(1);
@@ -650,6 +772,131 @@ export class AuthService {
         entityType: "identity",
         entityId: reset.identityId,
       });
+    });
+  }
+
+  private async enqueueEmailVerification(
+    requestedIdentity: { id: string; email: string; displayName: string },
+    encryption: ReturnType<typeof encryptionKey>,
+    enumerationSafe = false,
+  ) {
+    const email = requestedIdentity.email.trim().toLowerCase();
+    const emailHash = tokenHash(email);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
+      );
+      const now = new Date();
+      const requests = await tx
+        .select({ requestedAt: emailVerificationRequests.requestedAt })
+        .from(emailVerificationRequests)
+        .where(
+          and(
+            eq(emailVerificationRequests.emailHash, emailHash),
+            gt(emailVerificationRequests.requestedAt, new Date(now.valueOf() - 24 * 60 * 60_000)),
+          ),
+        )
+        .orderBy(desc(emailVerificationRequests.requestedAt));
+      const latest = requests[0]?.requestedAt;
+      const hourCount = requests.filter(
+        (request) => request.requestedAt > new Date(now.valueOf() - 60 * 60_000),
+      ).length;
+      if (
+        (latest && now.valueOf() - latest.valueOf() < 60_000) ||
+        hourCount >= 5 ||
+        requests.length >= 10
+      ) {
+        throw new HttpException(
+          {
+            code: "EMAIL_VERIFICATION_RATE_LIMITED",
+            message: "Aguarde antes de solicitar um novo envio.",
+          },
+          429,
+        );
+      }
+
+      const [storedIdentity] = await tx
+        .select()
+        .from(identities)
+        .where(eq(identities.email, email))
+        .limit(1);
+      const identity =
+        storedIdentity && (!requestedIdentity.id || requestedIdentity.id === storedIdentity.id)
+          ? storedIdentity
+          : undefined;
+      await tx.insert(emailVerificationRequests).values({
+        emailHash,
+        identityId: identity?.id ?? null,
+        requestedAt: now,
+      });
+      if (!identity || identity.disabledAt || identity.emailVerifiedAt) {
+        return enumerationSafe ? EMAIL_VERIFICATION_ACCEPTED : null;
+      }
+
+      await tx
+        .update(emailVerificationTokens)
+        .set({ revokedAt: now })
+        .where(
+          and(
+            eq(emailVerificationTokens.identityId, identity.id),
+            isNull(emailVerificationTokens.usedAt),
+            isNull(emailVerificationTokens.revokedAt),
+          ),
+        );
+      const verificationToken = randomBytes(32).toString("base64url");
+      const expiresAt = new Date(now.valueOf() + EMAIL_VERIFICATION_TTL_MS);
+      await tx.insert(emailVerificationTokens).values({
+        identityId: identity.id,
+        tokenHash: tokenHash(verificationToken),
+        expiresAt,
+      });
+      const eventId = randomUUID();
+      await tx.insert(outboxEvents).values({
+        id: eventId,
+        topic: "auth.email_verification_requested",
+        aggregateType: "identity",
+        aggregateId: identity.id,
+        payload: {
+          identityId: identity.id,
+          verificationTokenEnvelope: encryptSecret(
+            verificationToken,
+            encryption,
+            `email-verification:${identity.id}:${eventId}`,
+          ),
+          expiresAt: expiresAt.toISOString(),
+        },
+      });
+      await tx.insert(auditEvents).values({
+        actorIdentityId: identity.id,
+        action: "auth.email_verification_requested",
+        entityType: "identity",
+        entityId: identity.id,
+      });
+      return EMAIL_VERIFICATION_ACCEPTED;
+    });
+  }
+
+  private emailVerificationEncryption() {
+    if (process.env.EMAIL_PROVIDER_ENABLED !== "true") {
+      throw new ServiceUnavailableException({
+        code: "EMAIL_VERIFICATION_NOT_CONFIGURED",
+        message: "A verificação de e-mail não está disponível neste ambiente.",
+      });
+    }
+    try {
+      return encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
+    } catch {
+      throw new ServiceUnavailableException({
+        code: "EMAIL_VERIFICATION_NOT_CONFIGURED",
+        message: "A verificação de e-mail não está disponível neste ambiente.",
+      });
+    }
+  }
+
+  private invalidEmailVerification() {
+    return new BadRequestException({
+      code: "INVALID_EMAIL_VERIFICATION_TOKEN",
+      message: "Link de verificação inválido ou expirado.",
     });
   }
 

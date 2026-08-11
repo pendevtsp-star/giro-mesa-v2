@@ -42,9 +42,8 @@ export default function CreateAccountPage() {
       setMessage("A criação de conta ainda não está configurada neste ambiente.");
       return;
     }
-    const destination = returnTo
-      ? new URL(returnTo, window.location.origin).toString()
-      : resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
+    const destination =
+      returnTo ?? resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
     if (!destination) {
       setMessage("O destino seguro do aplicativo operacional ainda não está configurado.");
       return;
@@ -64,7 +63,17 @@ export default function CreateAccountPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Cadastro recusado");
-      window.location.assign(destination);
+      const result = (await response.json()) as {
+        email?: unknown;
+        verificationRequired?: unknown;
+      };
+      if (result.verificationRequired !== true || typeof result.email !== "string") {
+        throw new Error("Resposta de cadastro inválida");
+      }
+      window.sessionStorage.setItem("giromesa.pendingVerificationEmail", result.email);
+      const verification = new URL("/verificar-email", window.location.origin);
+      if (returnTo) verification.searchParams.set("returnTo", returnTo);
+      window.location.assign(verification.toString());
     } catch {
       setMessage("Não foi possível criar a conta. Revise os dados ou tente novamente mais tarde.");
     }
