@@ -209,6 +209,30 @@ O breaker final corrige os dois achados importantes no cliente Ops, sem alterar 
 - Biome focado nos **2 arquivos TypeScript/TSX alterados: verde**. `git diff --check`: **verde**.
 - A matriz desktop/mobile regenerou as quatro capturas de topo/ativação. O detector Impeccable não foi repetido, conforme o cap explícito; backend/API/generated permaneceram intocados. Não houve provider, credencial real, push, deploy ou Task 9+.
 
+## Fechamento pós-breaker — mutation busy e mismatch de status
+
+Este fechamento focado corrige somente os dois findings finais do reviewer, sem abrir nova rodada ampla nem alterar backend, contratos, OpenAPI ou clientes gerados.
+
+### RED adicional capturado
+
+- Com o run A em `publishing` e latch permanente ativo, `activate()` limpava a supressão antes do POST e o effect ignorava `busy`. Uma falha do POST reabria o polling; um POST atrasado permitia que o status GET incrementasse a ordem global e tornasse a resposta `completed` do POST obsoleta.
+- Um `GET /provisioning/A` que retornava DTO válido, mas com `status.id = B`, caía no guard silencioso. O snapshot não era contaminado, porém o usuário não recebia erro e eventos de lifecycle podiam rearmar o mesmo request divergente.
+
+### Correções
+
+- Polling agora trata `busy` como hard stop reativo, além do abort síncrono já executado por PATCH, seleção e ativação. A ativação não limpa mais o latch antes do POST: falha preserva a supressão, nenhum timer disputa a ordem monotônica durante a mutation e um POST `completed` seguido pelo snapshot autoritativo é aplicado.
+- Refresh automático/recovery não limpa o latch por padrão. A liberação exige refresh explícito do usuário, mudança real de scope/revisão/run ou snapshot de sucesso autoritativo. A resposta bem-sucedida da ativação solicita refresh com liberação explícita; erro do mesmo run não o faz.
+- Depois de todos os guards de request corrente, `status.id !== expectedRunId` se torna `INVALID_API_RESPONSE` não retryable. A UI exibe somente a orientação genérica segura para 5xx, latcha exatamente scope/revisão/run esperado, não incorpora o DTO B e não cria novos timers por visibility/network. Refresh manual autoritativo libera uma única retomada.
+
+### Gates do fechamento focado
+
+- RED reproduzido nos dois cenários antes da correção.
+- Playwright focal: **4/4**, os dois casos em desktop + mobile.
+- Ops unit/component/runtime boundary: **13 arquivos, 50/50 testes**.
+- Ops typecheck: **verde**.
+- Biome focado nos **2 arquivos TypeScript/TSX alterados: verde**. `git diff --check`: **verde**.
+- Conforme o protocolo otimizado, workspace global, PostgreSQL, C#, detector Impeccable e geração não foram repetidos. Não houve push, deploy, provider real, credencial real ou Task 9+.
+
 ## Limites conhecidos
 
 - O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.

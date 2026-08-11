@@ -594,7 +594,11 @@ export function OnboardingPage({
       const nextIdentity = snapshotIdentity(next, expectedScope);
       const previousPollingIdentity = pollingIdentity(snapshotRef.current, expectedScope);
       const nextPollingIdentity = pollingIdentity(next, expectedScope);
-      if (clearPollingSuppression || previousPollingIdentity !== nextPollingIdentity) {
+      if (
+        clearPollingSuppression ||
+        previousPollingIdentity !== nextPollingIdentity ||
+        snapshotResolvedSuccessfully(next)
+      ) {
         pollSuppressionRef.current = null;
         setPollSuppression(null);
       }
@@ -618,6 +622,7 @@ export function OnboardingPage({
     async (
       expectedGeneration = generationRef.current,
       expectedScope = scopeKeyRef.current,
+      clearPollingSuppression = false,
     ): Promise<RefreshOutcome> => {
       if (!authorized || !organizationId) {
         return { status: "ignored", requestOrder: snapshotRequestOrderRef.current };
@@ -639,7 +644,15 @@ export function OnboardingPage({
         ) {
           return { status: "ignored", requestOrder };
         }
-        if (!applySnapshot(next, expectedGeneration, expectedScope, requestOrder, true)) {
+        if (
+          !applySnapshot(
+            next,
+            expectedGeneration,
+            expectedScope,
+            requestOrder,
+            clearPollingSuppression,
+          )
+        ) {
           return { status: "ignored", requestOrder };
         }
         return { status: "applied", requestOrder, snapshot: next };
@@ -734,7 +747,7 @@ export function OnboardingPage({
 
   useEffect(() => {
     const run = snapshot?.provisioning;
-    if (!run || locked || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
+    if (!run || busy || locked || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
     if (!shouldPollProvisioning({ online, visible, state: run.state })) return undefined;
     const expectedPollingIdentity = pollingIdentity(snapshot, scopeKey);
     if (!expectedPollingIdentity || pollSuppression === expectedPollingIdentity) {
@@ -759,11 +772,18 @@ export function OnboardingPage({
           snapshotRequestOrderRef.current !== requestOrder ||
           generationRef.current !== expectedGeneration ||
           scopeKeyRef.current !== expectedScope ||
-          status.id !== expectedRunId ||
           current?.provisioning?.id !== expectedRunId ||
           (current.selection?.revision ?? null) !== expectedRevision
         ) {
           return;
+        }
+        if (status.id !== expectedRunId) {
+          throw new ApiClientError(
+            "A API retornou um status de ativação inválido.",
+            502,
+            "INVALID_API_RESPONSE",
+            false,
+          );
         }
         const next = { ...current, provisioning: status };
         snapshotRef.current = next;
@@ -802,6 +822,7 @@ export function OnboardingPage({
       globalThis.clearTimeout(timer);
     };
   }, [
+    busy,
     locked,
     online,
     organizationId,
@@ -839,7 +860,9 @@ export function OnboardingPage({
         <Icon name="refresh" />
         <h2 id="onboarding-empty-title">O onboarding ainda não pôde ser carregado</h2>
         <p>{error?.message ?? "Confirme a conexão e a organização selecionada."}</p>
-        <Button onClick={() => void refresh()}>Tentar novamente</Button>
+        <Button onClick={() => void refresh(generationRef.current, scopeKeyRef.current, true)}>
+          Tentar novamente
+        </Button>
       </section>
     );
   }
@@ -947,8 +970,6 @@ export function OnboardingPage({
     const expectedScope = scopeKeyRef.current;
     const sequence = ++mutationSequenceRef.current;
     const requestOrder = ++snapshotRequestOrderRef.current;
-    pollSuppressionRef.current = null;
-    setPollSuppression(null);
     pollControllerRef.current?.abort();
     setBusy(true);
     setError(null);
@@ -968,7 +989,7 @@ export function OnboardingPage({
         return;
       }
       releaseActivationKey(organizationId, result.state, storage);
-      await refresh(expectedGeneration, expectedScope);
+      await refresh(expectedGeneration, expectedScope, true);
     } catch (caught) {
       if (
         sequence !== mutationSequenceRef.current ||
@@ -1039,7 +1060,11 @@ export function OnboardingPage({
             )}
           </div>
           {!error.sessionEnded && (
-            <Button onClick={() => void refresh()} size="sm" variant="secondary">
+            <Button
+              onClick={() => void refresh(generationRef.current, scopeKeyRef.current, true)}
+              size="sm"
+              variant="secondary"
+            >
               {error.action}
             </Button>
           )}
@@ -1077,7 +1102,7 @@ export function OnboardingPage({
         units={units}
         onActivate={() => void activate()}
         onPatch={(input) => void patch(input)}
-        onRefresh={() => void refresh()}
+        onRefresh={() => void refresh(generationRef.current, scopeKeyRef.current, true)}
         onSelect={(input) => void select(input)}
       />
     </>

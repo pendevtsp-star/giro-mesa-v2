@@ -1293,6 +1293,247 @@ for (const status of [400, 404] as const) {
   });
 }
 
+test("mantém latch e pausa polling durante ativação pendente", async ({ page }) => {
+  let completed = false;
+  let activationCalls = 0;
+  let statusCalls = 0;
+  let markDelayedPostStarted: (() => void) | undefined;
+  let releaseDelayedPost: (() => void) | undefined;
+  const delayedPostStarted = new Promise<void>((resolve) => {
+    markDelayedPostStarted = resolve;
+  });
+  const allowDelayedPost = new Promise<void>((resolve) => {
+    releaseDelayedPost = resolve;
+  });
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1_000));
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname.endsWith(`/provisioning/${runId}`)) {
+        statusCalls += 1;
+        await route.fulfill({
+          status: statusCalls === 1 ? 400 : 500,
+          json: {
+            statusCode: statusCalls === 1 ? 400 : 500,
+            code: statusCalls === 1 ? "POLL_PERMANENT" : "UNEXPECTED_POLL_DURING_MUTATION",
+            message:
+              statusCalls === 1
+                ? "Polling bloqueado até recuperação explícita."
+                : "O polling não pode avançar durante a ativação.",
+          },
+        });
+        return;
+      }
+      if (request.method() === "POST" && url.pathname.endsWith("/activate")) {
+        activationCalls += 1;
+        if (activationCalls === 1) {
+          await route.fulfill({
+            status: 500,
+            json: {
+              statusCode: 500,
+              code: "ACTIVATION_TRANSIENT_FAILURE",
+              message: "A primeira ativação falhou.",
+            },
+          });
+          return;
+        }
+        markDelayedPostStarted?.();
+        await allowDelayedPost;
+        completed = true;
+        await route.fulfill({
+          status: 201,
+          json: {
+            id: "a2222222-2222-4222-8222-222222222222",
+            organizationId,
+            commercialPlanId: planId,
+            provisioningRunId: runId,
+            subscriptionId,
+            startsAt: "2026-08-11T10:30:00.000Z",
+            endsAt: "2026-08-25T10:30:00.000Z",
+            state: "completed",
+            entitlements: [],
+          },
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+        await route.fulfill({
+          json: onboardingSnapshot({
+            items: verifiedItems(),
+            selection: selectedPlan(1),
+            provisioning: {
+              id: runId,
+              state: completed ? "completed" : "publishing",
+              checkpoint: completed ? "published" : "activation_committed",
+              attempts: completed ? 2 : 1,
+              lastErrorCode: null,
+              nextRetryAt: null,
+              completedAt: completed ? "2026-08-11T10:30:00.000Z" : null,
+              failedAt: null,
+              createdAt: "2026-08-11T10:00:00.000Z",
+              updatedAt: completed ? "2026-08-11T10:30:00.000Z" : "2026-08-11T10:00:00.000Z",
+            },
+            activatedAt: completed ? "2026-08-11T10:30:00.000Z" : null,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await expect(page.getByText("Publicando conclusão", { exact: true })).toBeVisible();
+  await page.clock.runFor(1_100);
+  await expect(page.getByRole("alert")).toContainText(
+    "Polling bloqueado até recuperação explícita.",
+  );
+  expect(statusCalls).toBe(1);
+
+  const activation = page.locator(".onboarding-activation");
+  await activation.getByRole("checkbox").check();
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await expect(page.getByRole("alert")).toContainText("O servidor não concluiu a solicitação.");
+  await page.clock.runFor(10_000);
+  expect(statusCalls).toBe(1);
+
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await delayedPostStarted;
+  await page.clock.runFor(1_600);
+  expect(statusCalls).toBe(1);
+  releaseDelayedPost?.();
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  expect(activationCalls).toBe(2);
+});
+
+test("latcha resposta de status pertencente a outro run até refresh autoritativo", async ({
+  page,
+}) => {
+  const runB = "e2222222-2222-4222-8222-222222222222";
+  let recover = false;
+  let completed = false;
+  let onboardingGets = 0;
+  let statusCalls = 0;
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1_000));
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname.endsWith(`/provisioning/${runId}`)) {
+        statusCalls += 1;
+        if (!recover) {
+          await route.fulfill({
+            json: {
+              id: runB,
+              state: "publishing",
+              checkpoint: "activation_committed",
+              attempts: 1,
+              lastErrorCode: null,
+              nextRetryAt: null,
+              completedAt: null,
+              failedAt: null,
+              createdAt: "2026-08-11T10:00:00.000Z",
+              updatedAt: "2026-08-11T10:00:00.000Z",
+              steps: [],
+            },
+          });
+          return;
+        }
+        completed = true;
+        await route.fulfill({
+          json: {
+            id: runId,
+            state: "completed",
+            checkpoint: "published",
+            attempts: 2,
+            lastErrorCode: null,
+            nextRetryAt: null,
+            completedAt: "2026-08-11T10:40:00.000Z",
+            failedAt: null,
+            createdAt: "2026-08-11T10:00:00.000Z",
+            updatedAt: "2026-08-11T10:40:00.000Z",
+            steps: [],
+          },
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+        onboardingGets += 1;
+        await route.fulfill({
+          json: onboardingSnapshot({
+            items: verifiedItems(),
+            selection: selectedPlan(1),
+            provisioning: {
+              id: runId,
+              state: completed ? "completed" : "publishing",
+              checkpoint: completed ? "published" : "activation_committed",
+              attempts: completed ? 2 : 1,
+              lastErrorCode: null,
+              nextRetryAt: null,
+              completedAt: completed ? "2026-08-11T10:40:00.000Z" : null,
+              failedAt: null,
+              createdAt: "2026-08-11T10:00:00.000Z",
+              updatedAt: completed ? "2026-08-11T10:40:00.000Z" : "2026-08-11T10:00:00.000Z",
+            },
+            activatedAt: completed ? "2026-08-11T10:40:00.000Z" : null,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await expect(page.getByText("Publicando conclusão", { exact: true })).toBeVisible();
+  await page.clock.runFor(1_100);
+  await expect(page.getByRole("alert")).toContainText("O servidor não concluiu a solicitação.");
+  await expect(page.getByText(runB)).toHaveCount(0);
+  expect(statusCalls).toBe(1);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    window.dispatchEvent(new Event("offline"));
+  });
+  await page.clock.runFor(10_000);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    window.dispatchEvent(new Event("online"));
+  });
+  await page.clock.runFor(10_000);
+  expect(statusCalls).toBe(1);
+
+  recover = true;
+  const getsBeforeRecovery = onboardingGets;
+  await page
+    .locator("button:not([disabled])")
+    .filter({ hasText: "Atualizar status" })
+    .first()
+    .click();
+  await expect.poll(() => onboardingGets).toBeGreaterThan(getsBeforeRecovery);
+  await page.waitForTimeout(100);
+  await page.clock.runFor(1_100);
+  await expect.poll(() => statusCalls).toBe(2);
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+});
+
 test("suprime 409 de ativação antigo depois de refresh autoritativo terminal", async ({ page }) => {
   let completed = false;
   const completedAt = "2026-08-11T10:10:00.000Z";
