@@ -6,7 +6,13 @@ import {
   ApiResponse,
   type OpenAPIObject,
 } from "@nestjs/swagger";
-import { type SyncBatchInput, syncBatchSchema } from "./sync.schemas.js";
+import { ZodPipe } from "../common/zod.pipe.js";
+import {
+  type DispatchOutcomeBatchInput,
+  dispatchOutcomeBatchSchema,
+  type SyncBatchInput,
+  syncBatchSchema,
+} from "./sync.schemas.js";
 import { SyncService } from "./sync.service.js";
 import {
   SYNC_ACK_SCHEMA_INVALID,
@@ -242,5 +248,17 @@ export class SyncController {
     @Body(new SyncBatchPipe(syncBatchSchema)) body: SyncBatchInput,
   ) {
     return this.sync.synchronize(hubSyncKey(authorization), body);
+  }
+
+  @HttpCode(200)
+  @Post("dispatch-outcomes")
+  @ApiOkResponse({
+    description: "Idempotent dispatch outcomes accepted from the authenticated Hub.",
+  })
+  dispatchOutcomes(
+    @Headers("authorization") authorization: string | undefined,
+    @Body(new ZodPipe(dispatchOutcomeBatchSchema)) body: DispatchOutcomeBatchInput,
+  ) {
+    return this.sync.applyDispatchOutcomes(hubSyncKey(authorization), body.outcomes);
   }
 }

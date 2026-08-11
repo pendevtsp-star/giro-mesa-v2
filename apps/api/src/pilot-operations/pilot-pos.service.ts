@@ -860,6 +860,58 @@ export class PilotPosService {
     return effects;
   }
 
+  async listDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    state?: "pending" | "delivered" | "acked" | "canceled" | "dlq",
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+      "kds",
+    ]);
+    const conditions = [
+      eq(dispatchEffects.organizationId, organizationId),
+      eq(dispatchEffects.unitId, unitId),
+    ];
+    if (state) conditions.push(eq(dispatchEffects.state, state));
+    const effects = await this.database.db
+      .select()
+      .from(dispatchEffects)
+      .where(and(...conditions))
+      .limit(500);
+    const effectIds = effects.map((effect) => effect.id);
+    const attempts = effectIds.length
+      ? await this.database.db
+          .select()
+          .from(dispatchAttempts)
+          .where(
+            and(
+              eq(dispatchAttempts.organizationId, organizationId),
+              eq(dispatchAttempts.unitId, unitId),
+              inArray(dispatchAttempts.effectId, effectIds),
+            ),
+          )
+      : [];
+    const deadLetters = effectIds.length
+      ? await this.database.db
+          .select()
+          .from(dispatchDeadLetters)
+          .where(
+            and(
+              eq(dispatchDeadLetters.organizationId, organizationId),
+              eq(dispatchDeadLetters.unitId, unitId),
+              inArray(dispatchDeadLetters.effectId, effectIds),
+              isNull(dispatchDeadLetters.resolvedAt),
+            ),
+          )
+      : [];
+    return { effects, attempts, deadLetters };
+  }
+
   async ensureDispatchEffects(
     identityId: string,
     organizationId: string,

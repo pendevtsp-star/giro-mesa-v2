@@ -1,3 +1,5 @@
+using GiroMesa.EdgeHub.Storage;
+
 namespace GiroMesa.EdgeHub.Adapters;
 
 public sealed class DisabledPaymentGateway : IPaymentGateway
@@ -22,4 +24,21 @@ public sealed class DisabledPrinterGateway : IPrinterGateway
 
     public Task<PrintResult> PrintAsync(PrintRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PrintResult(false, "unavailable", "PRINTER_NOT_CONFIGURED"));
+}
+
+public sealed class LocalKitchenDispatchGateway(HubStore store) : IKitchenDispatchGateway
+{
+    public CapabilityState Capability { get; } = new(
+        true,
+        "local-kds-inbox",
+        "KDS local persistente aguardando confirmação da estação.");
+
+    public async Task<KitchenDispatchResult> DeliverAsync(
+        KitchenDispatchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        await store.PublishKitchenDispatchAsync(request);
+        return new(true, "delivered", null);
+    }
 }

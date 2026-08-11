@@ -223,6 +223,13 @@ public sealed record CloudCommand(
     DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt);
 
+public sealed record PendingCloudCommand(
+    string Id,
+    string Type,
+    JsonElement Payload,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt);
+
 public sealed record ReconciliationEvent(
     string Id,
     string IdempotencyKey,
@@ -249,3 +256,19 @@ public sealed record LocalDispatchDeadLetter(
     string EffectId,
     string Reason,
     DateTimeOffset CreatedAt);
+
+public sealed record LocalKitchenDispatch(
+    string EffectId,
+    string DeliveryKey,
+    string TargetRef,
+    string Operation,
+    string Payload,
+    DateTimeOffset DeliveredAt);
+
+public sealed record LocalDispatchOutcome(
+    string Id,
+    string EffectId,
+    string DeliveryKey,
+    string State,
+    string? Error,
+    DateTimeOffset OccurredAt);

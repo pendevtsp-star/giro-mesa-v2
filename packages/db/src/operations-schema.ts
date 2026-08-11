@@ -1302,6 +1302,40 @@ export const dispatchDeadLetters = pgTable(
   ],
 );
 
+export const dispatchOutcomes = pgTable(
+  "dispatch_outcomes",
+  {
+    id: uuid("id").primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    effectId: uuid("effect_id").notNull(),
+    deliveryKey: varchar("delivery_key", { length: 240 }).notNull(),
+    state: varchar("state", { length: 24 })
+      .$type<"delivered" | "acked" | "failed" | "canceled" | "dlq">()
+      .notNull(),
+    error: text("error"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("dispatch_outcomes_effect_delivery_state_unique").on(
+      table.effectId,
+      table.deliveryKey,
+      table.state,
+    ),
+    index("dispatch_outcomes_effect_idx").on(table.organizationId, table.unitId, table.effectId),
+    foreignKey({
+      name: "dispatch_outcomes_effect_scope_fk",
+      columns: [table.organizationId, table.unitId, table.effectId],
+      foreignColumns: [dispatchEffects.organizationId, dispatchEffects.unitId, dispatchEffects.id],
+    }).onDelete("restrict"),
+    check(
+      "dispatch_outcomes_state_check",
+      sql`${table.state} in ('delivered','acked','failed','canceled','dlq')`,
+    ),
+  ],
+);
+
 export const operationsTenantTables = [
   posCatalogCategories,
   posAllergens,
@@ -1344,6 +1378,7 @@ export const operationsTenantTables = [
   dispatchAttempts,
   dispatchAcknowledgements,
   dispatchDeadLetters,
+  dispatchOutcomes,
 ] as const;
 
 for (const table of operationsTenantTables) table.enableRLS();

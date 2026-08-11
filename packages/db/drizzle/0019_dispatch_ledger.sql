@@ -74,6 +74,26 @@ CREATE TABLE public.dispatch_dead_letters (
 );--> statement-breakpoint
 CREATE UNIQUE INDEX dispatch_dead_letters_open_unique
   ON public.dispatch_dead_letters(effect_id) WHERE resolved_at IS NULL;--> statement-breakpoint
+CREATE INDEX dispatch_dead_letters_scope_created_idx
+  ON public.dispatch_dead_letters(organization_id, unit_id, created_at DESC)
+  WHERE resolved_at IS NULL;--> statement-breakpoint
+
+CREATE TABLE public.dispatch_outcomes (
+  id uuid PRIMARY KEY, organization_id uuid NOT NULL, unit_id uuid NOT NULL,
+  effect_id uuid NOT NULL, delivery_key varchar(240) NOT NULL, state varchar(24) NOT NULL,
+  error text, occurred_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT dispatch_outcomes_effect_scope_fk FOREIGN KEY (organization_id, unit_id, effect_id)
+    REFERENCES public.dispatch_effects(organization_id, unit_id, id) ON DELETE RESTRICT,
+  CONSTRAINT dispatch_outcomes_state_check CHECK (state IN ('delivered','acked','failed','canceled','dlq'))
+);--> statement-breakpoint
+CREATE UNIQUE INDEX dispatch_outcomes_effect_delivery_state_unique
+  ON public.dispatch_outcomes(effect_id, delivery_key, state);--> statement-breakpoint
+CREATE INDEX dispatch_outcomes_effect_idx
+  ON public.dispatch_outcomes(organization_id, unit_id, effect_id);--> statement-breakpoint
+CREATE INDEX dispatch_attempts_effect_state_idx
+  ON public.dispatch_attempts(organization_id, unit_id, effect_id, state, attempted_at DESC);--> statement-breakpoint
+CREATE INDEX dispatch_acknowledgements_effect_idx
+  ON public.dispatch_acknowledgements(organization_id, unit_id, effect_id, acknowledged_at DESC);--> statement-breakpoint
 
 CREATE OR REPLACE FUNCTION public.giromesa_append_only_dispatch_record()
 RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
@@ -83,12 +103,15 @@ CREATE TRIGGER dispatch_attempts_append_only BEFORE UPDATE OR DELETE ON public.d
   FOR EACH ROW EXECUTE FUNCTION public.giromesa_append_only_dispatch_record();--> statement-breakpoint
 CREATE TRIGGER dispatch_acknowledgements_append_only BEFORE UPDATE OR DELETE ON public.dispatch_acknowledgements
   FOR EACH ROW EXECUTE FUNCTION public.giromesa_append_only_dispatch_record();--> statement-breakpoint
+CREATE TRIGGER dispatch_outcomes_append_only BEFORE UPDATE OR DELETE ON public.dispatch_outcomes
+  FOR EACH ROW EXECUTE FUNCTION public.giromesa_append_only_dispatch_record();--> statement-breakpoint
 
 DO $$
 DECLARE tenant_table text;
 BEGIN
   FOREACH tenant_table IN ARRAY ARRAY[
-    'production_station_routes','dispatch_effects','dispatch_attempts','dispatch_acknowledgements','dispatch_dead_letters'
+    'production_station_routes','dispatch_effects','dispatch_attempts','dispatch_acknowledgements','dispatch_dead_letters',
+    'dispatch_outcomes'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tenant_table);
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table);

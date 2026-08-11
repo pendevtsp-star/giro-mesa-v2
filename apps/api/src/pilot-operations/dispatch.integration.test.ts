@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   dispatchEffects,
+  deviceEnrollments,
+  hubCommands,
+  hubHeartbeats,
   identities,
   memberships,
   organizations,
@@ -16,6 +19,7 @@ import {
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { DispatchCloudWorker } from "./dispatch-cloud.worker.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 
 it("creates one effect per destination and keeps attempts, ack, reprint and DLQ auditable", async (context) => {
@@ -46,6 +50,24 @@ it("creates one effect per destination and keeps attempts, ack, reprint and DLQ 
       .values({ email: `dispatch-${randomUUID()}@example.test`, displayName: "Owner" })
       .returning();
     assert.ok(unit && identity);
+    const syncKey = `dispatch-sync-${randomUUID()}`;
+    const [hub] = await database.db
+      .insert(deviceEnrollments)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        label: "Edge Hub",
+        syncKeyHash: createHash("sha256").update(syncKey).digest("hex"),
+      })
+      .returning();
+    assert.ok(hub);
+    await database.db.insert(hubHeartbeats).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      hubId: hub.id,
+      version: "1.0.0",
+      lastSeenAt: new Date(),
+    });
     const [membership] = await database.db
       .insert(memberships)
       .values({ organizationId: organization.id, identityId: identity.id, status: "active" })
@@ -112,6 +134,21 @@ it("creates one effect per destination and keeps attempts, ack, reprint and DLQ 
     ]);
     assert.equal(created.effects.length, 2);
     assert.equal(replay.effects.length, 2);
+    const cloudWorker = new DispatchCloudWorker(database);
+    const [scheduled, duplicateSchedule] = await Promise.all([
+      cloudWorker.runOnce(),
+      cloudWorker.runOnce(),
+    ]);
+    assert.equal(scheduled.scheduled + duplicateSchedule.scheduled, 2);
+    const cloudCommands = await database.db
+      .select()
+      .from(hubCommands)
+      .where(eq(hubCommands.hubId, hub.id));
+    assert.equal(cloudCommands.length, 2);
+    assert.deepEqual(
+      cloudCommands.map((command) => command.type),
+      ["dispatch.effect.execute", "dispatch.effect.execute"],
+    );
     const printer = created.effects.find((effect) => effect.destination === "printer");
     assert.ok(printer);
     const reprint = await service.reprintDispatch(

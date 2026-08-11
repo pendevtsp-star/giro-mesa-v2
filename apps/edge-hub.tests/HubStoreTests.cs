@@ -85,6 +85,9 @@ public sealed class HubStoreTests : IAsyncLifetime
         await store.InitializeAsync();
         await store.SaveCloudCommandsAsync([command]);
         await store.SaveCloudCommandsAsync([command]);
+        Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
+        Assert.Single(await store.GetPendingCloudCommandsAsync(10));
+        await store.MarkCloudCommandProcessedAsync(command.Id);
         Assert.Equal([command.Id], await store.GetPendingCloudAcknowledgementsAsync(10));
 
         SqliteConnection.ClearAllPools();

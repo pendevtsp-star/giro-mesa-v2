@@ -1,4 +1,7 @@
+using System.Text.Json;
+using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Storage;
+using GiroMesa.EdgeHub.Sync;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -56,6 +59,48 @@ public sealed class DispatchLedgerTests : IAsyncLifetime
         Assert.Single(await restarted.GetPendingDispatchAsync(10));
     }
 
+    [Fact]
+    public async Task ConsumesCloudDispatchExactlyOnceAndOnlyAcknowledgesAfterPrinterAndKdsDelivery()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var organizationId = Guid.NewGuid().ToString();
+        var unitId = Guid.NewGuid().ToString();
+        var printerEffectId = Guid.NewGuid().ToString();
+        var kdsEffectId = Guid.NewGuid().ToString();
+        var now = DateTimeOffset.UtcNow;
+        await store.SaveCloudCommandsAsync([
+            DispatchCommand(
+                Guid.NewGuid().ToString(), printerEffectId, organizationId, unitId,
+                "printer", "printer:cozinha", "dispatch-printer-1", now),
+            DispatchCommand(
+                Guid.NewGuid().ToString(), kdsEffectId, organizationId, unitId,
+                "kds", "kds:cozinha", "dispatch-kds-1", now),
+        ]);
+        var printer = new RecordingPrinterGateway();
+        var processor = new DispatchProcessor(
+            store,
+            printer,
+            new LocalKitchenDispatchGateway(store),
+            NullLogger<DispatchProcessor>.Instance);
+
+        Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
+        await processor.ProcessPendingCommandsAsync();
+        await processor.ProcessPendingCommandsAsync();
+
+        Assert.Single(printer.Requests);
+        Assert.Equal("dispatch-printer-1", printer.Requests[0].IdempotencyKey);
+        var kds = await store.GetPendingKitchenDispatchAsync(10);
+        Assert.Single(kds);
+        Assert.Equal(kdsEffectId, kds[0].EffectId);
+        Assert.Equal(2, (await store.GetPendingCloudAcknowledgementsAsync(10)).Count);
+        Assert.True(await store.AcknowledgeDispatchAsync(kdsEffectId, "kds-screen-ack"));
+        Assert.Empty(await store.GetPendingKitchenDispatchAsync(10));
+        Assert.Contains(
+            await store.GetPendingDispatchOutcomesAsync(20),
+            outcome => outcome.EffectId == kdsEffectId && outcome.State == "acked");
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync()
@@ -71,4 +116,46 @@ public sealed class DispatchLedgerTests : IAsyncLifetime
     private HubStore CreateStore() => new(
         Options.Create(new HubOptions { DataDirectory = _directory, DatabaseKey = "test-database-key-32-characters-long" }),
         NullLogger<HubStore>.Instance);
+
+    private static CloudCommand DispatchCommand(
+        string commandId,
+        string effectId,
+        string organizationId,
+        string unitId,
+        string destination,
+        string targetRef,
+        string deliveryKey,
+        DateTimeOffset now) =>
+        new(
+            commandId,
+            "dispatch.effect.execute",
+            JsonSerializer.SerializeToElement(new
+            {
+                effectId,
+                organizationId,
+                unitId,
+                effectKey = $"effect:{effectId}",
+                destination,
+                targetRef,
+                operation = "dispatch",
+                deliveryKey,
+                attemptNumber = 1,
+                payload = new { orderId = Guid.NewGuid(), stationId = Guid.NewGuid(), content = "Pedido 42" },
+            }),
+            now,
+            now.AddMinutes(5));
+
+    private sealed class RecordingPrinterGateway : IPrinterGateway
+    {
+        public CapabilityState Capability { get; } = new(true, "test-printer", "ready");
+        public List<PrintRequest> Requests { get; } = [];
+
+        public Task<PrintResult> PrintAsync(
+            PrintRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new PrintResult(true, "accepted", null));
+        }
+    }
 }

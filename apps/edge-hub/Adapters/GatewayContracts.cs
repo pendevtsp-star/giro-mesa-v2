@@ -52,3 +52,20 @@ public interface IPrinterGateway
     CapabilityState Capability { get; }
     Task<PrintResult> PrintAsync(PrintRequest request, CancellationToken cancellationToken = default);
 }
+
+public sealed record KitchenDispatchRequest(
+    string EffectId,
+    string IdempotencyKey,
+    string TargetRef,
+    string Operation,
+    string Payload);
+
+public sealed record KitchenDispatchResult(bool Success, string Status, string? ErrorCode);
+
+public interface IKitchenDispatchGateway
+{
+    CapabilityState Capability { get; }
+    Task<KitchenDispatchResult> DeliverAsync(
+        KitchenDispatchRequest request,
+        CancellationToken cancellationToken = default);
+}

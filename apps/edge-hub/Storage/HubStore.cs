@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Security;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
@@ -90,10 +91,12 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 created_at TEXT NOT NULL,
                 expires_at TEXT NOT NULL,
                 received_at TEXT NOT NULL,
+                processed_at TEXT NULL,
+                processing_error TEXT NULL,
                 cloud_acknowledged_at TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_inbound_cloud_commands_ack
-                ON inbound_cloud_commands (cloud_acknowledged_at, received_at);
+                ON inbound_cloud_commands (processed_at, cloud_acknowledged_at, received_at);
             CREATE TABLE IF NOT EXISTS operational_snapshots (
                 organization_id TEXT NOT NULL,
                 unit_id TEXT NOT NULL,
@@ -147,6 +150,29 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             );
             CREATE UNIQUE INDEX IF NOT EXISTS ux_local_dispatch_dead_letters_open
                 ON local_dispatch_dead_letters(effect_id) WHERE resolved_at IS NULL;
+            CREATE TABLE IF NOT EXISTS local_kds_deliveries (
+                effect_id TEXT PRIMARY KEY REFERENCES local_dispatch_effects(id),
+                delivery_key TEXT NOT NULL UNIQUE,
+                target_ref TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                delivered_at TEXT NOT NULL,
+                acknowledged_at TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_local_kds_deliveries_pending
+                ON local_kds_deliveries (acknowledged_at, delivered_at);
+            CREATE TABLE IF NOT EXISTS local_dispatch_outcomes (
+                id TEXT PRIMARY KEY,
+                effect_id TEXT NOT NULL REFERENCES local_dispatch_effects(id),
+                delivery_key TEXT NOT NULL,
+                state TEXT NOT NULL,
+                error TEXT NULL,
+                occurred_at TEXT NOT NULL,
+                cloud_acknowledged_at TEXT NULL,
+                UNIQUE(effect_id, delivery_key, state)
+            );
+            CREATE INDEX IF NOT EXISTS ix_local_dispatch_outcomes_pending
+                ON local_dispatch_outcomes (cloud_acknowledged_at, occurred_at);
             CREATE TABLE IF NOT EXISTS hub_installation_identity (
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                 installation_id TEXT NOT NULL UNIQUE,
@@ -178,6 +204,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         await EnsureColumnAsync(connection, "operational_events", "price_references", "TEXT NULL");
         await EnsureColumnAsync(connection, "operational_events", "primary_resource_id", "TEXT NULL");
         await EnsureColumnAsync(connection, "local_dispatch_dead_letters", "resolved_at", "TEXT NULL");
+        await EnsureColumnAsync(connection, "inbound_cloud_commands", "processed_at", "TEXT NULL");
+        await EnsureColumnAsync(connection, "inbound_cloud_commands", "processing_error", "TEXT NULL");
         var backfill = connection.CreateCommand();
         backfill.CommandText = "UPDATE operational_events SET idempotency_key = id WHERE idempotency_key IS NULL";
         await backfill.ExecuteNonQueryAsync();
@@ -185,6 +213,9 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         indexes.CommandText = """
             CREATE UNIQUE INDEX IF NOT EXISTS ux_operational_events_idempotency
                 ON operational_events (unit_id, idempotency_key);
+            DROP INDEX IF EXISTS ix_inbound_cloud_commands_ack;
+            CREATE INDEX ix_inbound_cloud_commands_ack
+                ON inbound_cloud_commands (processed_at, cloud_acknowledged_at, received_at);
             """;
         await indexes.ExecuteNonQueryAsync();
         logger.LogInformation("Edge database ready at {DataDirectory}", Path.GetFullPath(_options.DataDirectory));
@@ -538,6 +569,74 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         }
     }
 
+    public async Task<IReadOnlyList<PendingCloudCommand>> GetPendingCloudCommandsAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, type, payload, created_at, expires_at
+            FROM inbound_cloud_commands
+            WHERE processed_at IS NULL AND processing_error IS NULL AND expires_at > $now
+            ORDER BY received_at, id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+        var commands = new List<PendingCloudCommand>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            commands.Add(new(
+                reader.GetString(0),
+                reader.GetString(1),
+                ParseElement(reader.GetString(2)),
+                DateTimeOffset.Parse(reader.GetString(3)),
+                DateTimeOffset.Parse(reader.GetString(4))));
+        }
+        return commands;
+    }
+
+    public async Task MarkCloudCommandProcessedAsync(string commandId)
+    {
+        await SetCloudCommandProcessingStateAsync(commandId, processed: true, null);
+    }
+
+    public async Task MarkCloudCommandFailedAsync(string commandId, string error)
+    {
+        await SetCloudCommandProcessingStateAsync(commandId, processed: false, error);
+    }
+
+    private async Task SetCloudCommandProcessingStateAsync(
+        string commandId,
+        bool processed,
+        string? error)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE inbound_cloud_commands SET
+                    processed_at = CASE WHEN $processed = 1 THEN $now ELSE NULL END,
+                    processing_error = $error
+                WHERE id = $id AND processed_at IS NULL;
+                """;
+            command.Parameters.AddWithValue("$processed", processed ? 1 : 0);
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            command.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
+            command.Parameters.AddWithValue("$id", commandId);
+            if (await command.ExecuteNonQueryAsync() != 1)
+                throw new InvalidOperationException("CLOUD_COMMAND_PROCESSING_CONFLICT");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<string>> GetPendingCloudAcknowledgementsAsync(int limit)
     {
         await using var connection = new SqliteConnection(ConnectionString);
@@ -545,7 +644,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id FROM inbound_cloud_commands
-            WHERE cloud_acknowledged_at IS NULL
+            WHERE processed_at IS NOT NULL AND cloud_acknowledged_at IS NULL
             ORDER BY received_at
             LIMIT $limit;
             """;
@@ -702,6 +801,108 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         return results;
     }
 
+    public async Task<string> ClaimDispatchAttemptAsync(string effectId, string deliveryKey)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT OR IGNORE INTO local_dispatch_attempts
+                    (effect_id, delivery_key, attempt_number, state, attempted_at)
+                SELECT id, $deliveryKey, attempt_count + 1, 'executing', $attemptedAt
+                FROM local_dispatch_effects
+                WHERE id = $effectId AND state NOT IN ('acked', 'dlq', 'canceled');
+                """;
+            insert.Parameters.AddWithValue("$effectId", effectId);
+            insert.Parameters.AddWithValue("$deliveryKey", deliveryKey);
+            insert.Parameters.AddWithValue("$attemptedAt", DateTimeOffset.UtcNow.ToString("O"));
+            var inserted = await insert.ExecuteNonQueryAsync() == 1;
+            if (inserted)
+            {
+                var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE local_dispatch_effects
+                    SET attempt_count = attempt_count + 1, updated_at = $now
+                    WHERE id = $effectId;
+                    """;
+                update.Parameters.AddWithValue("$effectId", effectId);
+                update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+                await update.ExecuteNonQueryAsync();
+            }
+            var read = connection.CreateCommand();
+            read.Transaction = transaction;
+            read.CommandText = "SELECT state FROM local_dispatch_attempts WHERE delivery_key = $deliveryKey";
+            read.Parameters.AddWithValue("$deliveryKey", deliveryKey);
+            var state = Convert.ToString(await read.ExecuteScalarAsync())
+                ?? throw new InvalidOperationException("DISPATCH_ATTEMPT_NOT_CLAIMED");
+            await transaction.CommitAsync();
+            return inserted ? "claimed" : state;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task CompleteDispatchAttemptAsync(
+        string effectId,
+        string deliveryKey,
+        bool delivered,
+        string? error)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var now = DateTimeOffset.UtcNow;
+            var updateAttempt = connection.CreateCommand();
+            updateAttempt.Transaction = transaction;
+            updateAttempt.CommandText = """
+                UPDATE local_dispatch_attempts SET state = $state
+                WHERE effect_id = $effectId AND delivery_key = $deliveryKey AND state = 'executing';
+                """;
+            updateAttempt.Parameters.AddWithValue("$state", delivered ? "delivered" : "failed");
+            updateAttempt.Parameters.AddWithValue("$effectId", effectId);
+            updateAttempt.Parameters.AddWithValue("$deliveryKey", deliveryKey);
+            if (await updateAttempt.ExecuteNonQueryAsync() != 1)
+                throw new InvalidOperationException("DISPATCH_ATTEMPT_COMPLETION_CONFLICT");
+            var updateEffect = connection.CreateCommand();
+            updateEffect.Transaction = transaction;
+            updateEffect.CommandText = """
+                UPDATE local_dispatch_effects SET state = $state, next_attempt_at = $nextAttemptAt,
+                    updated_at = $now
+                WHERE id = $effectId AND state NOT IN ('acked', 'dlq', 'canceled');
+                """;
+            updateEffect.Parameters.AddWithValue("$state", delivered ? "delivered" : "pending");
+            updateEffect.Parameters.AddWithValue("$nextAttemptAt", now.AddSeconds(delivered ? 45 : 5).ToString("O"));
+            updateEffect.Parameters.AddWithValue("$now", now.ToString("O"));
+            updateEffect.Parameters.AddWithValue("$effectId", effectId);
+            if (await updateEffect.ExecuteNonQueryAsync() != 1)
+                throw new InvalidOperationException("DISPATCH_EFFECT_COMPLETION_CONFLICT");
+            await InsertDispatchOutcomeAsync(
+                connection,
+                transaction,
+                effectId,
+                deliveryKey,
+                delivered ? "delivered" : "failed",
+                error,
+                now);
+            await transaction.CommitAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<bool> RecordDispatchAttemptAsync(string effectId, string deliveryKey, bool delivered)
     {
         await _gate.WaitAsync();
@@ -725,6 +926,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             var inserted = await insert.ExecuteNonQueryAsync() == 1;
             if (inserted)
             {
+                var now = DateTimeOffset.UtcNow;
                 var update = connection.CreateCommand();
                 update.Transaction = transaction;
                 update.CommandText = """
@@ -737,9 +939,17 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                     """;
                 update.Parameters.AddWithValue("$effectId", effectId);
                 update.Parameters.AddWithValue("$state", delivered ? "delivered" : "pending");
-                update.Parameters.AddWithValue("$nextAttemptAt", DateTimeOffset.UtcNow.AddSeconds(delivered ? 45 : 5).ToString("O"));
-                update.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+                update.Parameters.AddWithValue("$nextAttemptAt", now.AddSeconds(delivered ? 45 : 5).ToString("O"));
+                update.Parameters.AddWithValue("$updatedAt", now.ToString("O"));
                 await update.ExecuteNonQueryAsync();
+                await InsertDispatchOutcomeAsync(
+                    connection,
+                    transaction,
+                    effectId,
+                    deliveryKey,
+                    delivered ? "delivered" : "failed",
+                    null,
+                    now);
             }
             await transaction.CommitAsync();
             return inserted;
@@ -765,7 +975,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 INSERT OR IGNORE INTO local_dispatch_acknowledgements
                     (effect_id, acknowledgement_key, acknowledged_at)
                 SELECT id, $acknowledgementKey, $acknowledgedAt
-                FROM local_dispatch_effects WHERE id = $effectId AND state NOT IN ('dlq', 'canceled');
+                FROM local_dispatch_effects WHERE id = $effectId AND state = 'delivered';
                 """;
             insert.Parameters.AddWithValue("$effectId", effectId);
             insert.Parameters.AddWithValue("$acknowledgementKey", acknowledgementKey);
@@ -783,6 +993,24 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 update.Parameters.AddWithValue("$effectId", effectId);
                 update.Parameters.AddWithValue("$acknowledgedAt", now);
                 await update.ExecuteNonQueryAsync();
+                var acknowledgeKds = connection.CreateCommand();
+                acknowledgeKds.Transaction = transaction;
+                acknowledgeKds.CommandText = """
+                    UPDATE local_kds_deliveries SET acknowledged_at = $acknowledgedAt
+                    WHERE effect_id = $effectId AND acknowledged_at IS NULL;
+                    """;
+                acknowledgeKds.Parameters.AddWithValue("$effectId", effectId);
+                acknowledgeKds.Parameters.AddWithValue("$acknowledgedAt", now);
+                await acknowledgeKds.ExecuteNonQueryAsync();
+                var deliveryKey = await LatestDispatchDeliveryKeyAsync(connection, transaction, effectId);
+                await InsertDispatchOutcomeAsync(
+                    connection,
+                    transaction,
+                    effectId,
+                    deliveryKey,
+                    "acked",
+                    null,
+                    DateTimeOffset.Parse(now));
             }
             await transaction.CommitAsync();
             return inserted;
@@ -819,6 +1047,15 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             update.Parameters.AddWithValue("$effectId", effectId);
             update.Parameters.AddWithValue("$updatedAt", now);
             await update.ExecuteNonQueryAsync();
+            var deliveryKey = await LatestDispatchDeliveryKeyAsync(connection, transaction, effectId);
+            await InsertDispatchOutcomeAsync(
+                connection,
+                transaction,
+                effectId,
+                deliveryKey,
+                "dlq",
+                reason,
+                DateTimeOffset.Parse(now));
             await transaction.CommitAsync();
         }
         finally
@@ -884,6 +1121,125 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         while (await reader.ReadAsync())
             results.Add(new LocalDispatchDeadLetter(reader.GetString(0), reader.GetString(1), DateTimeOffset.Parse(reader.GetString(2))));
         return results;
+    }
+
+    public async Task<bool> PublishKitchenDispatchAsync(KitchenDispatchRequest request)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var now = DateTimeOffset.UtcNow.ToString("O");
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT OR IGNORE INTO local_kds_deliveries
+                    (effect_id, delivery_key, target_ref, operation, payload, delivered_at)
+                SELECT id, $deliveryKey, $targetRef, $operation, $payload, $deliveredAt
+                FROM local_dispatch_effects WHERE id = $effectId AND destination = 'kds';
+                """;
+            insert.Parameters.AddWithValue("$effectId", request.EffectId);
+            insert.Parameters.AddWithValue("$deliveryKey", request.IdempotencyKey);
+            insert.Parameters.AddWithValue("$targetRef", request.TargetRef);
+            insert.Parameters.AddWithValue("$operation", request.Operation);
+            insert.Parameters.AddWithValue("$payload", request.Payload);
+            insert.Parameters.AddWithValue("$deliveredAt", now);
+            var inserted = await insert.ExecuteNonQueryAsync() == 1;
+
+            var verify = connection.CreateCommand();
+            verify.Transaction = transaction;
+            verify.CommandText = """
+                SELECT delivery_key, target_ref, operation, payload
+                FROM local_kds_deliveries WHERE effect_id = $effectId;
+                """;
+            verify.Parameters.AddWithValue("$effectId", request.EffectId);
+            await using var reader = await verify.ExecuteReaderAsync();
+            if (!await reader.ReadAsync() ||
+                reader.GetString(0) != request.IdempotencyKey ||
+                reader.GetString(1) != request.TargetRef ||
+                reader.GetString(2) != request.Operation ||
+                reader.GetString(3) != request.Payload)
+                throw new InvalidOperationException("KDS_DISPATCH_IDEMPOTENCY_CONFLICT");
+            await transaction.CommitAsync();
+            return inserted;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<LocalKitchenDispatch>> GetPendingKitchenDispatchAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT effect_id, delivery_key, target_ref, operation, payload, delivered_at
+            FROM local_kds_deliveries
+            WHERE acknowledged_at IS NULL
+            ORDER BY delivered_at, effect_id LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+        var results = new List<LocalKitchenDispatch>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            results.Add(new(
+                reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetString(4), DateTimeOffset.Parse(reader.GetString(5))));
+        return results;
+    }
+
+    public async Task<IReadOnlyList<LocalDispatchOutcome>> GetPendingDispatchOutcomesAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, effect_id, delivery_key, state, error, occurred_at
+            FROM local_dispatch_outcomes
+            WHERE cloud_acknowledged_at IS NULL
+            ORDER BY occurred_at, id LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+        var results = new List<LocalDispatchOutcome>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            results.Add(new(
+                reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4), DateTimeOffset.Parse(reader.GetString(5))));
+        return results;
+    }
+
+    public async Task MarkDispatchOutcomesAcknowledgedAsync(IReadOnlyList<string> outcomeIds)
+    {
+        if (outcomeIds.Count == 0) return;
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            foreach (var outcomeId in outcomeIds)
+            {
+                var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE local_dispatch_outcomes SET cloud_acknowledged_at = $now
+                    WHERE id = $id AND cloud_acknowledged_at IS NULL;
+                    """;
+                update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+                update.Parameters.AddWithValue("$id", outcomeId);
+                await update.ExecuteNonQueryAsync();
+            }
+            await transaction.CommitAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task<HubIdentityRegistration> EnsureHubIdentityAsync(
@@ -1094,6 +1450,48 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         command.Parameters.AddWithValue("$stateGeneration", stateGeneration);
         command.Parameters.AddWithValue("$detail", detail);
         command.Parameters.AddWithValue("$createdAt", createdAt.ToString("O"));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<string> LatestDispatchDeliveryKeyAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string effectId)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT delivery_key FROM local_dispatch_attempts
+            WHERE effect_id = $effectId
+            ORDER BY attempt_number DESC LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$effectId", effectId);
+        return Convert.ToString(await command.ExecuteScalarAsync())
+            ?? throw new InvalidOperationException("DISPATCH_ATTEMPT_REQUIRED");
+    }
+
+    private static async Task InsertDispatchOutcomeAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string effectId,
+        string deliveryKey,
+        string state,
+        string? error,
+        DateTimeOffset occurredAt)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT OR IGNORE INTO local_dispatch_outcomes
+                (id, effect_id, delivery_key, state, error, occurred_at)
+            VALUES ($id, $effectId, $deliveryKey, $state, $error, $occurredAt);
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$effectId", effectId);
+        command.Parameters.AddWithValue("$deliveryKey", deliveryKey);
+        command.Parameters.AddWithValue("$state", state);
+        command.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
+        command.Parameters.AddWithValue("$occurredAt", occurredAt.ToString("O"));
         await command.ExecuteNonQueryAsync();
     }
 

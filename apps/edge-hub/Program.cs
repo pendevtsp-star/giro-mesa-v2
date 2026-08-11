@@ -34,6 +34,9 @@ builder.Services.AddSingleton<IFiscalGateway>(services =>
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
 builder.Services.AddSingleton<IPrinterGateway, DisabledPrinterGateway>();
+builder.Services.AddSingleton<IKitchenDispatchGateway, LocalKitchenDispatchGateway>();
+builder.Services.AddSingleton<DispatchProcessor>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DispatchProcessor>());
 builder.Services.AddHttpClient<CloudSyncWorker>()
     .ConfigurePrimaryHttpMessageHandler(() =>
     {
@@ -99,12 +102,17 @@ app.MapPost("/v1/pair", async (PairDeviceRequest request, DeviceAuthenticator au
         : Results.Json(new { code = result.Error }, statusCode: result.StatusCode);
 });
 
-app.MapGet("/v1/capabilities", (IPaymentGateway payment, IFiscalGateway fiscal, IPrinterGateway printer) =>
+app.MapGet("/v1/capabilities", (
+    IPaymentGateway payment,
+    IFiscalGateway fiscal,
+    IPrinterGateway printer,
+    IKitchenDispatchGateway kitchen) =>
     Results.Ok(new
     {
         payment = payment.Capability,
         fiscal = fiscal.Capability,
         printing = printer.Capability,
+        kitchen = kitchen.Capability,
     }));
 
 app.MapPost("/v1/backups", async (HubIdentity identity) =>
@@ -239,6 +247,25 @@ app.MapPost("/v1/print-jobs", async (PrintRequest request, IPrinterGateway gatew
         : Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
 });
 
+app.MapGet("/v1/dispatch/kds", async (HubStore hubStore, int? limit) =>
+    Results.Ok(await hubStore.GetPendingKitchenDispatchAsync(Math.Clamp(limit ?? 100, 1, 500))));
+
+app.MapPost("/v1/dispatch/{effectId}/ack", async (
+    string effectId,
+    DispatchAcknowledgement request,
+    HubStore hubStore) =>
+    await hubStore.AcknowledgeDispatchAsync(effectId, request.AcknowledgementKey)
+        ? Results.NoContent()
+        : Results.Conflict(new { code = "DISPATCH_ACK_CONFLICT" }));
+
+app.MapGet("/v1/dispatch/dlq", async (HubStore hubStore, int? limit) =>
+    Results.Ok(await hubStore.GetDeadLettersAsync(Math.Clamp(limit ?? 100, 1, 500))));
+
+app.MapPost("/v1/dispatch/{effectId}/reconcile", async (string effectId, HubStore hubStore) =>
+    await hubStore.RequeueDeadLetterAsync(effectId)
+        ? Results.Accepted()
+        : Results.Conflict(new { code = "DISPATCH_RECONCILIATION_CONFLICT" }));
+
 app.Run();
 
 static IResult SnapshotSection(
@@ -271,3 +298,5 @@ static X509Certificate2 LoadClientCertificate(HubOptions options)
 }
 
 public partial class Program;
+
+public sealed record DispatchAcknowledgement(string AcknowledgementKey);

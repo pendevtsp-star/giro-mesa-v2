@@ -203,13 +203,14 @@ public sealed class CloudSyncWorker(
                 needsReconciliation = await ApplyResponseAsync(response, needsReconciliation);
             await store.MarkCloudAcknowledgementsAsync(pendingAcknowledgements);
 
-            var receivedCommandIds = responses.SelectMany(response => response.Commands)
-                .Select(command => command.Id).Distinct().ToArray();
-            if (receivedCommandIds.Length > 0)
+            await PushDispatchOutcomesAsync(cancellationToken);
+            var processedCommandIds = await store.GetPendingCloudAcknowledgementsAsync(
+                SyncEnvelopeLimits.MaximumAcknowledgements);
+            if (processedCommandIds.Count > 0)
             {
-                var acknowledgementResponse = await PostBatchAsync([], receivedCommandIds, 2, cancellationToken);
+                var acknowledgementResponse = await PostBatchAsync([], processedCommandIds, 2, cancellationToken);
                 needsReconciliation = await ApplyResponseAsync(acknowledgementResponse, needsReconciliation);
-                await store.MarkCloudAcknowledgementsAsync(receivedCommandIds);
+                await store.MarkCloudAcknowledgementsAsync(processedCommandIds);
             }
             Status = needsReconciliation ? "reconciling" : "idle";
         }
@@ -312,6 +313,26 @@ public sealed class CloudSyncWorker(
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<SyncResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Cloud returned an empty sync acknowledgement.");
+    }
+
+    private async Task PushDispatchOutcomesAsync(CancellationToken cancellationToken)
+    {
+        var outcomes = await store.GetPendingDispatchOutcomesAsync(100);
+        if (outcomes.Count == 0) return;
+        using var response = await httpClient.PostAsJsonAsync(
+            "/api/v1/sync/dispatch-outcomes",
+            new DispatchOutcomeBatch(outcomes),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<DispatchOutcomeAcknowledgement>(
+            cancellationToken)
+            ?? throw new InvalidOperationException("Cloud returned an empty dispatch outcome acknowledgement.");
+        var expected = outcomes.Select(outcome => outcome.Id).Order(StringComparer.Ordinal).ToArray();
+        var accepted = result.AcceptedOutcomeIds.Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal).ToArray();
+        if (!expected.SequenceEqual(accepted))
+            throw new InvalidOperationException("Cloud returned an invalid dispatch outcome acknowledgement.");
+        await store.MarkDispatchOutcomesAcknowledgedAsync(accepted);
     }
 
     private async Task<bool> PostBatchIsolatedAsync(
@@ -686,3 +707,6 @@ public sealed record SyncResponse(
     DateTimeOffset ServerTime,
     OperationalSnapshot? Snapshot = null,
     IReadOnlyList<ServerEventOutcome>? EventResults = null);
+
+public sealed record DispatchOutcomeBatch(IReadOnlyList<LocalDispatchOutcome> Outcomes);
+public sealed record DispatchOutcomeAcknowledgement(IReadOnlyList<string> AcceptedOutcomeIds);
