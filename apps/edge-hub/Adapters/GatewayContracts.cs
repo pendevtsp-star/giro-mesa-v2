@@ -18,6 +18,7 @@ public interface IPaymentGateway
 {
     CapabilityState Capability { get; }
     Task<PaymentResult> ExecuteAsync(PaymentRequest request, CancellationToken cancellationToken = default);
+    Task<PaymentResult> LookupAsync(string providerReference, CancellationToken cancellationToken = default);
 }
 
 public sealed record FiscalRequest(

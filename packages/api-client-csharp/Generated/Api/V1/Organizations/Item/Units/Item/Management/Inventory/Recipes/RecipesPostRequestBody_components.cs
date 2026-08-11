@@ -20,8 +20,18 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public Guid? LocationId { get; set; }
         /// <summary>The lossBasisPoints property</summary>
         public int? LossBasisPoints { get; set; }
+        /// <summary>The quantity property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity? Quantity { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity Quantity { get; set; }
+#endif
         /// <summary>The quantityMilli property</summary>
         public int? QuantityMilli { get; set; }
+        /// <summary>The unit property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components_unit? Unit { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components"/> and sets the default values.
         /// </summary>
@@ -51,7 +61,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
                 { "inventoryItemId", n => { InventoryItemId = n.GetGuidValue(); } },
                 { "locationId", n => { LocationId = n.GetGuidValue(); } },
                 { "lossBasisPoints", n => { LossBasisPoints = n.GetIntValue(); } },
+                { "quantity", n => { Quantity = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity.CreateFromDiscriminatorValue); } },
                 { "quantityMilli", n => { QuantityMilli = n.GetIntValue(); } },
+                { "unit", n => { Unit = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components_unit>(); } },
             };
         }
         /// <summary>
@@ -64,8 +76,70 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
             writer.WriteGuidValue("inventoryItemId", InventoryItemId);
             writer.WriteGuidValue("locationId", LocationId);
             writer.WriteIntValue("lossBasisPoints", LossBasisPoints);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity>("quantity", Quantity);
             writer.WriteIntValue("quantityMilli", QuantityMilli);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components_unit>("unit", Unit);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="double"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class RecipesPostRequestBody_components_quantity : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="double"/></summary>
+            public double? Double { get; set; }
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes.RecipesPostRequestBody_components.RecipesPostRequestBody_components_quantity();
+                if(parseNode.GetDoubleValue() is double doubleValue)
+                {
+                    result.Double = doubleValue;
+                }
+                else if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Double != null)
+                {
+                    writer.WriteDoubleValue(null, Double);
+                }
+                else if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+            }
         }
     }
 }

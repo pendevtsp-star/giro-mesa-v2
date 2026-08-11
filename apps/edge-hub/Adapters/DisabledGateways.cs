@@ -8,6 +8,9 @@ public sealed class DisabledPaymentGateway : IPaymentGateway
 
     public Task<PaymentResult> ExecuteAsync(PaymentRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PaymentResult(false, "unavailable", null, "PAYGO_NOT_CONFIGURED"));
+
+    public Task<PaymentResult> LookupAsync(string providerReference, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new PaymentResult(false, "unavailable", null, "PAYGO_NOT_CONFIGURED"));
 }
 
 public sealed class DisabledFiscalGateway : IFiscalGateway

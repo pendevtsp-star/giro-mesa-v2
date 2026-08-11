@@ -84,6 +84,8 @@ export const COMMERCIAL_PLANS = [
 
 export const ANNUAL_MONTH_MULTIPLIER = 10;
 
+export type CommercialAmountCents = number;
+
 export type CommercialPlanSlug = (typeof COMMERCIAL_PLANS)[number]["slug"];
 
 export function getCommercialPlan(slug: string) {

@@ -4,103 +4,7 @@
  */
 
 export interface paths {
-  "/api/v1/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["HealthController_health[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["HealthController_health[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/metrics": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["MetricsController_metricsText[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/metrics": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["MetricsController_metricsText[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/public/commercial-catalog": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["CatalogController_catalog[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/public/v1/commercial-catalog": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["CatalogController_catalog[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/public/trial-applications": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
@@ -109,14 +13,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[0]"];
+    post: operations["FiscalController_issue[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/trial-applications": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
@@ -125,14 +29,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[1]"];
+    post: operations["FiscalController_issue[1]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/contact": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
     parameters: {
       query?: never;
       header?: never;
@@ -141,14 +45,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[0]"];
+    post: operations["FiscalController_retry[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/contact": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
     parameters: {
       query?: never;
       header?: never;
@@ -157,7 +61,39 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[1]"];
+    post: operations["FiscalController_retry[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancel[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancel[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1230,6 +1166,326 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["OrganizationsController_acceptInvite[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_report[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_report[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_review[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_review[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_decide[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_decide[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_close[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_close[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IncidentsController_reportView[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IncidentsController_reportView[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3348,6 +3604,294 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_createAsset[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_createAsset[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_move[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_move[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ReturnablesController_ledger[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ReturnablesController_ledger[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_createIntent[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_createIntent[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_executeAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_executeAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_manualReview[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_manualReview[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/overview": {
     parameters: {
       query?: never;
@@ -4174,6 +4718,294 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createCommission[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_createRule[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_createRule[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_publishVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_publishVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_simulate[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_simulate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_calculate[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_calculate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_close[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_close[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_adjustClosed[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_adjustClosed[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_portfolio[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_portfolio[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_exportRun[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_exportRun[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -5720,6 +6552,302 @@ export interface components {
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
     };
+    RemunerationController_createRule_0__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_if"];
+    RemunerationController_createRule_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_0__request_recursive"][];
+    };
+    RemunerationController_createRule_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_if"];
+    RemunerationController_createRule_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_1__request_recursive"][];
+    };
+    RemunerationController_createRule_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_if"];
+    RemunerationController_publishVersion_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"][];
+    };
+    RemunerationController_publishVersion_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_if"];
+    RemunerationController_publishVersion_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"][];
+    };
+    RemunerationController_publishVersion_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
   };
   responses: never;
   parameters: never;
@@ -5729,212 +6857,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  "HealthController_health[0]": {
+  "FiscalController_issue[0]": {
     parameters: {
       query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
+      header: {
+        "idempotency-key": string;
       };
-    };
-  };
-  "HealthController_health[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
       };
-    };
-  };
-  "MetricsController_metricsText[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "MetricsController_metricsText[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_contact[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          saleReference: string;
+          /** @enum {string} */
+          documentType: "nfce" | "nfe";
+          totalCents: number;
+          document: {
+            [key: string]: unknown;
+          };
         };
       };
     };
@@ -5947,22 +6891,124 @@ export interface operations {
       };
     };
   };
-  "CatalogController_contact[1]": {
+  "FiscalController_issue[1]": {
     parameters: {
       query?: never;
-      header?: never;
-      path?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          saleReference: string;
+          /** @enum {string} */
+          documentType: "nfce" | "nfe";
+          totalCents: number;
+          document: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_retry[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_retry[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_cancel[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_cancel[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
         };
       };
     };
@@ -7546,6 +8592,584 @@ export interface operations {
       content: {
         "application/json": {
           token: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "HealthController_health[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "HealthController_health[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_report[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_report[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_review[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_review[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_decide[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_decide[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_close[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_close[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_reportView[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_reportView[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
         };
       };
     };
@@ -12894,6 +14518,608 @@ export interface operations {
       };
     };
   };
+  "ReturnablesController_createAsset[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sku: string;
+          name: string;
+          /** @enum {string} */
+          trackingMode: "aggregate" | "serialized";
+          depositCents?: number;
+          /** @default [] */
+          serialNumbers?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_createAsset[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sku: string;
+          name: string;
+          /** @enum {string} */
+          trackingMode: "aggregate" | "serialized";
+          depositCents?: number;
+          /** @default [] */
+          serialNumbers?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_move[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          /** Format: uuid */
+          serialId?: string;
+          /** @enum {string} */
+          movementType:
+            | "receive"
+            | "circulate"
+            | "return_empty"
+            | "send_supplier"
+            | "receive_supplier"
+            | "broken"
+            | "lost";
+          quantity: number;
+          fromCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          toCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          supplierReference?: string;
+          lotReference?: string;
+          reason?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_move[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          /** Format: uuid */
+          serialId?: string;
+          /** @enum {string} */
+          movementType:
+            | "receive"
+            | "circulate"
+            | "return_empty"
+            | "send_supplier"
+            | "receive_supplier"
+            | "broken"
+            | "lost";
+          quantity: number;
+          fromCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          toCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          supplierReference?: string;
+          lotReference?: string;
+          reason?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          custody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
+          /** Format: date-time */
+          occurredAt: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          custody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
+          /** Format: date-time */
+          occurredAt: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_ledger[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_ledger[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_createIntent[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sourceType: string;
+          sourceId: string;
+          amountCents: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_createIntent[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sourceType: string;
+          sourceId: string;
+          amountCents: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_executeAttempt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        intentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "credit" | "debit" | "pix";
+          /** Format: uuid */
+          terminalId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_executeAttempt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        intentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "credit" | "debit" | "pix";
+          /** Format: uuid */
+          terminalId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_manualReview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "authorized" | "declined";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentsController_manualReview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "authorized" | "declined";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PlatformController_overview[0]": {
     parameters: {
       query?: never;
@@ -13039,7 +15265,10 @@ export interface operations {
           productId?: string;
           name: string;
           sku?: string;
-          unit: string;
+          /** @enum {string} */
+          unit: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          /** @enum {string} */
+          dimension?: "mass" | "volume" | "count";
           /** @default 0 */
           minimumQuantity?: string | number;
           /** @default false */
@@ -13073,7 +15302,10 @@ export interface operations {
           productId?: string;
           name: string;
           sku?: string;
-          unit: string;
+          /** @enum {string} */
+          unit: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          /** @enum {string} */
+          dimension?: "mass" | "volume" | "count";
           /** @default 0 */
           minimumQuantity?: string | number;
           /** @default false */
@@ -13205,12 +15437,18 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId: string;
+          yieldQuantity?: string | number;
+          /** @enum {string} */
+          yieldUnit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
             /** Format: uuid */
             locationId: string;
-            quantityMilli: number;
+            quantity?: string | number;
+            /** @enum {string} */
+            unit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+            quantityMilli?: number;
             /** @default 0 */
             lossBasisPoints?: number;
           }[];
@@ -13263,12 +15501,18 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId: string;
+          yieldQuantity?: string | number;
+          /** @enum {string} */
+          yieldUnit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
             /** Format: uuid */
             locationId: string;
-            quantityMilli: number;
+            quantity?: string | number;
+            /** @enum {string} */
+            unit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+            quantityMilli?: number;
             /** @default 0 */
             lossBasisPoints?: number;
           }[];
@@ -14737,6 +16981,540 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_createRule[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          name: string;
+          expression: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_createRule[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          name: string;
+          expression: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_publishVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleSetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expression: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_publishVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleSetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expression: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_simulate[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleVersionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_simulate[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleVersionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_calculate[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          periodStart: string;
+          periodEnd: string;
+          /** Format: uuid */
+          ruleVersionId: string;
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+          sourceReferences: string[];
+          recipients: {
+            reference: string;
+            label: string;
+            basisPoints: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_calculate[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          periodStart: string;
+          periodEnd: string;
+          /** Format: uuid */
+          ruleVersionId: string;
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+          sourceReferences: string[];
+          recipients: {
+            reference: string;
+            label: string;
+            basisPoints: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_approve[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_approve[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_close[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_close[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_adjustClosed[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          reason: string;
+          sourceReferences: string[];
+          recipient: {
+            reference: string;
+            label: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_adjustClosed[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          reason: string;
+          sourceReferences: string[];
+          recipient: {
+            reference: string;
+            label: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_portfolio[0]": {
+    parameters: {
+      query: {
+        periodStart: string;
+        periodEnd: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_portfolio[1]": {
+    parameters: {
+      query: {
+        periodStart: string;
+        periodEnd: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_exportRun[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+        format: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "RemunerationController_exportRun[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+        format: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };

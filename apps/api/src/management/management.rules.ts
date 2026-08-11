@@ -14,16 +14,16 @@ function assertCents(value: number, field: string, allowZero = false) {
 
 export function quantityToMilli(value: string | number, field = "quantity") {
   const normalized = typeof value === "number" ? String(value) : value.trim();
-  if (!/^-?\d+(\.\d{1,3})?$/.test(normalized)) {
+  if (!/^-?\d+(\.\d{1,6})?$/.test(normalized)) {
     throw new BadRequestException({
       code: "INVALID_QUANTITY",
-      message: `${field} deve ter no máximo três casas decimais.`,
+      message: `${field} deve ter no máximo seis casas decimais.`,
     });
   }
   const negative = normalized.startsWith("-");
   const unsigned = negative ? normalized.slice(1) : normalized;
   const [whole = "0", fraction = ""] = unsigned.split(".");
-  const milli = Number(whole) * 1_000 + Number(fraction.padEnd(3, "0"));
+  const milli = Number(whole) * 1_000_000 + Number(fraction.padEnd(6, "0"));
   if (!Number.isSafeInteger(milli)) {
     throw new BadRequestException({
       code: "INVALID_QUANTITY",
@@ -37,7 +37,7 @@ export function milliToQuantity(value: number) {
   if (!Number.isSafeInteger(value)) throw new Error("Quantidade interna inválida.");
   const negative = value < 0 ? "-" : "";
   const absolute = Math.abs(value);
-  return `${negative}${Math.floor(absolute / 1_000)}.${String(absolute % 1_000).padStart(3, "0")}`;
+  return `${negative}${Math.floor(absolute / 1_000_000)}.${String(absolute % 1_000_000).padStart(6, "0")}`;
 }
 
 export function inventoryChange(
@@ -248,7 +248,7 @@ export function purchaseReceiptPlan(
       purchaseOrderItemId: item.id,
       quantityMilli,
       nextReceivedQuantity: milliToQuantity(nextReceivedMilli),
-      totalCents: Math.round((quantityMilli * item.unitCostCents) / 1_000),
+      totalCents: Math.round((quantityMilli * item.unitCostCents) / 1_000_000),
     };
   });
   return { updates, totalCents: updates.reduce((sum, update) => sum + update.totalCents, 0) };

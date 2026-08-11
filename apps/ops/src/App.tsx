@@ -77,6 +77,7 @@ import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./
 import { RealPlatformPage } from "./platform";
 import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
+import { RemunerationPage } from "./remuneration";
 import { parseRoute, routeHref } from "./router";
 import { calculateCartTotal, canAccess, formatMoney, isValidTerminalPin } from "./rules";
 import { SalonMap, type SalonMapTable } from "./salon-map";
@@ -125,6 +126,7 @@ const navItems: { route: RouteId; label: string; icon: IconName }[] = [
   { route: "inventory", label: "Estoque", icon: "box" },
   { route: "purchases", label: "Compras", icon: "package" },
   { route: "finance", label: "Financeiro", icon: "trend-up" },
+  { route: "remuneration", label: "Remuneração", icon: "wallet" },
   { route: "people", label: "Pessoas", icon: "users" },
   { route: "delivery", label: "Delivery", icon: "truck" },
   { route: "reservations", label: "Reservas e espera", icon: "calendar" },
@@ -1341,6 +1343,10 @@ const pageMeta: Record<RouteId, { title: string; description: string }> = {
     title: "Financeiro",
     description: "Contas, conciliação e caixa projetado.",
   },
+  remuneration: {
+    title: "Remuneração",
+    description: "Taxa de serviço, comissão e participação com memória e aprovação.",
+  },
   people: {
     title: "Pessoas",
     description: "Equipe, escalas, ponto e comissões.",
@@ -1480,6 +1486,8 @@ function PageContent({
       return session.demo ? <DemoPurchasesPage /> : <RealPurchasesPage scope={managementScope} />;
     case "finance":
       return session.demo ? <FinancePage /> : <RealFinancePage scope={managementScope} />;
+    case "remuneration":
+      return <RemunerationPage demo={session.demo} scope={managementScope} />;
     case "people":
       return session.demo ? <DemoPeoplePage /> : <RealPeoplePage scope={managementScope} />;
     case "delivery":
@@ -1639,6 +1647,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
   finance: {
     title: "Ler o financeiro",
     steps: ["Separe contas a pagar e receber.", "Conciliação exige fonte bancária homologada."],
+  },
+  remuneration: {
+    title: "Revisar remuneração",
+    steps: [
+      "Confirme a categoria e as fontes do cálculo.",
+      "Valores estimados exigem aprovação antes do fechamento.",
+      "Exporte CSV, PDF ou a versão de impressão somente após revisar a memória.",
+    ],
   },
   people: {
     title: "Acompanhar equipe",

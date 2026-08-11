@@ -29,6 +29,7 @@ public sealed record HubOptions
 public sealed class FocusOptions
 {
     public bool Enabled { get; init; }
+    public bool Homologated { get; init; }
     public string Environment { get; init; } = "homologation";
     public string? Token { get; init; }
     public int RequestTimeoutSeconds { get; init; } = 20;

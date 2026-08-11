@@ -16,9 +16,9 @@ describe("management rules", () => {
   it("blocks negative inventory unless the item explicitly allows it", () => {
     assert.throws(() => inventoryChange("2.000", "loss", "2.001", false), ConflictException);
     assert.deepEqual(inventoryChange("2.000", "loss", "2.001", true), {
-      previousQuantity: "2.000",
-      quantityDelta: "-2.001",
-      resultingQuantity: "-0.001",
+      previousQuantity: "2.000000",
+      quantityDelta: "-2.001000",
+      resultingQuantity: "-0.001000",
     });
   });
 
@@ -36,14 +36,14 @@ describe("management rules", () => {
         updates: [
           {
             purchaseOrderItemId: "item-a",
-            quantityMilli: 1_500,
-            nextReceivedQuantity: "2.000",
+            quantityMilli: 1_500_000,
+            nextReceivedQuantity: "2.000000",
             totalCents: 1_875,
           },
           {
             purchaseOrderItemId: "item-b",
-            quantityMilli: 2_000,
-            nextReceivedQuantity: "2.000",
+            quantityMilli: 2_000_000,
+            nextReceivedQuantity: "2.000000",
             totalCents: 1_000,
           },
         ],

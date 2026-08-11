@@ -2,10 +2,14 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Incidents;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Media;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Payments;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.PublicMenus;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Returnables;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Salon;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
@@ -31,6 +35,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The fiscal property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The incidents property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Incidents.IncidentsRequestBuilder Incidents
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Incidents.IncidentsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The management property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder Management
         {
@@ -41,6 +55,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Media.MediaRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The payments property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Payments.PaymentsRequestBuilder Payments
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Payments.PaymentsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The pilot property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PilotRequestBuilder Pilot
         {
@@ -50,6 +69,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.PublicMenus.PublicMenusRequestBuilder PublicMenus
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.PublicMenus.PublicMenusRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The returnables property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Returnables.ReturnablesRequestBuilder Returnables
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Returnables.ReturnablesRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The salon property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Salon.SalonRequestBuilder Salon

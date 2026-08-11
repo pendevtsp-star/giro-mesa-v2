@@ -104,6 +104,35 @@ public sealed class FocusFiscalGatewayTests
         Assert.Equal("FOCUS_PROCESSING", result.ErrorCode);
     }
 
+    [Fact]
+    public async Task RefusesProductionWithoutExplicitHomologationEvidence()
+    {
+        var gateway = new FocusFiscalGateway(
+            new HttpClient(new RecordingHandler((_, _) =>
+                throw new Xunit.Sdk.XunitException("HTTP should not be called"))),
+            Options.Create(new HubOptions
+            {
+                Focus = new FocusOptions
+                {
+                    Enabled = true,
+                    Environment = "production",
+                    Token = "focus-company-token",
+                    Homologated = false,
+                }
+            }));
+
+        var result = await gateway.IssueAsync(new FiscalRequest(
+            "order-2026-0003",
+            ActorIdentityId,
+            "order-id",
+            1590,
+            "{\"natureza_operacao\":\"Venda\"}"));
+
+        Assert.False(result.Success);
+        Assert.Equal("FOCUS_NOT_CONFIGURED", result.ErrorCode);
+        Assert.False(gateway.Capability.Configured);
+    }
+
     private static FocusFiscalGateway Gateway(HttpMessageHandler handler) => new(
         new HttpClient(handler),
         Options.Create(new HubOptions

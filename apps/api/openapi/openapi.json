@@ -1,385 +1,42 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/api/v1/health": {
-      "get": {
-        "operationId": "HealthController_health[0]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Health"
-        ]
-      }
-    },
-    "/health": {
-      "get": {
-        "operationId": "HealthController_health[1]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Health"
-        ]
-      }
-    },
-    "/api/v1/metrics": {
-      "get": {
-        "operationId": "MetricsController_metricsText[0]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Metrics"
-        ]
-      }
-    },
-    "/metrics": {
-      "get": {
-        "operationId": "MetricsController_metricsText[1]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Metrics"
-        ]
-      }
-    },
-    "/api/v1/public/commercial-catalog": {
-      "get": {
-        "operationId": "CatalogController_catalog[0]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Catalog"
-        ]
-      }
-    },
-    "/public/v1/commercial-catalog": {
-      "get": {
-        "operationId": "CatalogController_catalog[1]",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Catalog"
-        ]
-      }
-    },
-    "/api/v1/public/trial-applications": {
+    "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
       "post": {
-        "operationId": "CatalogController_trialApplication[0]",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Catalog"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "email": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "format": "email",
-                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                      },
-                      "phone": {
-                        "type": "string",
-                        "minLength": 10,
-                        "maxLength": 20
-                      },
-                      "businessName": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "segment": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 80
-                      },
-                      "planSlug": {
-                        "type": "string",
-                        "enum": [
-                          "operacao",
-                          "crescimento",
-                          "rede"
-                        ]
-                      },
-                      "consent": {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ]
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "email",
-                      "phone",
-                      "businessName",
-                      "planSlug",
-                      "consent"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "email": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "format": "email",
-                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                      },
-                      "phone": {
-                        "type": "string",
-                        "minLength": 10,
-                        "maxLength": 20
-                      },
-                      "businessName": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "segment": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 80
-                      },
-                      "plan": {
-                        "type": "string",
-                        "enum": [
-                          "Operação",
-                          "Crescimento",
-                          "Rede"
-                        ]
-                      },
-                      "privacyAccepted": {
-                        "anyOf": [
-                          {
-                            "type": "boolean",
-                            "enum": [
-                              true
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "true"
-                            ]
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "email",
-                      "phone",
-                      "businessName",
-                      "segment",
-                      "plan",
-                      "privacyAccepted"
-                    ]
-                  }
-                ]
-              }
+        "operationId": "FiscalController_issue[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
             }
           }
-        }
-      }
-    },
-    "/public/v1/trial-applications": {
-      "post": {
-        "operationId": "CatalogController_trialApplication[1]",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Catalog"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "email": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "format": "email",
-                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                      },
-                      "phone": {
-                        "type": "string",
-                        "minLength": 10,
-                        "maxLength": 20
-                      },
-                      "businessName": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "segment": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 80
-                      },
-                      "planSlug": {
-                        "type": "string",
-                        "enum": [
-                          "operacao",
-                          "crescimento",
-                          "rede"
-                        ]
-                      },
-                      "consent": {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ]
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "email",
-                      "phone",
-                      "businessName",
-                      "planSlug",
-                      "consent"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "email": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "format": "email",
-                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                      },
-                      "phone": {
-                        "type": "string",
-                        "minLength": 10,
-                        "maxLength": 20
-                      },
-                      "businessName": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 120
-                      },
-                      "segment": {
-                        "type": "string",
-                        "minLength": 2,
-                        "maxLength": 80
-                      },
-                      "plan": {
-                        "type": "string",
-                        "enum": [
-                          "Operação",
-                          "Crescimento",
-                          "Rede"
-                        ]
-                      },
-                      "privacyAccepted": {
-                        "anyOf": [
-                          {
-                            "type": "boolean",
-                            "enum": [
-                              true
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "true"
-                            ]
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "email",
-                      "phone",
-                      "businessName",
-                      "segment",
-                      "plan",
-                      "privacyAccepted"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/public/contact": {
-      "post": {
-        "operationId": "CatalogController_contact[0]",
-        "parameters": [],
         "responses": {
           "201": {
             "description": ""
           }
         },
         "tags": [
-          "Catalog"
+          "Fiscal"
         ],
         "requestBody": {
           "required": true,
@@ -388,68 +45,78 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": {
+                  "saleReference": {
                     "type": "string",
-                    "minLength": 2,
-                    "maxLength": 120
+                    "minLength": 1,
+                    "maxLength": 160
                   },
-                  "email": {
+                  "documentType": {
                     "type": "string",
-                    "maxLength": 254,
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
-                  "phone": {
-                    "type": "string",
-                    "minLength": 10,
-                    "maxLength": 20
-                  },
-                  "message": {
-                    "type": "string",
-                    "minLength": 5,
-                    "maxLength": 4000
-                  },
-                  "privacyAccepted": {
-                    "anyOf": [
-                      {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ]
-                      },
-                      {
-                        "type": "string",
-                        "enum": [
-                          "true"
-                        ]
-                      }
+                    "enum": [
+                      "nfce",
+                      "nfe"
                     ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "document": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
-                  "name",
-                  "email",
-                  "phone",
-                  "message",
-                  "privacyAccepted"
-                ]
+                  "saleReference",
+                  "documentType",
+                  "totalCents",
+                  "document"
+                ],
+                "additionalProperties": false
               }
             }
           }
         }
       }
     },
-    "/public/v1/contact": {
+    "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
       "post": {
-        "operationId": "CatalogController_contact[1]",
-        "parameters": [],
+        "operationId": "FiscalController_issue[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
           }
         },
         "tags": [
-          "Catalog"
+          "Fiscal"
         ],
         "requestBody": {
           "required": true,
@@ -458,51 +125,234 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": {
+                  "saleReference": {
                     "type": "string",
-                    "minLength": 2,
-                    "maxLength": 120
+                    "minLength": 1,
+                    "maxLength": 160
                   },
-                  "email": {
+                  "documentType": {
                     "type": "string",
-                    "maxLength": 254,
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
-                  "phone": {
-                    "type": "string",
-                    "minLength": 10,
-                    "maxLength": 20
-                  },
-                  "message": {
-                    "type": "string",
-                    "minLength": 5,
-                    "maxLength": 4000
-                  },
-                  "privacyAccepted": {
-                    "anyOf": [
-                      {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ]
-                      },
-                      {
-                        "type": "string",
-                        "enum": [
-                          "true"
-                        ]
-                      }
+                    "enum": [
+                      "nfce",
+                      "nfe"
                     ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "document": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
-                  "name",
-                  "email",
-                  "phone",
-                  "message",
-                  "privacyAccepted"
-                ]
+                  "saleReference",
+                  "documentType",
+                  "totalCents",
+                  "document"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
+      "post": {
+        "operationId": "FiscalController_retry[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fiscal"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
+      "post": {
+        "operationId": "FiscalController_retry[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fiscal"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+      "post": {
+        "operationId": "FiscalController_cancel[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fiscal"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+      "post": {
+        "operationId": "FiscalController_cancel[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fiscal"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -3012,6 +2862,1368 @@
                 },
                 "required": [
                   "token"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_health[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_health[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/metrics": {
+      "get": {
+        "operationId": "MetricsController_metricsText[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Metrics"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "MetricsController_metricsText[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Metrics"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+      "post": {
+        "operationId": "IncidentsController_report[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "incidentType": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 48
+                  },
+                  "neutralSummary": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "evidence": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "document",
+                            "photo",
+                            "note",
+                            "reference"
+                          ]
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "checksum": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "reference"
+                      ]
+                    }
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "incidentType",
+                  "neutralSummary",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+      "post": {
+        "operationId": "IncidentsController_report[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "incidentType": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 48
+                  },
+                  "neutralSummary": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "evidence": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "document",
+                            "photo",
+                            "note",
+                            "reference"
+                          ]
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "checksum": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "reference"
+                      ]
+                    }
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "incidentType",
+                  "neutralSummary",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+      "post": {
+        "operationId": "IncidentsController_review[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "neutralNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+      "post": {
+        "operationId": "IncidentsController_review[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "neutralNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+      "post": {
+        "operationId": "IncidentsController_decide[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "neutralNote",
+                  "decision"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+      "post": {
+        "operationId": "IncidentsController_decide[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "neutralNote",
+                  "decision"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+      "post": {
+        "operationId": "IncidentsController_close[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "neutralNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+      "post": {
+        "operationId": "IncidentsController_close[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "neutralNote": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "neutralNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+      "get": {
+        "operationId": "IncidentsController_reportView[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "incidentType": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 48
+                  },
+                  "neutralSummary": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "evidence": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "document",
+                            "photo",
+                            "note",
+                            "reference"
+                          ]
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "checksum": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "reference"
+                      ]
+                    }
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "incidentType",
+                  "neutralSummary",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+      "get": {
+        "operationId": "IncidentsController_reportView[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incidentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Incidents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "incidentType": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 48
+                  },
+                  "neutralSummary": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 1000
+                  },
+                  "evidence": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "document",
+                            "photo",
+                            "note",
+                            "reference"
+                          ]
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "checksum": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "reference"
+                      ]
+                    }
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "incidentType",
+                  "neutralSummary",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/commercial-catalog": {
+      "get": {
+        "operationId": "CatalogController_catalog[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/public/v1/commercial-catalog": {
+      "get": {
+        "operationId": "CatalogController_catalog[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/public/trial-applications": {
+      "post": {
+        "operationId": "CatalogController_trialApplication[0]",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 20
+                      },
+                      "businessName": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "segment": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      "planSlug": {
+                        "type": "string",
+                        "enum": [
+                          "operacao",
+                          "crescimento",
+                          "rede"
+                        ]
+                      },
+                      "consent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email",
+                      "phone",
+                      "businessName",
+                      "planSlug",
+                      "consent"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 20
+                      },
+                      "businessName": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "segment": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "Operação",
+                          "Crescimento",
+                          "Rede"
+                        ]
+                      },
+                      "privacyAccepted": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email",
+                      "phone",
+                      "businessName",
+                      "segment",
+                      "plan",
+                      "privacyAccepted"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/trial-applications": {
+      "post": {
+        "operationId": "CatalogController_trialApplication[1]",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 20
+                      },
+                      "businessName": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "segment": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      "planSlug": {
+                        "type": "string",
+                        "enum": [
+                          "operacao",
+                          "crescimento",
+                          "rede"
+                        ]
+                      },
+                      "consent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email",
+                      "phone",
+                      "businessName",
+                      "planSlug",
+                      "consent"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 20
+                      },
+                      "businessName": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "segment": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "Operação",
+                          "Crescimento",
+                          "Rede"
+                        ]
+                      },
+                      "privacyAccepted": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email",
+                      "phone",
+                      "businessName",
+                      "segment",
+                      "plan",
+                      "privacyAccepted"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/contact": {
+      "post": {
+        "operationId": "CatalogController_contact[0]",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 20
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 4000
+                  },
+                  "privacyAccepted": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "message",
+                  "privacyAccepted"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/contact": {
+      "post": {
+        "operationId": "CatalogController_contact[1]",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 20
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 4000
+                  },
+                  "privacyAccepted": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "message",
+                  "privacyAccepted"
                 ]
               }
             }
@@ -16075,6 +17287,1496 @@
         ]
       }
     },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+      "post": {
+        "operationId": "ReturnablesController_createAsset[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "trackingMode": {
+                    "type": "string",
+                    "enum": [
+                      "aggregate",
+                      "serialized"
+                    ]
+                  },
+                  "depositCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "serialNumbers": {
+                    "default": [],
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    }
+                  }
+                },
+                "required": [
+                  "sku",
+                  "name",
+                  "trackingMode"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+      "post": {
+        "operationId": "ReturnablesController_createAsset[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "trackingMode": {
+                    "type": "string",
+                    "enum": [
+                      "aggregate",
+                      "serialized"
+                    ]
+                  },
+                  "depositCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "serialNumbers": {
+                    "default": [],
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    }
+                  }
+                },
+                "required": [
+                  "sku",
+                  "name",
+                  "trackingMode"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+      "post": {
+        "operationId": "ReturnablesController_move[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "serialId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "movementType": {
+                    "type": "string",
+                    "enum": [
+                      "receive",
+                      "circulate",
+                      "return_empty",
+                      "send_supplier",
+                      "receive_supplier",
+                      "broken",
+                      "lost"
+                    ]
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 1000000,
+                    "minimum": 0
+                  },
+                  "fromCustody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "toCustody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "supplierReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "lotReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 240
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "movementType",
+                  "quantity",
+                  "fromCustody",
+                  "toCustody",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+      "post": {
+        "operationId": "ReturnablesController_move[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "serialId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "movementType": {
+                    "type": "string",
+                    "enum": [
+                      "receive",
+                      "circulate",
+                      "return_empty",
+                      "send_supplier",
+                      "receive_supplier",
+                      "broken",
+                      "lost"
+                    ]
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 1000000,
+                    "minimum": 0
+                  },
+                  "fromCustody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "toCustody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "supplierReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "lotReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 240
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "movementType",
+                  "quantity",
+                  "fromCustody",
+                  "toCustody",
+                  "occurredAt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+      "post": {
+        "operationId": "ReturnablesController_reconcile[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "custody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "physicalQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "physicalSerialIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "custody",
+                  "occurredAt",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+      "post": {
+        "operationId": "ReturnablesController_reconcile[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "custody": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "supplier",
+                          "location",
+                          "table",
+                          "waiter",
+                          "shift",
+                          "reconciliation"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "physicalQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "physicalSerialIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "custody",
+                  "occurredAt",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+      "get": {
+        "operationId": "ReturnablesController_ledger[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+      "get": {
+        "operationId": "ReturnablesController_ledger[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Returnables"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+      "post": {
+        "operationId": "PaymentsController_createIntent[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "sourceType",
+                  "sourceId",
+                  "amountCents"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+      "post": {
+        "operationId": "PaymentsController_createIntent[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "sourceType",
+                  "sourceId",
+                  "amountCents"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+      "post": {
+        "operationId": "PaymentsController_executeAttempt[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "credit",
+                      "debit",
+                      "pix"
+                    ]
+                  },
+                  "terminalId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "amountCents",
+                  "method"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+      "post": {
+        "operationId": "PaymentsController_executeAttempt[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "credit",
+                      "debit",
+                      "pix"
+                    ]
+                  },
+                  "terminalId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "amountCents",
+                  "method"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+      "post": {
+        "operationId": "PaymentsController_reconcile[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+      "post": {
+        "operationId": "PaymentsController_reconcile[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+      "post": {
+        "operationId": "PaymentsController_manualReview[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "declined"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+      "post": {
+        "operationId": "PaymentsController_manualReview[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "declined"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payment-provider-callbacks/{adapter}": {
+      "post": {
+        "operationId": "PaymentCallbacksController_callback[0]",
+        "parameters": [
+          {
+            "name": "adapter",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PaymentCallbacks"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "attemptId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "providerEventId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "declined",
+                      "unknown"
+                    ]
+                  },
+                  "providerReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "safePayload": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "organizationId",
+                  "unitId",
+                  "attemptId",
+                  "providerEventId",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payment-provider-callbacks/{adapter}": {
+      "post": {
+        "operationId": "PaymentCallbacksController_callback[1]",
+        "parameters": [
+          {
+            "name": "adapter",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PaymentCallbacks"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "attemptId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "providerEventId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "declined",
+                      "unknown"
+                    ]
+                  },
+                  "providerReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "safePayload": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "organizationId",
+                  "unitId",
+                  "attemptId",
+                  "providerEventId",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/platform/overview": {
       "get": {
         "operationId": "PlatformController_overview[0]",
@@ -16334,8 +19036,23 @@
                   },
                   "unit": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 20
+                    "enum": [
+                      "mg",
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "unit",
+                      "dozen"
+                    ]
+                  },
+                  "dimension": {
+                    "type": "string",
+                    "enum": [
+                      "mass",
+                      "volume",
+                      "count"
+                    ]
                   },
                   "minimumQuantity": {
                     "default": "0",
@@ -16416,8 +19133,23 @@
                   },
                   "unit": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 20
+                    "enum": [
+                      "mg",
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "unit",
+                      "dozen"
+                    ]
+                  },
+                  "dimension": {
+                    "type": "string",
+                    "enum": [
+                      "mass",
+                      "volume",
+                      "count"
+                    ]
                   },
                   "minimumQuantity": {
                     "default": "0",
@@ -16741,6 +19473,28 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
+                  "yieldQuantity": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "yieldUnit": {
+                    "type": "string",
+                    "enum": [
+                      "mg",
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "unit",
+                      "dozen"
+                    ]
+                  },
                   "components": {
                     "minItems": 1,
                     "maxItems": 500,
@@ -16758,6 +19512,28 @@
                           "format": "uuid",
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
+                        "quantity": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mg",
+                            "g",
+                            "kg",
+                            "ml",
+                            "l",
+                            "unit",
+                            "dozen"
+                          ]
+                        },
                         "quantityMilli": {
                           "type": "integer",
                           "exclusiveMinimum": true,
@@ -16773,8 +19549,7 @@
                       },
                       "required": [
                         "inventoryItemId",
-                        "locationId",
-                        "quantityMilli"
+                        "locationId"
                       ]
                     }
                   }
@@ -16867,6 +19642,28 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
+                  "yieldQuantity": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "yieldUnit": {
+                    "type": "string",
+                    "enum": [
+                      "mg",
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "unit",
+                      "dozen"
+                    ]
+                  },
                   "components": {
                     "minItems": 1,
                     "maxItems": 500,
@@ -16884,6 +19681,28 @@
                           "format": "uuid",
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
+                        "quantity": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mg",
+                            "g",
+                            "kg",
+                            "ml",
+                            "l",
+                            "unit",
+                            "dozen"
+                          ]
+                        },
                         "quantityMilli": {
                           "type": "integer",
                           "exclusiveMinimum": true,
@@ -16899,8 +19718,7 @@
                       },
                       "required": [
                         "inventoryItemId",
-                        "locationId",
-                        "quantityMilli"
+                        "locationId"
                       ]
                     }
                   }
@@ -20275,6 +23093,1388 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+      "post": {
+        "operationId": "RemunerationController_createRule[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "service",
+                      "commission",
+                      "profit_sharing"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 160
+                  },
+                  "expression": {
+                    "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name",
+                  "expression",
+                  "effectiveFrom"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+      "post": {
+        "operationId": "RemunerationController_createRule[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "service",
+                      "commission",
+                      "profit_sharing"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 160
+                  },
+                  "expression": {
+                    "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name",
+                  "expression",
+                  "effectiveFrom"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+      "post": {
+        "operationId": "RemunerationController_publishVersion[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleSetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "expression",
+                  "effectiveFrom"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+      "post": {
+        "operationId": "RemunerationController_publishVersion[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleSetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "expression",
+                  "effectiveFrom"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+      "post": {
+        "operationId": "RemunerationController_simulate[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleVersionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "grossSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "netSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "serviceChargeCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "eligibleSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "profitCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "hoursMinutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unitsSold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "grossSalesCents",
+                      "netSalesCents",
+                      "serviceChargeCents",
+                      "eligibleSalesCents",
+                      "profitCents",
+                      "hoursMinutes",
+                      "unitsSold"
+                    ]
+                  }
+                },
+                "required": [
+                  "metrics"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+      "post": {
+        "operationId": "RemunerationController_simulate[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleVersionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "grossSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "netSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "serviceChargeCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "eligibleSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "profitCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "hoursMinutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unitsSold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "grossSalesCents",
+                      "netSalesCents",
+                      "serviceChargeCents",
+                      "eligibleSalesCents",
+                      "profitCents",
+                      "hoursMinutes",
+                      "unitsSold"
+                    ]
+                  }
+                },
+                "required": [
+                  "metrics"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+      "post": {
+        "operationId": "RemunerationController_calculate[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "service",
+                      "commission",
+                      "profit_sharing"
+                    ]
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "ruleVersionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "grossSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "netSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "serviceChargeCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "eligibleSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "profitCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "hoursMinutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unitsSold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "grossSalesCents",
+                      "netSalesCents",
+                      "serviceChargeCents",
+                      "eligibleSalesCents",
+                      "profitCents",
+                      "hoursMinutes",
+                      "unitsSold"
+                    ]
+                  },
+                  "sourceReferences": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "recipients": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "basisPoints": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        }
+                      },
+                      "required": [
+                        "reference",
+                        "label",
+                        "basisPoints"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "periodStart",
+                  "periodEnd",
+                  "ruleVersionId",
+                  "metrics",
+                  "sourceReferences",
+                  "recipients"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+      "post": {
+        "operationId": "RemunerationController_calculate[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "service",
+                      "commission",
+                      "profit_sharing"
+                    ]
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "ruleVersionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "grossSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "netSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "serviceChargeCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "eligibleSalesCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "profitCents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "hoursMinutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unitsSold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "grossSalesCents",
+                      "netSalesCents",
+                      "serviceChargeCents",
+                      "eligibleSalesCents",
+                      "profitCents",
+                      "hoursMinutes",
+                      "unitsSold"
+                    ]
+                  },
+                  "sourceReferences": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "recipients": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "basisPoints": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        }
+                      },
+                      "required": [
+                        "reference",
+                        "label",
+                        "basisPoints"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "periodStart",
+                  "periodEnd",
+                  "ruleVersionId",
+                  "metrics",
+                  "sourceReferences",
+                  "recipients"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+      "post": {
+        "operationId": "RemunerationController_approve[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+      "post": {
+        "operationId": "RemunerationController_approve[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+      "post": {
+        "operationId": "RemunerationController_close[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+      "post": {
+        "operationId": "RemunerationController_close[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+      "post": {
+        "operationId": "RemunerationController_adjustClosed[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 500
+                  },
+                  "sourceReferences": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "recipient": {
+                    "type": "object",
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "reference",
+                      "label"
+                    ]
+                  }
+                },
+                "required": [
+                  "amountCents",
+                  "reason",
+                  "sourceReferences",
+                  "recipient"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+      "post": {
+        "operationId": "RemunerationController_adjustClosed[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 500
+                  },
+                  "sourceReferences": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "recipient": {
+                    "type": "object",
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "reference",
+                      "label"
+                    ]
+                  }
+                },
+                "required": [
+                  "amountCents",
+                  "reason",
+                  "sourceReferences",
+                  "recipient"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+      "get": {
+        "operationId": "RemunerationController_portfolio[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodEnd",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+      "get": {
+        "operationId": "RemunerationController_portfolio[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodEnd",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+      "get": {
+        "operationId": "RemunerationController_exportRun[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+      "get": {
+        "operationId": "RemunerationController_exportRun[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Remuneration"
+        ]
       }
     },
     "/api/v1/organizations/{organizationId}/units/{unitId}/media/images": {
@@ -26406,6 +30606,878 @@
           "updatedAt",
           "steps"
         ]
+      },
+      "RemunerationController_createRule_0__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_createRule_0__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_createRule_0__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_createRule_0__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_createRule_0__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_createRule_0__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_createRule_0__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_createRule_1__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_createRule_1__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_createRule_1__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_createRule_1__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_createRule_1__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_createRule_1__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_publishVersion_0__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_publishVersion_1__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
       }
     }
   }

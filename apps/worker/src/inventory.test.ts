@@ -5,7 +5,9 @@ import {
   milliToQuantity,
   parseOrderSentPayload,
   quantityToMilli,
+  recipeBatchConsumptionQuantity,
   recipeConsumptionMilli,
+  recipeConsumptionQuantity,
 } from "./inventory.js";
 
 const payload = {
@@ -40,6 +42,41 @@ describe("order inventory consumption rules", () => {
       (error: unknown) =>
         error instanceof InventoryConsumptionError &&
         error.message === "INVENTORY_RECIPE_LOSS_INVALID",
+    );
+  });
+
+  it("keeps six-decimal dimensional precision for versioned technical sheets", () => {
+    assert.deepEqual(recipeConsumptionQuantity("0.333333", "l", 3, 9_000), {
+      quantity: "1.111110",
+      unit: "l",
+      dimension: "volume",
+    });
+  });
+
+  it("scales a batch recipe by its declared yield and converts into the stock unit", () => {
+    assert.deepEqual(
+      recipeBatchConsumptionQuantity({
+        componentQuantity: "1",
+        componentUnit: "kg",
+        inventoryUnit: "g",
+        orderQuantity: 1,
+        yieldQuantity: "10",
+        yieldUnit: "unit",
+        lossBasisPoints: 0,
+      }),
+      { quantity: "100.000000", unit: "g", dimension: "mass" },
+    );
+    assert.deepEqual(
+      recipeBatchConsumptionQuantity({
+        componentQuantity: "6",
+        componentUnit: "l",
+        inventoryUnit: "ml",
+        orderQuantity: 2,
+        yieldQuantity: "1",
+        yieldUnit: "dozen",
+        lossBasisPoints: 0,
+      }),
+      { quantity: "1000.000000", unit: "ml", dimension: "volume" },
     );
   });
 });

@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Auth;
 using GiroMesa.ApiClient.V1.Growth;
 using GiroMesa.ApiClient.V1.Organizations;
+using GiroMesa.ApiClient.V1.PaymentProviderCallbacks;
 using GiroMesa.ApiClient.V1.Platform;
 using GiroMesa.ApiClient.V1.Public;
 using GiroMesa.ApiClient.V1.Sync;
@@ -34,6 +35,11 @@ namespace GiroMesa.ApiClient.V1
         public global::GiroMesa.ApiClient.V1.Organizations.OrganizationsRequestBuilder Organizations
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.OrganizationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentProviderCallbacks property</summary>
+        public global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.PaymentProviderCallbacksRequestBuilder PaymentProviderCallbacks
+        {
+            get => new global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.PaymentProviderCallbacksRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The platform property</summary>
         public global::GiroMesa.ApiClient.V1.Platform.PlatformRequestBuilder Platform

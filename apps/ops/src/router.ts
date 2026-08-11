@@ -11,6 +11,7 @@ export const routeIds: RouteId[] = [
   "inventory",
   "purchases",
   "finance",
+  "remuneration",
   "people",
   "delivery",
   "reservations",

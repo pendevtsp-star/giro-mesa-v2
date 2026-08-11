@@ -134,6 +134,34 @@
       "when": 1786452000000,
       "tag": "0019_dispatch_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786478400000,
+      "tag": "0020_financial_ledger_and_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786482000000,
+      "tag": "0021_inventory_returnables_incidents",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786485600000,
+      "tag": "0022_remuneration_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786489200000,
+      "tag": "0023_fiscal_documents",
+      "breakpoints": true
     }
   ]
 }

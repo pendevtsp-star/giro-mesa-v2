@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The allowNegative property</summary>
         public bool? AllowNegative { get; set; }
+        /// <summary>The dimension property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_dimension? Dimension { get; set; }
         /// <summary>The minimumQuantity property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -43,13 +45,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public string Sku { get; set; }
 #endif
         /// <summary>The unit property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Unit { get; set; }
-#nullable restore
-#else
-        public string Unit { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_unit? Unit { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody"/> and sets the default values.
         /// </summary>
@@ -77,11 +73,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "allowNegative", n => { AllowNegative = n.GetBoolValue(); } },
+                { "dimension", n => { Dimension = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_dimension>(); } },
                 { "minimumQuantity", n => { MinimumQuantity = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity.CreateFromDiscriminatorValue); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
                 { "sku", n => { Sku = n.GetStringValue(); } },
-                { "unit", n => { Unit = n.GetStringValue(); } },
+                { "unit", n => { Unit = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_unit>(); } },
             };
         }
         /// <summary>
@@ -92,11 +89,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteBoolValue("allowNegative", AllowNegative);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_dimension>("dimension", Dimension);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity>("minimumQuantity", MinimumQuantity);
             writer.WriteStringValue("name", Name);
             writer.WriteGuidValue("productId", ProductId);
             writer.WriteStringValue("sku", Sku);
-            writer.WriteStringValue("unit", Unit);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_unit>("unit", Unit);
             writer.WriteAdditionalData(AdditionalData);
         }
         /// <summary>

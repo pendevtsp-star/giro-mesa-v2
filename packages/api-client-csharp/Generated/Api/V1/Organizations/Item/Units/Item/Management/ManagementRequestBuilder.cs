@@ -6,6 +6,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Invento
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Purchases;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reconciliations;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Remuneration;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Suppliers;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -51,6 +52,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reconciliations.ReconciliationsRequestBuilder Reconciliations
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reconciliations.ReconciliationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The remuneration property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Remuneration.RemunerationRequestBuilder Remuneration
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Remuneration.RemunerationRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The reports property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.ReportsRequestBuilder Reports
