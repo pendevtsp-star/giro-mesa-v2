@@ -167,3 +167,38 @@ Registration still has one PostgreSQL transaction and now serializes the normali
 | focused API Biome check and `git diff --check` | PASS |
 
 The PostgreSQL checks used only `giromesa-task6-fix3-pg16` on port 55442 and `giromesa-task6-fix3-pg17` on port 55443. Both containers used `--rm`, were stopped, and their absence was verified. The rollback test used a temporary database trigger only inside its unique disposable test database; no production seam or schema change was introduced. No provider call, push, deployment or persistent migration was performed.
+
+## Fix round 4
+
+Every human-identity trust mutation now shares one namespaced PostgreSQL transaction advisory lock, `auth-trust:identity:<identityId>`, through `acquireIdentityTrustLock`. The documented global order is provider subject/e-mail lock, identity trust lock, identity revalidation, then credential/token/factor/challenge/session rows. No identity-first flow subsequently acquires an e-mail lock, and no bare UUID advisory lock remains in the auth service.
+
+The boundary covers local registration, password login and final session issuance, Google link/recovery, e-mail verification and resend, MFA challenge/setup/confirmation/disable, password-reset request/confirmation and logout revocation. Password login compares the still-current Argon2 credential after acquiring the identity lock. MFA verification re-reads a verified, active identity, factor and challenge after that lock. Password reset now uses the same identity serialization and a password-before-reset row order, so it cannot deadlock with Google recovery or restore a credential after the recovery sweep.
+
+Pending Google recovery now verifies the identity, removes the untrusted password/factor, revokes or consumes every active verification/reset/challenge credential, sweeps sessions, links Google and creates the legitimate Google session in the same transaction while the identity lock is still held. Already-verified identities preserve their password and MFA.
+
+### RED
+
+The first focused PostgreSQL 16 run completed 9 tests and failed the three new deterministic concurrency cases. Each failed after the explicit 15-second bound while waiting for a second `pg_stat_activity` advisory waiter: concurrent MFA, password-reset confirmation and stale password login were not waiting behind the Google recovery identity boundary. This failure was captured before production code changed.
+
+### Deterministic concurrency coverage
+
+- Temporary test-only triggers pause Google recovery after its session sweep on a separately held advisory gate. Tests observe one recovery wait, then two advisory waits after starting the competing operation before releasing the gate.
+- Concurrent MFA cannot consume a recovery code or create an attacker session; final active state has no password, factor, challenge, verification token or reset token, and only the legitimate Google session remains.
+- Concurrent reset and recovery both finish within the explicit bound without deadlock; the attacker password is never valid.
+- A deliberately expensive real Argon2 credential lets `pg_stat_activity` prove the password read has completed. Recovery then changes the trust state and wins the identity lock; the already-started login waits and cannot create a stale session.
+- Register versus Google has bounded, semantic outcomes only: Google succeeds; local registration either succeeds before recovery or returns the exact identity conflict; final state is one verified identity, one Google link, no password or active verification token and one active session.
+
+### Final gates
+
+| Gate | Exact result |
+| --- | --- |
+| complete e-mail/auth integration on disposable PostgreSQL 16 | PASS; 12 tests, 12 pass, 0 fail |
+| complete e-mail/auth integration on disposable PostgreSQL 17 | PASS; 12 tests, 12 pass, 0 fail |
+| complete API suite with PostgreSQL 16 e-mail and Google integration enabled | PASS; 106 tests, 98 pass, 8 expected skips, 0 fail |
+| complete API suite without PostgreSQL variables | PASS; 106 tests, 85 pass, 21 expected skips, 0 fail |
+| Google auth integration on migrated PostgreSQL 16 and 17 | PASS; 1 test on each version, 0 fail |
+| repository typecheck | PASS; 12 tasks, 12 successful |
+| repository build | PASS; 8 tasks, 8 successful |
+| focused API Biome check and `git diff --check` | PASS |
+
+The PostgreSQL gates used only `giromesa-task6-fix4-pg16` on port 55444 and `giromesa-task6-fix4-pg17` on port 55445. Both containers used `--rm`, were stopped, and their absence was verified. The concurrency controls are database triggers and advisory locks created only inside each disposable test database; no production pause seam was added. The existing least-privilege grants were preserved: verification/reset/challenge credentials are made unusable by revocation/consumption rather than expanding the identity role solely to erase history. No provider call, push, deployment or persistent migration was performed.

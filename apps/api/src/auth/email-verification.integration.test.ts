@@ -18,6 +18,7 @@ import {
   passwordResetTokens,
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
+import * as argon2 from "argon2";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { AuthService } from "./auth.service.js";
@@ -44,6 +45,99 @@ async function applyMigration(client: ReturnType<typeof createDatabase>["client"
   await client.begin(async (transaction) => {
     for (const statement of statements) await transaction.unsafe(statement);
   });
+}
+
+async function bounded<T>(promise: Promise<T>, label: string, timeoutMs = 15_000): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} exceeded ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function waitForAdvisoryWaits(
+  owner: ReturnType<typeof createDatabase>,
+  databaseName: string,
+  loginRole: string,
+  minimum: number,
+) {
+  await bounded(
+    (async () => {
+      while (true) {
+        const [result] = await owner.client<{ waiting: number }[]>`
+          select count(*)::int as waiting
+          from pg_stat_activity
+          where datname = ${databaseName}
+            and usename = ${loginRole}
+            and wait_event_type = 'Lock'
+            and wait_event = 'advisory'
+        `;
+        if ((result?.waiting ?? 0) >= minimum) return;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    })(),
+    `waiting for ${minimum} advisory lock waiter(s)`,
+  );
+}
+
+async function waitForPasswordHashWork(
+  owner: ReturnType<typeof createDatabase>,
+  databaseName: string,
+  loginRole: string,
+) {
+  await bounded(
+    (async () => {
+      while (true) {
+        const [result] = await owner.client<{ hashing: number }[]>`
+          select count(*)::int as hashing
+          from pg_stat_activity
+          where datname = ${databaseName}
+            and usename = ${loginRole}
+            and state = 'idle in transaction'
+            and query ilike '%password_credentials%'
+        `;
+        if ((result?.hashing ?? 0) >= 1) return;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    })(),
+    "waiting for password hash verification",
+  );
+}
+
+async function installSessionSweepGate(
+  owner: ReturnType<typeof createDatabase>,
+  identityId: string,
+  gate: number,
+  name: string,
+) {
+  await owner.client.unsafe(`
+    create function ${name}() returns trigger
+    language plpgsql as $$
+    begin
+      if old.revoked_at is null and new.revoked_at is not null
+        and new.identity_id = '${identityId}'::uuid then
+        perform pg_advisory_xact_lock(${gate});
+      end if;
+      return new;
+    end
+    $$
+  `);
+  await owner.client.unsafe(`
+    create trigger ${name}
+    after update on auth_sessions
+    for each row execute function ${name}()
+  `);
+}
+
+async function removeSessionSweepGate(owner: ReturnType<typeof createDatabase>, name: string) {
+  await owner.client.unsafe(`drop trigger if exists ${name} on auth_sessions`);
+  await owner.client.unsafe(`drop function if exists ${name}()`);
 }
 
 describe("email verification", () => {
@@ -943,31 +1037,40 @@ describe("email verification", () => {
     assert.equal("token" in restored, true);
 
     const concurrentEmail = `google-local-race-${suffix}@example.test`;
-    const [localRace, googleRace] = await Promise.allSettled([
-      database.withRoleContext("identity", null, () =>
-        service.register({
-          email: concurrentEmail,
-          displayName: "Concurrent Local",
-          password: "concurrent-local-password",
-        }),
-      ),
-      database.withRoleContext("identity", null, () =>
-        service.authenticateGoogle(
-          {
-            subject: `concurrent-google-${suffix}`,
+    const [localRace, googleRace] = await bounded(
+      Promise.allSettled([
+        database.withRoleContext("identity", null, () =>
+          service.register({
             email: concurrentEmail,
-            displayName: "Concurrent Google",
-          },
-          "signup",
+            displayName: "Concurrent Local",
+            password: "concurrent-local-password",
+          }),
         ),
-      ),
-    ]);
+        database.withRoleContext("identity", null, () =>
+          service.authenticateGoogle(
+            {
+              subject: `concurrent-google-${suffix}`,
+              email: concurrentEmail,
+              displayName: "Concurrent Google",
+            },
+            "signup",
+          ),
+        ),
+      ]),
+      "register versus Google",
+    );
     assert.equal(googleRace.status, "fulfilled");
-    assert.equal(localRace.status === "fulfilled" || localRace.status === "rejected", true);
-    const [racedIdentity] = await testOwner.db
+    if (localRace.status === "rejected") {
+      assert.match(JSON.stringify(localRace.reason), /IDENTITY_EXISTS/);
+    } else {
+      assert.equal(localRace.value.verificationRequired, true);
+    }
+    const racedIdentities = await testOwner.db
       .select()
       .from(identities)
       .where(eq(identities.email, concurrentEmail));
+    assert.equal(racedIdentities.length, 1);
+    const [racedIdentity] = racedIdentities;
     assert.ok(racedIdentity?.emailVerifiedAt);
     assert.equal(
       (
@@ -987,6 +1090,341 @@ describe("email verification", () => {
       ).length,
       1,
     );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(emailVerificationTokens)
+          .where(
+            and(
+              eq(emailVerificationTokens.identityId, racedIdentity.id),
+              isNull(emailVerificationTokens.usedAt),
+              isNull(emailVerificationTokens.revokedAt),
+            ),
+          )
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(authSessions)
+          .where(and(eq(authSessions.identityId, racedIdentity.id), isNull(authSessions.revokedAt)))
+      ).length,
+      1,
+    );
+  });
+
+  it("serializes pending Google recovery against an already-issued MFA challenge", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth || !databaseUrl) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const service = auth;
+    const email = `google-mfa-race-${suffix}@example.test`;
+    await database.withRoleContext("identity", null, () =>
+      service.register({
+        email,
+        displayName: "Pending MFA Race",
+        password: "attacker-controlled-password",
+      }),
+    );
+    const [identity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email));
+    assert.ok(identity);
+    const attackerSession = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(authSessions).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(attackerSession).digest("hex"),
+      trustedDevice: true,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    const resetToken = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(passwordResetTokens).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(resetToken).digest("hex"),
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    });
+    const challengeToken = randomBytes(32).toString("base64url");
+    const recoveryCode = "attacker-recovery-code";
+    const key = mfaKey();
+    await testOwner.db.insert(mfaFactors).values({
+      identityId: identity.id,
+      ...encryptMfaSecret("JBSWY3DPEHPK3PXP", key),
+      recoveryCodeHashes: [recoveryCodeHash(recoveryCode, key)],
+      verifiedAt: new Date(),
+    });
+    await testOwner.db.insert(mfaChallenges).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(challengeToken).digest("hex"),
+      trustedDevice: false,
+      expiresAt: new Date(Date.now() + 5 * 60_000),
+    });
+
+    const gate = 900_000_000 + Number.parseInt(suffix.slice(0, 6), 16);
+    const triggerName = `task6_mfa_gate_${suffix.slice(0, 12)}`;
+    const blocker = createDatabase(databaseUrl.toString(), { max: 1 });
+    let googlePromise: Promise<Awaited<ReturnType<AuthService["authenticateGoogle"]>>> | undefined;
+    let mfaPromise: Promise<Awaited<ReturnType<AuthService["verifyMfaChallenge"]>>> | undefined;
+    try {
+      await installSessionSweepGate(testOwner, identity.id, gate, triggerName);
+      await blocker.client.unsafe(`select pg_advisory_lock(${gate})`);
+      googlePromise = database.withRoleContext("identity", null, () =>
+        service.authenticateGoogle(
+          { subject: `mfa-race-${suffix}`, email, displayName: "Verified Google Owner" },
+          "login",
+        ),
+      );
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 1);
+      mfaPromise = database.withRoleContext("identity", null, () =>
+        service.verifyMfaChallenge({ challengeToken, recoveryCode }),
+      );
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 2);
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`);
+
+      const [googleResult, mfaResult] = await bounded(
+        Promise.allSettled([googlePromise, mfaPromise]),
+        "Google recovery versus MFA",
+      );
+      assert.equal(googleResult.status, "fulfilled");
+      assert.equal(mfaResult.status, "rejected");
+      if (mfaResult.status === "rejected") {
+        assert.match(JSON.stringify(mfaResult.reason), /INVALID_MFA_CHALLENGE/);
+      }
+      assert.equal(
+        await database.withRoleContext("identity", null, () =>
+          service.authenticate(attackerSession),
+        ),
+        null,
+      );
+      const [counts] = await testOwner.client<
+        {
+          passwords: number;
+          factors: number;
+          active_challenges: number;
+          active_verifications: number;
+          active_resets: number;
+          active_sessions: number;
+        }[]
+      >`
+          select
+            (select count(*)::int from password_credentials where identity_id = ${identity.id}) passwords,
+            (select count(*)::int from mfa_factors where identity_id = ${identity.id}) factors,
+            (select count(*)::int from mfa_challenges where identity_id = ${identity.id} and used_at is null) active_challenges,
+            (select count(*)::int from email_verification_tokens where identity_id = ${identity.id} and used_at is null and revoked_at is null) active_verifications,
+            (select count(*)::int from password_reset_tokens where identity_id = ${identity.id} and used_at is null) active_resets,
+            (select count(*)::int from auth_sessions where identity_id = ${identity.id} and revoked_at is null) active_sessions
+        `;
+      assert.deepEqual(counts, {
+        passwords: 0,
+        factors: 0,
+        active_challenges: 0,
+        active_verifications: 0,
+        active_resets: 0,
+        active_sessions: 1,
+      });
+      if (googleResult.status === "fulfilled") {
+        assert.equal("token" in googleResult.value, true);
+        if ("token" in googleResult.value) {
+          const googleToken = googleResult.value.token;
+          assert.ok(
+            await database.withRoleContext("identity", null, () =>
+              service.authenticate(googleToken),
+            ),
+          );
+        }
+      }
+    } finally {
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`).catch(() => undefined);
+      if (googlePromise) await bounded(Promise.allSettled([googlePromise]), "Google cleanup");
+      if (mfaPromise) await bounded(Promise.allSettled([mfaPromise]), "MFA cleanup");
+      await removeSessionSweepGate(testOwner, triggerName);
+      await blocker.client.end();
+    }
+  });
+
+  it("finishes pending Google recovery versus password reset without deadlock", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth || !databaseUrl) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const service = auth;
+    const email = `google-reset-race-${suffix}@example.test`;
+    await database.withRoleContext("identity", null, () =>
+      service.register({
+        email,
+        displayName: "Pending Reset Race",
+        password: "attacker-original-password",
+      }),
+    );
+    const [identity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email));
+    assert.ok(identity);
+    const attackerSession = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(authSessions).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(attackerSession).digest("hex"),
+      trustedDevice: false,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    const resetToken = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(passwordResetTokens).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(resetToken).digest("hex"),
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    });
+
+    const gate = 920_000_000 + Number.parseInt(suffix.slice(0, 6), 16);
+    const triggerName = `task6_reset_gate_${suffix.slice(0, 12)}`;
+    const blocker = createDatabase(databaseUrl.toString(), { max: 1 });
+    let googlePromise: Promise<Awaited<ReturnType<AuthService["authenticateGoogle"]>>> | undefined;
+    let resetPromise: Promise<void> | undefined;
+    try {
+      await installSessionSweepGate(testOwner, identity.id, gate, triggerName);
+      await blocker.client.unsafe(`select pg_advisory_lock(${gate})`);
+      googlePromise = database.withRoleContext("identity", null, () =>
+        service.authenticateGoogle(
+          { subject: `reset-race-${suffix}`, email, displayName: "Verified Google Owner" },
+          "login",
+        ),
+      );
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 1);
+      resetPromise = database.withRoleContext("identity", null, () =>
+        service.confirmPasswordReset({
+          token: resetToken,
+          password: "attacker-raced-password",
+        }),
+      );
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 2);
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`);
+      const [googleResult, resetResult] = await bounded(
+        Promise.allSettled([googlePromise, resetPromise]),
+        "Google recovery versus password reset",
+      );
+      assert.equal(googleResult.status, "fulfilled");
+      assert.equal(resetResult.status, "rejected");
+      if (resetResult.status === "rejected") {
+        assert.match(JSON.stringify(resetResult.reason), /INVALID_RESET_TOKEN/);
+      }
+      assert.equal(
+        (
+          await testOwner.db
+            .select()
+            .from(passwordCredentials)
+            .where(eq(passwordCredentials.identityId, identity.id))
+        ).length,
+        0,
+      );
+      for (const password of ["attacker-original-password", "attacker-raced-password"]) {
+        await assert.rejects(
+          database.withRoleContext("identity", null, () =>
+            service.login({ email, password, trustedDevice: false }),
+          ),
+          (error: unknown) => JSON.stringify(error).includes("INVALID_CREDENTIALS"),
+        );
+      }
+    } finally {
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`).catch(() => undefined);
+      if (googlePromise) await bounded(Promise.allSettled([googlePromise]), "Google cleanup");
+      if (resetPromise) await bounded(Promise.allSettled([resetPromise]), "reset cleanup");
+      await removeSessionSweepGate(testOwner, triggerName);
+      await blocker.client.end();
+    }
+  });
+
+  it("rejects a password login that verified a hash before Google recovery committed", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth || !databaseUrl) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const service = auth;
+    const email = `google-login-race-${suffix}@example.test`;
+    const attackerPassword = "attacker-stale-login-password";
+    await database.withRoleContext("identity", null, () =>
+      service.register({ email, displayName: "Pending Login Race", password: attackerPassword }),
+    );
+    const [identity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email));
+    assert.ok(identity);
+    const sweptSession = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(authSessions).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(sweptSession).digest("hex"),
+      trustedDevice: false,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    const deliberatelySlowHash = await argon2.hash(attackerPassword, {
+      type: argon2.argon2id,
+      memoryCost: 32 * 1024,
+      timeCost: 30,
+      parallelism: 1,
+    });
+    await testOwner.db
+      .update(passwordCredentials)
+      .set({ passwordHash: deliberatelySlowHash })
+      .where(eq(passwordCredentials.identityId, identity.id));
+    await testOwner.db
+      .update(identities)
+      .set({ emailVerifiedAt: new Date() })
+      .where(eq(identities.id, identity.id));
+
+    const gate = 940_000_000 + Number.parseInt(suffix.slice(0, 6), 16);
+    const triggerName = `task6_login_gate_${suffix.slice(0, 12)}`;
+    const blocker = createDatabase(databaseUrl.toString(), { max: 1 });
+    let googlePromise: Promise<Awaited<ReturnType<AuthService["authenticateGoogle"]>>> | undefined;
+    let loginPromise: Promise<Awaited<ReturnType<AuthService["login"]>>> | undefined;
+    try {
+      await installSessionSweepGate(testOwner, identity.id, gate, triggerName);
+      await blocker.client.unsafe(`select pg_advisory_lock(${gate})`);
+      loginPromise = database.withRoleContext("identity", null, () =>
+        service.login({ email, password: attackerPassword, trustedDevice: true }),
+      );
+      await waitForPasswordHashWork(testOwner, databaseName, loginRole);
+      await testOwner.db
+        .update(identities)
+        .set({ emailVerifiedAt: null })
+        .where(eq(identities.id, identity.id));
+      googlePromise = database.withRoleContext("identity", null, () =>
+        service.authenticateGoogle(
+          { subject: `login-race-${suffix}`, email, displayName: "Verified Google Owner" },
+          "login",
+        ),
+      );
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 1);
+      await waitForAdvisoryWaits(testOwner, databaseName, loginRole, 2);
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`);
+      const [googleResult, loginResult] = await bounded(
+        Promise.allSettled([googlePromise, loginPromise]),
+        "Google recovery versus stale password login",
+      );
+      assert.equal(googleResult.status, "fulfilled");
+      assert.equal(loginResult.status, "rejected");
+      if (loginResult.status === "rejected") {
+        assert.match(JSON.stringify(loginResult.reason), /INVALID_CREDENTIALS/);
+      }
+      const activeSessions = await testOwner.db
+        .select({ tokenHash: authSessions.tokenHash })
+        .from(authSessions)
+        .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)));
+      assert.equal(activeSessions.length, 1);
+      assert.equal(
+        await database.withRoleContext("identity", null, () => service.authenticate(sweptSession)),
+        null,
+      );
+    } finally {
+      await blocker.client.unsafe(`select pg_advisory_unlock(${gate})`).catch(() => undefined);
+      if (googlePromise) await bounded(Promise.allSettled([googlePromise]), "Google cleanup");
+      if (loginPromise) await bounded(Promise.allSettled([loginPromise]), "login cleanup");
+      await removeSessionSweepGate(testOwner, triggerName);
+      await blocker.client.end();
+    }
   });
 
   it("guarantees one initial verification after anonymous durable quota without bypassing resends", async (context) => {

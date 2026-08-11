@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type {
   ConfirmPasswordResetInput,
   LoginInput,
@@ -37,6 +37,7 @@ import { and, desc, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { isPlatformAdminEmail } from "../platform/platform-access.js";
 import type { GoogleAuthIntent, GoogleProfile } from "./google-oauth.js";
+import { acquireIdentityTrustLock } from "./identity-trust-lock.js";
 import {
   decryptMfaSecret,
   encryptMfaSecret,
@@ -60,6 +61,11 @@ export interface AuthContext {
 }
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
+const sameOpaqueValue = (left: string, right: string) => {
+  const leftBytes = Buffer.from(left);
+  const rightBytes = Buffer.from(right);
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
+};
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
 const EMAIL_VERIFICATION_ACCEPTED = Object.freeze({ accepted: true as const });
 
@@ -96,14 +102,13 @@ export class AuthService {
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     try {
       return await this.database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${email}`}::text, 0))`,
-        );
+        await this.acquireIdentityEmailLock(tx, email);
         const [identity] = await tx
           .insert(identities)
           .values({ email, displayName: input.displayName })
           .returning();
         if (!identity) throw new Error("Identity was not created");
+        await acquireIdentityTrustLock(tx, identity.id);
         await tx.insert(passwordCredentials).values({ identityId: identity.id, passwordHash });
         await tx.insert(auditEvents).values({
           actorIdentityId: identity.id,
@@ -138,11 +143,12 @@ export class AuthService {
   }
 
   async login(input: LoginInput) {
+    const email = input.email.trim().toLowerCase();
     const [record] = await this.database.db
       .select({ identity: identities, passwordHash: passwordCredentials.passwordHash })
       .from(identities)
       .innerJoin(passwordCredentials, eq(passwordCredentials.identityId, identities.id))
-      .where(and(eq(identities.email, input.email), isNull(identities.disabledAt)))
+      .where(and(eq(identities.email, email), isNull(identities.disabledAt)))
       .limit(1);
 
     const valid = record
@@ -162,11 +168,15 @@ export class AuthService {
       });
     }
 
-    return this.beginIdentitySession(record.identity, input.trustedDevice, "auth.login");
+    return this.beginPasswordIdentitySession(
+      record.identity,
+      record.passwordHash,
+      input.trustedDevice,
+    );
   }
 
   async authenticateGoogle(profile: GoogleProfile, intent: GoogleAuthIntent) {
-    const identity = await this.database.db.transaction(async (tx) => {
+    return this.database.db.transaction(async (tx) => {
       const normalizedEmail = profile.email.trim().toLowerCase();
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`google:${profile.subject}`}::text, 0))`,
@@ -183,16 +193,21 @@ export class AuthService {
         )
         .limit(1);
       if (linked) {
-        if (linked.identity.disabledAt) throw new UnauthorizedException();
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${linked.identity.email}`}::text, 0))`,
+        await this.acquireIdentityEmailLock(tx, linked.identity.email);
+        await acquireIdentityTrustLock(tx, linked.identity.id);
+        const recoveredIdentity = await this.recoverPendingIdentityForGoogle(
+          tx,
+          linked.identity.id,
         );
-        return this.recoverPendingIdentityForGoogle(tx, linked.identity);
+        return this.beginIdentitySessionInTransaction(
+          tx,
+          recoveredIdentity.id,
+          false,
+          "auth.google_login",
+        );
       }
 
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${normalizedEmail}`}::text, 0))`,
-      );
+      await this.acquireIdentityEmailLock(tx, normalizedEmail);
       const [existing] = await tx
         .select()
         .from(identities)
@@ -218,7 +233,8 @@ export class AuthService {
             .returning()
         )[0];
       if (!identity) throw new Error("Google identity was not created");
-      const recoveredIdentity = await this.recoverPendingIdentityForGoogle(tx, identity);
+      await acquireIdentityTrustLock(tx, identity.id);
+      const recoveredIdentity = await this.recoverPendingIdentityForGoogle(tx, identity.id);
       await tx.insert(oauthAccounts).values({
         identityId: recoveredIdentity.id,
         provider: "google",
@@ -239,9 +255,13 @@ export class AuthService {
           payload: { identityId: recoveredIdentity.id },
         });
       }
-      return recoveredIdentity;
+      return this.beginIdentitySessionInTransaction(
+        tx,
+        recoveredIdentity.id,
+        false,
+        "auth.google_login",
+      );
     });
-    return this.beginIdentitySession(identity, false, "auth.google_login");
   }
 
   async requestEmailVerification(input: RequestEmailVerificationInput) {
@@ -270,10 +290,8 @@ export class AuthService {
         .where(eq(identities.id, candidate.identityId))
         .limit(1);
       if (!identityForLock) throw this.invalidEmailVerification();
-      const emailHash = tokenHash(identityForLock.email.trim().toLowerCase());
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
-      );
+      await this.acquireIdentityEmailLock(tx, identityForLock.email);
+      await acquireIdentityTrustLock(tx, candidate.identityId);
 
       const [record] = await tx
         .select({ token: emailVerificationTokens, identity: identities })
@@ -286,20 +304,6 @@ export class AuthService {
       if (record.token.usedAt || record.token.revokedAt || record.token.expiresAt <= new Date()) {
         throw this.invalidEmailVerification();
       }
-
-      const [claimed] = await tx
-        .update(emailVerificationTokens)
-        .set({ usedAt: new Date() })
-        .where(
-          and(
-            eq(emailVerificationTokens.id, record.token.id),
-            isNull(emailVerificationTokens.usedAt),
-            isNull(emailVerificationTokens.revokedAt),
-            gt(emailVerificationTokens.expiresAt, new Date()),
-          ),
-        )
-        .returning({ identityId: emailVerificationTokens.identityId });
-      if (!claimed) throw this.invalidEmailVerification();
 
       const verifiedAt = new Date();
       const [verified] = await tx
@@ -314,6 +318,19 @@ export class AuthService {
         )
         .returning({ id: identities.id });
       if (!verified) throw this.invalidEmailVerification();
+      const [claimed] = await tx
+        .update(emailVerificationTokens)
+        .set({ usedAt: verifiedAt })
+        .where(
+          and(
+            eq(emailVerificationTokens.id, record.token.id),
+            isNull(emailVerificationTokens.usedAt),
+            isNull(emailVerificationTokens.revokedAt),
+            gt(emailVerificationTokens.expiresAt, verifiedAt),
+          ),
+        )
+        .returning({ identityId: emailVerificationTokens.identityId });
+      if (!claimed) throw this.invalidEmailVerification();
       await tx
         .update(emailVerificationTokens)
         .set({ revokedAt: verifiedAt })
@@ -338,25 +355,18 @@ export class AuthService {
         entityType: "identity",
         entityId: record.identity.id,
       });
-      return {
-        verifiedIdentity: {
-          id: record.identity.id,
-          email: record.identity.email,
-          displayName: record.identity.displayName,
-        },
-      };
+      const access = await this.beginIdentitySessionInTransaction(
+        tx,
+        record.identity.id,
+        false,
+        "auth.email_verification_session",
+      );
+      if ("mfaRequired" in access) {
+        return { status: "mfa_required" as const, ...access };
+      }
+      return { status: "verified" as const, ...access };
     });
-    if ("status" in verification) return verification;
-
-    const access = await this.beginIdentitySession(
-      verification.verifiedIdentity,
-      false,
-      "auth.email_verification_session",
-    );
-    if ("mfaRequired" in access) {
-      return { status: "mfa_required" as const, ...access };
-    }
-    return { status: "verified" as const, ...access };
+    return verification;
   }
 
   async verifyMfaChallenge(input: {
@@ -372,9 +382,7 @@ export class AuthService {
     if (!candidate) throw this.invalidMfaChallenge();
 
     const result = await this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${candidate.identityId}::text, 0))`,
-      );
+      await acquireIdentityTrustLock(tx, candidate.identityId);
       const [challenge] = await tx
         .select({ challenge: mfaChallenges, identity: identities, factor: mfaFactors })
         .from(mfaChallenges)
@@ -387,10 +395,12 @@ export class AuthService {
             gt(mfaChallenges.expiresAt, new Date()),
             lt(mfaChallenges.attempts, 5),
             isNull(identities.disabledAt),
+            isNotNull(identities.emailVerifiedAt),
+            isNotNull(mfaFactors.verifiedAt),
           ),
         )
         .limit(1);
-      if (!challenge?.factor.verifiedAt) return null;
+      if (!challenge) return null;
 
       const key = this.getMfaKey();
       const secret = decryptMfaSecret(challenge.factor, key);
@@ -409,6 +419,20 @@ export class AuthService {
         return null;
       }
 
+      if (recoveryIndex >= 0) {
+        const remaining = challenge.factor.recoveryCodeHashes.filter(
+          (_, index) => index !== recoveryIndex,
+        );
+        const [updatedFactor] = await tx
+          .update(mfaFactors)
+          .set({ recoveryCodeHashes: remaining, updatedAt: new Date() })
+          .where(
+            and(eq(mfaFactors.identityId, challenge.identity.id), isNotNull(mfaFactors.verifiedAt)),
+          )
+          .returning({ identityId: mfaFactors.identityId });
+        if (!updatedFactor) throw this.invalidMfaChallenge();
+      }
+
       if (acceptedCounter !== null) {
         const [replayMarker] = await tx
           .insert(mfaChallenges)
@@ -422,11 +446,7 @@ export class AuthService {
           .onConflictDoNothing({ target: mfaChallenges.tokenHash })
           .returning({ id: mfaChallenges.id });
         if (!replayMarker) {
-          await tx
-            .update(mfaChallenges)
-            .set({ usedAt: new Date() })
-            .where(eq(mfaChallenges.id, challenge.challenge.id));
-          return null;
+          throw this.invalidMfaChallenge();
         }
       }
 
@@ -441,22 +461,13 @@ export class AuthService {
           ),
         )
         .returning({ id: mfaChallenges.id });
-      if (!claimed) return null;
+      if (!claimed) throw this.invalidMfaChallenge();
       await tx
         .update(mfaChallenges)
         .set({ usedAt: new Date() })
         .where(
           and(eq(mfaChallenges.identityId, challenge.identity.id), isNull(mfaChallenges.usedAt)),
         );
-      if (recoveryIndex >= 0) {
-        const remaining = challenge.factor.recoveryCodeHashes.filter(
-          (_, index) => index !== recoveryIndex,
-        );
-        await tx
-          .update(mfaFactors)
-          .set({ recoveryCodeHashes: remaining, updatedAt: new Date() })
-          .where(eq(mfaFactors.identityId, challenge.identity.id));
-      }
       const token = randomBytes(32).toString("base64url");
       const expiresAt = this.sessionExpiration(challenge.challenge.trustedDevice);
       const [session] = await tx
@@ -502,50 +513,67 @@ export class AuthService {
     const key = this.getMfaKey();
     const secret = generateMfaSecret();
     const encrypted = encryptMfaSecret(secret, key);
-    const [identity] = await this.database.db
-      .select({ email: identities.email })
-      .from(identities)
-      .where(eq(identities.id, identityId))
-      .limit(1);
-    if (!identity) throw new UnauthorizedException();
-    const [stored] = await this.database.db
-      .insert(mfaFactors)
-      .values({ identityId, ...encrypted, recoveryCodeHashes: [], verifiedAt: null })
-      .onConflictDoUpdate({
-        target: mfaFactors.identityId,
-        set: { ...encrypted, recoveryCodeHashes: [], verifiedAt: null, updatedAt: new Date() },
-        setWhere: isNull(mfaFactors.verifiedAt),
-      })
-      .returning({ identityId: mfaFactors.identityId });
-    if (!stored) {
-      throw new ConflictException({
-        code: "MFA_ALREADY_ENABLED",
-        message: "Desative o MFA atual antes de configurar um novo autenticador.",
+    const email = await this.database.db.transaction(async (tx) => {
+      await acquireIdentityTrustLock(tx, identityId);
+      const [identity] = await tx
+        .select({ email: identities.email })
+        .from(identities)
+        .where(
+          and(
+            eq(identities.id, identityId),
+            isNull(identities.disabledAt),
+            isNotNull(identities.emailVerifiedAt),
+          ),
+        )
+        .limit(1);
+      if (!identity) throw new UnauthorizedException();
+      const [stored] = await tx
+        .insert(mfaFactors)
+        .values({ identityId, ...encrypted, recoveryCodeHashes: [], verifiedAt: null })
+        .onConflictDoUpdate({
+          target: mfaFactors.identityId,
+          set: { ...encrypted, recoveryCodeHashes: [], verifiedAt: null, updatedAt: new Date() },
+          setWhere: isNull(mfaFactors.verifiedAt),
+        })
+        .returning({ identityId: mfaFactors.identityId });
+      if (!stored) {
+        throw new ConflictException({
+          code: "MFA_ALREADY_ENABLED",
+          message: "Desative o MFA atual antes de configurar um novo autenticador.",
+        });
+      }
+      await tx.insert(auditEvents).values({
+        actorIdentityId: identityId,
+        action: "auth.mfa_setup_started",
+        entityType: "identity",
+        entityId: identityId,
       });
-    }
-    await this.database.db.insert(auditEvents).values({
-      actorIdentityId: identityId,
-      action: "auth.mfa_setup_started",
-      entityType: "identity",
-      entityId: identityId,
+      return identity.email;
     });
-    return { secret, otpauthUri: otpauthUri(secret, identity.email) };
+    return { secret, otpauthUri: otpauthUri(secret, email) };
   }
 
   async confirmMfaSetup(identityId: string, currentSessionId: string, code: string) {
-    const [factor] = await this.database.db
-      .select()
-      .from(mfaFactors)
-      .where(and(eq(mfaFactors.identityId, identityId), isNull(mfaFactors.verifiedAt)))
-      .limit(1);
-    if (!factor) throw this.invalidMfaChallenge();
     const key = this.getMfaKey();
-    const acceptedCounter = verifiedTotpCounter(decryptMfaSecret(factor, key), code);
-    if (acceptedCounter === null) {
-      throw this.invalidMfaChallenge();
-    }
     const recoveryCodes = generateRecoveryCodes();
     await this.database.db.transaction(async (tx) => {
+      await acquireIdentityTrustLock(tx, identityId);
+      const [factor] = await tx
+        .select({ factor: mfaFactors })
+        .from(mfaFactors)
+        .innerJoin(identities, eq(identities.id, mfaFactors.identityId))
+        .where(
+          and(
+            eq(mfaFactors.identityId, identityId),
+            isNull(mfaFactors.verifiedAt),
+            isNull(identities.disabledAt),
+            isNotNull(identities.emailVerifiedAt),
+          ),
+        )
+        .limit(1);
+      if (!factor) throw this.invalidMfaChallenge();
+      const acceptedCounter = verifiedTotpCounter(decryptMfaSecret(factor.factor, key), code);
+      if (acceptedCounter === null) throw this.invalidMfaChallenge();
       const [claimed] = await tx
         .update(mfaFactors)
         .set({
@@ -590,20 +618,32 @@ export class AuthService {
 
   async disableMfa(identityId: string, proof: { code?: string; recoveryCode?: string }) {
     const disabled = await this.database.db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${identityId}::text, 0))`);
+      await acquireIdentityTrustLock(tx, identityId);
       const [factor] = await tx
-        .select()
+        .select({ factor: mfaFactors })
         .from(mfaFactors)
-        .where(eq(mfaFactors.identityId, identityId))
+        .innerJoin(identities, eq(identities.id, mfaFactors.identityId))
+        .where(
+          and(
+            eq(mfaFactors.identityId, identityId),
+            isNull(identities.disabledAt),
+            isNotNull(identities.emailVerifiedAt),
+          ),
+        )
         .limit(1);
-      if (!factor?.verifiedAt) return false;
+      if (!factor?.factor.verifiedAt) return false;
       const key = this.getMfaKey();
-      const secret = decryptMfaSecret(factor, key);
+      const secret = decryptMfaSecret(factor.factor, key);
       const acceptedCounter = proof.code ? verifiedTotpCounter(secret, proof.code) : null;
       const recoveryIndex = proof.recoveryCode
-        ? recoveryCodeMatches(proof.recoveryCode, factor.recoveryCodeHashes, key)
+        ? recoveryCodeMatches(proof.recoveryCode, factor.factor.recoveryCodeHashes, key)
         : -1;
       if (acceptedCounter === null && recoveryIndex < 0) return false;
+      const [deleted] = await tx
+        .delete(mfaFactors)
+        .where(and(eq(mfaFactors.identityId, identityId), isNotNull(mfaFactors.verifiedAt)))
+        .returning({ identityId: mfaFactors.identityId });
+      if (!deleted) return false;
       if (acceptedCounter !== null) {
         const [replayMarker] = await tx
           .insert(mfaChallenges)
@@ -616,13 +656,8 @@ export class AuthService {
           })
           .onConflictDoNothing({ target: mfaChallenges.tokenHash })
           .returning({ id: mfaChallenges.id });
-        if (!replayMarker) return false;
+        if (!replayMarker) throw this.invalidMfaChallenge();
       }
-      const [deleted] = await tx
-        .delete(mfaFactors)
-        .where(eq(mfaFactors.identityId, identityId))
-        .returning({ identityId: mfaFactors.identityId });
-      if (!deleted) return false;
       await tx.insert(auditEvents).values({
         actorIdentityId: identityId,
         action: "auth.mfa_disabled",
@@ -659,15 +694,18 @@ export class AuthService {
   }
 
   async revoke(sessionId: string, identityId: string) {
-    await this.database.db
-      .update(authSessions)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(authSessions.id, sessionId), eq(authSessions.identityId, identityId)));
-    await this.database.db.insert(auditEvents).values({
-      actorIdentityId: identityId,
-      action: "auth.logout",
-      entityType: "session",
-      entityId: sessionId,
+    await this.database.db.transaction(async (tx) => {
+      await acquireIdentityTrustLock(tx, identityId);
+      await tx
+        .update(authSessions)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(authSessions.id, sessionId), eq(authSessions.identityId, identityId)));
+      await tx.insert(auditEvents).values({
+        actorIdentityId: identityId,
+        action: "auth.logout",
+        entityType: "session",
+        entityId: sessionId,
+      });
     });
   }
 
@@ -695,15 +733,30 @@ export class AuthService {
   async requestPasswordReset(input: RequestPasswordResetInput) {
     if (process.env.EMAIL_PROVIDER_ENABLED !== "true") return;
     const encryption = encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
-    const [identity] = await this.database.db
-      .select({ id: identities.id })
-      .from(identities)
-      .where(eq(identities.email, input.email))
-      .limit(1);
-    if (!identity) return;
-    const token = randomBytes(32).toString("base64url");
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const email = input.email.trim().toLowerCase();
     await this.database.db.transaction(async (tx) => {
+      await this.acquireIdentityEmailLock(tx, email);
+      const [candidate] = await tx
+        .select({ id: identities.id })
+        .from(identities)
+        .where(and(eq(identities.email, email), isNull(identities.disabledAt)))
+        .limit(1);
+      if (!candidate) return;
+      await acquireIdentityTrustLock(tx, candidate.id);
+      const [identity] = await tx
+        .select({ id: identities.id })
+        .from(identities)
+        .where(
+          and(
+            eq(identities.id, candidate.id),
+            eq(identities.email, email),
+            isNull(identities.disabledAt),
+          ),
+        )
+        .limit(1);
+      if (!identity) return;
+      const token = randomBytes(32).toString("base64url");
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await tx
         .insert(passwordResetTokens)
         .values({ identityId: identity.id, tokenHash: tokenHash(token), expiresAt });
@@ -745,18 +798,21 @@ export class AuthService {
       });
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     await this.database.db.transaction(async (tx) => {
-      const [claimed] = await tx
-        .update(passwordResetTokens)
-        .set({ usedAt: new Date() })
+      await acquireIdentityTrustLock(tx, reset.identityId);
+      const [current] = await tx
+        .select({ reset: passwordResetTokens })
+        .from(passwordResetTokens)
+        .innerJoin(identities, eq(identities.id, passwordResetTokens.identityId))
         .where(
           and(
             eq(passwordResetTokens.id, reset.id),
             isNull(passwordResetTokens.usedAt),
             gt(passwordResetTokens.expiresAt, new Date()),
+            isNull(identities.disabledAt),
           ),
         )
-        .returning({ identityId: passwordResetTokens.identityId });
-      if (!claimed) {
+        .limit(1);
+      if (!current) {
         throw new UnauthorizedException({
           code: "INVALID_RESET_TOKEN",
           message: "Link de redefinição inválido ou expirado.",
@@ -764,29 +820,50 @@ export class AuthService {
       }
       await tx
         .insert(passwordCredentials)
-        .values({ identityId: reset.identityId, passwordHash, passwordChangedAt: new Date() })
+        .values({
+          identityId: current.reset.identityId,
+          passwordHash,
+          passwordChangedAt: new Date(),
+        })
         .onConflictDoUpdate({
           target: passwordCredentials.identityId,
           set: { passwordHash, passwordChangedAt: new Date() },
         });
+      const [claimed] = await tx
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(
+          and(
+            eq(passwordResetTokens.id, current.reset.id),
+            isNull(passwordResetTokens.usedAt),
+            gt(passwordResetTokens.expiresAt, new Date()),
+          ),
+        )
+        .returning({ identityId: passwordResetTokens.identityId });
+      if (!claimed) throw this.invalidPasswordReset();
       await tx
         .update(passwordResetTokens)
         .set({ usedAt: new Date() })
         .where(
           and(
-            eq(passwordResetTokens.identityId, reset.identityId),
+            eq(passwordResetTokens.identityId, current.reset.identityId),
             isNull(passwordResetTokens.usedAt),
           ),
         );
       await tx
         .update(authSessions)
         .set({ revokedAt: new Date() })
-        .where(and(eq(authSessions.identityId, reset.identityId), isNull(authSessions.revokedAt)));
+        .where(
+          and(
+            eq(authSessions.identityId, current.reset.identityId),
+            isNull(authSessions.revokedAt),
+          ),
+        );
       await tx.insert(auditEvents).values({
-        actorIdentityId: reset.identityId,
+        actorIdentityId: current.reset.identityId,
         action: "auth.password_reset_completed",
         entityType: "identity",
-        entityId: reset.identityId,
+        entityId: current.reset.identityId,
       });
     });
   }
@@ -799,20 +876,36 @@ export class AuthService {
     return this.enqueueEmailVerification(tx, identity, encryption, "initial");
   }
 
-  private async recoverPendingIdentityForGoogle(
-    tx: TenantTransaction,
-    identity: {
-      id: string;
-      email: string;
-      displayName: string;
-      emailVerifiedAt?: Date | null;
-    },
-  ) {
+  private async recoverPendingIdentityForGoogle(tx: TenantTransaction, identityId: string) {
+    const [identity] = await tx
+      .select()
+      .from(identities)
+      .where(and(eq(identities.id, identityId), isNull(identities.disabledAt)))
+      .limit(1);
+    if (!identity) throw new UnauthorizedException();
     if (identity.emailVerifiedAt) {
       return { id: identity.id, email: identity.email, displayName: identity.displayName };
     }
 
     const recoveredAt = new Date();
+    const [verifiedIdentity] = await tx
+      .update(identities)
+      .set({ emailVerifiedAt: recoveredAt, updatedAt: recoveredAt })
+      .where(
+        and(
+          eq(identities.id, identity.id),
+          isNull(identities.emailVerifiedAt),
+          isNull(identities.disabledAt),
+        ),
+      )
+      .returning({
+        id: identities.id,
+        email: identities.email,
+        displayName: identities.displayName,
+      });
+    if (!verifiedIdentity) {
+      throw new ConflictException({ code: "IDENTITY_STATE_CHANGED" });
+    }
     await tx.delete(passwordCredentials).where(eq(passwordCredentials.identityId, identity.id));
     await tx
       .update(emailVerificationTokens)
@@ -825,32 +918,20 @@ export class AuthService {
         ),
       );
     await tx
-      .update(authSessions)
-      .set({ revokedAt: recoveredAt })
-      .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)));
-    await tx
-      .update(mfaChallenges)
-      .set({ usedAt: recoveredAt })
-      .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)));
-    await tx.delete(mfaFactors).where(eq(mfaFactors.identityId, identity.id));
-    await tx
       .update(passwordResetTokens)
       .set({ usedAt: recoveredAt })
       .where(
         and(eq(passwordResetTokens.identityId, identity.id), isNull(passwordResetTokens.usedAt)),
       );
-    const [verifiedIdentity] = await tx
-      .update(identities)
-      .set({ emailVerifiedAt: recoveredAt, updatedAt: recoveredAt })
-      .where(and(eq(identities.id, identity.id), isNull(identities.emailVerifiedAt)))
-      .returning({
-        id: identities.id,
-        email: identities.email,
-        displayName: identities.displayName,
-      });
-    if (!verifiedIdentity) {
-      throw new ConflictException({ code: "IDENTITY_STATE_CHANGED" });
-    }
+    await tx.delete(mfaFactors).where(eq(mfaFactors.identityId, identity.id));
+    await tx
+      .update(mfaChallenges)
+      .set({ usedAt: recoveredAt })
+      .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)));
+    await tx
+      .update(authSessions)
+      .set({ revokedAt: recoveredAt })
+      .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)));
     await tx.insert(auditEvents).values({
       actorIdentityId: identity.id,
       action: "auth.google_pending_identity_recovered",
@@ -869,9 +950,24 @@ export class AuthService {
   ) {
     const email = requestedIdentity.email.trim().toLowerCase();
     const emailHash = tokenHash(email);
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
-    );
+    if (mode === "resend") await this.acquireIdentityEmailLock(tx, email);
+    const [storedIdentity] = await tx
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email))
+      .limit(1);
+    let identity =
+      storedIdentity && (!requestedIdentity.id || requestedIdentity.id === storedIdentity.id)
+        ? storedIdentity
+        : undefined;
+    if (identity) {
+      await acquireIdentityTrustLock(tx, identity.id);
+      [identity] = await tx
+        .select()
+        .from(identities)
+        .where(and(eq(identities.id, identity.id), eq(identities.email, email)))
+        .limit(1);
+    }
     const now = new Date();
     const requests = await tx
       .select({ requestedAt: emailVerificationRequests.requestedAt })
@@ -893,15 +989,6 @@ export class AuthService {
       requests.length >= 10;
     if (rateLimited && mode === "resend") return EMAIL_VERIFICATION_ACCEPTED;
 
-    const [storedIdentity] = await tx
-      .select()
-      .from(identities)
-      .where(eq(identities.email, email))
-      .limit(1);
-    const identity =
-      storedIdentity && (!requestedIdentity.id || requestedIdentity.id === storedIdentity.id)
-        ? storedIdentity
-        : undefined;
     if (mode === "initial") {
       if (!identity || identity.id !== requestedIdentity.id) {
         throw new Error("Initial e-mail verification requires the newly created identity");
@@ -983,10 +1070,31 @@ export class AuthService {
     }
   }
 
+  private async acquireIdentityEmailLock(tx: TenantTransaction, email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${normalizedEmail}`}::text, 0))`,
+    );
+  }
+
   private invalidEmailVerification() {
     return new BadRequestException({
       code: "INVALID_EMAIL_VERIFICATION_TOKEN",
       message: "Link de verificação inválido ou expirado.",
+    });
+  }
+
+  private invalidCredentials() {
+    return new UnauthorizedException({
+      code: "INVALID_CREDENTIALS",
+      message: "E-mail ou senha inválidos.",
+    });
+  }
+
+  private invalidPasswordReset() {
+    return new UnauthorizedException({
+      code: "INVALID_RESET_TOKEN",
+      message: "Link de redefinição inválido ou expirado.",
     });
   }
 
@@ -995,68 +1103,107 @@ export class AuthService {
     return false;
   }
 
-  private async beginIdentitySession(
-    identity: { id: string; email: string; displayName: string },
+  private async beginPasswordIdentitySession(
+    candidate: { id: string; email: string; displayName: string },
+    expectedPasswordHash: string,
+    trustedDevice: boolean,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      await acquireIdentityTrustLock(tx, candidate.id);
+      const [current] = await tx
+        .select({ identity: identities, passwordHash: passwordCredentials.passwordHash })
+        .from(identities)
+        .innerJoin(passwordCredentials, eq(passwordCredentials.identityId, identities.id))
+        .where(
+          and(
+            eq(identities.id, candidate.id),
+            eq(identities.email, candidate.email),
+            isNull(identities.disabledAt),
+            isNotNull(identities.emailVerifiedAt),
+          ),
+        )
+        .limit(1);
+      if (!current || !sameOpaqueValue(current.passwordHash, expectedPasswordHash)) {
+        throw this.invalidCredentials();
+      }
+      return this.beginIdentitySessionInTransaction(
+        tx,
+        current.identity.id,
+        trustedDevice,
+        "auth.login",
+      );
+    });
+  }
+
+  private async beginIdentitySessionInTransaction(
+    tx: TenantTransaction,
+    identityId: string,
     trustedDevice: boolean,
     action: string,
   ) {
-    const [factor] = await this.database.db
-      .select({ verifiedAt: mfaFactors.verifiedAt })
-      .from(mfaFactors)
-      .where(eq(mfaFactors.identityId, identity.id))
+    const [record] = await tx
+      .select({ identity: identities, factorVerifiedAt: mfaFactors.verifiedAt })
+      .from(identities)
+      .leftJoin(mfaFactors, eq(mfaFactors.identityId, identities.id))
+      .where(
+        and(
+          eq(identities.id, identityId),
+          isNull(identities.disabledAt),
+          isNotNull(identities.emailVerifiedAt),
+        ),
+      )
       .limit(1);
-    if (!factor?.verifiedAt) return this.createSession(identity, trustedDevice, action);
+    if (!record) throw new UnauthorizedException();
+    if (!record.factorVerifiedAt) {
+      return this.createSessionInTransaction(tx, record.identity, trustedDevice, action);
+    }
 
     const challengeToken = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    await this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${identity.id}::text, 0))`,
+    const [recentChallenge] = await tx
+      .select({ attempts: mfaChallenges.attempts })
+      .from(mfaChallenges)
+      .where(
+        and(
+          eq(mfaChallenges.identityId, record.identity.id),
+          gt(mfaChallenges.createdAt, new Date(Date.now() - 15 * 60 * 1000)),
+        ),
+      )
+      .orderBy(desc(mfaChallenges.createdAt), desc(mfaChallenges.id))
+      .limit(1);
+    const attempts = inheritedMfaAttempts(recentChallenge?.attempts);
+    if (attempts === null) {
+      throw new HttpException(
+        {
+          code: "MFA_LOCKED",
+          message: "Muitas tentativas de MFA. Tente novamente em alguns minutos.",
+        },
+        429,
       );
-      const [recentChallenge] = await tx
-        .select({ attempts: mfaChallenges.attempts })
-        .from(mfaChallenges)
-        .where(
-          and(
-            eq(mfaChallenges.identityId, identity.id),
-            gt(mfaChallenges.createdAt, new Date(Date.now() - 15 * 60 * 1000)),
-          ),
-        )
-        .orderBy(desc(mfaChallenges.createdAt), desc(mfaChallenges.id))
-        .limit(1);
-      const attempts = inheritedMfaAttempts(recentChallenge?.attempts);
-      if (attempts === null) {
-        throw new HttpException(
-          {
-            code: "MFA_LOCKED",
-            message: "Muitas tentativas de MFA. Tente novamente em alguns minutos.",
-          },
-          429,
-        );
-      }
-      await tx
-        .update(mfaChallenges)
-        .set({ usedAt: new Date() })
-        .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)));
-      await tx.insert(mfaChallenges).values({
-        identityId: identity.id,
-        tokenHash: tokenHash(challengeToken),
-        trustedDevice,
-        attempts,
-        expiresAt,
-      });
+    }
+    await tx
+      .update(mfaChallenges)
+      .set({ usedAt: new Date() })
+      .where(and(eq(mfaChallenges.identityId, record.identity.id), isNull(mfaChallenges.usedAt)));
+    await tx.insert(mfaChallenges).values({
+      identityId: record.identity.id,
+      tokenHash: tokenHash(challengeToken),
+      trustedDevice,
+      attempts,
+      expiresAt,
     });
     return { mfaRequired: true as const, challengeToken, expiresAt };
   }
 
-  private async createSession(
+  private async createSessionInTransaction(
+    tx: TenantTransaction,
     identity: { id: string; email: string; displayName: string },
     trustedDevice: boolean,
     action: string,
   ) {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = this.sessionExpiration(trustedDevice);
-    const [session] = await this.database.db
+    const [session] = await tx
       .insert(authSessions)
       .values({
         identityId: identity.id,
@@ -1066,7 +1213,7 @@ export class AuthService {
       })
       .returning({ id: authSessions.id });
     if (!session) throw new Error("Session was not created");
-    await this.database.db.insert(auditEvents).values({
+    await tx.insert(auditEvents).values({
       actorIdentityId: identity.id,
       action,
       entityType: "session",
