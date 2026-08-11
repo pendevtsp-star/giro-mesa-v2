@@ -8,6 +8,7 @@ import {
   posDiningRooms,
   posDiningTables,
   publicMenus,
+  publicTableServiceSettings,
   roleBindings,
   units,
 } from "@giromesa/db";
@@ -44,6 +45,14 @@ it("binds a signed public session to the current occupancy epoch", async (contex
     const [table] = await database.db.insert(posDiningTables).values({ organizationId: organization.id, unitId: unit.id, roomId: room.id, label: "01" }).returning();
     const [menu] = await database.db.insert(publicMenus).values({ organizationId: organization.id, unitId: unit.id, slug: `qr-${randomUUID()}`, active: true, publishedAt: new Date() }).returning();
     assert.ok(table && menu);
+    await database.db.insert(publicTableServiceSettings).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      callWaiterEnabled: true,
+      requestBillEnabled: true,
+      viewPartialEnabled: true,
+      updatedByIdentityId: identity.id,
+    });
     const opened = await new PilotPosService(database, new ScopeService(database)).openTab(identity.id, organization.id, unit.id, "qr-open-session", { tableId: table.id, guestCount: 2 });
     assert.ok(opened.occupancy);
 

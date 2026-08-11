@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { PublicMenuCommandInput } from "@giromesa/contracts";
 import {
   deviceEnrollments,
   hubHeartbeats,
@@ -16,13 +15,10 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  PayloadTooLargeException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
-import { SyncService } from "../sync/sync.service.js";
 import { TableSessionCodec } from "./table-session.js";
 
 export type PublicMenuDraftInput = {
@@ -109,7 +105,6 @@ function assertDraft(input: PublicMenuDraftInput) {
 export class PublicMenuService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly sync: SyncService,
     private readonly scope: ScopeService,
   ) {}
 
@@ -415,33 +410,6 @@ export class PublicMenuService {
   async hubStatus(slug: string) {
     const menu = await this.resolveMenuRecord(slug);
     return { acknowledged: Boolean(await this.recentHub(menu.organizationId, menu.unitId)) };
-  }
-
-  async command(slug: string, idempotencyKey: string, body: PublicMenuCommandInput) {
-    const menu = await this.resolveMenuRecord(slug);
-    if (Buffer.byteLength(JSON.stringify(body.payload), "utf8") > 65_536) {
-      throw new PayloadTooLargeException({
-        code: "PUBLIC_COMMAND_TOO_LARGE",
-        message: "O comando público excede o limite permitido.",
-      });
-    }
-    const hub = await this.recentHub(menu.organizationId, menu.unitId);
-    if (!hub) {
-      throw new ServiceUnavailableException({
-        code: "PUBLIC_ORDERING_OFFLINE",
-        message: "A unidade não está confirmando pedidos digitais neste momento.",
-      });
-    }
-    const command = await this.sync.enqueuePublicCommand({
-      organizationId: menu.organizationId,
-      unitId: menu.unitId,
-      hubId: hub.hubId,
-      idempotencyKey,
-      type: body.type,
-      payload: body.payload,
-    });
-    const acknowledgement = await this.sync.waitForAcknowledgement(command);
-    return { commandId: command.id, expiresAt: command.expiresAt, ...acknowledgement };
   }
 
   private async resolveMenu(slug: string) {

@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
+  type Database,
   publicMenus,
+  publicTableServiceSettings,
   publicTableSessionNonces,
   publicTableSessionRateLimits,
   publicTableSessions,
@@ -10,6 +12,8 @@ import {
 import { ForbiddenException, HttpException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 interface TableQrClaims {
   type: "table-qr";
@@ -194,7 +198,7 @@ export class TableSessionService {
     }
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1_000);
-    const capabilities: PublicTableCapability[] = ["call_waiter", "request_bill", "view_partial"];
+    const capabilities = await this.currentCapabilities(menu.organizationId, menu.unitId);
     const issued = this.codec.issueSession(
       {
         sessionId,
@@ -254,7 +258,12 @@ export class TableSessionService {
       )
       .limit(1);
     if (!session) throw new UnauthorizedException({ code: "TABLE_SESSION_STALE", message: "TABLE_SESSION_STALE" });
-    if (!session.capabilities.includes(capability) || !claims.capabilities.includes(capability)) {
+    const currentCapabilities = await this.currentCapabilities(claims.organizationId, claims.unitId);
+    if (
+      !session.capabilities.includes(capability) ||
+      !claims.capabilities.includes(capability) ||
+      !currentCapabilities.includes(capability)
+    ) {
       throw new ForbiddenException({ code: "TABLE_SESSION_CAPABILITY_DENIED", message: "Ação não permitida para esta mesa." });
     }
     const [occupancy] = await this.database.db
@@ -281,12 +290,17 @@ export class TableSessionService {
     return claims;
   }
 
-  async consumeRequestNonce(claims: TableSessionClaims, nonce: string, purpose: string) {
+  async consumeRequestNonce(
+    claims: TableSessionClaims,
+    nonce: string,
+    purpose: string,
+    tx?: Transaction,
+  ) {
     if (!/^[A-Za-z0-9_-]{24,128}$/.test(nonce)) {
       throw new UnauthorizedException({ code: "INVALID_REQUEST_NONCE", message: "Nonce inválido." });
     }
     try {
-      await this.database.db.insert(publicTableSessionNonces).values({
+      await (tx ?? this.database.db).insert(publicTableSessionNonces).values({
         organizationId: claims.organizationId,
         unitId: claims.unitId,
         sessionId: claims.sessionId,
@@ -302,6 +316,24 @@ export class TableSessionService {
       }
       throw error;
     }
+  }
+
+  async currentCapabilities(organizationId: string, unitId: string) {
+    const [settings] = await this.database.db
+      .select()
+      .from(publicTableServiceSettings)
+      .where(
+        and(
+          eq(publicTableServiceSettings.organizationId, organizationId),
+          eq(publicTableServiceSettings.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    const capabilities: PublicTableCapability[] = [];
+    if (settings?.callWaiterEnabled) capabilities.push("call_waiter");
+    if (settings?.requestBillEnabled) capabilities.push("request_bill");
+    if (settings?.viewPartialEnabled) capabilities.push("view_partial");
+    return capabilities;
   }
 
   private async enforceRateLimit(organizationId: string, unitId: string, menuId: string, source: string) {

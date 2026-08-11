@@ -10,6 +10,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -964,6 +965,34 @@ export const publicMenuVersions = pgTable(
 
 export type PublicTableCapability = "call_waiter" | "request_bill" | "view_partial";
 
+export const publicTableServiceSettings = pgTable(
+  "public_table_service_settings",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    callWaiterEnabled: boolean("call_waiter_enabled").notNull().default(false),
+    requestBillEnabled: boolean("request_bill_enabled").notNull().default(false),
+    viewPartialEnabled: boolean("view_partial_enabled").notNull().default(false),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId] }),
+    foreignKey({
+      name: "public_table_service_settings_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "public_table_service_settings_version_check",
+      sql`${table.resourceVersion} >= 0`,
+    ),
+  ],
+);
+
 export const publicTableSessions = pgTable(
   "public_table_sessions",
   {
@@ -1137,6 +1166,50 @@ export const tableServiceCallEvents = pgTable(
   ],
 );
 
+export const tableServiceCallReceipts = pgTable(
+  "table_service_call_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    callId: uuid("call_id").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    cooldownDeduplicated: boolean("cooldown_deduplicated").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("table_service_call_receipts_idempotency_unique").on(
+      table.sessionId,
+      table.idempotencyKey,
+    ),
+    index("table_service_call_receipts_call_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.callId,
+    ),
+    foreignKey({
+      name: "table_service_call_receipts_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [
+        publicTableSessions.organizationId,
+        publicTableSessions.unitId,
+        publicTableSessions.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_service_call_receipts_call_scope_fk",
+      columns: [table.organizationId, table.unitId, table.callId],
+      foreignColumns: [
+        tableServiceCalls.organizationId,
+        tableServiceCalls.unitId,
+        tableServiceCalls.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
 // RLS is declared in Drizzle as well as in the hand-authored policy migration so
 // a later schema generation cannot silently remove the live tenant boundary.
 export const growthTenantTables = [
@@ -1166,10 +1239,12 @@ export const growthTenantTables = [
   publicMenuDrafts,
   publicMenuVersions,
   publicTableSessions,
+  publicTableServiceSettings,
   publicTableSessionNonces,
   publicTableSessionRateLimits,
   tableServiceCalls,
   tableServiceCallEvents,
+  tableServiceCallReceipts,
 ] as const;
 
 for (const table of growthTenantTables) table.enableRLS();

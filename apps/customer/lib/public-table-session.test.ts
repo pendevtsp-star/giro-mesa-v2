@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { readTablePartial, readTableSession } from "./public-contracts.ts";
 
@@ -24,4 +25,16 @@ test("aceita somente sessão e parcial vinculadas ao contrato público", () => {
     1_250,
   );
   assert.equal(readTablePartial({ occupancyId: "occupancy", tab: { id: "tab" }, items: [] }), null);
+});
+
+test("usa apenas sessão assinada e capabilities para ações da mesa", async () => {
+  const [menu, services] = await Promise.all([
+    readFile(new URL("../components/menu-experience.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/public-services-experience.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(menu, /\/public\/v1\/menus\/.*\/commands/);
+  assert.match(menu, /\/servicos#mesa/);
+  for (const capability of ["call_waiter", "request_bill", "view_partial"]) {
+    assert.match(services, new RegExp(`canUse\\("${capability}"\\)`));
+  }
 });

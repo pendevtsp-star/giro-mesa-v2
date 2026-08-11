@@ -36,7 +36,7 @@ it("publishes an immutable, tenant-isolated menu version with CAS", async (conte
   const database = new DatabaseService();
   try {
     const scope = new ScopeService(database);
-    const service = new PublicMenuService(database, {} as never, scope);
+    const service = new PublicMenuService(database, scope);
     const suffix = randomUUID();
     const [organizationA, organizationB] = await database.db
       .insert(organizations)

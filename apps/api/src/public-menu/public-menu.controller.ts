@@ -1,8 +1,6 @@
 import {
   idempotencyKeySchema,
-  type PublicMenuCommandInput,
   type PublicOrderInput,
-  publicMenuCommandSchema,
   publicMenuSlugSchema,
   publicOrderSchema,
 } from "@giromesa/contracts";
@@ -79,6 +77,14 @@ const expectedVersionSchema = z.object({ expectedVersion: z.number().int().nonne
 const publishSchema = z.object({ expectedPublishEpoch: z.number().int().nonnegative() });
 const tableSessionSchema = z.object({ qrToken: z.string().min(40).max(2_048) });
 const tableCallSchema = z.object({ kind: z.enum(["waiter", "bill"]) });
+const tableCapabilitiesSchema = z
+  .object({
+    callWaiterEnabled: z.boolean(),
+    requestBillEnabled: z.boolean(),
+    viewPartialEnabled: z.boolean(),
+    expectedResourceVersion: z.number().int().nonnegative(),
+  })
+  .strict();
 
 function tableToken(authorization: string | undefined, explicit: string | undefined) {
   if (authorization?.startsWith("Bearer ")) return authorization.slice(7);
@@ -164,15 +170,6 @@ export class PublicMenuController {
     return this.publicOrderService.place(slug, idempotencyKey, body);
   }
 
-  @Post(":slug/commands")
-  command(
-    @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
-    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
-    @Body(new ZodPipe(publicMenuCommandSchema)) body: PublicMenuCommandInput,
-  ) {
-    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
-    return this.publicMenuService.command(slug, idempotencyKey, body);
-  }
 }
 
 @UseGuards(SessionGuard)
@@ -185,6 +182,34 @@ export class PublicMenuAdminController {
     private readonly publicMenuService: PublicMenuService,
     private readonly tableServiceService: TableServiceService,
   ) {}
+
+  @Get("table-capabilities")
+  tableCapabilities(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.tableServiceService.capabilitySettings(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+    );
+  }
+
+  @Put("table-capabilities")
+  configureTableCapabilities(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(tableCapabilitiesSchema)) body: z.infer<typeof tableCapabilitiesSchema>,
+  ) {
+    return this.tableServiceService.configureCapabilities(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      body,
+    );
+  }
 
   @Post(":menuId/tables/:tableId/qr")
   tableQr(

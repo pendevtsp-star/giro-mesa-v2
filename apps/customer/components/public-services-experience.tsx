@@ -32,6 +32,8 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
   const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
   const configured =
     !demo && Boolean(apiUrl) && process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
+  const canUse = (capability: PublicTableSession["capabilities"][number]) =>
+    demo || tableSession?.capabilities.includes(capability) === true;
 
   useEffect(() => {
     if (demo || !apiUrl || !configured) return;
@@ -296,16 +298,25 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
               : "Leia o QR físico da mesa para habilitar chamados e visualizar a parcial atual."}
         </p>
         <div className="public-service-table-actions">
-          <button type="button" disabled={(!demo && !tableSession) || tableBusy !== null} onClick={() => void requestTableService("waiter")}>
-            {tableBusy === "waiter" ? "Encaminhando…" : "Chamar garçom"}
-          </button>
-          <button type="button" disabled={(!demo && !tableSession) || tableBusy !== null} onClick={() => void requestTableService("bill")}>
-            {tableBusy === "bill" ? "Encaminhando…" : "Pedir a conta"}
-          </button>
-          <button type="button" disabled={(!demo && !tableSession) || tableBusy !== null} onClick={() => void loadPartial()}>
-            {tableBusy === "partial" ? "Atualizando…" : "Ver parcial"}
-          </button>
+          {canUse("call_waiter") && (
+            <button type="button" disabled={tableBusy !== null} onClick={() => void requestTableService("waiter")}>
+              {tableBusy === "waiter" ? "Encaminhando…" : "Chamar garçom"}
+            </button>
+          )}
+          {canUse("request_bill") && (
+            <button type="button" disabled={tableBusy !== null} onClick={() => void requestTableService("bill")}>
+              {tableBusy === "bill" ? "Encaminhando…" : "Pedir a conta"}
+            </button>
+          )}
+          {canUse("view_partial") && (
+            <button type="button" disabled={tableBusy !== null} onClick={() => void loadPartial()}>
+              {tableBusy === "partial" ? "Atualizando…" : "Ver parcial"}
+            </button>
+          )}
         </div>
+        {!demo && tableSession && tableSession.capabilities.length === 0 && (
+          <p role="status">A unidade não habilitou ações digitais para esta mesa.</p>
+        )}
         {partial && (
           <div className="public-service-partial" aria-live="polite">
             <h3>Parcial deste atendimento</h3>

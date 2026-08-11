@@ -211,6 +211,19 @@ CREATE TRIGGER table_occupancy_events_append_only
 BEFORE UPDATE OR DELETE ON public.table_occupancy_events FOR EACH ROW
 EXECUTE FUNCTION public.giromesa_append_only_occupancy_event();--> statement-breakpoint
 
+CREATE TABLE public.public_table_service_settings (
+  organization_id uuid NOT NULL, unit_id uuid NOT NULL,
+  call_waiter_enabled boolean NOT NULL DEFAULT false,
+  request_bill_enabled boolean NOT NULL DEFAULT false,
+  view_partial_enabled boolean NOT NULL DEFAULT false,
+  resource_version integer NOT NULL DEFAULT 0 CHECK (resource_version >= 0),
+  updated_by_identity_id uuid NOT NULL REFERENCES public.identities(id),
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (organization_id, unit_id),
+  CONSTRAINT public_table_service_settings_unit_scope_fk FOREIGN KEY (organization_id, unit_id)
+    REFERENCES public.units(organization_id, id) ON DELETE CASCADE
+);--> statement-breakpoint
+
 CREATE TABLE public.public_table_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, unit_id uuid NOT NULL,
   menu_id uuid NOT NULL, table_id uuid NOT NULL, occupancy_id uuid NOT NULL, occupancy_epoch uuid NOT NULL,
@@ -282,14 +295,35 @@ CREATE TRIGGER table_service_call_events_append_only
 BEFORE UPDATE OR DELETE ON public.table_service_call_events FOR EACH ROW
 EXECUTE FUNCTION public.giromesa_append_only_service_call_event();--> statement-breakpoint
 
+CREATE TABLE public.table_service_call_receipts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, unit_id uuid NOT NULL,
+  session_id uuid NOT NULL, call_id uuid NOT NULL, idempotency_key varchar(160) NOT NULL,
+  request_hash varchar(64) NOT NULL, cooldown_deduplicated boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT table_service_call_receipts_idempotency_unique UNIQUE (session_id, idempotency_key),
+  CONSTRAINT table_service_call_receipts_session_scope_fk FOREIGN KEY (organization_id, unit_id, session_id)
+    REFERENCES public.public_table_sessions(organization_id, unit_id, id) ON DELETE RESTRICT,
+  CONSTRAINT table_service_call_receipts_call_scope_fk FOREIGN KEY (organization_id, unit_id, call_id)
+    REFERENCES public.table_service_calls(organization_id, unit_id, id) ON DELETE RESTRICT
+);--> statement-breakpoint
+CREATE INDEX table_service_call_receipts_call_idx
+  ON public.table_service_call_receipts(organization_id, unit_id, call_id);--> statement-breakpoint
+CREATE INDEX table_service_calls_cooldown_idx
+  ON public.table_service_calls(organization_id, unit_id, occupancy_id, occupancy_epoch, kind, created_at DESC)
+  WHERE state IN ('received','routed');--> statement-breakpoint
+CREATE TRIGGER table_service_call_receipts_append_only
+BEFORE UPDATE OR DELETE ON public.table_service_call_receipts FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_append_only_service_call_event();--> statement-breakpoint
+
 DO $$
 DECLARE tenant_table text;
 BEGIN
   FOREACH tenant_table IN ARRAY ARRAY[
     'service_areas','table_layout_versions','table_layout_nodes','service_shifts','area_assignments',
     'table_groups','table_occupancies','table_group_members','table_occupancy_events','service_incidents',
-    'staff_presence_leases','salon_exceptions','public_table_sessions','public_table_session_nonces',
-    'public_table_session_rate_limits','table_service_calls','table_service_call_events'
+    'staff_presence_leases','salon_exceptions','public_table_service_settings','public_table_sessions',
+    'public_table_session_nonces','public_table_session_rate_limits','table_service_calls',
+    'table_service_call_events','table_service_call_receipts'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tenant_table);
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table);

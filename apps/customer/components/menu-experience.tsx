@@ -12,11 +12,7 @@ import {
   type Modifier,
   type ModifierGroup,
 } from "../lib/menu";
-import {
-  isCommandAccepted,
-  type MutationAttempt,
-  resolveMutationAttempt,
-} from "../lib/public-contracts";
+import { type MutationAttempt, resolveMutationAttempt } from "../lib/public-contracts";
 import {
   type PublicOrderOptions,
   type PublicOrderReceipt,
@@ -70,9 +66,7 @@ export function MenuExperience({
   const [cartOpen, setCartOpen] = useState(false);
   const [hub, setHub] = useState<HubState>("checking");
   const [notice, setNotice] = useState<Notice>(null);
-  const [pendingCommand, setPendingCommand] = useState<
-    "public_order" | "call_waiter" | "request_check" | null
-  >(null);
+  const [pendingCommand, setPendingCommand] = useState<"public_order" | null>(null);
   const [orderOptions, setOrderOptions] = useState<OrderOptionsState>({ status: "loading" });
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [customerName, setCustomerName] = useState("");
@@ -241,57 +235,6 @@ export function MenuExperience({
             : [],
       ),
     );
-  }
-
-  async function sendCommand(type: "call_waiter" | "request_check", payload: object = {}) {
-    if (pendingCommand) return false;
-    if (hub !== "online") {
-      setNotice({
-        tone: "warning",
-        text: "Atendimento digital pausado. Chame a equipe presencialmente.",
-      });
-      return false;
-    }
-    if (demoAck) {
-      setNotice({
-        tone: "success",
-        text: "Ação demonstrada. Nenhum chamado real foi enviado.",
-      });
-      return true;
-    }
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    const apiEnabled = process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
-    if (!apiUrl || !apiEnabled) return false;
-    setPendingCommand(type);
-    try {
-      const response = await fetch(
-        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-          body: JSON.stringify({ type, payload }),
-        },
-      );
-      const result: unknown = await response.json();
-      if (!response.ok || !isCommandAccepted(result)) throw new Error("Sem confirmação do hub");
-      setNotice({
-        tone: "success",
-        text:
-          type === "call_waiter"
-            ? "A equipe recebeu o chamado da mesa."
-            : "A operação recebeu o pedido da conta.",
-      });
-      return true;
-    } catch {
-      setHub("offline");
-      setNotice({
-        tone: "warning",
-        text: "Não recebemos confirmação da operação. Nenhum pedido foi registrado.",
-      });
-      return false;
-    } finally {
-      setPendingCommand(null);
-    }
   }
 
   async function placePublicOrder() {
@@ -530,20 +473,9 @@ export function MenuExperience({
           <h2 id="table-actions-title">Atendimento na mesa</h2>
         </div>
         <div>
-          <button
-            type="button"
-            disabled={pendingCommand !== null}
-            onClick={() => void sendCommand("call_waiter")}
-          >
-            <span aria-hidden="true">♢</span>Chamar garçom
-          </button>
-          <button
-            type="button"
-            disabled={pendingCommand !== null}
-            onClick={() => void sendCommand("request_check")}
-          >
-            <span aria-hidden="true">▤</span>Pedir a conta
-          </button>
+          <a href={`/m/${menuSlug}/servicos#mesa`}>
+            Atendimento seguro pelo QR
+          </a>
         </div>
       </section>
       <section className="public-services" aria-labelledby="public-services-title">

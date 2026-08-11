@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
 import { randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
-import { areaAssignments, deviceEnrollments, identities, memberships, organizations, posDiningRooms, posDiningTables, publicMenus, roleBindings, serviceAreas, serviceShifts, staffPresenceLeases, tableLayoutNodes, tableLayoutVersions, units } from "@giromesa/db";
+import {
+  areaAssignments,
+  deviceEnrollments,
+  identities,
+  memberships,
+  organizations,
+  posDiningRooms,
+  posDiningTables,
+  publicMenus,
+  publicTableServiceSettings,
+  roleBindings,
+  serviceAreas,
+  serviceShifts,
+  staffPresenceLeases,
+  tableLayoutNodes,
+  tableLayoutVersions,
+  tableServiceCallReceipts,
+  tableServiceCalls,
+  units,
+} from "@giromesa/db";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -38,14 +57,68 @@ it("routes idempotent calls and exposes only the current occupancy partial", asy
     );
     const codec = new TableSessionCodec("table-service-integration-key-32-bytes-minimum");
     const sessions = new TableSessionService(database, codec);
+    await database.db.insert(publicTableServiceSettings).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      callWaiterEnabled: true,
+      requestBillEnabled: true,
+      viewPartialEnabled: true,
+      resourceVersion: 1,
+      updatedByIdentityId: identity.id,
+    });
     const issued = await sessions.issue(menu.slug, codec.issueTableQr({ organizationId: organization.id, unitId: unit.id, menuId: menu.id, tableId: table.id }), "calls-source");
     const service = new TableServiceService(database, sessions, new ScopeService(database));
+    assert.deepEqual(issued.capabilities, ["call_waiter", "request_bill", "view_partial"]);
+    const disabledPartial = await service.configureCapabilities(identity.id, organization.id, unit.id, {
+      callWaiterEnabled: true,
+      requestBillEnabled: true,
+      viewPartialEnabled: false,
+      expectedResourceVersion: 1,
+    });
+    assert.equal(disabledPartial.resourceVersion, 2);
+    await assert.rejects(
+      () => service.partial(menu.slug, issued.token),
+      /TABLE_SESSION_CAPABILITY_DENIED|Ação não permitida/,
+    );
+    await service.configureCapabilities(identity.id, organization.id, unit.id, {
+      callWaiterEnabled: true,
+      requestBillEnabled: true,
+      viewPartialEnabled: true,
+      expectedResourceVersion: 2,
+    });
 
-    const call = await service.request(menu.slug, issued.token, "a".repeat(32), "calls-waiter-request", "waiter");
+    const waiterInputs = [
+      { nonce: "a".repeat(32), key: "calls-waiter-request-a" },
+      { nonce: "b".repeat(32), key: "calls-waiter-request-b" },
+    ];
+    const waiterResults = await Promise.all(
+      waiterInputs.map((input) =>
+        service.request(menu.slug, issued.token, input.nonce, input.key, "waiter"),
+      ),
+    );
+    assert.equal(waiterResults[0]?.call.id, waiterResults[1]?.call.id);
+    assert.equal(waiterResults.filter((result) => result.cooldownDeduplicated).length, 1);
+    const createdIndex = waiterResults.findIndex((result) => !result.cooldownDeduplicated);
+    const call = waiterResults[createdIndex];
+    assert.ok(call);
     assert.equal(call.call.state, "received");
     assert.equal(call.call.routeSource, "unassigned");
-    const replay = await service.request(menu.slug, issued.token, "b".repeat(32), "calls-waiter-request", "waiter");
+    const replay = await service.request(
+      menu.slug,
+      issued.token,
+      "r".repeat(32),
+      waiterInputs[createdIndex]!.key,
+      "waiter",
+    );
     assert.equal(replay.idempotentReplay, true);
+    assert.equal(
+      (await database.db.select().from(tableServiceCalls).where(eq(tableServiceCalls.organizationId, organization.id))).length,
+      1,
+    );
+    assert.equal(
+      (await database.db.select().from(tableServiceCallReceipts).where(eq(tableServiceCallReceipts.organizationId, organization.id))).length,
+      2,
+    );
 
     const [waiter] = await database.db.insert(identities).values({ email: `waiter-${randomUUID()}@example.test`, displayName: "Waiter" }).returning();
     assert.ok(waiter);

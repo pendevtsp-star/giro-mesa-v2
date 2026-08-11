@@ -12,6 +12,8 @@ import {
   tableLayoutNodes,
   tableLayoutVersions,
   tableOccupancies,
+  publicTableServiceSettings,
+  tableServiceCallReceipts,
   tableServiceCallEvents,
   tableServiceCalls,
 } from "@giromesa/db";
@@ -53,39 +55,81 @@ export class TableServiceService {
     }
     const capability = kind === "waiter" ? "call_waiter" : "request_bill";
     const claims = await this.sessions.validate(slug, token, capability);
-    const requestHash = fingerprint({ kind, occupancyId: claims.occupancyId, occupancyEpoch: claims.occupancyEpoch });
-    const [existing] = await this.database.db
-      .select()
-      .from(tableServiceCalls)
-      .where(and(eq(tableServiceCalls.sessionId, claims.sessionId), eq(tableServiceCalls.idempotencyKey, idempotencyKey)))
-      .limit(1);
-    if (existing) {
-      if (existing.requestHash !== requestHash) throw conflict("IDEMPOTENCY_KEY_REUSED", "A chave já foi usada para outro chamado.");
-      return { call: existing, idempotentReplay: true, cooldownDeduplicated: false };
-    }
-    await this.sessions.consumeRequestNonce(claims, requestNonce, `call:${kind}`);
-    const [cooldown] = await this.database.db
-      .select()
-      .from(tableServiceCalls)
-      .where(
-        and(
-          eq(tableServiceCalls.organizationId, claims.organizationId),
-          eq(tableServiceCalls.unitId, claims.unitId),
-          eq(tableServiceCalls.occupancyId, claims.occupancyId),
-          eq(tableServiceCalls.occupancyEpoch, claims.occupancyEpoch),
-          eq(tableServiceCalls.kind, kind),
-          inArray(tableServiceCalls.state, ["received", "routed"]),
-          gt(tableServiceCalls.createdAt, new Date(Date.now() - 90_000)),
-        ),
-      )
-      .orderBy(desc(tableServiceCalls.createdAt))
-      .limit(1);
-    if (cooldown) return { call: cooldown, idempotentReplay: false, cooldownDeduplicated: true };
+    const requestHash = fingerprint({
+      kind,
+      occupancyId: claims.occupancyId,
+      occupancyEpoch: claims.occupancyEpoch,
+    });
+    const result = await this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`table-call:${claims.organizationId}:${claims.unitId}:${claims.occupancyId}:${claims.occupancyEpoch}:${kind}`}))`,
+      );
+      const [receipt] = await tx
+        .select()
+        .from(tableServiceCallReceipts)
+        .where(
+          and(
+            eq(tableServiceCallReceipts.sessionId, claims.sessionId),
+            eq(tableServiceCallReceipts.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (receipt) {
+        if (receipt.requestHash !== requestHash) {
+          throw conflict("IDEMPOTENCY_KEY_REUSED", "A chave já foi usada para outro chamado.");
+        }
+        const [knownCall] = await tx
+          .select()
+          .from(tableServiceCalls)
+          .where(eq(tableServiceCalls.id, receipt.callId))
+          .limit(1);
+        if (!knownCall) throw new Error("TABLE_SERVICE_RECEIPT_CALL_NOT_FOUND");
+        return {
+          call: knownCall,
+          idempotentReplay: true,
+          cooldownDeduplicated: receipt.cooldownDeduplicated,
+          notify: false,
+        };
+      }
 
-    const route = await this.resolveRoute(claims.organizationId, claims.unitId, claims.tableId);
-    const state = route.identityId ? "routed" : "received";
-    const now = new Date();
-    const [call] = await this.database.db.transaction(async (tx) => {
+      await this.sessions.consumeRequestNonce(claims, requestNonce, `call:${kind}`, tx);
+      const [cooldown] = await tx
+        .select()
+        .from(tableServiceCalls)
+        .where(
+          and(
+            eq(tableServiceCalls.organizationId, claims.organizationId),
+            eq(tableServiceCalls.unitId, claims.unitId),
+            eq(tableServiceCalls.occupancyId, claims.occupancyId),
+            eq(tableServiceCalls.occupancyEpoch, claims.occupancyEpoch),
+            eq(tableServiceCalls.kind, kind),
+            inArray(tableServiceCalls.state, ["received", "routed"]),
+            gt(tableServiceCalls.createdAt, new Date(Date.now() - 90_000)),
+          ),
+        )
+        .orderBy(desc(tableServiceCalls.createdAt))
+        .limit(1);
+      if (cooldown) {
+        await tx.insert(tableServiceCallReceipts).values({
+          organizationId: claims.organizationId,
+          unitId: claims.unitId,
+          sessionId: claims.sessionId,
+          callId: cooldown.id,
+          idempotencyKey,
+          requestHash,
+          cooldownDeduplicated: true,
+        });
+        return {
+          call: cooldown,
+          idempotentReplay: false,
+          cooldownDeduplicated: true,
+          notify: false,
+        };
+      }
+
+      const route = await this.resolveRoute(claims.organizationId, claims.unitId, claims.tableId);
+      const state = route.identityId ? "routed" : "received";
+      const now = new Date();
       const [created] = await tx
         .insert(tableServiceCalls)
         .values({
@@ -105,6 +149,14 @@ export class TableServiceService {
         })
         .returning();
       if (!created) throw new Error("TABLE_SERVICE_CALL_NOT_CREATED");
+      await tx.insert(tableServiceCallReceipts).values({
+        organizationId: claims.organizationId,
+        unitId: claims.unitId,
+        sessionId: claims.sessionId,
+        callId: created.id,
+        idempotencyKey,
+        requestHash,
+      });
       await tx.insert(tableServiceCallEvents).values([
         {
           organizationId: claims.organizationId,
@@ -146,19 +198,29 @@ export class TableServiceService {
           routedIdentityId: route.identityId,
         },
       });
-      return [created];
+      return {
+        call: created,
+        idempotentReplay: false,
+        cooldownDeduplicated: false,
+        notify: true,
+      };
     });
-    if (!call) throw new Error("TABLE_SERVICE_CALL_NOT_CREATED");
-    this.realtime?.publishTableServiceCall({
-      organizationId: call.organizationId,
-      unitId: call.unitId,
-      callId: call.id,
-      tableId: call.tableId,
-      occupancyEpoch: call.occupancyEpoch,
-      state: call.state,
-      routeSource: call.routeSource,
-    });
-    return { call, idempotentReplay: false, cooldownDeduplicated: false };
+    if (result.notify) {
+      this.realtime?.publishTableServiceCall({
+        organizationId: result.call.organizationId,
+        unitId: result.call.unitId,
+        callId: result.call.id,
+        tableId: result.call.tableId,
+        occupancyEpoch: result.call.occupancyEpoch,
+        state: result.call.state,
+        routeSource: result.call.routeSource,
+      });
+    }
+    return {
+      call: result.call,
+      idempotentReplay: result.idempotentReplay,
+      cooldownDeduplicated: result.cooldownDeduplicated,
+    };
   }
 
   async partial(slug: string, token: string) {
@@ -206,6 +268,92 @@ export class TableServiceService {
         ),
       );
     return { occupancyId: claims.occupancyId, occupancyEpoch: claims.occupancyEpoch, tab, items };
+  }
+
+  async capabilitySettings(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
+    const [settings] = await this.database.db
+      .select()
+      .from(publicTableServiceSettings)
+      .where(
+        and(
+          eq(publicTableServiceSettings.organizationId, organizationId),
+          eq(publicTableServiceSettings.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    return (
+      settings ?? {
+        organizationId,
+        unitId,
+        callWaiterEnabled: false,
+        requestBillEnabled: false,
+        viewPartialEnabled: false,
+        resourceVersion: 0,
+      }
+    );
+  }
+
+  async configureCapabilities(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: {
+      callWaiterEnabled: boolean;
+      requestBillEnabled: boolean;
+      viewPartialEnabled: boolean;
+      expectedResourceVersion: number;
+    },
+  ) {
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`table-capabilities:${organizationId}:${unitId}`}))`,
+      );
+      if (input.expectedResourceVersion === 0) {
+        const [created] = await tx
+          .insert(publicTableServiceSettings)
+          .values({
+            organizationId,
+            unitId,
+            callWaiterEnabled: input.callWaiterEnabled,
+            requestBillEnabled: input.requestBillEnabled,
+            viewPartialEnabled: input.viewPartialEnabled,
+            resourceVersion: 1,
+            updatedByIdentityId: identityId,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (created) return created;
+      }
+      const [updated] = await tx
+        .update(publicTableServiceSettings)
+        .set({
+          callWaiterEnabled: input.callWaiterEnabled,
+          requestBillEnabled: input.requestBillEnabled,
+          viewPartialEnabled: input.viewPartialEnabled,
+          resourceVersion: input.expectedResourceVersion + 1,
+          updatedByIdentityId: identityId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(publicTableServiceSettings.organizationId, organizationId),
+            eq(publicTableServiceSettings.unitId, unitId),
+            eq(publicTableServiceSettings.resourceVersion, input.expectedResourceVersion),
+          ),
+        )
+        .returning();
+      if (!updated) {
+        throw conflict(
+          "TABLE_CAPABILITIES_VERSION_CONFLICT",
+          "As permissões da mesa mudaram em outro dispositivo.",
+        );
+      }
+      return updated;
+    });
   }
 
   async attend(identityId: string, organizationId: string, unitId: string, callId: string, expectedVersion: number) {

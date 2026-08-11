@@ -531,10 +531,6 @@ export const contactRequestSchema = z.object({
   privacyAccepted: z.union([z.literal(true), z.literal("true")]),
 });
 
-export const publicMenuCommandSchema = z.object({
-  type: z.enum(["place_order", "call_waiter", "request_check"]),
-  payload: z.record(z.string(), z.unknown()).default({}),
-});
 export const publicMenuSlugSchema = z
   .string()
   .trim()
@@ -632,7 +628,6 @@ export type BillingEventInput = z.infer<typeof billingEventSchema>;
 export type TrialApplicationInput = z.infer<typeof trialApplicationSchema>;
 export type PublicTrialApplicationInput = z.infer<typeof publicTrialApplicationSchema>;
 export type ContactRequestInput = z.infer<typeof contactRequestSchema>;
-export type PublicMenuCommandInput = z.infer<typeof publicMenuCommandSchema>;
 export type PublicOrderInput = z.infer<typeof publicOrderSchema>;
 export type RegisterRequestInput = z.infer<typeof registerRequestSchema>;
 export type LoginRequestInput = z.infer<typeof loginRequestSchema>;
