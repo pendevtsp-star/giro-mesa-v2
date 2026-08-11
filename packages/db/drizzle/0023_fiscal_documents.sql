@@ -50,6 +50,82 @@ CREATE UNIQUE INDEX "fiscal_documents_idempotency_unique" ON "fiscal_documents" 
 CREATE INDEX "fiscal_documents_sale_idx" ON "fiscal_documents" ("organization_id", "unit_id", "sale_reference");
 CREATE INDEX "fiscal_document_events_document_idx" ON "fiscal_document_events" ("document_id", "created_at");
 --> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_protect_fiscal_document()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'pending'
+       OR NEW.document_reference IS NOT NULL
+       OR NEW.last_error_code IS NOT NULL
+       OR NEW.attempt_count <> 0
+       OR NEW.version <> 1
+       OR NEW.authorized_at IS NOT NULL
+       OR NEW.cancelled_at IS NOT NULL THEN
+      RAISE EXCEPTION 'fiscal documents must start pending and unsubmitted at version one'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'fiscal documents cannot be deleted' USING ERRCODE = '55000';
+  END IF;
+  IF ROW(
+    OLD.id, OLD.organization_id, OLD.unit_id, OLD.sale_reference, OLD.document_type,
+    OLD.total_cents, OLD.document_payload, OLD.adapter, OLD.adapter_homologated,
+    OLD.idempotency_key, OLD.request_hash, OLD.actor_identity_id, OLD.created_at
+  ) IS DISTINCT FROM ROW(
+    NEW.id, NEW.organization_id, NEW.unit_id, NEW.sale_reference, NEW.document_type,
+    NEW.total_cents, NEW.document_payload, NEW.adapter, NEW.adapter_homologated,
+    NEW.idempotency_key, NEW.request_hash, NEW.actor_identity_id, NEW.created_at
+  ) THEN
+    RAISE EXCEPTION 'fiscal scope, value, provider payload and idempotency are immutable'
+      USING ERRCODE = '55000';
+  END IF;
+  IF OLD.document_reference IS NOT NULL
+     AND NEW.document_reference IS DISTINCT FROM OLD.document_reference THEN
+    RAISE EXCEPTION 'fiscal provider reference cannot be replaced' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.version <> OLD.version + 1 OR NEW.updated_at < OLD.updated_at THEN
+    RAISE EXCEPTION 'fiscal document updates require the next version'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NOT (
+    (OLD.status = 'pending' AND NEW.status = 'submitted')
+    OR (OLD.status = 'submitted' AND NEW.status IN ('submitted', 'pending', 'authorized', 'rejected'))
+    OR (OLD.status = 'rejected' AND NEW.status = 'pending')
+    OR (OLD.status = 'authorized' AND NEW.status = 'cancelled')
+  ) THEN
+    RAISE EXCEPTION 'invalid fiscal document transition: % -> %', OLD.status, NEW.status
+      USING ERRCODE = '55000';
+  END IF;
+  IF OLD.status = 'pending' AND NEW.status = 'submitted' THEN
+    IF NEW.attempt_count <> OLD.attempt_count + 1 THEN
+      RAISE EXCEPTION 'fiscal submission must increment attempt count once'
+        USING ERRCODE = '55000';
+    END IF;
+  ELSIF NEW.attempt_count <> OLD.attempt_count THEN
+    RAISE EXCEPTION 'fiscal attempt count can change only on submission'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.status = 'authorized' AND NEW.authorized_at IS NULL THEN
+    RAISE EXCEPTION 'authorized fiscal documents require authorization time'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.status = 'cancelled'
+     AND (NEW.authorized_at IS NULL OR NEW.cancelled_at IS NULL) THEN
+    RAISE EXCEPTION 'cancelled fiscal documents require authorization and cancellation times'
+      USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "fiscal_documents_state_machine"
+BEFORE INSERT OR UPDATE OR DELETE ON "fiscal_documents"
+FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_fiscal_document();
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION public.giromesa_reject_fiscal_event_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -66,7 +142,11 @@ ALTER TABLE "fiscal_documents" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "fiscal_document_events" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "fiscal_document_events" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "fiscal_documents", "fiscal_document_events" FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_internal, giromesa_legacy_transition;
-GRANT SELECT, INSERT, UPDATE ON "fiscal_documents" TO giromesa_app;
+GRANT SELECT, INSERT ON "fiscal_documents" TO giromesa_app;
+GRANT UPDATE (
+  "status", "document_reference", "last_error_code", "attempt_count", "version",
+  "authorized_at", "cancelled_at", "updated_at"
+) ON "fiscal_documents" TO giromesa_app;
 GRANT SELECT, INSERT ON "fiscal_document_events" TO giromesa_app;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "fiscal_documents" FOR ALL TO giromesa_app

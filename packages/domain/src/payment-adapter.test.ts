@@ -41,4 +41,13 @@ describe("payment adapter boundary", () => {
       method: "credit",
     });
   });
+
+  it("does not mistake canonical UUID identifiers for card numbers", () => {
+    assert.doesNotThrow(() =>
+      assertSafePaymentPayload({
+        intentId: "00000000-0000-4000-8000-000000000000",
+        attemptId: "12345678-1234-4123-8123-123456789012",
+      }),
+    );
+  });
 });

@@ -32,10 +32,11 @@ export interface PaymentProviderAdapter {
 const sensitiveKeys =
   /(?:^|_)(?:pan|cvv|cvc|track1|track2|track_data|pin|password|secret|credential|api_key)(?:$|_)/i;
 const cardNumberLike = /(?:^|\D)(?:\d[ -]?){13,19}(?:$|\D)/;
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function assertSafePaymentPayload<T>(payload: T): T {
   const visit = (value: unknown, path: string) => {
-    if (typeof value === "string" && cardNumberLike.test(value)) {
+    if (typeof value === "string" && !canonicalUuid.test(value) && cardNumberLike.test(value)) {
       throw new TypeError(`Sensitive payment data is forbidden at ${path}.`);
     }
     if (Array.isArray(value)) {

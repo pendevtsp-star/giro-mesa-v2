@@ -203,6 +203,176 @@ CREATE TRIGGER "financial_ledger_transactions_immutable" BEFORE UPDATE OR DELETE
 --> statement-breakpoint
 CREATE TRIGGER "financial_ledger_entries_immutable" BEFORE UPDATE OR DELETE ON "financial_ledger_entries" FOR EACH ROW EXECUTE FUNCTION public.giromesa_reject_ledger_mutation();
 --> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_protect_payment_terminal()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'active' OR NEW.revoked_at IS NOT NULL THEN
+      RAISE EXCEPTION 'payment terminals must start active and unrevoked'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'payment terminals cannot be deleted' USING ERRCODE = '55000';
+  END IF;
+  IF ROW(
+    OLD.id, OLD.organization_id, OLD.unit_id, OLD.label, OLD.adapter,
+    OLD.external_reference, OLD.capabilities, OLD.paired_at, OLD.created_at
+  ) IS DISTINCT FROM ROW(
+    NEW.id, NEW.organization_id, NEW.unit_id, NEW.label, NEW.adapter,
+    NEW.external_reference, NEW.capabilities, NEW.paired_at, NEW.created_at
+  ) THEN
+    RAISE EXCEPTION 'payment terminal identity, provider binding and scope are immutable'
+      USING ERRCODE = '55000';
+  END IF;
+  IF OLD.status = 'revoked'
+     OR NOT (
+       OLD.status = NEW.status
+       OR (OLD.status = 'active' AND NEW.status IN ('offline', 'revoked'))
+       OR (OLD.status = 'offline' AND NEW.status IN ('active', 'revoked'))
+     ) THEN
+    RAISE EXCEPTION 'invalid payment terminal transition: % -> %', OLD.status, NEW.status
+      USING ERRCODE = '55000';
+  END IF;
+  IF (NEW.status = 'revoked') <> (NEW.revoked_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'revoked payment terminals require a revocation timestamp'
+      USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "payment_terminals_state_machine"
+BEFORE INSERT OR UPDATE OR DELETE ON "payment_terminals"
+FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_payment_terminal();
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_protect_payment_intent()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'pending' OR NEW.captured_cents <> 0 OR NEW.version <> 1 THEN
+      RAISE EXCEPTION 'payment intents must start pending, uncaptured and at version one'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'payment intents cannot be deleted' USING ERRCODE = '55000';
+  END IF;
+  IF ROW(
+    OLD.id, OLD.organization_id, OLD.unit_id, OLD.source_type, OLD.source_id,
+    OLD.amount_cents, OLD.currency, OLD.idempotency_key, OLD.request_hash, OLD.created_at
+  ) IS DISTINCT FROM ROW(
+    NEW.id, NEW.organization_id, NEW.unit_id, NEW.source_type, NEW.source_id,
+    NEW.amount_cents, NEW.currency, NEW.idempotency_key, NEW.request_hash, NEW.created_at
+  ) THEN
+    RAISE EXCEPTION 'payment intent value, idempotency and scope are immutable'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.version <> OLD.version + 1 OR NEW.updated_at < OLD.updated_at THEN
+    RAISE EXCEPTION 'payment intent updates require the next version'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.captured_cents < OLD.captured_cents THEN
+    RAISE EXCEPTION 'captured payment value cannot decrease' USING ERRCODE = '55000';
+  END IF;
+  IF NOT (
+    (OLD.status IN ('pending', 'partially_paid') AND NEW.status IN ('partially_paid', 'paid'))
+    OR (
+      OLD.status IN ('pending', 'partially_paid')
+      AND NEW.status = 'cancelled'
+      AND NEW.captured_cents = OLD.captured_cents
+    )
+  ) THEN
+    RAISE EXCEPTION 'invalid payment intent transition: % -> %', OLD.status, NEW.status
+      USING ERRCODE = '55000';
+  END IF;
+  IF (NEW.status = 'paid' AND NEW.captured_cents <> NEW.amount_cents)
+     OR (NEW.status = 'partially_paid' AND NOT (
+       NEW.captured_cents > 0 AND NEW.captured_cents < NEW.amount_cents
+     )) THEN
+    RAISE EXCEPTION 'payment intent status does not match captured value'
+      USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "payment_intents_state_machine"
+BEFORE INSERT OR UPDATE OR DELETE ON "payment_intents"
+FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_payment_intent();
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_protect_payment_attempt()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status NOT IN ('created', 'processing')
+       OR NEW.provider_reference IS NOT NULL
+       OR NEW.review_required
+       OR NEW.review_reason IS NOT NULL
+       OR NEW.last_lookup_at IS NOT NULL
+       OR NEW.resolved_at IS NOT NULL
+       OR NEW.version <> 1 THEN
+      RAISE EXCEPTION 'payment attempts must start unresolved and at version one'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'payment attempts cannot be deleted' USING ERRCODE = '55000';
+  END IF;
+  IF ROW(
+    OLD.id, OLD.organization_id, OLD.unit_id, OLD.intent_id, OLD.terminal_id,
+    OLD.adapter, OLD.amount_cents, OLD.idempotency_key, OLD.request_hash, OLD.created_at
+  ) IS DISTINCT FROM ROW(
+    NEW.id, NEW.organization_id, NEW.unit_id, NEW.intent_id, NEW.terminal_id,
+    NEW.adapter, NEW.amount_cents, NEW.idempotency_key, NEW.request_hash, NEW.created_at
+  ) THEN
+    RAISE EXCEPTION 'payment attempt value, idempotency, provider and scope are immutable'
+      USING ERRCODE = '55000';
+  END IF;
+  IF OLD.provider_reference IS NOT NULL
+     AND NEW.provider_reference IS DISTINCT FROM OLD.provider_reference THEN
+    RAISE EXCEPTION 'payment provider reference cannot be replaced' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.version <> OLD.version + 1 OR NEW.updated_at < OLD.updated_at THEN
+    RAISE EXCEPTION 'payment attempt updates require the next version'
+      USING ERRCODE = '55000';
+  END IF;
+  IF NOT (
+    (OLD.status = 'created' AND NEW.status IN ('processing', 'cancelled'))
+    OR (OLD.status = 'processing' AND NEW.status IN ('authorized', 'declined', 'unknown', 'cancelled'))
+    OR (OLD.status = 'unknown' AND NEW.status IN ('authorized', 'declined', 'unknown', 'reconciled', 'cancelled'))
+  ) THEN
+    RAISE EXCEPTION 'invalid payment attempt transition: % -> %', OLD.status, NEW.status
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.status = 'unknown' THEN
+    IF NOT NEW.review_required OR NEW.review_reason IS NULL OR NEW.resolved_at IS NOT NULL THEN
+      RAISE EXCEPTION 'unknown payment attempts require unresolved manual review'
+        USING ERRCODE = '55000';
+    END IF;
+  ELSIF NEW.status IN ('authorized', 'declined', 'reconciled', 'cancelled') THEN
+    IF NEW.review_required OR NEW.review_reason IS NOT NULL OR NEW.resolved_at IS NULL THEN
+      RAISE EXCEPTION 'resolved payment attempts cannot retain manual review state'
+        USING ERRCODE = '55000';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "payment_attempts_state_machine"
+BEFORE INSERT OR UPDATE OR DELETE ON "payment_attempts"
+FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_payment_attempt();
+--> statement-breakpoint
 ALTER TABLE "financial_ledger_transactions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "financial_ledger_transactions" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "financial_ledger_entries" ENABLE ROW LEVEL SECURITY;
@@ -219,7 +389,12 @@ ALTER TABLE "payment_provider_events" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "financial_ledger_transactions", "financial_ledger_entries", "payment_terminals", "payment_intents", "payment_attempts", "payment_provider_events" FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_internal, giromesa_legacy_transition;
 --> statement-breakpoint
 GRANT SELECT, INSERT ON "financial_ledger_transactions", "financial_ledger_entries" TO giromesa_app;
-GRANT SELECT, INSERT, UPDATE ON "payment_terminals", "payment_intents", "payment_attempts" TO giromesa_app;
+GRANT SELECT, INSERT ON "payment_terminals", "payment_intents", "payment_attempts" TO giromesa_app;
+GRANT UPDATE ("captured_cents", "status", "version", "updated_at") ON "payment_intents" TO giromesa_app;
+GRANT UPDATE (
+  "status", "provider_reference", "review_required", "review_reason",
+  "last_lookup_at", "resolved_at", "version", "updated_at"
+) ON "payment_attempts" TO giromesa_app;
 GRANT SELECT, INSERT ON "payment_provider_events" TO giromesa_app;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "financial_ledger_transactions" FOR ALL TO giromesa_app

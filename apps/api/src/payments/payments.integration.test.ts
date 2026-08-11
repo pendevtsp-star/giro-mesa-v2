@@ -241,7 +241,7 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
 
       await database.db
         .update(paymentIntents)
-        .set({ capturedCents: 1_200, status: "paid" })
+        .set({ capturedCents: 1_200, status: "paid", version: 2, updatedAt: new Date() })
         .where(eq(paymentIntents.id, callbackIntent.intentId));
       await assert.rejects(() =>
         uncertainPayments.handleProviderCallback(
@@ -262,23 +262,41 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
         0,
       );
 
-      await database.db
-        .update(paymentIntents)
-        .set({ capturedCents: 0, status: "pending" })
-        .where(eq(paymentIntents.id, callbackIntent.intentId));
+      const successfulCallbackKey = "payment-attempt-callback-success";
+      simulator.setScenario(successfulCallbackKey, "unknown_then_authorized");
+      const successfulIntent = await uncertainPayments.createPaymentIntent(
+        identity.id,
+        organization.id,
+        unit.id,
+        "payment-intent-callback-success",
+        { sourceType: "order", sourceId: randomUUID(), amountCents: 1_200 },
+      );
+      const successfulAttempt = await uncertainPayments.executePaymentAttempt(
+        identity.id,
+        organization.id,
+        unit.id,
+        successfulCallbackKey,
+        { intentId: successfulIntent.intentId, amountCents: 1_200, method: "credit" },
+      );
+      const successfulCallbackInput = {
+        ...callbackInput,
+        attemptId: successfulAttempt.attemptId,
+        providerEventId: `provider-event-${randomUUID()}`,
+        providerReference: successfulAttempt.providerReference ?? undefined,
+      };
       const applied = await uncertainPayments.handleProviderCallback(
         "api-simulator",
         process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
         organization.id,
         unit.id,
-        callbackInput,
+        successfulCallbackInput,
       );
       const replay = await uncertainPayments.handleProviderCallback(
         "api-simulator",
         process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
         organization.id,
         unit.id,
-        callbackInput,
+        successfulCallbackInput,
       );
       assert.equal(applied.status, "authorized");
       assert.equal(replay.status, "authorized");
@@ -288,7 +306,9 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
           await database.db
             .select()
             .from(paymentProviderEvents)
-            .where(eq(paymentProviderEvents.providerEventId, callbackInput.providerEventId))
+            .where(
+              eq(paymentProviderEvents.providerEventId, successfulCallbackInput.providerEventId),
+            )
         ).length,
         1,
       );

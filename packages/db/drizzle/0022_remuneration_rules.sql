@@ -89,9 +89,27 @@ ALTER TABLE "remuneration_calculation_runs" ADD CONSTRAINT "remuneration_calcula
 ALTER TABLE "remuneration_calculation_runs" ADD CONSTRAINT "remuneration_calculation_runs_closed_by_fk" FOREIGN KEY ("closed_by_identity_id") REFERENCES "public"."identities"("id") ON DELETE restrict;
 ALTER TABLE "remuneration_calculation_entries" ADD CONSTRAINT "remuneration_calculation_entries_run_fk" FOREIGN KEY ("organization_id", "unit_id", "run_id") REFERENCES "public"."remuneration_calculation_runs"("organization_id", "unit_id", "id") ON DELETE restrict;
 --> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.giromesa_protect_remuneration_rule_set()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  RAISE EXCEPTION 'remuneration rule sets are immutable; create a versioned replacement'
+    USING ERRCODE = '55000';
+END;
+$$;
+CREATE TRIGGER "remuneration_rule_sets_immutable"
+BEFORE UPDATE OR DELETE ON "remuneration_rule_sets"
+FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_remuneration_rule_set();
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION public.giromesa_protect_remuneration_rule_version()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.effective_until IS NOT NULL THEN
+      RAISE EXCEPTION 'remuneration rule versions must start with open validity'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'remuneration rule versions are append-only' USING ERRCODE = '55000';
   END IF;
@@ -104,29 +122,66 @@ BEGIN
   RAISE EXCEPTION 'remuneration rule versions are immutable except for closing validity' USING ERRCODE = '55000';
 END;
 $$;
-CREATE TRIGGER "remuneration_rule_versions_immutable" BEFORE UPDATE OR DELETE ON "remuneration_rule_versions" FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_remuneration_rule_version();
+CREATE TRIGGER "remuneration_rule_versions_immutable" BEFORE INSERT OR UPDATE OR DELETE ON "remuneration_rule_versions" FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_remuneration_rule_version();
 CREATE OR REPLACE FUNCTION public.giromesa_protect_remuneration_run()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'estimated'
+       OR NEW.approved_by_identity_id IS NOT NULL
+       OR NEW.approved_at IS NOT NULL
+       OR NEW.closed_by_identity_id IS NOT NULL
+       OR NEW.closed_at IS NOT NULL THEN
+      RAISE EXCEPTION 'remuneration calculations must start estimated and unapproved'
+        USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'remuneration calculations cannot be deleted' USING ERRCODE = '55000';
   END IF;
-  IF OLD."frozen_rule" IS DISTINCT FROM NEW."frozen_rule"
-     OR OLD."frozen_metrics" IS DISTINCT FROM NEW."frozen_metrics"
-     OR OLD."source_references" IS DISTINCT FROM NEW."source_references"
-     OR OLD."evaluation_trace" IS DISTINCT FROM NEW."evaluation_trace"
-     OR OLD."output_cents" IS DISTINCT FROM NEW."output_cents"
-     OR OLD."memory_hash" IS DISTINCT FROM NEW."memory_hash"
-     OR OLD."rule_version_id" IS DISTINCT FROM NEW."rule_version_id" THEN
-    RAISE EXCEPTION 'frozen remuneration memory is immutable' USING ERRCODE = '55000';
+  IF ROW(
+    OLD.id, OLD.organization_id, OLD.unit_id, OLD.kind, OLD.period_start, OLD.period_end,
+    OLD.rule_version_id, OLD.frozen_rule, OLD.frozen_metrics, OLD.source_references,
+    OLD.evaluation_trace, OLD.output_cents, OLD.memory_hash, OLD.idempotency_key,
+    OLD.request_hash, OLD.adjustment_of, OLD.created_by_identity_id, OLD.created_at
+  ) IS DISTINCT FROM ROW(
+    NEW.id, NEW.organization_id, NEW.unit_id, NEW.kind, NEW.period_start, NEW.period_end,
+    NEW.rule_version_id, NEW.frozen_rule, NEW.frozen_metrics, NEW.source_references,
+    NEW.evaluation_trace, NEW.output_cents, NEW.memory_hash, NEW.idempotency_key,
+    NEW.request_hash, NEW.adjustment_of, NEW.created_by_identity_id, NEW.created_at
+  ) THEN
+    RAISE EXCEPTION 'remuneration scope, idempotency and frozen calculation are immutable'
+      USING ERRCODE = '55000';
   END IF;
-  IF OLD."status" = 'closed' THEN
-    RAISE EXCEPTION 'closed remuneration calculations are immutable' USING ERRCODE = '55000';
+  IF NEW.updated_at < OLD.updated_at THEN
+    RAISE EXCEPTION 'remuneration update timestamp cannot move backwards' USING ERRCODE = '55000';
+  END IF;
+  IF OLD.status = 'estimated' AND NEW.status = 'approved' THEN
+    IF NEW.approved_by_identity_id IS NULL
+       OR NEW.approved_by_identity_id = OLD.created_by_identity_id
+       OR NEW.approved_at IS NULL
+       OR NEW.closed_by_identity_id IS NOT NULL
+       OR NEW.closed_at IS NOT NULL THEN
+      RAISE EXCEPTION 'remuneration approval requires an independent approver'
+        USING ERRCODE = '55000';
+    END IF;
+  ELSIF OLD.status = 'approved' AND NEW.status = 'closed' THEN
+    IF NEW.approved_by_identity_id IS DISTINCT FROM OLD.approved_by_identity_id
+       OR NEW.approved_at IS DISTINCT FROM OLD.approved_at
+       OR NEW.closed_by_identity_id IS NULL
+       OR NEW.closed_at IS NULL THEN
+      RAISE EXCEPTION 'remuneration closure must preserve approval evidence'
+        USING ERRCODE = '55000';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'invalid remuneration transition: % -> %', OLD.status, NEW.status
+      USING ERRCODE = '55000';
   END IF;
   RETURN NEW;
 END;
 $$;
-CREATE TRIGGER "remuneration_calculation_runs_protected" BEFORE UPDATE OR DELETE ON "remuneration_calculation_runs" FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_remuneration_run();
+CREATE TRIGGER "remuneration_calculation_runs_protected" BEFORE INSERT OR UPDATE OR DELETE ON "remuneration_calculation_runs" FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_remuneration_run();
 CREATE TRIGGER "remuneration_calculation_entries_immutable" BEFORE UPDATE OR DELETE ON "remuneration_calculation_entries" FOR EACH ROW EXECUTE FUNCTION public.giromesa_reject_management_ledger_mutation();
 --> statement-breakpoint
 ALTER TABLE "remuneration_rule_sets" ENABLE ROW LEVEL SECURITY;
@@ -138,8 +193,12 @@ ALTER TABLE "remuneration_calculation_runs" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "remuneration_calculation_entries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "remuneration_calculation_entries" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "remuneration_rule_sets", "remuneration_rule_versions", "remuneration_calculation_runs", "remuneration_calculation_entries" FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_internal, giromesa_legacy_transition;
-GRANT SELECT, INSERT, UPDATE ON "remuneration_rule_sets", "remuneration_calculation_runs" TO giromesa_app;
-GRANT SELECT, INSERT, UPDATE ON "remuneration_rule_versions" TO giromesa_app;
+GRANT SELECT, INSERT ON "remuneration_rule_sets", "remuneration_rule_versions", "remuneration_calculation_runs" TO giromesa_app;
+GRANT UPDATE ("effective_until") ON "remuneration_rule_versions" TO giromesa_app;
+GRANT UPDATE (
+  "status", "approved_by_identity_id", "approved_at", "closed_by_identity_id", "closed_at",
+  "updated_at"
+) ON "remuneration_calculation_runs" TO giromesa_app;
 GRANT SELECT, INSERT ON "remuneration_calculation_entries" TO giromesa_app;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "remuneration_rule_sets" FOR ALL TO giromesa_app USING (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id)) WITH CHECK (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id));
