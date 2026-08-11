@@ -13,9 +13,10 @@ public sealed class LocalEnvelopeException(string code) : Exception(code)
     public string Code { get; } = code;
 }
 
-public sealed class CloudEnvelopeRejectedException(HttpStatusCode statusCode) : Exception("CLOUD_ENVELOPE_REJECTED")
+public sealed class CloudEventValidationException(IReadOnlyList<int> eventIndexes)
+    : Exception("SYNC_EVENT_SCHEMA_INVALID")
 {
-    public HttpStatusCode StatusCode { get; } = statusCode;
+    public IReadOnlyList<int> EventIndexes { get; } = eventIndexes;
 }
 
 public sealed record EdgeConflictInput(
@@ -303,7 +304,10 @@ public sealed class CloudSyncWorker(
             batch,
             cancellationToken);
         if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
-            throw new CloudEnvelopeRejectedException(response.StatusCode);
+        {
+            var eventIndexes = await ReadAuthenticatedEventValidationAsync(response, events.Count, cancellationToken);
+            if (eventIndexes is not null) throw new CloudEventValidationException(eventIndexes);
+        }
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<SyncResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Cloud returned an empty sync acknowledgement.");
@@ -325,36 +329,127 @@ public sealed class CloudSyncWorker(
                 cancellationToken));
             return false;
         }
-        catch (CloudEnvelopeRejectedException) when (events.Count > 1)
+        catch (CloudEventValidationException exception)
         {
-            var midpoint = events.Count / 2;
-            var leftReconciliation = await PostBatchIsolatedAsync(
-                events.Take(midpoint).ToArray(),
-                acknowledgedCommandIds,
-                protocolVersion,
-                responses,
-                cancellationToken);
-            var rightReconciliation = await PostBatchIsolatedAsync(
-                events.Skip(midpoint).ToArray(),
-                [],
-                protocolVersion,
-                responses,
-                cancellationToken);
-            return leftReconciliation || rightReconciliation;
-        }
-        catch (CloudEnvelopeRejectedException) when (events.Count == 1)
-        {
-            var item = events[0];
-            await store.RejectEventAsync(item.Id, "CLOUD_ENVELOPE_REJECTED");
-            _authoritativeOutcomes[item.Id] = new(
-                item.Id,
-                false,
-                new("reconcile", "CLOUD_ENVELOPE_REJECTED"));
+            var rejectedIndexes = exception.EventIndexes.ToHashSet();
+            foreach (var index in rejectedIndexes)
+            {
+                var item = events[index];
+                await store.RejectEventAsync(item.Id, "SYNC_EVENT_SCHEMA_INVALID");
+                _authoritativeOutcomes[item.Id] = new(
+                    item.Id,
+                    false,
+                    new("reconcile", "SYNC_EVENT_SCHEMA_INVALID"));
+            }
             AuthoritativeOutcomes = _authoritativeOutcomes.Values.OrderBy(value => value.Id).ToArray();
+
+            var validSiblings = events.Where((_, index) => !rejectedIndexes.Contains(index)).ToArray();
+            if (validSiblings.Length > 0)
+            {
+                _ = await PostBatchIsolatedAsync(
+                    validSiblings,
+                    [],
+                    protocolVersion,
+                    responses,
+                    cancellationToken);
+            }
             if (acknowledgedCommandIds.Count > 0)
-                responses.Add(await PostBatchAsync([], acknowledgedCommandIds, protocolVersion, cancellationToken));
+            {
+                responses.Add(await PostBatchAsync(
+                    [],
+                    acknowledgedCommandIds,
+                    protocolVersion,
+                    cancellationToken));
+            }
             return true;
         }
+    }
+
+    private async Task<IReadOnlyList<int>?> ReadAuthenticatedEventValidationAsync(
+        HttpResponseMessage response,
+        int submittedEventCount,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthenticatedCloudJson(response) ||
+            submittedEventCount < 1 ||
+            submittedEventCount > SyncEnvelopeLimits.MaximumBatchEvents)
+            return null;
+
+        var bytes = await ReadBoundedProblemBodyAsync(response.Content, cancellationToken);
+        if (bytes is null) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(bytes);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+            var properties = root.EnumerateObject().ToArray();
+            if (properties.Length != 3 ||
+                properties.Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() != 3 ||
+                properties.Any(property => property.Name is not ("code" or "scope" or "eventIndexes")))
+                return null;
+            if (!root.TryGetProperty("code", out var code) ||
+                code.ValueKind != JsonValueKind.String ||
+                code.GetString() != "SYNC_EVENT_SCHEMA_INVALID" ||
+                !root.TryGetProperty("scope", out var scope) ||
+                scope.ValueKind != JsonValueKind.String ||
+                scope.GetString() != "event" ||
+                !root.TryGetProperty("eventIndexes", out var indexesElement) ||
+                indexesElement.ValueKind != JsonValueKind.Array)
+                return null;
+
+            var indexes = new List<int>();
+            foreach (var element in indexesElement.EnumerateArray())
+            {
+                if (!element.TryGetInt32(out var index) || index < 0 || index >= submittedEventCount)
+                    return null;
+                if (indexes.Count > 0 && index <= indexes[^1]) return null;
+                indexes.Add(index);
+                if (indexes.Count > SyncEnvelopeLimits.MaximumBatchEvents) return null;
+            }
+            return indexes.Count > 0 ? indexes : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private bool IsAuthenticatedCloudJson(HttpResponseMessage response)
+    {
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (mediaType is null ||
+            !(mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
+              mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)))
+            return false;
+        var requestUri = httpClient.BaseAddress;
+        var authorization = httpClient.DefaultRequestHeaders.Authorization;
+        var configuredBase = Uri.TryCreate(_options.CloudApiBaseUrl, UriKind.Absolute, out var value) ? value : null;
+        return configuredBase is not null &&
+            configuredBase.Scheme == Uri.UriSchemeHttps &&
+            requestUri is not null &&
+            requestUri.Scheme == Uri.UriSchemeHttps &&
+            requestUri.Host.Equals(configuredBase.Host, StringComparison.OrdinalIgnoreCase) &&
+            requestUri.Port == configuredBase.Port &&
+            authorization?.Scheme == "GiroMesaHub" &&
+            !string.IsNullOrEmpty(authorization.Parameter);
+    }
+
+    private static async Task<byte[]?> ReadBoundedProblemBodyAsync(
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        const int maximumProblemBytes = 8_192;
+        if (content.Headers.ContentLength is > maximumProblemBytes) return null;
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        var buffer = new byte[maximumProblemBytes + 1];
+        var length = 0;
+        while (length < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(length, buffer.Length - length), cancellationToken);
+            if (read == 0) break;
+            length += read;
+        }
+        return length <= maximumProblemBytes ? buffer.AsSpan(0, length).ToArray() : null;
     }
 
     public static object CreateOutboundEvent(PendingEvent item)

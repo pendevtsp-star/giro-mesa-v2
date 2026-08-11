@@ -6660,42 +6660,135 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
+        "application/json":
+          | {
+              /** @enum {number} */
+              protocolVersion: 1;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                id: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                version: number;
+              }[];
+            }
+          | {
+              /** @enum {number} */
+              protocolVersion: 2;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                commandId: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                aggregate: {
+                  type: string;
+                  id: string;
+                };
+                occupancyEpoch: string;
+                resourceVersion: number;
+                aggregateSequence: number;
+                /** @default [] */
+                resourcePreconditions?: {
+                  type: string;
+                  id: string;
+                  occupancyEpoch: string;
+                  resourceVersion: number;
+                }[];
+                /** @default [] */
+                priceReferences?: {
+                  kind: string;
+                  entityId: string;
+                  priceRevision: string;
+                  token: string;
+                }[];
+              }[];
             };
-            version: number;
-            /** Format: date-time */
-            occurredAt: string;
-          }[];
-        };
       };
     };
     responses: {
-      200: {
+      /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
+      400: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
+      };
+      /** @description Structured sync validation problem with the same fail-closed scope contract as HTTP 400. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
       };
     };
   };
@@ -6708,42 +6801,135 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
+        "application/json":
+          | {
+              /** @enum {number} */
+              protocolVersion: 1;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                id: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                version: number;
+              }[];
+            }
+          | {
+              /** @enum {number} */
+              protocolVersion: 2;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                commandId: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                aggregate: {
+                  type: string;
+                  id: string;
+                };
+                occupancyEpoch: string;
+                resourceVersion: number;
+                aggregateSequence: number;
+                /** @default [] */
+                resourcePreconditions?: {
+                  type: string;
+                  id: string;
+                  occupancyEpoch: string;
+                  resourceVersion: number;
+                }[];
+                /** @default [] */
+                priceReferences?: {
+                  kind: string;
+                  entityId: string;
+                  priceRevision: string;
+                  token: string;
+                }[];
+              }[];
             };
-            version: number;
-            /** Format: date-time */
-            occurredAt: string;
-          }[];
-        };
       };
     };
     responses: {
-      200: {
+      /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
+      400: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
+      };
+      /** @description Structured sync validation problem with the same fail-closed scope contract as HTTP 400. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
       };
     };
   };

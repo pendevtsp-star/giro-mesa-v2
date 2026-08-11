@@ -271,7 +271,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task BisectsHiddenCloudSchema400AndUploadsValidSibling()
+    public async Task IsolatesIndexedCloudEventSchemaErrorAndUploadsValidSibling()
     {
         var options = Options.Create(new HubOptions
         {
@@ -297,12 +297,53 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
 
         await worker.SyncOnceAsync();
 
-        Assert.Equal(3, handler.CallCount);
+        Assert.Equal(2, handler.CallCount);
         Assert.Equal([valid.Id], handler.UploadedIds);
         Assert.Equal("reconciling", worker.Status);
         Assert.Contains(await store.GetReconciliationAsync(10), item =>
-            item.Id == hiddenInvalid.Id && item.Reason == "CLOUD_ENVELOPE_REJECTED");
+            item.Id == hiddenInvalid.Id && item.Reason == "SYNC_EVENT_SCHEMA_INVALID");
         Assert.Empty(await store.GetPendingAsync(10));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, "text/html", "<html>generic proxy rejection</html>")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"VALIDATION_ERROR\"}")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "application/json", "{\"code\":\"WAF_BLOCKED\",\"scope\":\"event\",\"eventIndexes\":[0]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_BATCH_SCHEMA_INVALID\",\"scope\":\"batch\"}")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "application/json", "{\"code\":\"SYNC_ACK_SCHEMA_INVALID\",\"scope\":\"ack\"}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0,0]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0],\"eventId\":\"forged\"}")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[2]}")]
+    public async Task DoesNotIsolateUnclassifiedOrMalformed400And422(
+        HttpStatusCode statusCode,
+        string contentType,
+        string responseBody)
+    {
+        var caseDirectory = Path.Combine(_directory, Guid.NewGuid().ToString("N"));
+        var options = Options.Create(new HubOptions
+        {
+            DataDirectory = caseDirectory,
+            DatabaseKey = "test-database-key-32-characters-long",
+            CloudApiBaseUrl = "https://cloud.example",
+            CloudSyncKey = "cloud-sync-secret",
+        });
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        await store.AcceptCommandAsync(ValidCommand());
+        await store.AcceptCommandAsync(ValidCommand());
+        var handler = new UnclassifiedFailureHandler(statusCode, contentType, responseBody);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal("offline", worker.Status);
+        Assert.Equal(2, (await store.GetPendingAsync(10)).Count);
+        Assert.Empty(await store.GetReconciliationAsync(10));
     }
 
     [Theory]
@@ -746,10 +787,14 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                     ? commandId.GetString()!
                     : item.GetProperty("id").GetString()!)
                 .ToArray();
-            if (ids.Contains(hiddenId))
-                return JsonResponse(ids.Length == 1
-                    ? HttpStatusCode.UnprocessableEntity
-                    : HttpStatusCode.BadRequest, new { code = "HIDDEN_SCHEMA_RULE" });
+            var hiddenIndex = Array.IndexOf(ids, hiddenId);
+            if (hiddenIndex >= 0)
+                return JsonResponse(HttpStatusCode.BadRequest, new
+                {
+                    code = "SYNC_EVENT_SCHEMA_INVALID",
+                    scope = "event",
+                    eventIndexes = new[] { hiddenIndex },
+                });
             UploadedIds.AddRange(ids);
             return JsonResponse(HttpStatusCode.OK, new
             {
@@ -771,6 +816,25 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         {
             CallCount += 1;
             return Task.FromResult(JsonResponse(statusCode, new { code = "FAILURE" }));
+        }
+    }
+
+    private sealed class UnclassifiedFailureHandler(
+        HttpStatusCode statusCode,
+        string contentType,
+        string responseBody) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            return Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(responseBody, Encoding.UTF8, contentType),
+            });
         }
     }
 
