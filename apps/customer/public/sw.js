@@ -1,14 +1,8 @@
-import {
-  canCacheResponse,
-  isFreshResponse,
-  isSafeAssetRequest,
-  stampCachedResponse,
-} from "/pwa-cache-policy.js";
+import { fetchRuntimeAsset, isSafeAssetRequest } from "/pwa-cache-policy.js";
 
-const VERSION = "2026-08-11-1";
+const VERSION = "2026-08-11-2";
 const CACHE_PREFIX = "giromesa-customer-static-";
 const STATIC_CACHE = `${CACHE_PREFIX}${VERSION}`;
-const ASSET_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const PRECACHE = [
   "/manifest.webmanifest",
   "/icons/pwa-192.svg",
@@ -54,22 +48,5 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (!isSafeAssetRequest(request, self.location.origin)) return;
 
-  event.respondWith(
-    caches.open(STATIC_CACHE).then(async (cache) => {
-      const cached = await cache.match(request);
-      if (cached && isFreshResponse(cached, Date.now(), ASSET_TTL_MS)) return cached;
-      if (cached) await cache.delete(request);
-
-      try {
-        const response = await fetch(request);
-        if (canCacheResponse(response)) {
-          await cache.put(request, stampCachedResponse(response.clone()));
-        }
-        return response;
-      } catch (error) {
-        if (cached) return cached;
-        throw error;
-      }
-    }),
-  );
+  event.respondWith(caches.open(STATIC_CACHE).then((cache) => fetchRuntimeAsset(request, cache)));
 });

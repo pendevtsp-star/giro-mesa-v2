@@ -7,6 +7,9 @@ const pwaHeaders: Plugin = {
   configureServer(server) {
     server.middlewares.use((request, response, next) => {
       const pathname = request.url?.split("?", 1)[0];
+      if (pathname?.startsWith("/assets/") || pathname?.startsWith("/icons/")) {
+        response.setHeader("Cache-Control", "public, max-age=604800");
+      }
       if (pathname === "/sw.js" || pathname === "/pwa-cache-policy.js") {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       }
@@ -20,6 +23,9 @@ const pwaHeaders: Plugin = {
   configurePreviewServer(server) {
     server.middlewares.use((request, response, next) => {
       const pathname = request.url?.split("?", 1)[0];
+      if (pathname?.startsWith("/assets/") || pathname?.startsWith("/icons/")) {
+        response.setHeader("Cache-Control", "public, max-age=604800");
+      }
       if (pathname === "/sw.js" || pathname === "/pwa-cache-policy.js") {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       }
