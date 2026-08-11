@@ -10,7 +10,13 @@ import {
   posOrderItems,
   posOrders,
 } from "@giromesa/db";
-import { applyYield, formatQuantity, parseQuantity, type QuantityUnit } from "@giromesa/domain";
+import {
+  applyYield,
+  convertQuantity,
+  formatQuantity,
+  parseQuantity,
+  type QuantityUnit,
+} from "@giromesa/domain";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -209,24 +215,53 @@ function microsToQuantity(micros: bigint) {
   return `${negative ? "-" : ""}${absolute / 1_000_000n}.${String(absolute % 1_000_000n).padStart(6, "0")}`;
 }
 
-function recipeConsumptionMicros(
-  quantityMicros: bigint,
-  orderQuantity: number,
-  lossBasisPoints: number,
-) {
-  if (
-    quantityMicros <= 0n ||
-    !Number.isInteger(orderQuantity) ||
-    orderQuantity <= 0 ||
-    !Number.isInteger(lossBasisPoints) ||
-    lossBasisPoints < 0 ||
-    lossBasisPoints >= 10_000
-  ) {
-    throw new InventoryConsumptionError("INVENTORY_RECIPE_LOSS_INVALID");
+function divideUp(numerator: bigint, denominator: bigint) {
+  if (numerator <= 0n || denominator <= 0n) {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
   }
-  const netMicros = quantityMicros * BigInt(orderQuantity);
-  const yieldBasisPoints = BigInt(10_000 - lossBasisPoints);
-  return (netMicros * 10_000n + yieldBasisPoints - 1n) / yieldBasisPoints;
+  return (numerator + denominator - 1n) / denominator;
+}
+
+export function recipeBatchConsumptionQuantity(input: {
+  componentQuantity: string;
+  componentUnit: QuantityUnit;
+  inventoryUnit: QuantityUnit;
+  orderQuantity: number;
+  yieldQuantity: string;
+  yieldUnit: QuantityUnit;
+  lossBasisPoints: number;
+}) {
+  if (
+    !Number.isSafeInteger(input.orderQuantity) ||
+    input.orderQuantity <= 0 ||
+    !Number.isSafeInteger(input.lossBasisPoints) ||
+    input.lossBasisPoints < 0 ||
+    input.lossBasisPoints >= 10_000
+  ) {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
+  }
+  try {
+    const component = parseQuantity(input.componentQuantity, input.componentUnit);
+    const declaredYield = parseQuantity(input.yieldQuantity, input.yieldUnit);
+    const yieldInUnits = convertQuantity(declaredYield, "unit", "exact");
+    if (component.atoms <= 0n || yieldInUnits.atoms <= 0n) {
+      throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
+    }
+    const batchScaled = divideUp(
+      component.atoms * BigInt(input.orderQuantity) * 1_000_000n,
+      yieldInUnits.atoms,
+    );
+    const withLoss = divideUp(batchScaled * 10_000n, BigInt(10_000 - input.lossBasisPoints));
+    const converted = convertQuantity({ ...component, atoms: withLoss }, input.inventoryUnit, "up");
+    return {
+      quantity: formatQuantity(converted),
+      unit: converted.unit,
+      dimension: converted.dimension,
+    };
+  } catch (error) {
+    if (error instanceof InventoryConsumptionError) throw error;
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_QUANTITY_INVALID");
+  }
 }
 
 export function recipeConsumptionQuantity(
@@ -378,8 +413,11 @@ export async function consumeOrderSentInventory(
           lossBasisPoints: managementRecipeComponents.lossBasisPoints,
           productId: managementRecipeVersions.productId,
           quantityMicros: managementRecipeComponents.quantityMicros,
+          componentUnit: managementRecipeComponents.unit,
           recipeVersionId: managementRecipeVersions.id,
           recipeVersion: managementRecipeVersions.version,
+          yieldQuantity: managementRecipeVersions.yieldQuantity,
+          yieldUnit: managementRecipeVersions.yieldUnit,
         })
         .from(managementRecipeVersions)
         .innerJoin(
@@ -486,11 +524,16 @@ export async function consumeOrderSentInventory(
         }
         let requiredMilli: bigint;
         try {
-          requiredMilli = recipeConsumptionMicros(
-            component.quantityMicros,
-            orderItem.quantity,
-            component.lossBasisPoints,
-          );
+          const consumption = recipeBatchConsumptionQuantity({
+            componentQuantity: microsToQuantity(component.quantityMicros),
+            componentUnit: component.componentUnit as QuantityUnit,
+            inventoryUnit: inventoryItem.unit as QuantityUnit,
+            orderQuantity: orderItem.quantity,
+            yieldQuantity: component.yieldQuantity,
+            yieldUnit: component.yieldUnit as QuantityUnit,
+            lossBasisPoints: component.lossBasisPoints,
+          });
+          requiredMilli = quantityToMicros(consumption.quantity);
         } catch {
           blockingIssues.push({
             code: "INVENTORY_RECIPE_LOSS_INVALID",

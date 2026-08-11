@@ -5,6 +5,7 @@ import {
   milliToQuantity,
   parseOrderSentPayload,
   quantityToMilli,
+  recipeBatchConsumptionQuantity,
   recipeConsumptionMilli,
   recipeConsumptionQuantity,
 } from "./inventory.js";
@@ -50,5 +51,32 @@ describe("order inventory consumption rules", () => {
       unit: "l",
       dimension: "volume",
     });
+  });
+
+  it("scales a batch recipe by its declared yield and converts into the stock unit", () => {
+    assert.deepEqual(
+      recipeBatchConsumptionQuantity({
+        componentQuantity: "1",
+        componentUnit: "kg",
+        inventoryUnit: "g",
+        orderQuantity: 1,
+        yieldQuantity: "10",
+        yieldUnit: "unit",
+        lossBasisPoints: 0,
+      }),
+      { quantity: "100.000000", unit: "g", dimension: "mass" },
+    );
+    assert.deepEqual(
+      recipeBatchConsumptionQuantity({
+        componentQuantity: "6",
+        componentUnit: "l",
+        inventoryUnit: "ml",
+        orderQuantity: 2,
+        yieldQuantity: "1",
+        yieldUnit: "dozen",
+        lossBasisPoints: 0,
+      }),
+      { quantity: "1000.000000", unit: "ml", dimension: "volume" },
+    );
   });
 });

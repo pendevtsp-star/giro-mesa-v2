@@ -183,6 +183,8 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
           unitId: unitA.id,
           productId: product.id,
           version: 1,
+          yieldQuantity: "10",
+          yieldUnit: "unit",
           validFrom: new Date(orderSentAt.getTime() - 60_000),
           validUntil: recipeSwitchAt,
           createdByIdentityId: identityA.id,
@@ -287,7 +289,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         .where(eq(managementStockBalances.id, balanceB.id))
         .limit(1),
     ]);
-    assert.equal(updatedA[0]?.quantity, "9.444444");
+    assert.equal(updatedA[0]?.quantity, "9.944444");
     assert.equal(untouchedB[0]?.quantity, "20.000000");
 
     const movementsAfterSend = await database.db
@@ -301,7 +303,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         ),
       );
     assert.equal(movementsAfterSend.length, 1);
-    assert.equal(movementsAfterSend[0]?.quantityDelta, "-0.555556");
+    assert.equal(movementsAfterSend[0]?.quantityDelta, "-0.055556");
 
     await database.db
       .update(outboxEvents)
@@ -341,7 +343,7 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
           eq(managementInventoryMovements.type, "order_consumption"),
         ),
       );
-    assert.equal(balanceAfterReplay[0]?.quantity, "9.444444");
+    assert.equal(balanceAfterReplay[0]?.quantity, "9.944444");
     assert.equal(movementsAfterReplay.length, 1);
     assert.equal(tenantBMovements.length, 0);
 
