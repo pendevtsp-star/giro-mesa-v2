@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   type CallHandler,
   type ExecutionContext,
   Injectable,
@@ -9,6 +10,7 @@ import { Reflector } from "@nestjs/core";
 import type { FastifyRequest } from "fastify";
 import { from, lastValueFrom } from "rxjs";
 import type { AuthContext } from "../auth/auth.service.js";
+import { PlatformDurableOutcomeError } from "../platform/platform-errors.js";
 import { DatabaseService } from "./database.module.js";
 import { DATABASE_CONTEXT_ROLE, type HttpDatabaseContext } from "./database-context.decorator.js";
 
@@ -21,6 +23,12 @@ type TenantRequest = FastifyRequest & {
 function routeUuid(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type PlatformContextOutcome =
+  | { status: "success"; value: unknown }
+  | { status: "durable-error"; error: unknown };
 
 @Injectable()
 export class TenantContextInterceptor implements NestInterceptor {
@@ -38,15 +46,39 @@ export class TenantContextInterceptor implements NestInterceptor {
     ]);
     if (role === "platform") {
       if (!request.auth) throw new UnauthorizedException();
+      if (organizationId && !uuidPattern.test(organizationId)) {
+        throw new BadRequestException({
+          statusCode: 400,
+          code: "INVALID_PLATFORM_ORGANIZATION_ID",
+          message: "O identificador da organizacao e invalido.",
+        });
+      }
       return from(
-        this.database.withPlatformContext(
-          {
-            actorIdentityId: request.auth.identityId,
-            sessionId: request.auth.sessionId,
-            organizationId,
-          },
-          () => lastValueFrom(next.handle()),
-        ),
+        this.database
+          .withPlatformContext<PlatformContextOutcome>(
+            {
+              actorIdentityId: request.auth.identityId,
+              sessionId: request.auth.sessionId,
+              organizationId,
+            },
+            async () => {
+              try {
+                return {
+                  status: "success" as const,
+                  value: await lastValueFrom(next.handle()),
+                };
+              } catch (error) {
+                if (error instanceof PlatformDurableOutcomeError) {
+                  return { status: "durable-error" as const, error: error.originalError };
+                }
+                throw error;
+              }
+            },
+          )
+          .then((outcome) => {
+            if (outcome.status === "durable-error") throw outcome.error;
+            return outcome.value;
+          }),
       );
     }
     if (!organizationId) {

@@ -27,11 +27,20 @@ export class PlatformDomainError extends Error {
   }
 }
 
+export class PlatformDurableOutcomeError extends Error {
+  constructor(readonly originalError: unknown) {
+    super(originalError instanceof Error ? originalError.message : "PLATFORM_DURABLE_OUTCOME");
+    this.name = "PlatformDurableOutcomeError";
+  }
+}
+
 function response(statusCode: number, code: string) {
   return { statusCode, code, message: "A operação administrativa não pôde ser concluída." };
 }
 
 export function platformHttpException(error: unknown): HttpException {
+  if (error instanceof PlatformDurableOutcomeError)
+    return platformHttpException(error.originalError);
   if (error instanceof HttpException) return error;
   const code = error instanceof Error ? error.message : "";
   if (!(code in platformErrorStatus))

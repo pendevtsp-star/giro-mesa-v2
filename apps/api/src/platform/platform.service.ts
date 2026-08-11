@@ -45,6 +45,7 @@ import {
   platformActionFromAuditEvents,
   platformActionTargetType,
 } from "./platform-actions.js";
+import { PlatformDurableOutcomeError } from "./platform-errors.js";
 import {
   maskPlatformEmail,
   type PlatformProjectionPage,
@@ -365,7 +366,7 @@ export class PlatformService {
         decisionFingerprint,
         error,
       );
-      throw error;
+      throw new PlatformDurableOutcomeError(error);
     }
   }
 

@@ -248,4 +248,74 @@ describe("platform HTTP database boundary", () => {
     assert.equal(expired.statusCode, 410, expired.body);
     assert.equal(expired.json().code, "PLATFORM_ACTION_EXPIRED");
   });
+
+  it("rejects an invalid organization id as a stable client error on both aliases", async (context) => {
+    if (!app) return context.skip("PLATFORM_HTTP_DATABASE_URL not configured");
+    for (const prefix of ["/v1", "/api/v1"]) {
+      const response: {
+        statusCode: number;
+        body: string;
+        json(): { code?: string };
+      } = await app.inject({
+        method: "GET",
+        url: `${prefix}/platform/tenants/not-a-uuid/context`,
+        headers: { authorization: `Bearer ${tokenA}` },
+      });
+      assert.equal(response.statusCode, 400, response.body);
+      assert.equal(response.json().code, "INVALID_PLATFORM_ORGANIZATION_ID");
+    }
+  });
+
+  it("durably records a failed outcome after the HTTP transaction rolls back the effect", async (context) => {
+    if (!app || !ownerConnection)
+      return context.skip("PLATFORM_HTTP_DATABASE_URL not configured");
+    const proposal = await app.inject({
+      method: "POST",
+      url: `/v1/platform/tenants/${organizationId}/actions`,
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        "idempotency-key": "http-failed-proposal-0001",
+      },
+      payload: {
+        action: "tenant.suspend",
+        targetId: organizationId,
+        justification: "Precondicao concorrente usada para validar o outcome duravel.",
+        payload: { expectedState: "active" },
+      },
+    });
+    assert.equal(proposal.statusCode, 201, proposal.body);
+    const proposalId = proposal.json().id as string;
+    await ownerConnection.client`
+      update organizations set billing_state = 'grace' where id = ${organizationId}
+    `;
+    try {
+      const approval = await app.inject({
+        method: "POST",
+        url: `/api/v1/platform/tenants/${organizationId}/actions/${proposalId}/approve`,
+        headers: {
+          authorization: `Bearer ${tokenB}`,
+          "idempotency-key": "http-failed-approval-0001",
+        },
+        payload: { expectedVersion: 1 },
+      });
+      assert.equal(approval.statusCode, 409, approval.body);
+      assert.equal(approval.json().message, "PLATFORM_ACTION_PRECONDITION_FAILED");
+
+      const events = await ownerConnection.client<{ action: string; status: string }[]>`
+        select action, metadata->>'status' as status
+        from audit_events
+        where organization_id = ${organizationId}
+          and entity_id = ${proposalId}
+        order by (metadata->>'version')::int, id
+      `;
+      assert.deepEqual(events.map((event) => ({ ...event })), [
+        { action: "platform.action.proposed", status: "pending" },
+        { action: "platform.action.failed", status: "failed" },
+      ]);
+    } finally {
+      await ownerConnection.client`
+        update organizations set billing_state = 'active' where id = ${organizationId}
+      `;
+    }
+  });
 });
