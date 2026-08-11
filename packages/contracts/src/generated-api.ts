@@ -4643,14 +4643,15 @@ export interface components {
         | "activation_committed"
         | "published"
         | "compensated";
+      /** Format: int32 */
       attempts: number;
-      lastErrorCode?: string | null;
+      lastErrorCode: string | null;
       /** Format: date-time */
-      nextRetryAt?: string | null;
+      nextRetryAt: string | null;
       /** Format: date-time */
-      completedAt?: string | null;
+      completedAt: string | null;
       /** Format: date-time */
-      failedAt?: string | null;
+      failedAt: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4660,7 +4661,7 @@ export interface components {
       /** Format: uuid */
       organizationId: string;
       /** Format: date-time */
-      activatedAt?: string | null;
+      activatedAt: string | null;
       items: components["schemas"]["OnboardingChecklistItemsResponse"];
       ready: boolean;
       missingItems: (
@@ -4677,8 +4678,8 @@ export interface components {
         | "training"
         | "rehearsal"
       )[];
-      selection?: components["schemas"]["OnboardingSelectionResponse"] | null;
-      provisioning?: components["schemas"]["ProvisioningSummaryResponse"] | null;
+      selection: components["schemas"]["OnboardingSelectionResponse"] | null;
+      provisioning: components["schemas"]["ProvisioningSummaryResponse"] | null;
     };
     OnboardingApiErrorDetails: {
       /** Format: uuid */
@@ -4732,13 +4733,14 @@ export interface components {
       step: "validation" | "internal_provisioning" | "activation" | "publication" | "compensation";
       /** @enum {string} */
       status: "pending" | "in_progress" | "completed" | "failed" | "compensated";
+      /** Format: int32 */
       attempts: number;
       /** Format: date-time */
-      startedAt?: string | null;
+      startedAt: string | null;
       /** Format: date-time */
-      completedAt?: string | null;
+      completedAt: string | null;
       /** Format: date-time */
-      compensatedAt?: string | null;
+      compensatedAt: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4767,14 +4769,15 @@ export interface components {
         | "activation_committed"
         | "published"
         | "compensated";
+      /** Format: int32 */
       attempts: number;
-      lastErrorCode?: string | null;
+      lastErrorCode: string | null;
       /** Format: date-time */
-      nextRetryAt?: string | null;
+      nextRetryAt: string | null;
       /** Format: date-time */
-      completedAt?: string | null;
+      completedAt: string | null;
       /** Format: date-time */
-      failedAt?: string | null;
+      failedAt: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */

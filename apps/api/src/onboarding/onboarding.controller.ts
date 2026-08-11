@@ -224,14 +224,14 @@ class ProvisioningSummaryResponse {
     ],
   })
   declare checkpoint: string;
-  @ApiProperty() declare attempts: number;
-  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 120 })
+  @ApiProperty({ type: "integer", format: "int32", minimum: 0 }) declare attempts: number;
+  @ApiProperty({ nullable: true, type: String, maxLength: 120 })
   declare lastErrorCode: string | null;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare nextRetryAt: string | null;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare completedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare failedAt: string | null;
   @ApiProperty({ format: "date-time" }) declare createdAt: string;
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;
@@ -239,7 +239,7 @@ class ProvisioningSummaryResponse {
 
 class OnboardingResponse {
   @ApiProperty({ format: "uuid" }) declare organizationId: string;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare activatedAt: string | null;
   @ApiProperty({ type: () => OnboardingChecklistItemsResponse })
   declare items: OnboardingChecklistItemsResponse;
@@ -262,9 +262,9 @@ class OnboardingResponse {
     ],
   })
   declare missingItems: string[];
-  @ApiProperty({ required: false, nullable: true, type: () => OnboardingSelectionResponse })
+  @ApiProperty({ nullable: true, type: () => OnboardingSelectionResponse })
   declare selection: OnboardingSelectionResponse | null;
-  @ApiProperty({ required: false, nullable: true, type: () => ProvisioningSummaryResponse })
+  @ApiProperty({ nullable: true, type: () => ProvisioningSummaryResponse })
   declare provisioning: ProvisioningSummaryResponse | null;
 }
 
@@ -275,12 +275,12 @@ class ProvisioningStepResponse {
   declare step: string;
   @ApiProperty({ enum: ["pending", "in_progress", "completed", "failed", "compensated"] })
   declare status: string;
-  @ApiProperty() declare attempts: number;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ type: "integer", format: "int32", minimum: 0 }) declare attempts: number;
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare startedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare completedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare compensatedAt: string | null;
   @ApiProperty({ format: "date-time" }) declare createdAt: string;
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;

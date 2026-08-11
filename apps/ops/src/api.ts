@@ -224,7 +224,10 @@ function parseApiPayload<T>(
 async function safeJson<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
-  } catch {
+  } catch (error) {
+    if ((error instanceof DOMException || error instanceof Error) && error.name === "AbortError") {
+      throw error;
+    }
     return null;
   }
 }

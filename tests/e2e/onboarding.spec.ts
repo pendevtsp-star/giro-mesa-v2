@@ -516,13 +516,12 @@ test("PATCH 400 associa somente erros seguros ao campo e foca o primeiro inváli
         status: 400,
         json: {
           statusCode: 400,
-          code: "INVALID_ONBOARDING_EVIDENCE",
-          message: "Revise os campos indicados.",
+          code: "VALIDATION_ERROR",
+          message: "Dados inválidos.",
           details: {
             fieldErrors: {
-              "items.fiscalChoice.evidence.choice": ["Escolha fiscal inválida."],
+              "items.fiscalChoice.evidence.choice": ["Valor inválido."],
             },
-            formErrors: ["A evidência precisa corresponder à operação real."],
           },
         },
       });
@@ -535,8 +534,7 @@ test("PATCH 400 associa somente erros seguros ao campo e foca o primeiro inváli
   const fiscal = page.getByLabel("Modo fiscal real");
   await expect(fiscal).toHaveAttribute("aria-invalid", "true");
   await expect(fiscal).toHaveAttribute("aria-describedby", "onboarding-fiscal-error");
-  await expect(page.getByText("Escolha fiscal inválida.")).toBeVisible();
-  await expect(page.getByText("A evidência precisa corresponder à operação real.")).toBeVisible();
+  await expect(page.getByText("Valor inválido.")).toBeVisible();
   await expect(fiscal).toBeFocused();
 });
 
@@ -658,6 +656,112 @@ test("aborta GET obsoleto e preserva a revisão mais nova", async ({ page }) => 
   await expect(page.getByText("1 de 12 requisitos prontos")).toBeVisible();
 });
 
+test("ordena GET e PATCH em ambos os sentidos sem rebaixar a revisão", async ({ page }) => {
+  const fiscalOnly = pendingItems();
+  fiscalOnly.fiscalChoice = itemEvidence("verified", "actor_attestation", {
+    evidenceReference: "actor:fiscal:old",
+    evidence: { choice: "disabled" },
+    verifiedAt: "2026-08-11T10:01:00.000Z",
+  });
+  const serverRevision = pendingItems();
+  serverRevision.business = itemEvidence("verified", "system", {
+    evidenceReference: "server:business:new",
+    verifiedAt: "2026-08-11T10:02:00.000Z",
+  });
+  serverRevision.catalog = itemEvidence("verified", "system", {
+    evidenceReference: "server:catalog:new",
+    verifiedAt: "2026-08-11T10:02:00.000Z",
+  });
+  const mutationRevision = structuredClone(serverRevision);
+  mutationRevision.fiscalChoice = itemEvidence("verified", "actor_attestation", {
+    evidenceReference: "actor:fiscal:new",
+    evidence: { choice: "disabled" },
+    verifiedAt: "2026-08-11T10:03:00.000Z",
+  });
+  let getCalls = 0;
+  let patchCalls = 0;
+  let releaseFirstPatch: (() => void) | undefined;
+  const firstPatchMayFinish = new Promise<void>((resolve) => {
+    releaseFirstPatch = resolve;
+  });
+  let markFirstPatchStarted: (() => void) | undefined;
+  const firstPatchStarted = new Promise<void>((resolve) => {
+    markFirstPatchStarted = resolve;
+  });
+  let releaseThirdGet: (() => void) | undefined;
+  const thirdGetMayFinish = new Promise<void>((resolve) => {
+    releaseThirdGet = resolve;
+  });
+  let markThirdGetStarted: (() => void) | undefined;
+  const thirdGetStarted = new Promise<void>((resolve) => {
+    markThirdGetStarted = resolve;
+  });
+
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      if (route.request().method() === "GET") {
+        getCalls += 1;
+        if (getCalls === 3) {
+          markThirdGetStarted?.();
+          await thirdGetMayFinish;
+        }
+        await route.fulfill({
+          json: onboardingSnapshot({
+            items: getCalls === 1 ? pendingItems() : serverRevision,
+            selection: selectedPlan(getCalls === 1 ? 1 : 3),
+          }),
+        });
+        return;
+      }
+      if (route.request().method() === "PATCH") {
+        patchCalls += 1;
+        if (patchCalls === 1) {
+          markFirstPatchStarted?.();
+          await firstPatchMayFinish;
+          await route.fulfill({
+            json: onboardingSnapshot({ items: fiscalOnly, selection: selectedPlan(2) }),
+          });
+          return;
+        }
+        await route.fulfill({
+          json: onboardingSnapshot({ items: mutationRevision, selection: selectedPlan(4) }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const fiscalAction = page.getByRole("button", { name: "Confirmar escolha fiscal" });
+  await fiscalAction.click();
+  await firstPatchStarted;
+  await page
+    .getByRole("button", { name: "Atualizar status" })
+    .first()
+    .evaluate((button) => {
+      (button as HTMLButtonElement).disabled = false;
+      button.click();
+    });
+  await expect(page.getByText("2 de 12 requisitos prontos")).toBeVisible();
+  releaseFirstPatch?.();
+  await page.waitForTimeout(150);
+  await expect(page.getByText("2 de 12 requisitos prontos")).toBeVisible();
+
+  await page.getByRole("button", { name: "Atualizar status" }).first().click();
+  await thirdGetStarted;
+  await fiscalAction.click();
+  await expect(page.getByText("3 de 12 requisitos prontos")).toBeVisible();
+  releaseThirdGet?.();
+  await page.waitForTimeout(150);
+  await expect(page.getByText("3 de 12 requisitos prontos")).toBeVisible();
+});
+
 test("invalida confirmações quando readiness, revisão ou motivo mudam", async ({ page }) => {
   let revision = 1;
   let items = verifiedItems();
@@ -762,6 +866,113 @@ test("cancela polling antigo ao desmontar e não mistura runs", async ({ page })
   await expect(page.getByText("Ativação concluída")).toBeVisible();
   await page.waitForTimeout(800);
   await expect(page.getByText("Ativação concluída")).toBeVisible();
+});
+
+test("aborta body 503 atrasado quando GET troca revisão e run", async ({ page }) => {
+  const runB = "e2222222-2222-4222-8222-222222222222";
+  const summary = (id: string, state: "publishing" | "completed") => ({
+    id,
+    state,
+    checkpoint: state === "completed" ? "published" : "activation_committed",
+    attempts: 1,
+    lastErrorCode: null,
+    nextRetryAt: null,
+    completedAt: state === "completed" ? "2026-08-11T10:10:00.000Z" : null,
+    failedAt: null,
+    createdAt: "2026-08-11T10:00:00.000Z",
+    updatedAt: "2026-08-11T10:10:00.000Z",
+  });
+  const initial = onboardingSnapshot({
+    items: verifiedItems(),
+    selection: selectedPlan(1),
+    provisioning: summary(runId, "publishing"),
+  });
+  const next = onboardingSnapshot({
+    items: verifiedItems(),
+    selection: selectedPlan(2),
+    provisioning: summary(runB, "completed"),
+    activatedAt: "2026-08-11T10:10:00.000Z",
+  });
+  await page.addInitScript(
+    ({ initialSnapshot, nextSnapshot, organization, oldRun }) => {
+      const browserWindow = window as typeof window & {
+        __pollBodyStarted?: boolean;
+        __useNextOnboardingSnapshot?: boolean;
+      };
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = new URL(typeof input === "string" ? input : input.url, window.location.href);
+        if (!url.pathname.includes(`/v1/organizations/${organization}/onboarding`)) {
+          return originalFetch(input, init);
+        }
+        if (url.pathname.endsWith(`/provisioning/${oldRun}`)) {
+          let settled = false;
+          const body = new ReadableStream({
+            start(controller) {
+              browserWindow.__pollBodyStarted = true;
+              init?.signal?.addEventListener(
+                "abort",
+                () => {
+                  settled = true;
+                  controller.error(new DOMException("The operation was aborted.", "AbortError"));
+                },
+                { once: true },
+              );
+              window.setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    JSON.stringify({
+                      statusCode: 503,
+                      code: "PROVISIONING_TRANSIENT_FAILURE",
+                      message: "Erro antigo não pode contaminar o run novo.",
+                    }),
+                  ),
+                );
+                controller.close();
+              }, 1_500);
+            },
+          });
+          return new Response(body, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if ((init?.method ?? "GET") === "GET") {
+          return Response.json(
+            browserWindow.__useNextOnboardingSnapshot ? nextSnapshot : initialSnapshot,
+          );
+        }
+        return Response.json(
+          { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+          { status: 404 },
+        );
+      };
+    },
+    { initialSnapshot: initial, nextSnapshot: next, organization: organizationId, oldRun: runId },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await page.waitForFunction(() => {
+    return (window as typeof window & { __pollBodyStarted?: boolean }).__pollBodyStarted === true;
+  });
+  await page.evaluate(() => {
+    (
+      window as typeof window & { __useNextOnboardingSnapshot?: boolean }
+    ).__useNextOnboardingSnapshot = true;
+  });
+  const refreshCurrentRun = page
+    .locator("button:not([disabled])")
+    .filter({ hasText: "Atualizar status" })
+    .first();
+  await expect(refreshCurrentRun).toBeEnabled();
+  await refreshCurrentRun.click();
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  await page.waitForTimeout(1_600);
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("perfil não autorizado vê bloqueio sem request e erro de autorização recebe foco", async ({

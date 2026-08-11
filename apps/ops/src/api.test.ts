@@ -73,4 +73,41 @@ describe("fronteira runtime da API de onboarding", () => {
       retryable: false,
     });
   });
+
+  it("propaga AbortError quando o cancelamento acontece durante o body de um erro HTTP", async () => {
+    let markBodyStarted: (() => void) | undefined;
+    const bodyStarted = new Promise<void>((resolve) => {
+      markBodyStarted = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const signal = init?.signal;
+        return {
+          ok: false,
+          status: 503,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              markBodyStarted?.();
+              signal?.addEventListener(
+                "abort",
+                () => reject(new DOMException("The operation was aborted.", "AbortError")),
+                { once: true },
+              );
+            }),
+        } as Response;
+      }),
+    );
+    const controller = new AbortController();
+    const pending = api.onboarding.provisioning(
+      organizationId,
+      "e1111111-1111-4111-8111-111111111111",
+      controller.signal,
+    );
+    await bodyStarted;
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await expect(pending).rejects.not.toBeInstanceOf(ApiClientError);
+  });
 });

@@ -288,17 +288,22 @@ describe("onboarding real HTTP error contract", () => {
         headers: { authorization: "Bearer test" },
         payload: {
           items: {
-            training: {
+            fiscalChoice: {
               status: "verified",
-              evidenceReference: "training-http-contract",
-              evidence: { completed: true, secret: "must-not-be-stored", note: "x".repeat(1_000) },
+              evidenceReference: "fiscal-http-contract",
+              evidence: { choice: "must-not-cross-secret" },
             },
           },
         },
       });
-      exactError(invalidEvidence.json(), 400, "VALIDATION_ERROR");
+      const invalidEvidenceBody = exactError(invalidEvidence.json(), 400, "VALIDATION_ERROR");
+      assert.deepEqual(invalidEvidenceBody.details, {
+        fieldErrors: {
+          "items.fiscalChoice.evidence.choice": ["Valor inválido."],
+        },
+      });
       assert.equal(updateCalls, callsBeforeInvalidEvidence);
-      assert.doesNotMatch(invalidEvidence.body, /must-not-be-stored/i);
+      assert.doesNotMatch(invalidEvidence.body, /must-not-cross-secret/i);
 
       const unavailable = await app.inject({
         method: "POST",

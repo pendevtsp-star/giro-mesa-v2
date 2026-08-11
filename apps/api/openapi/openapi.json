@@ -21531,7 +21531,9 @@
             ]
           },
           "attempts": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           },
           "lastErrorCode": {
             "type": "string",
@@ -21567,6 +21569,10 @@
           "state",
           "checkpoint",
           "attempts",
+          "lastErrorCode",
+          "nextRetryAt",
+          "completedAt",
+          "failedAt",
           "createdAt",
           "updatedAt"
         ]
@@ -21630,9 +21636,12 @@
         },
         "required": [
           "organizationId",
+          "activatedAt",
           "items",
           "ready",
-          "missingItems"
+          "missingItems",
+          "selection",
+          "provisioning"
         ]
       },
       "OnboardingApiErrorDetails": {
@@ -21781,7 +21790,9 @@
             ]
           },
           "attempts": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           },
           "startedAt": {
             "type": "string",
@@ -21811,6 +21822,9 @@
           "step",
           "status",
           "attempts",
+          "startedAt",
+          "completedAt",
+          "compensatedAt",
           "createdAt",
           "updatedAt"
         ]
@@ -21849,7 +21863,9 @@
             ]
           },
           "attempts": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           },
           "lastErrorCode": {
             "type": "string",
@@ -21891,6 +21907,10 @@
           "state",
           "checkpoint",
           "attempts",
+          "lastErrorCode",
+          "nextRetryAt",
+          "completedAt",
+          "failedAt",
           "createdAt",
           "updatedAt",
           "steps"

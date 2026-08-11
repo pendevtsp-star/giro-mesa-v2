@@ -101,6 +101,36 @@ O round de revisÃ£o corrigiu o achado crÃ­tico e os sete achados importantes
 - QA visual em lote: as quatro capturas desktop/mobile de topo/ativaÃ§Ã£o foram inspecionadas em resoluÃ§Ã£o original; hierarquia, wrapping, foco visual e ausÃªncia de overflow permaneceram corretos.
 - O detector Impeccable nÃ£o foi executado novamente neste round: a Task 8 exigia uma Ãºnica execuÃ§Ã£o final, jÃ¡ registrada acima. As correÃ§Ãµes preservam esse gate sem fabricar uma segunda passagem.
 
+## Fix round 2 — paths profundos, cancelamento e ordem total
+
+O segundo round fecha os três achados importantes e o achado menor da nova revisão sem reduzir o contrato, repetir o detector Impeccable ou antecipar Task 9+.
+
+### RED adicional capturado
+
+- O pipe Zod retornava apenas `fieldErrors.items` para a escolha fiscal aninhada. O teste HTTP real capturou a perda de `items.fiscalChoice.evidence.choice` e mostrou que o E2E anterior não usava o body produzido pelo backend.
+- Quando os headers 503 já tinham chegado e o abort ocorria durante `response.json()`, `safeJson` convertia `AbortError` em `ApiClientError`. O teste determinístico reproduziu a contaminação possível após a troca de run.
+- A sequência por tipo de request permitia que um PATCH antigo respondesse depois de um GET novo e rebaixasse a revisão do snapshot. O E2E reproduziu a reversão de revisão e cobriu também o interleaving inverso.
+- Os schemas OpenAPI marcavam campos sempre presentes e nullable como opcionais; `attempts` era `number` e o cliente C# gerava `double?`. Os testes de contrato falharam antes da correção.
+
+### Correções
+
+- `ZodPipe` agora deriva paths completos somente de `issue.path`, limita profundidade, comprimento, quantidade e mensagens, seleciona de forma determinística o ramo mais próximo de unions e nunca propaga valor, payload, mensagem arbitrária ou segredo do cliente. O boundary HTTP real e o E2E compartilham exatamente `items.fiscalChoice.evidence.choice`; o campo correto recebe mensagem, `aria-invalid`, `aria-describedby` e foco.
+- `safeJson` relança `AbortError`. Polling só aceita sucesso ou erro se controller, signal, organização, unidade, generation, revisão, run e ordem ainda forem correntes; um body 503 atrasado é abortado ao trocar para o novo run e não cria alerta nem backoff residual.
+- GET, PATCH, seleção, ativação e polling compartilham uma única ordem monotônica para qualquer resposta que possa afetar o snapshot. Request posterior invalida resposta anterior independentemente do tipo. Refresh permanece uma leitura segura durante provisioning ativo, enquanto mutations continuam bloqueadas.
+- DTO, OpenAPI e runtime Zod agora concordam sobre campos nullable sempre presentes; `attempts` é `integer/int32` com mínimo zero. Clientes TypeScript e C# foram regenerados e o C# usa `int?`, não `double?`.
+
+### Gates do fix round 2
+
+- Zod/HTTP/OpenAPI focados: **7/7**; inclui path aninhado real, ausência do valor malicioso, requiredness e `attempts` inteiro.
+- API completa sem env de integração: **92 passed, 42 skipped declarados, 0 failures**. Contracts: **8/8**.
+- PostgreSQL 17 focal unit-scope: **1/1**. A autorização não foi alterada neste round; a matriz completa PG16+17 do round 1 permanece a regressão de referência. O container descartável `giromesa-task8-fix2-pg17` foi conferido e removido.
+- Ops unit/component/runtime boundary: **13 arquivos, 50/50 testes**.
+- Playwright onboarding: **24/24**, 12 cenários em desktop + mobile; inclui os dois interleavings GET/PATCH e abort durante streaming do body 503 com troca de revisão/run.
+- Clientes: geração TypeScript e C# **verde**. `C:\Users\maxue\.dotnet\dotnet.exe build --no-restore`: **verde, 0 warnings, 0 errors** (`net10.0`).
+- Workspace typecheck: **12/12 tasks**. Workspace test: **12/12 tasks**. Workspace build: **8/8 tasks**.
+- Biome focado em **10 arquivos TypeScript/TSX: verde**. `git diff --check`: **verde**.
+- O detector Impeccable não foi repetido, conforme o limite explícito. O OpenAPI foi gerado apenas com uma URL PostgreSQL local placeholder necessária ao bootstrap; não houve conexão com provider, credencial real, deploy ou push.
+
 ## Limites conhecidos
 
 - O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.

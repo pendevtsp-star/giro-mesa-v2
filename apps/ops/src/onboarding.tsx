@@ -502,6 +502,7 @@ export function OnboardingPage({
   const generationRef = useRef(0);
   const refreshSequenceRef = useRef(0);
   const mutationSequenceRef = useRef(0);
+  const snapshotRequestOrderRef = useRef(0);
   const snapshotRef = useRef<OnboardingResponse | null>(null);
   const refreshControllerRef = useRef<AbortController | null>(null);
   const pollControllerRef = useRef<AbortController | null>(null);
@@ -537,8 +538,26 @@ export function OnboardingPage({
   }, [error, loading]);
 
   const applySnapshot = useCallback(
-    (next: OnboardingResponse, expectedGeneration: number, expectedScope: string) => {
-      if (generationRef.current !== expectedGeneration || scopeKeyRef.current !== expectedScope) {
+    (
+      next: OnboardingResponse,
+      expectedGeneration: number,
+      expectedScope: string,
+      requestOrder: number,
+    ) => {
+      if (
+        generationRef.current !== expectedGeneration ||
+        scopeKeyRef.current !== expectedScope ||
+        snapshotRequestOrderRef.current !== requestOrder
+      ) {
+        return false;
+      }
+      const currentRevision = snapshotRef.current?.selection?.revision;
+      const nextRevision = next.selection?.revision;
+      if (
+        currentRevision !== undefined &&
+        nextRevision !== undefined &&
+        nextRevision < currentRevision
+      ) {
         return false;
       }
       const previousIdentity = snapshotIdentity(snapshotRef.current, expectedScope);
@@ -563,6 +582,8 @@ export function OnboardingPage({
     async (expectedGeneration = generationRef.current, expectedScope = scopeKeyRef.current) => {
       if (!authorized || !organizationId) return;
       const sequence = ++refreshSequenceRef.current;
+      const requestOrder = ++snapshotRequestOrderRef.current;
+      pollControllerRef.current?.abort();
       refreshControllerRef.current?.abort();
       const controller = new AbortController();
       refreshControllerRef.current = controller;
@@ -571,12 +592,18 @@ export function OnboardingPage({
       }
       try {
         const next = await api.onboarding.get(organizationId, controller.signal);
-        if (sequence !== refreshSequenceRef.current) return;
-        applySnapshot(next, expectedGeneration, expectedScope);
+        if (
+          sequence !== refreshSequenceRef.current ||
+          requestOrder !== snapshotRequestOrderRef.current
+        ) {
+          return;
+        }
+        applySnapshot(next, expectedGeneration, expectedScope, requestOrder);
       } catch (caught) {
         if (
           !isAbortError(caught) &&
           sequence === refreshSequenceRef.current &&
+          requestOrder === snapshotRequestOrderRef.current &&
           generationRef.current === expectedGeneration &&
           scopeKeyRef.current === expectedScope
         ) {
@@ -601,6 +628,7 @@ export function OnboardingPage({
     scopeKeyRef.current = scopeKey;
     refreshSequenceRef.current += 1;
     mutationSequenceRef.current += 1;
+    snapshotRequestOrderRef.current += 1;
     refreshControllerRef.current?.abort();
     pollControllerRef.current?.abort();
     snapshotRef.current = null;
@@ -645,11 +673,15 @@ export function OnboardingPage({
     const expectedRunId = run.id;
     const expectedRevision = snapshot.selection?.revision ?? null;
     const timer = globalThis.setTimeout(async () => {
+      if (controller.signal.aborted || pollControllerRef.current !== controller) return;
+      const requestOrder = ++snapshotRequestOrderRef.current;
       try {
         const status = await api.onboarding.provisioning(organizationId, run.id, controller.signal);
         const current = snapshotRef.current;
         if (
           controller.signal.aborted ||
+          pollControllerRef.current !== controller ||
+          snapshotRequestOrderRef.current !== requestOrder ||
           generationRef.current !== expectedGeneration ||
           scopeKeyRef.current !== expectedScope ||
           current?.provisioning?.id !== expectedRunId ||
@@ -669,8 +701,13 @@ export function OnboardingPage({
       } catch (caught) {
         if (
           !isAbortError(caught) &&
+          !controller.signal.aborted &&
+          pollControllerRef.current === controller &&
+          snapshotRequestOrderRef.current === requestOrder &&
           generationRef.current === expectedGeneration &&
-          scopeKeyRef.current === expectedScope
+          scopeKeyRef.current === expectedScope &&
+          snapshotRef.current?.provisioning?.id === expectedRunId &&
+          (snapshotRef.current.selection?.revision ?? null) === expectedRevision
         ) {
           showError(caught);
           setPollAttempt((attempt) => attempt + 1);
@@ -718,16 +755,22 @@ export function OnboardingPage({
     const expectedGeneration = generationRef.current;
     const expectedScope = scopeKeyRef.current;
     const sequence = ++mutationSequenceRef.current;
+    const requestOrder = ++snapshotRequestOrderRef.current;
+    pollControllerRef.current?.abort();
     setBusy(true);
     setError(null);
     try {
       const next = await request();
-      if (sequence === mutationSequenceRef.current) {
-        applySnapshot(next, expectedGeneration, expectedScope);
+      if (
+        sequence === mutationSequenceRef.current &&
+        requestOrder === snapshotRequestOrderRef.current
+      ) {
+        applySnapshot(next, expectedGeneration, expectedScope, requestOrder);
       }
     } catch (caught) {
       if (
         sequence === mutationSequenceRef.current &&
+        requestOrder === snapshotRequestOrderRef.current &&
         generationRef.current === expectedGeneration &&
         scopeKeyRef.current === expectedScope
       ) {
@@ -753,12 +796,15 @@ export function OnboardingPage({
     const expectedGeneration = generationRef.current;
     const expectedScope = scopeKeyRef.current;
     const sequence = ++mutationSequenceRef.current;
+    const requestOrder = ++snapshotRequestOrderRef.current;
+    pollControllerRef.current?.abort();
     setBusy(true);
     setError(null);
     try {
       await api.onboarding.select(organizationId, input);
       if (
         sequence !== mutationSequenceRef.current ||
+        requestOrder !== snapshotRequestOrderRef.current ||
         generationRef.current !== expectedGeneration ||
         scopeKeyRef.current !== expectedScope
       ) {
@@ -771,6 +817,7 @@ export function OnboardingPage({
     } catch (caught) {
       if (
         sequence === mutationSequenceRef.current &&
+        requestOrder === snapshotRequestOrderRef.current &&
         generationRef.current === expectedGeneration &&
         scopeKeyRef.current === expectedScope
       ) {
@@ -805,6 +852,8 @@ export function OnboardingPage({
     const expectedGeneration = generationRef.current;
     const expectedScope = scopeKeyRef.current;
     const sequence = ++mutationSequenceRef.current;
+    const requestOrder = ++snapshotRequestOrderRef.current;
+    pollControllerRef.current?.abort();
     setBusy(true);
     setError(null);
     try {
@@ -816,6 +865,7 @@ export function OnboardingPage({
       );
       if (
         sequence !== mutationSequenceRef.current ||
+        requestOrder !== snapshotRequestOrderRef.current ||
         generationRef.current !== expectedGeneration ||
         scopeKeyRef.current !== expectedScope
       ) {
@@ -826,6 +876,7 @@ export function OnboardingPage({
     } catch (caught) {
       if (
         sequence !== mutationSequenceRef.current ||
+        requestOrder !== snapshotRequestOrderRef.current ||
         generationRef.current !== expectedGeneration ||
         scopeKeyRef.current !== expectedScope
       ) {
@@ -1036,6 +1087,7 @@ export function OnboardingJourney({
                   key={`${confirmationIdentity}:${definition.item}`}
                   online={online}
                   profileId={profileId}
+                  refreshDisabled={busy || Boolean(snapshot.activatedAt)}
                   selection={snapshot.selection}
                   unitId={unitId}
                   units={units}
@@ -1070,6 +1122,7 @@ function ChecklistRow({
   profileId,
   online,
   busy,
+  refreshDisabled,
   onRefresh,
   onPatch,
   onSelect,
@@ -1083,6 +1136,7 @@ function ChecklistRow({
   profileId: ProfileId;
   online: boolean;
   busy: boolean;
+  refreshDisabled: boolean;
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
   onSelect: (input: OnboardingSelectionInput) => void;
@@ -1117,6 +1171,7 @@ function ChecklistRow({
           item={definition.item}
           online={online}
           profileId={profileId}
+          refreshDisabled={refreshDisabled}
           selection={selection}
           unitId={unitId}
           units={units}
@@ -1138,6 +1193,7 @@ function ItemAction({
   profileId,
   online,
   busy,
+  refreshDisabled,
   onRefresh,
   onPatch,
   onSelect,
@@ -1151,6 +1207,7 @@ function ItemAction({
   profileId: ProfileId;
   online: boolean;
   busy: boolean;
+  refreshDisabled: boolean;
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
   onSelect: (input: OnboardingSelectionInput) => void;
@@ -1187,6 +1244,7 @@ function ItemAction({
         evidence={evidence}
         fieldErrors={fieldErrors}
         profileId={profileId}
+        refreshDisabled={refreshDisabled || !online}
         onPatch={onPatch}
         onRefresh={onRefresh}
       />
@@ -1198,6 +1256,7 @@ function ItemAction({
         disabled={disabled}
         evidence={evidence}
         fieldErrors={fieldErrors}
+        refreshDisabled={refreshDisabled || !online}
         onPatch={onPatch}
         onRefresh={onRefresh}
       />
@@ -1230,7 +1289,12 @@ function ItemAction({
           {destination.label}
         </a>
       )}
-      <Button disabled={disabled} onClick={onRefresh} size="sm" variant="secondary">
+      <Button
+        disabled={refreshDisabled || !online}
+        onClick={onRefresh}
+        size="sm"
+        variant="secondary"
+      >
         Atualizar status
       </Button>
     </div>
@@ -1395,6 +1459,7 @@ function FiscalControl({
 
 function QrControl({
   disabled,
+  refreshDisabled,
   evidence,
   profileId,
   onRefresh,
@@ -1402,6 +1467,7 @@ function QrControl({
   fieldErrors,
 }: {
   disabled: boolean;
+  refreshDisabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   profileId: ProfileId;
   onRefresh: () => void;
@@ -1421,7 +1487,7 @@ function QrControl({
       <a className="onboarding-action-link" href={routeHref("catalog")}>
         Revisar menu e QR
       </a>
-      <Button disabled={disabled} onClick={onRefresh} size="sm" variant="secondary">
+      <Button disabled={refreshDisabled} onClick={onRefresh} size="sm" variant="secondary">
         Atualizar prova do servidor
       </Button>
       {!resolved && profileId === "owner" ? (
@@ -1501,12 +1567,14 @@ function QrControl({
 
 function ProductionControl({
   disabled,
+  refreshDisabled,
   evidence,
   onPatch,
   onRefresh,
   fieldErrors,
 }: {
   disabled: boolean;
+  refreshDisabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   onPatch: (input: OnboardingUpdateInput) => void;
   onRefresh: () => void;
@@ -1582,7 +1650,13 @@ function ProductionControl({
         </a>
       )}
       {mode !== "off" && evidence?.status === "in_progress" && (
-        <Button disabled={disabled} onClick={onRefresh} size="sm" type="button" variant="secondary">
+        <Button
+          disabled={refreshDisabled}
+          onClick={onRefresh}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
           Atualizar prova do servidor
         </Button>
       )}

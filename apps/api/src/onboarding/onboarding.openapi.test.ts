@@ -24,6 +24,10 @@ const csharpAliasRoot = new URL(
   "../../../../packages/api-client-csharp/Generated/V1/Organizations/Item/Onboarding/",
   import.meta.url,
 );
+const csharpModelsRoot = new URL(
+  "../../../../packages/api-client-csharp/Generated/Models/",
+  import.meta.url,
+);
 
 describe("onboarding generated contract", () => {
   it("keeps aliases, success/error responses and Idempotency-Key explicit", async () => {
@@ -196,6 +200,11 @@ describe("onboarding generated contract", () => {
         );
       }
     }
+    for (const model of ["ProvisioningSummaryResponse.cs", "ProvisioningStepResponse.cs"]) {
+      const source = await readFile(new URL(model, csharpModelsRoot), "utf8");
+      assert.match(source, /public int\? Attempts \{ get; set; \}/);
+      assert.doesNotMatch(source, /public double\? Attempts/);
+    }
   });
 
   it("describes checklist evidence and provisioning with closed enums and date-times", async () => {
@@ -240,6 +249,51 @@ describe("onboarding generated contract", () => {
       property(schemas.OnboardingChecklistEvidenceResponse, "properties", "evidence"),
       { $ref: "#/components/schemas/OnboardingEvidenceResponse" },
     );
+    assert.deepEqual(
+      [...(property(schemas.OnboardingResponse, "required") as string[])].sort(),
+      [
+        "activatedAt",
+        "items",
+        "missingItems",
+        "organizationId",
+        "provisioning",
+        "ready",
+        "selection",
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...(property(schemas.ProvisioningSummaryResponse, "required") as string[])].sort(),
+      [
+        "attempts",
+        "checkpoint",
+        "completedAt",
+        "createdAt",
+        "failedAt",
+        "id",
+        "lastErrorCode",
+        "nextRetryAt",
+        "state",
+        "updatedAt",
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...(property(schemas.ProvisioningStepResponse, "required") as string[])].sort(),
+      [
+        "attempts",
+        "compensatedAt",
+        "completedAt",
+        "createdAt",
+        "startedAt",
+        "status",
+        "step",
+        "updatedAt",
+      ].sort(),
+    );
+    for (const schema of [schemas.ProvisioningSummaryResponse, schemas.ProvisioningStepResponse]) {
+      assert.equal(property(schema, "properties", "attempts", "type"), "integer");
+      assert.equal(property(schema, "properties", "attempts", "format"), "int32");
+      assert.equal(property(schema, "properties", "attempts", "minimum"), 0);
+    }
     assert.deepEqual(property(schemas.ProvisioningSummaryResponse, "properties", "state", "enum"), [
       "requested",
       "validating",

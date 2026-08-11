@@ -15,7 +15,7 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The attempts property</summary>
-        public double? Attempts { get; set; }
+        public int? Attempts { get; set; }
         /// <summary>The checkpoint property</summary>
         public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint? Checkpoint { get; set; }
         /// <summary>The completedAt property</summary>
@@ -65,7 +65,7 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "attempts", n => { Attempts = n.GetDoubleValue(); } },
+                { "attempts", n => { Attempts = n.GetIntValue(); } },
                 { "checkpoint", n => { Checkpoint = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint>(); } },
                 { "completedAt", n => { CompletedAt = n.GetDateTimeOffsetValue(); } },
                 { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
@@ -84,7 +84,7 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteDoubleValue("attempts", Attempts);
+            writer.WriteIntValue("attempts", Attempts);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint>("checkpoint", Checkpoint);
             writer.WriteDateTimeOffsetValue("completedAt", CompletedAt);
             writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
