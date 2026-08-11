@@ -14,7 +14,7 @@ import {
   outboxEvents,
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { AuthService } from "./auth.service.js";
 import { encryptMfaSecret, mfaKey, recoveryCodeHash } from "./mfa.js";
@@ -447,6 +447,7 @@ describe("email verification", () => {
       .from(identities)
       .where(eq(identities.email, pendingEmail));
     assert.ok(pendingIdentity);
+    assert.equal(pendingIdentity.emailVerifiedAt, null);
     const recoveryCode = "http-recovery-code";
     const key = mfaKey();
     await testOwner.db.insert(mfaFactors).values({
@@ -572,10 +573,214 @@ describe("email verification", () => {
         results.slice(0, 10).every((response) => response.statusCode === 202),
         true,
       );
-      assert.equal(results[10]?.statusCode, 429);
-      assert.ok(Number(results[10]?.headers["retry-after"]) > 0);
+      const apiAlias = results[10];
+      assert.equal(apiAlias?.statusCode, 429);
+      assert.ok(Number(apiAlias?.headers["retry-after"]) > 0);
+      assert.equal(apiAlias?.headers["cache-control"], "no-store");
+      const publicAlias = await rateLimitedApp.inject({
+        method: "POST",
+        url: "/public/v1/auth/email-verification/request",
+        payload: { email: `ip-limit-alias-${suffix}@example.test` },
+      });
+      assert.equal(publicAlias.statusCode, 429);
+      assert.deepEqual(publicAlias.json(), apiAlias?.json());
+      assert.equal(publicAlias.headers["retry-after"], apiAlias?.headers["retry-after"]);
+      assert.equal(publicAlias.headers["cache-control"], apiAlias?.headers["cache-control"]);
     } finally {
       await rateLimitedApp.close();
+    }
+  });
+
+  it("guarantees one initial verification after anonymous durable quota without bypassing resends", async (context) => {
+    if (!integrationUrl || !testOwner) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const email = `quota-before-register-${suffix}@example.test`;
+    const emailHash = createHash("sha256").update(email).digest("hex");
+    const { createApplication } = await import("../app-factory.js");
+    const { app: anonymousApp } = await createApplication();
+    try {
+      await anonymousApp.init();
+      await anonymousApp.getHttpAdapter().getInstance().ready();
+      for (let index = 0; index < 10; index += 1) {
+        const response = await anonymousApp.inject({
+          method: "POST",
+          url: "/v1/auth/email-verification/request",
+          payload: { email },
+        });
+        assert.equal(response.statusCode, 202);
+        const [freshRequest] = await testOwner.db
+          .select({ id: emailVerificationRequests.id })
+          .from(emailVerificationRequests)
+          .where(eq(emailVerificationRequests.emailHash, emailHash))
+          .orderBy(desc(emailVerificationRequests.requestedAt))
+          .limit(1);
+        assert.ok(freshRequest);
+        await testOwner.db
+          .update(emailVerificationRequests)
+          .set({ requestedAt: new Date(Date.now() - (index + 1) * 2 * 60 * 60_000) })
+          .where(eq(emailVerificationRequests.id, freshRequest.id));
+      }
+    } finally {
+      await anonymousApp.close();
+    }
+
+    assert.equal(
+      (
+        await testOwner.db
+          .select({ id: emailVerificationRequests.id })
+          .from(emailVerificationRequests)
+          .where(eq(emailVerificationRequests.emailHash, emailHash))
+      ).length,
+      10,
+    );
+
+    const { app: registrationApp } = await createApplication();
+    try {
+      await registrationApp.init();
+      await registrationApp.getHttpAdapter().getInstance().ready();
+      const firstRegistration = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/register",
+        payload: {
+          email,
+          name: "Quota First Owner",
+          password: "a-secure-quota-first-password",
+          termsAccepted: true,
+        },
+      });
+      assert.equal(firstRegistration.statusCode, 201);
+      assert.deepEqual(firstRegistration.json(), {
+        accepted: true,
+        email,
+        verificationRequired: true,
+      });
+
+      const [identity] = await testOwner.db
+        .select()
+        .from(identities)
+        .where(eq(identities.email, email));
+      assert.ok(identity);
+      assert.equal(identity.emailVerifiedAt, null);
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: emailVerificationTokens.id })
+            .from(emailVerificationTokens)
+            .where(eq(emailVerificationTokens.identityId, identity.id))
+        ).length,
+        1,
+      );
+
+      const minuteResend = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/request",
+        payload: { email },
+      });
+      assert.equal(minuteResend.statusCode, 202);
+      assert.deepEqual(minuteResend.json(), { accepted: true });
+      assert.equal(minuteResend.headers["retry-after"], "60");
+      assert.equal(minuteResend.headers["cache-control"], "no-store");
+
+      const requests = await testOwner.db
+        .select({ id: emailVerificationRequests.id })
+        .from(emailVerificationRequests)
+        .where(eq(emailVerificationRequests.emailHash, emailHash));
+      assert.equal(requests.length, 11);
+      for (const [index, request] of requests.entries()) {
+        await testOwner.db
+          .update(emailVerificationRequests)
+          .set({
+            requestedAt:
+              index < 5
+                ? new Date(Date.now() - (index + 1) * 2 * 60_000)
+                : new Date(Date.now() - 25 * 60 * 60_000),
+          })
+          .where(eq(emailVerificationRequests.id, request.id));
+      }
+      const hourlyResend = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/request",
+        payload: { email },
+      });
+      assert.equal(hourlyResend.statusCode, 202);
+      assert.deepEqual(hourlyResend.json(), { accepted: true });
+
+      for (const [index, request] of requests.entries()) {
+        await testOwner.db
+          .update(emailVerificationRequests)
+          .set({ requestedAt: new Date(Date.now() - (index + 1) * 2 * 60 * 60_000) })
+          .where(eq(emailVerificationRequests.id, request.id));
+      }
+      const dailyResend = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/request",
+        payload: { email },
+      });
+      assert.equal(dailyResend.statusCode, 202);
+      assert.deepEqual(dailyResend.json(), { accepted: true });
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: outboxEvents.id })
+            .from(outboxEvents)
+            .where(
+              and(
+                eq(outboxEvents.topic, "auth.email_verification_requested"),
+                eq(outboxEvents.aggregateId, identity.id),
+              ),
+            )
+        ).length,
+        1,
+      );
+
+      const duplicateRegistration = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/register",
+        payload: {
+          email,
+          name: "Quota Duplicate Owner",
+          password: "a-secure-quota-duplicate-password",
+          termsAccepted: true,
+        },
+      });
+      assert.equal(duplicateRegistration.statusCode, 409);
+
+      const resend = await registrationApp.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/request",
+        payload: { email },
+      });
+      assert.equal(resend.statusCode, 202);
+      assert.deepEqual(resend.json(), { accepted: true });
+      assert.equal(resend.headers["retry-after"], "60");
+      assert.equal(resend.headers["cache-control"], "no-store");
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: emailVerificationTokens.id })
+            .from(emailVerificationTokens)
+            .where(eq(emailVerificationTokens.identityId, identity.id))
+        ).length,
+        1,
+      );
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: outboxEvents.id })
+            .from(outboxEvents)
+            .where(
+              and(
+                eq(outboxEvents.topic, "auth.email_verification_requested"),
+                eq(outboxEvents.aggregateId, identity.id),
+              ),
+            )
+        ).length,
+        1,
+      );
+    } finally {
+      await registrationApp.close();
     }
   });
 

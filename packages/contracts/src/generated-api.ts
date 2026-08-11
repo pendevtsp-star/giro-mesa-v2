@@ -4837,6 +4837,8 @@ export interface operations {
         headers: {
           /** @description Intervalo público uniforme antes de um novo pedido. */
           "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -4866,6 +4868,8 @@ export interface operations {
         headers: {
           /** @description Intervalo público uniforme antes de um novo pedido. */
           "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -4895,6 +4899,8 @@ export interface operations {
         headers: {
           /** @description Intervalo público uniforme antes de um novo pedido. */
           "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -4921,6 +4927,8 @@ export interface operations {
       /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -4950,6 +4958,8 @@ export interface operations {
       /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -4979,6 +4989,8 @@ export interface operations {
       /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
           [name: string]: unknown;
         };
         content: {

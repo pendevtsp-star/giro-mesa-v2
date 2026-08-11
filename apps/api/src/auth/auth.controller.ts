@@ -150,6 +150,10 @@ export class AuthController {
         description: "Intervalo público uniforme antes de um novo pedido.",
         schema: { type: "integer", example: 60 },
       },
+      "Cache-Control": {
+        description: "Impede armazenamento da resposta de autenticação.",
+        schema: { type: "string", example: "no-store" },
+      },
     },
     type: EmailVerificationAcceptedResponse,
   })
@@ -166,6 +170,12 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({
     description: "Verificação concluída, já consumida ou aguardando segundo fator.",
+    headers: {
+      "Cache-Control": {
+        description: "Impede armazenamento da resposta de autenticação.",
+        schema: { type: "string", example: "no-store" },
+      },
+    },
     schema: emailVerificationResultSchema,
   })
   @Post("email-verification/confirm")

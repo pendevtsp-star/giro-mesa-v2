@@ -21,6 +21,7 @@ import {
   passwordCredentials,
   passwordResetTokens,
   roleBindings,
+  type TenantTransaction,
 } from "@giromesa/db";
 import { encryptionKey, encryptSecret } from "@giromesa/domain";
 import {
@@ -62,6 +63,16 @@ const tokenHash = (token: string) => createHash("sha256").update(token).digest("
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
 const EMAIL_VERIFICATION_ACCEPTED = Object.freeze({ accepted: true as const });
 
+function databaseErrorCode(error: unknown) {
+  let candidate = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!candidate || typeof candidate !== "object") return undefined;
+    if ("code" in candidate && typeof candidate.code === "string") return candidate.code;
+    candidate = "cause" in candidate ? candidate.cause : undefined;
+  }
+  return undefined;
+}
+
 @Injectable()
 export class AuthService {
   constructor(private readonly database: DatabaseService) {}
@@ -90,7 +101,7 @@ export class AuthService {
           aggregateId: identity.id,
           payload: { identityId: identity.id },
         });
-        await this.enqueueEmailVerification(identity, encryption);
+        await this.enqueueInitialEmailVerification(tx, identity, encryption);
         return {
           accepted: true as const,
           email: identity.email,
@@ -98,7 +109,7 @@ export class AuthService {
         };
       });
     } catch (error) {
-      if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+      if (databaseErrorCode(error) === "23505") {
         throw new ConflictException({
           code: "IDENTITY_EXISTS",
           message: "Já existe uma conta com este e-mail.",
@@ -230,7 +241,9 @@ export class AuthService {
     const encryption = this.emailVerificationEncryption();
     const email = input.email.trim().toLowerCase();
     const identity = { id: "", email, displayName: "" };
-    await this.enqueueEmailVerification(identity, encryption, true);
+    await this.database.db.transaction((tx) =>
+      this.enqueueEmailVerification(tx, identity, encryption, "resend"),
+    );
     return EMAIL_VERIFICATION_ACCEPTED;
   }
 
@@ -771,106 +784,117 @@ export class AuthService {
     });
   }
 
+  private enqueueInitialEmailVerification(
+    tx: TenantTransaction,
+    identity: { id: string; email: string; displayName: string },
+    encryption: ReturnType<typeof encryptionKey>,
+  ) {
+    return this.enqueueEmailVerification(tx, identity, encryption, "initial");
+  }
+
   private async enqueueEmailVerification(
+    tx: TenantTransaction,
     requestedIdentity: { id: string; email: string; displayName: string },
     encryption: ReturnType<typeof encryptionKey>,
-    enumerationSafe = false,
+    mode: "initial" | "resend",
   ) {
     const email = requestedIdentity.email.trim().toLowerCase();
     const emailHash = tokenHash(email);
-    return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
-      );
-      const now = new Date();
-      const requests = await tx
-        .select({ requestedAt: emailVerificationRequests.requestedAt })
-        .from(emailVerificationRequests)
-        .where(
-          and(
-            eq(emailVerificationRequests.emailHash, emailHash),
-            gt(emailVerificationRequests.requestedAt, new Date(now.valueOf() - 24 * 60 * 60_000)),
-          ),
-        )
-        .orderBy(desc(emailVerificationRequests.requestedAt));
-      const latest = requests[0]?.requestedAt;
-      const hourCount = requests.filter(
-        (request) => request.requestedAt > new Date(now.valueOf() - 60 * 60_000),
-      ).length;
-      if (
-        (latest && now.valueOf() - latest.valueOf() < 60_000) ||
-        hourCount >= 5 ||
-        requests.length >= 10
-      ) {
-        if (enumerationSafe) return EMAIL_VERIFICATION_ACCEPTED;
-        throw new HttpException(
-          {
-            code: "EMAIL_VERIFICATION_RATE_LIMITED",
-            message: "Aguarde antes de solicitar um novo envio.",
-          },
-          429,
-        );
-      }
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`email-verification:${emailHash}`}::text, 0))`,
+    );
+    const now = new Date();
+    const requests = await tx
+      .select({ requestedAt: emailVerificationRequests.requestedAt })
+      .from(emailVerificationRequests)
+      .where(
+        and(
+          eq(emailVerificationRequests.emailHash, emailHash),
+          gt(emailVerificationRequests.requestedAt, new Date(now.valueOf() - 24 * 60 * 60_000)),
+        ),
+      )
+      .orderBy(desc(emailVerificationRequests.requestedAt));
+    const latest = requests[0]?.requestedAt;
+    const hourCount = requests.filter(
+      (request) => request.requestedAt > new Date(now.valueOf() - 60 * 60_000),
+    ).length;
+    const rateLimited =
+      (latest && now.valueOf() - latest.valueOf() < 60_000) ||
+      hourCount >= 5 ||
+      requests.length >= 10;
+    if (rateLimited && mode === "resend") return EMAIL_VERIFICATION_ACCEPTED;
 
-      const [storedIdentity] = await tx
-        .select()
-        .from(identities)
-        .where(eq(identities.email, email))
+    const [storedIdentity] = await tx
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email))
+      .limit(1);
+    const identity =
+      storedIdentity && (!requestedIdentity.id || requestedIdentity.id === storedIdentity.id)
+        ? storedIdentity
+        : undefined;
+    if (mode === "initial") {
+      if (!identity || identity.id !== requestedIdentity.id) {
+        throw new Error("Initial e-mail verification requires the newly created identity");
+      }
+      const [existingToken] = await tx
+        .select({ id: emailVerificationTokens.id })
+        .from(emailVerificationTokens)
+        .where(eq(emailVerificationTokens.identityId, identity.id))
         .limit(1);
-      const identity =
-        storedIdentity && (!requestedIdentity.id || requestedIdentity.id === storedIdentity.id)
-          ? storedIdentity
-          : undefined;
-      await tx.insert(emailVerificationRequests).values({
-        emailHash,
-        identityId: identity?.id ?? null,
-        requestedAt: now,
-      });
-      if (!identity || identity.disabledAt || identity.emailVerifiedAt) {
-        return enumerationSafe ? EMAIL_VERIFICATION_ACCEPTED : null;
+      if (existingToken) {
+        throw new Error("Initial e-mail verification was already issued");
       }
-
-      await tx
-        .update(emailVerificationTokens)
-        .set({ revokedAt: now })
-        .where(
-          and(
-            eq(emailVerificationTokens.identityId, identity.id),
-            isNull(emailVerificationTokens.usedAt),
-            isNull(emailVerificationTokens.revokedAt),
-          ),
-        );
-      const verificationToken = randomBytes(32).toString("base64url");
-      const expiresAt = new Date(now.valueOf() + EMAIL_VERIFICATION_TTL_MS);
-      await tx.insert(emailVerificationTokens).values({
-        identityId: identity.id,
-        tokenHash: tokenHash(verificationToken),
-        expiresAt,
-      });
-      const eventId = randomUUID();
-      await tx.insert(outboxEvents).values({
-        id: eventId,
-        topic: "auth.email_verification_requested",
-        aggregateType: "identity",
-        aggregateId: identity.id,
-        payload: {
-          identityId: identity.id,
-          verificationTokenEnvelope: encryptSecret(
-            verificationToken,
-            encryption,
-            `email-verification:${identity.id}:${eventId}`,
-          ),
-          expiresAt: expiresAt.toISOString(),
-        },
-      });
-      await tx.insert(auditEvents).values({
-        actorIdentityId: identity.id,
-        action: "auth.email_verification_requested",
-        entityType: "identity",
-        entityId: identity.id,
-      });
-      return EMAIL_VERIFICATION_ACCEPTED;
+    }
+    await tx.insert(emailVerificationRequests).values({
+      emailHash,
+      identityId: identity?.id ?? null,
+      requestedAt: now,
     });
+    if (!identity || identity.disabledAt || identity.emailVerifiedAt) {
+      return mode === "resend" ? EMAIL_VERIFICATION_ACCEPTED : null;
+    }
+
+    await tx
+      .update(emailVerificationTokens)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(emailVerificationTokens.identityId, identity.id),
+          isNull(emailVerificationTokens.usedAt),
+          isNull(emailVerificationTokens.revokedAt),
+        ),
+      );
+    const verificationToken = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(now.valueOf() + EMAIL_VERIFICATION_TTL_MS);
+    await tx.insert(emailVerificationTokens).values({
+      identityId: identity.id,
+      tokenHash: tokenHash(verificationToken),
+      expiresAt,
+    });
+    const eventId = randomUUID();
+    await tx.insert(outboxEvents).values({
+      id: eventId,
+      topic: "auth.email_verification_requested",
+      aggregateType: "identity",
+      aggregateId: identity.id,
+      payload: {
+        identityId: identity.id,
+        verificationTokenEnvelope: encryptSecret(
+          verificationToken,
+          encryption,
+          `email-verification:${identity.id}:${eventId}`,
+        ),
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+    await tx.insert(auditEvents).values({
+      actorIdentityId: identity.id,
+      action: "auth.email_verification_requested",
+      entityType: "identity",
+      entityId: identity.id,
+    });
+    return EMAIL_VERIFICATION_ACCEPTED;
   }
 
   private emailVerificationEncryption() {

@@ -102,3 +102,35 @@ This section supersedes the original statements that confirmation always creates
 | Task 5 regression check | PASS; no changed sync path and no changed sync line in the generated TypeScript client |
 
 The tests used only `giromesa-task6-fix1` on host port 55440 with separate API and worker databases; the `--rm` container was stopped and its absence verified after the gates. No real Resend request, persistent migration, push or deployment was performed.
+
+## Fix round 2
+
+The durable resend history no longer prevents the unique creation of a local identity from receiving its mandatory first verification. The initial issuance now runs inside the same registration transaction that inserted the identity. Only that private initial path may bypass pre-existing anonymous request history, it fails if a token already exists, and it always records the initial issuance before creating exactly one hash-only token and one encrypted outbox event. Ordinary resends and duplicate registrations have no bypass.
+
+### RED
+
+- `rtk pnpm --filter @giromesa/api test`: FAIL; 83 pass, 15 skip, 1 fail because the generated OpenAPI lacked the required `Cache-Control: no-store` response header schemas.
+- Focused real PostgreSQL/HTTP suite against `giromesa-task6-fix2`: FAIL; 4 pass, 2 fail. A first registration after ten anonymous durable request records returned 429 instead of 201, and an auth-bucket 429 response omitted `Cache-Control: no-store`.
+- After the first-send correction, the same focused suite exposed a second RED: 5 pass, 1 fail because Drizzle wrapped PostgreSQL `23505` in `cause`, so the required second registration returned 500 rather than the existing 409 conflict contract.
+
+### GREEN
+
+- The first real HTTP registration after ten anonymous requests returns 201/pending with `emailVerifiedAt = null`, exactly one verification token and exactly one verification outbox event. The request ledger contains eleven entries, proving the initial issuance still contributes to future limits.
+- A duplicate registration returns 409. Subsequent real HTTP resends at the one-minute, five-per-hour and ten-per-day boundaries return the uniform 202 response and create no additional token or outbox event.
+- Sensitive auth responses receive `Cache-Control: no-store` before the IP rate-limit hook can terminate a request. The `/v1` and `/public/v1` 429 aliases have the same body, `Retry-After` and `Cache-Control` headers.
+- OpenAPI documents `Cache-Control: no-store` on all three aliases for both the 202 request response and the 200 confirmation response. TypeScript and C# clients were regenerated.
+
+### Exact verification results
+
+| Gate | Result |
+| --- | --- |
+| focused compiled API integration on disposable PostgreSQL 16 | PASS; 6 tests, 6 pass, 0 fail |
+| API suite without PG variables | PASS; 99 tests, 84 pass, 15 expected skips, 0 fail |
+| site browser-boundary suite | PASS; 14 tests, 14 pass, 0 fail |
+| contracts suite | PASS; 4 tests, 4 pass, 0 fail |
+| `pnpm openapi:generate`, `pnpm clients:generate:ts`, `pnpm clients:generate:csharp` | PASS; only the pre-existing Kiota format and Task 5 sync error-shape warnings remain |
+| C# Release build | PASS; 0 warnings, 0 errors |
+| repository typecheck | PASS; 12 tasks, 12 successful |
+| focused Biome lint/format checks and `git diff --check` | PASS; the pre-existing mixed CRLF/LF formatter baseline in `app-factory.ts` was not bulk-rewritten |
+
+The PostgreSQL gate used only the disposable `giromesa-task6-fix2` container on host port 55441. It was stopped with `--rm`, and absence was verified. No provider call, persistent migration, push or deployment was performed.

@@ -14,7 +14,7 @@ import { AuthService } from "./auth/auth.service.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
-import { requestRateLimit } from "./common/rate-limit.js";
+import { isSensitiveAuthRequest, requestRateLimit } from "./common/rate-limit.js";
 import { MetricsService } from "./health/health.module.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
@@ -31,6 +31,10 @@ export async function createApplication() {
     },
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook("onRequest", async (request, reply) => {
+    if (isSensitiveAuthRequest(request.url)) reply.header("Cache-Control", "no-store");
+  });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(rateLimit, {
@@ -43,7 +47,6 @@ export async function createApplication() {
   app.enableShutdownHooks();
   app.enableCors(corsConfiguration());
 
-  const fastify = app.getHttpAdapter().getInstance();
   const metrics = app.get(MetricsService);
   const requestStartedAt = new WeakMap<object, bigint>();
   fastify.addHook("onRequest", async (request, reply) => {

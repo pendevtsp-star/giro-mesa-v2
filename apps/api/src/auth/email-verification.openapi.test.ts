@@ -41,6 +41,10 @@ describe("email verification generated contract", () => {
         type: "integer",
         example: 60,
       });
+      assert.deepEqual(property(accepted, "headers", "Cache-Control", "schema"), {
+        type: "string",
+        example: "no-store",
+      });
       assert.deepEqual(property(accepted, "content", "application/json", "schema"), {
         $ref: "#/components/schemas/EmailVerificationAcceptedResponse",
       });
@@ -57,6 +61,20 @@ describe("email verification generated contract", () => {
           "application/json",
           "schema",
         ),
+      );
+      assert.deepEqual(
+        property(
+          document,
+          "paths",
+          `${prefix}/auth/email-verification/confirm`,
+          "post",
+          "responses",
+          "200",
+          "headers",
+          "Cache-Control",
+          "schema",
+        ),
+        { type: "string", example: "no-store" },
       );
       assert.deepEqual(confirmed.oneOf, [
         { $ref: "#/components/schemas/EmailVerificationSessionResponse" },

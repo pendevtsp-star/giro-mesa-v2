@@ -715,6 +715,13 @@
                   "type": "integer",
                   "example": 60
                 }
+              },
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
               }
             },
             "content": {
@@ -765,6 +772,13 @@
                 "schema": {
                   "type": "integer",
                   "example": 60
+                }
+              },
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
                 }
               }
             },
@@ -817,6 +831,13 @@
                   "type": "integer",
                   "example": 60
                 }
+              },
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
               }
             },
             "content": {
@@ -861,6 +882,15 @@
         "responses": {
           "200": {
             "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -920,6 +950,15 @@
         "responses": {
           "200": {
             "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -979,6 +1018,15 @@
         "responses": {
           "200": {
             "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Impede armazenamento da resposta de autenticação.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
