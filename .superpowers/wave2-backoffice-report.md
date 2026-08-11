@@ -6,77 +6,76 @@ Base confirmada: `c899c4805f999eda18b22cbb8f7d8ebe30603333`
 
 ## Resultado
 
-A Onda 2B implementa as Tasks 33–34 sem migration nova, provider, DoseClub, observabilidade, demo, push ou deploy.
+As Tasks 33–34 e os achados da revisão cruzada foram concluídos sem provider, DoseClub, observabilidade, sessão externa, push ou deploy.
 
 Commits recuperáveis:
 
 - `eac17ab` — `feat(platform): add secure tenant-scoped backoffice APIs`
 - `348ef25` — `feat(ops): add actionable platform backoffice`
 - `8e027d6` — `fix(platform): order action ledger by version`
+- `37a4b1d` — `docs(backoffice): record wave 2B evidence`
+- `08a4859` — `fix(platform): harden cross-tenant admin actions`
+- `5a567c1` — `fix(platform): publish typed projection contracts`
+- `d6ea5a5` — `fix(ops): complete platform tab accessibility`
 
-## Task 33 — APIs administrativas seguras
+## Segurança e banco
 
-- Acesso platform fail-closed: allowlist exata, grants explícitos e leitura como padrão.
-- Step-up derivado apenas de `auth.mfa_verified` da sessão corrente, com janela máxima de dez minutos.
-- Contexto obrigatório por UUID exato; não existe endpoint de enumeração de tenants.
-- Projections limitadas e paginadas para tenant, plano, entitlements, usuários, onboarding, billing, integrações e audit.
-- E-mail de usuário é mascarado sem `platform.pii.read`; configuração e referências de credencial de integrações nunca retornam.
-- Leads, suporte e incidentes, ausentes na base `c899`, usam adapters explícitos `unavailable` e retornam lista vazia, nunca sucesso fabricado.
-- Ações críticas cobertas: suspender/restaurar tenant e desativar/restaurar membership.
-- Proposta, aprovação, rejeição, execução e falha são persistidas no `audit_events` append-only existente.
-- Dual-control impede autoaprovação, valida expiração e versão CAS, aplica idempotência por hash/fingerprint e protege último owner/self-membership.
-- Advisory locks transacionais serializam proposta e decisão. O efeito e o evento de execução ficam na mesma transação.
-- A reconstrução do ledger ordena pela versão explícita do evento, não pelo timestamp transacional. Isso elimina inversão não determinística quando `approved` e `executed` compartilham o mesmo `now()` do PostgreSQL.
-- OpenAPI publica schemas de request/response e headers de idempotência. Clientes TypeScript e C# foram regenerados.
+- A migration reservada `0024_platform_backoffice_rls` cria `giromesa_platform` como role `NOLOGIN`, `NOSUPERUSER`, `NOINHERIT` e `NOBYPASSRLS`, com grants apenas por coluna e policies de organização exata.
+- O contexto HTTP platform entra em transação dedicada somente depois de `SessionGuard` e `PlatformAdminGuard`, registra ator/sessão/organização e nunca depende de membership tenant.
+- O overview cross-tenant retorna somente contagens por função `SECURITY DEFINER`; o owner `giromesa_migrator` recebe somente `SELECT (id, billing_state)`.
+- Mutações continuam exigindo grant platform explícito e step-up recente no serviço antes de qualquer efeito.
+- O lock organizacional serializa alterações de membership; a contagem de owners é revalidada dentro do lock, impedindo duas desativações concorrentes do último owner.
+- Erros de domínio são allowlisted e sanitizados como 400, 403, 409 ou 410. Erros desconhecidos retornam 503 genérico, sem detalhes internos.
+- O ledger aceita somente `pending -> approved -> executed`; aprovação exige ator diferente do solicitante e execução exige o mesmo aprovador. Ação/status divergentes e sequências adulteradas falham fechadas.
+- A chave idempotente de decisão fica vinculada ao fingerprint de organização, proposta, comando e corpo (`expectedVersion`); reuso divergente retorna 409.
+- Proposta, decisão, efeito e auditoria permanecem transacionais, append-only e ordenados por versão explícita.
 
-Não foi necessária a migration reservada `0024`.
+## Contratos e clientes
 
-## Task 34 — Ops acionável
+- As 11 projeções são um `oneOf` discriminado por `resource`, com DTO próprio e `additionalProperties: false`.
+- Tenant, plano, entitlements, usuários, onboarding, billing, integrações e audit têm itens concretos. Leads, suporte e incidentes continuam `unavailable`, com lista obrigatoriamente vazia e sem sucesso sintético.
+- OpenAPI e cliente TypeScript foram regenerados sem `Record<string, never>[]` nas projeções.
+- O cliente C# foi regenerado por Kiota e compilado com .NET 10: 0 erros e 0 avisos.
 
-- Command bar e contexto permanente mostram ambiente, modo leitura, tenant, unidade, estado e validade do step-up.
-- Recursos são carregados somente após UUID exato e renderizados por allowlist de campos.
-- Estados de loading, vazio, indisponível e erro são distintos; indisponibilidade afirma que nenhum dado/sucesso foi simulado.
-- Formulário crítico mostra impacto, exige justificativa e confirmação e fica desabilitado sem grants e MFA recente.
-- Fila mostra `pending`, `approved`, `executed`, `rejected`, `expired` e `failed`; autoaprovação fica desabilitada no cliente e é novamente negada na API.
-- Recuperação é explícita para 401, 403, 409, 429 e 5xx.
-- Layout desktop/tablet preserva densidade, teclado, touch targets, foco visível e `prefers-reduced-motion`.
+## Ops e acessibilidade
+
+- Tabs usam roving tabindex, `aria-controls`, ids estáveis, `tabpanel`/`aria-labelledby` e navegação ArrowLeft/ArrowRight/Home/End.
+- Axe cobre o `.app-shell` inteiro. O contraste do rodapé da sidebar foi ajustado após o novo escopo revelar a violação.
+- A captura visual espera fontes, imagens e dois frames de layout, volta ao topo sem sleep arbitrário e verifica que shell/command bar estão dentro do viewport.
+- Desktop e tablet preservam topo, shell, contexto tenant, indisponibilidade verdadeira e controles de dual-control.
 
 ## TDD e gates
 
 RED observado:
 
-- Task 33: imports/módulos de access, actions e projections ainda ausentes.
-- Task 34: 10 falhas esperadas por métodos da API e parsers ainda ausentes.
-- Gate concorrente: `PLATFORM_ACTION_LEDGER_CORRUPT` reproduzido quando eventos v2/v3 tinham o mesmo timestamp e UUID definia a ordem.
+- HTTP real retornava 500 sem membership platform e payload inválido vazava para o handler genérico.
+- Duas desativações concorrentes removiam os dois owners; reuso divergente da mesma chave de decisão não era rejeitado.
+- O ledger aceitava execução sem aprovação independente e ação/status incompatíveis.
+- OpenAPI/TS/C# descreviam `items` como objeto vazio.
+- Tabs não tinham relação tab/panel, foco roving nem navegação por teclado.
+- Axe ampliado ao shell encontrou contraste insuficiente no rodapé da sidebar.
 
 GREEN final:
 
-- API unit/contract/projections/PostgreSQL: 14/14.
-- Repetição focada do cenário concorrente PostgreSQL: 5/5 execuções verdes.
-- Ops Vitest (`platform.test.ts` + `api.test.ts`): 12/12.
-- Turbo `typecheck` + `build`, escopo API/Ops/contracts e dependências: 11/11 tasks.
-- Playwright desktop + tablet: 4/4, incluindo dual-control e autoaprovação negada.
-- Axe no workspace do backoffice: zero violações.
-- Supply-chain: 11/11.
-- Biome focado: zero erros; 20 warnings no stylesheet compartilhado. O conjunto inclui `!important` preexistente e avisos de ordem de especificidade entre o bloco novo escopado e seletores globais existentes.
+- PostgreSQL 17 upgrade: platform actions 3/3 e HTTP real 2/2, incluindo aliases `/v1` e `/api/v1`, RLS sem membership, corrida de owners e erros 400/403/409/410.
+- PostgreSQL 16 fresh: migration completa e os mesmos gates focados 5/5.
+- API completa: 155 testes, 0 falhas; contratos/projeções gerados 2/2.
+- Ops Vitest: 58/58.
+- Playwright desktop + tablet: 4/4; Axe no shell inteiro sem violações.
+- Turbo `typecheck`, `test` e `build`: 15/15 tasks no escopo API/Ops/contracts/db.
+- OpenAPI, TypeScript, Kiota C# e build .NET 10 concluídos.
+- Biome focado de TS/TSX/E2E: zero erros. O stylesheet compartilhado mantém 20 warnings preexistentes (`!important` e ordem de especificidade), sem erro relacionado ao patch.
 - `git diff --check`: verde.
-- OpenAPI, cliente TypeScript e cliente C#: geração concluída. A primeira tentativa de OpenAPI, sem env local, falhou de forma segura em `DATABASE_URL is required`; a geração final usou somente o banco descartável.
-- Build do cliente C# não foi executado porque `dotnet` não está instalado no host; Kiota concluiu a geração. Os avisos Kiota sobre formatos email/URI e error types do Sync já pertencem ao contrato geral.
 
-Banco de teste: `giromesa_wave2b_test` foi criado somente no PostgreSQL local, recebeu as migrations existentes até `0016`, usado no gate e removido ao final (`DROP DATABASE`).
-
-## QA visual e detector
-
-Screenshots de fixture contratual (não sessão/provider real):
+Screenshots inspecionados:
 
 - `.superpowers/screenshots/wave2-backoffice-desktop.png`
 - `.superpowers/screenshots/wave2-backoffice-tablet.png`
 
-O detector Impeccable foi executado exatamente uma vez após a UI. Ele apontou o novo `border-left: 5px` e quatro ocorrências `side-tab` mais um grid decorativo já existentes no stylesheet compartilhado. O novo apontamento foi corrigido para um inset superior discreto; o detector não foi reexecutado para respeitar o limite de uma execução. Não há finding novo conhecido remanescente.
-
 ## Limites e concerns
 
-- A base não possui role PostgreSQL exclusiva para suporte platform. O serviço usa a conexão existente e aplica escopo exato em cada query/efeito; o gate PostgreSQL prova negação cross-tenant. Criar uma role least-privilege dedicada é hardening de integração futura.
-- Leads, suporte e incidentes precisam ser ligados às entidades/adapters das Ondas 1B/1C quando elas existirem. Até lá, permanecem explicitamente indisponíveis.
-- QA visual usou interceptação Playwright apenas para exercitar o contrato da UI. Autorização, isolamento, concorrência e exactly-once foram validados separadamente contra PostgreSQL real descartável.
-- Nenhuma sessão externa, provider real, push ou deploy foi realizado.
+- O login da aplicação precisa receber membership na role `giromesa_platform` durante provisioning operacional; a migration não presume o nome da role de login e não executa deploy.
+- Leads, suporte e incidentes dependem dos adapters reais das ondas correspondentes e permanecem explicitamente indisponíveis.
+- QA visual usa fixture HTTP somente para exercitar a UI; autorização, RLS, concorrência e exactly-once foram verificados separadamente em PostgreSQL real descartável.
+- Os avisos Kiota sobre formatos email/URI e error types do Sync são preexistentes e fora do contrato platform.
+- Nenhum provider, sessão externa, push ou deploy foi executado.
