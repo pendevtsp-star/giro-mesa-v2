@@ -39,6 +39,98 @@ export function toOpenApiSchema(schema: ZodType) {
   return openApi30(jsonSchema) as Record<string, unknown>;
 }
 
+function componentName(prefix: string, definitionName: string) {
+  const suffix = definitionName === "__schema0" ? "recursive" : definitionName;
+  return `${prefix}_${suffix}`.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+function rewriteDefinitionRefs(value: unknown, names: ReadonlyMap<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((child) => rewriteDefinitionRefs(child, names));
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => {
+      if (key === "$ref" && typeof child === "string") {
+        const match = child.match(/^#\/(?:definitions|\$defs)\/([^/]+)$/);
+        const promotedName = match?.[1] ? names.get(match[1]) : undefined;
+        if (promotedName) return [key, `#/components/schemas/${promotedName}`];
+      }
+      return [key, rewriteDefinitionRefs(child, names)];
+    }),
+  );
+}
+
+function promoteDiscriminatedUnion(value: unknown, name: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { [name]: value };
+  const schema = value as Record<string, unknown>;
+  if (!Array.isArray(schema.oneOf) || schema.oneOf.length < 2 || schema.discriminator) {
+    return { [name]: value };
+  }
+
+  const tagGroups = schema.oneOf.map((branch) => {
+    if (!branch || typeof branch !== "object" || Array.isArray(branch)) return undefined;
+    const properties = (branch as Record<string, unknown>).properties;
+    if (!properties || typeof properties !== "object" || Array.isArray(properties))
+      return undefined;
+    const typeProperty = (properties as Record<string, unknown>).type;
+    if (!typeProperty || typeof typeProperty !== "object" || Array.isArray(typeProperty)) {
+      return undefined;
+    }
+    const values = (typeProperty as Record<string, unknown>).enum;
+    return Array.isArray(values) &&
+      values.length > 0 &&
+      values.every((item) => typeof item === "string")
+      ? (values as string[])
+      : undefined;
+  });
+  if (tagGroups.some((tags) => !tags)) return { [name]: value };
+  const tags = tagGroups.flatMap((group) => group ?? []);
+  if (new Set(tags).size !== tags.length) return { [name]: value };
+
+  const memberNames = tagGroups.map((group) => componentName(name, (group ?? []).join("_")));
+  const mapping = Object.fromEntries(
+    tagGroups.flatMap((group, index) =>
+      (group ?? []).map((tag) => [tag, `#/components/schemas/${memberNames[index]}`]),
+    ),
+  );
+  return {
+    [name]: {
+      ...schema,
+      oneOf: memberNames.map((memberName) => ({ $ref: `#/components/schemas/${memberName}` })),
+      discriminator: { propertyName: "type", mapping },
+    },
+    ...Object.fromEntries(
+      schema.oneOf.map((branch, index) => [memberNames[index] as string, branch]),
+    ),
+  };
+}
+
+export function promoteOpenApiDefinitions(schema: Record<string, unknown>, prefix: string) {
+  const definitions = (schema.definitions ?? schema.$defs) as Record<string, unknown> | undefined;
+  if (!definitions) return { schema, components: {} as Record<string, unknown> };
+
+  const names = new Map(
+    Object.keys(definitions).map((name) => [name, componentName(prefix, name)] as const),
+  );
+  const requestSchema = { ...schema };
+  delete requestSchema.definitions;
+  delete requestSchema.$defs;
+
+  const components: Record<string, unknown> = {};
+  for (const [name, definition] of Object.entries(definitions)) {
+    const promotedName = names.get(name) as string;
+    Object.assign(
+      components,
+      promoteDiscriminatedUnion(rewriteDefinitionRefs(definition, names), promotedName),
+    );
+  }
+
+  return {
+    schema: rewriteDefinitionRefs(requestSchema, names) as Record<string, unknown>,
+    components,
+  };
+}
+
 export function addZodRequestBodies(app: NestFastifyApplication, document: OpenAPIObject) {
   const modules = app.get(ModulesContainer);
   for (const module of modules.values()) {
@@ -63,9 +155,20 @@ export function addZodRequestBodies(app: NestFastifyApplication, document: OpenA
           for (const method of httpMethods) {
             const operation = path?.[method];
             if (!operation?.operationId?.startsWith(operationPrefix)) continue;
+            const promoted = promoteOpenApiDefinitions(
+              toOpenApiSchema(pipe.schema),
+              `${operation.operationId}_request`,
+            );
+            document.components ??= {};
+            document.components.schemas = {
+              ...document.components.schemas,
+              ...(promoted.components as NonNullable<
+                NonNullable<OpenAPIObject["components"]>["schemas"]
+              >),
+            };
             operation.requestBody = {
               required: true,
-              content: { "application/json": { schema: toOpenApiSchema(pipe.schema) } },
+              content: { "application/json": { schema: promoted.schema } },
             };
           }
         }

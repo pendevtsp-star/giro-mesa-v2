@@ -5624,6 +5624,302 @@ export interface components {
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
     };
+    RemunerationController_createRule_0__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_if"];
+    RemunerationController_createRule_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_0__request_recursive"][];
+    };
+    RemunerationController_createRule_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_if"];
+    RemunerationController_createRule_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_1__request_recursive"][];
+    };
+    RemunerationController_createRule_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_if"];
+    RemunerationController_publishVersion_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"][];
+    };
+    RemunerationController_publishVersion_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_if"];
+    RemunerationController_publishVersion_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"][];
+    };
+    RemunerationController_publishVersion_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
   };
   responses: never;
   parameters: never;
@@ -11994,7 +12290,8 @@ export interface operations {
             type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
             id: string;
           };
-          physicalQuantity: number;
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
           /** Format: date-time */
           occurredAt: string;
           reason: string;
@@ -12032,7 +12329,8 @@ export interface operations {
             type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
             id: string;
           };
-          physicalQuantity: number;
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
           /** Format: date-time */
           occurredAt: string;
           reason: string;
@@ -14278,11 +14576,7 @@ export interface operations {
           /** @enum {string} */
           kind: "service" | "commission" | "profit_sharing";
           name: string;
-          expression: {
-            type: string;
-          } & {
-            [key: string]: unknown;
-          };
+          expression: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
           /** Format: date-time */
           effectiveFrom: string;
         };
@@ -14315,11 +14609,7 @@ export interface operations {
           /** @enum {string} */
           kind: "service" | "commission" | "profit_sharing";
           name: string;
-          expression: {
-            type: string;
-          } & {
-            [key: string]: unknown;
-          };
+          expression: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
           /** Format: date-time */
           effectiveFrom: string;
         };
@@ -14348,11 +14638,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          expression: {
-            type: string;
-          } & {
-            [key: string]: unknown;
-          };
+          expression: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
           /** Format: date-time */
           effectiveFrom: string;
         };
@@ -14381,11 +14667,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          expression: {
-            type: string;
-          } & {
-            [key: string]: unknown;
-          };
+          expression: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
           /** Format: date-time */
           effectiveFrom: string;
         };

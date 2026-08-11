@@ -14316,6 +14316,15 @@
                     "minimum": 0,
                     "maximum": 1000000
                   },
+                  "physicalSerialIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
                   "occurredAt": {
                     "type": "string",
                     "format": "date-time",
@@ -14330,10 +14339,10 @@
                 "required": [
                   "assetId",
                   "custody",
-                  "physicalQuantity",
                   "occurredAt",
                   "reason"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -14419,6 +14428,15 @@
                     "minimum": 0,
                     "maximum": 1000000
                   },
+                  "physicalSerialIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
                   "occurredAt": {
                     "type": "string",
                     "format": "date-time",
@@ -14433,10 +14451,10 @@
                 "required": [
                   "assetId",
                   "custody",
-                  "physicalQuantity",
                   "occurredAt",
                   "reason"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -19595,18 +19613,7 @@
                     "maxLength": 160
                   },
                   "expression": {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32
-                      }
-                    },
-                    "required": [
-                      "type"
-                    ],
-                    "additionalProperties": {}
+                    "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
                   },
                   "effectiveFrom": {
                     "type": "string",
@@ -19684,18 +19691,7 @@
                     "maxLength": 160
                   },
                   "expression": {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32
-                      }
-                    },
-                    "required": [
-                      "type"
-                    ],
-                    "additionalProperties": {}
+                    "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
                   },
                   "effectiveFrom": {
                     "type": "string",
@@ -19760,18 +19756,7 @@
                 "type": "object",
                 "properties": {
                   "expression": {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32
-                      }
-                    },
-                    "required": [
-                      "type"
-                    ],
-                    "additionalProperties": {}
+                    "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
                   },
                   "effectiveFrom": {
                     "type": "string",
@@ -19834,18 +19819,7 @@
                 "type": "object",
                 "properties": {
                   "expression": {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 32
-                      }
-                    },
-                    "required": [
-                      "type"
-                    ],
-                    "additionalProperties": {}
+                    "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
                   },
                   "effectiveFrom": {
                     "type": "string",
@@ -26892,6 +26866,878 @@
           "updatedAt",
           "steps"
         ]
+      },
+      "RemunerationController_createRule_0__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_createRule_0__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_createRule_0__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_createRule_0__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_createRule_0__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_createRule_0__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_createRule_0__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_createRule_0__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_0__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_createRule_1__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_createRule_1__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_createRule_1__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_createRule_1__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_createRule_1__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_createRule_1__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_createRule_1__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_createRule_1__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_createRule_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_publishVersion_0__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_0__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_0__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_constant"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_metric"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_subtract"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_basis_points"
+          },
+          {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_if"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "constant": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_constant",
+            "metric": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_metric",
+            "add": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "min": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "max": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_add_min_max",
+            "subtract": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_subtract",
+            "basis_points": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_basis_points",
+            "if": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive_if"
+          }
+        }
+      },
+      "RemunerationController_publishVersion_1__request_recursive_constant": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "constant"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_metric": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "metric"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "grossSalesCents",
+              "netSalesCents",
+              "serviceChargeCents",
+              "eligibleSalesCents",
+              "profitCents",
+              "hoursMinutes",
+              "unitsSold"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_add_min_max": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "add",
+              "min",
+              "max"
+            ]
+          },
+          "operands": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "operands"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_subtract": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "subtract"
+            ]
+          },
+          "left": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "left",
+          "right"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_basis_points": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "basis_points"
+            ]
+          },
+          "operand": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "basisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rounding": {
+            "type": "string",
+            "enum": [
+              "down",
+              "up",
+              "half_up"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "operand",
+          "basisPoints",
+          "rounding"
+        ],
+        "additionalProperties": false
+      },
+      "RemunerationController_publishVersion_1__request_recursive_if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "if"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "eq"
+                ]
+              },
+              "left": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+              },
+              "right": {
+                "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+              }
+            },
+            "required": [
+              "operator",
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "consequent": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          },
+          "alternate": {
+            "$ref": "#/components/schemas/RemunerationController_publishVersion_1__request_recursive"
+          }
+        },
+        "required": [
+          "type",
+          "condition",
+          "consequent",
+          "alternate"
+        ],
+        "additionalProperties": false
       }
     }
   }

@@ -9,11 +9,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Re
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class ReconciliationsPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class ReconciliationsPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The assetId property</summary>
         public Guid? AssetId { get; set; }
         /// <summary>The custody property</summary>
@@ -28,6 +26,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Re
         public DateTimeOffset? OccurredAt { get; set; }
         /// <summary>The physicalQuantity property</summary>
         public int? PhysicalQuantity { get; set; }
+        /// <summary>The physicalSerialIds property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<Guid?>? PhysicalSerialIds { get; set; }
+#nullable restore
+#else
+        public List<Guid?> PhysicalSerialIds { get; set; }
+#endif
         /// <summary>The reason property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -36,13 +42,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Re
 #else
         public string Reason { get; set; }
 #endif
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Reconciliations.ReconciliationsPostRequestBody"/> and sets the default values.
-        /// </summary>
-        public ReconciliationsPostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -65,6 +64,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Re
                 { "custody", n => { Custody = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Reconciliations.ReconciliationsPostRequestBody_custody>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Reconciliations.ReconciliationsPostRequestBody_custody.CreateFromDiscriminatorValue); } },
                 { "occurredAt", n => { OccurredAt = n.GetDateTimeOffsetValue(); } },
                 { "physicalQuantity", n => { PhysicalQuantity = n.GetIntValue(); } },
+                { "physicalSerialIds", n => { PhysicalSerialIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
             };
         }
@@ -79,8 +79,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Re
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.Reconciliations.ReconciliationsPostRequestBody_custody>("custody", Custody);
             writer.WriteDateTimeOffsetValue("occurredAt", OccurredAt);
             writer.WriteIntValue("physicalQuantity", PhysicalQuantity);
+            writer.WriteCollectionOfPrimitiveValues<Guid?>("physicalSerialIds", PhysicalSerialIds);
             writer.WriteStringValue("reason", Reason);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }
