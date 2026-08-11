@@ -17,6 +17,10 @@ Escopo: Tasks 36 e 39 antecipadas, sem integração com providers ou deploy.
 | Fix 36 | `721ae32` | Redaction normalizada em profundidade e Collector fail-closed nos três sinais |
 | Fix 36 | `f73e19a` | Interceptor HTTP global e boundary real do dispatch de worker |
 | Fix 39 | `0a88052` | Mesas exclusivas no spike e thresholds com abort automático |
+| Fix 36 | `e802ecd` | NodeSDK vendor-neutral, exporters OTLP e configuração fail-closed |
+| Fix 36 | `ac17f8f` | SDK antes dos entrypoints, lifecycle real e semântica HTTP 4xx |
+| Fix 36 | `b7a376a` | Recursos OTel padronizados e prova OTLP HTTP dos três sinais |
+| Fix 36 | `79c01bb` | Shutdown garantido mesmo se o force flush falhar |
 
 O commit documental posterior registra este relatório e o brief recebido. Os commits de produto permanecem recuperáveis separadamente.
 
@@ -25,7 +29,10 @@ O commit documental posterior registra este relatório e o brief recebido. Os co
 - RED redaction: valores `pin_`, `cvv_`, `cpf_`, `cookie_` e `phone_` atravessavam atributos permitidos; o teste novo falhou preservando quatro dos seis casos antes do fix.
 - RED runtime: o teste de boot não compilava porque o módulo ainda não oferecia backend injetável nem interceptor; o worker não possuía boundary ligado ao dispatch real.
 - RED carga: VUs locais 1 e 51 escolhiam a mesma mesa, iterações não tinham estado próprio e os thresholds eram strings sem `abortOnFail`.
-- GREEN: os cinco findings Important foram cobertos pelos commits de fix acima e pelos gates consolidados deste relatório.
+- RED SDK: os probes dinâmicos encontraram `ProxyTracerProvider`, `NoopMeterProvider` e `NonRecordingSpan`; API e worker não inicializavam providers/exporters.
+- RED HTTP: `BadRequestException(400)` era emitida como `outcome=error`, `HTTP_REQUEST_FAILED` e log de erro de servidor.
+- RED recurso: `service.version` e `deployment.environment.name` eram descartados pela allowlist/Collector.
+- GREEN: os findings foram cobertos pelos commits de fix acima e pelos gates consolidados deste relatório.
 
 ## Task 36 — observabilidade
 
@@ -37,9 +44,15 @@ O commit documental posterior registra este relatório e o brief recebido. Os co
 
 ### GREEN
 
-- API redaction/cardinality e boundary HTTP: 10/10.
-- Worker signals e boundary real de dispatch: 4/4 no gate focado (`observability` + `outbox`).
-- O pacote `@giromesa/observability` usa `@opentelemetry/api@1.9.0`, sem exporter/provider proprietário.
+- Runtime OTel: 4/4, incluindo memory exporters e receptor OTLP HTTP local para traces, metrics e logs.
+- API redaction/cardinality, boundary HTTP e lifecycle: 16/16.
+- Worker signals, dispatch real e lifecycle: 8/8.
+- O pacote `@giromesa/observability` inicializa `NodeSDK` com providers reais e exporters OTLP HTTP, sem exporter/provider proprietário.
+- API usa `service.name=giromesa.api`; worker usa `service.name=giromesa.worker`. Ambos publicam `service.version` e `deployment.environment.name` como recursos limitados.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` ou os três endpoints por sinal são obrigatórios. Protocolo, URLs, headers, timeouts, intervalo de métricas, sampler, service name e transporte inseguro são validados antes de importar a aplicação.
+- Headers aceitam apenas nomes válidos e valores sem CR/LF/NUL; falhas citam somente o nome da variável, nunca o valor secreto.
+- API e worker inicializam a telemetria antes do bootstrap por import dinâmico. SIGINT/SIGTERM, falha de bootstrap e término do loop fecham o serviço, fazem force flush e shutdown idempotente.
+- HTTP 4xx usa `outcome=client_rejected`, sem `HTTP_REQUEST_FAILED`, `error.type` ou log de erro de servidor; throws/5xx continuam `outcome=error`.
 - A allowlist aceita somente dimensões operacionais conhecidas; payloads, cookies, tokens, e-mail, telefone, documento, PIN, chaves, PAN/CVV/track e IDs livres são descartados ou redigidos. Prefixos sensíveis são normalizados com NFKC e detectados sem confundir nomes operacionais como `phonebook-sync`, `cookie_missing` ou `TOKEN_EXPIRED`.
 - Organização, unidade, dispositivo, rota, job e erros usam budgets por processo; excesso colapsa em `__overflow__` sem reter cardinalidade ilimitada.
 - Logs estruturados recebem apenas atributos sanitizados. Exceções de worker registram tipo e código estático, nunca a mensagem arbitrária.
@@ -50,9 +63,9 @@ O commit documental posterior registra este relatório e o brief recebido. Os co
 
 ### Supply chain
 
-O SDK não existia como dependência direta. Foi adicionado apenas `@opentelemetry/api@1.9.0` ao novo pacote compartilhado; API e worker usam dependência workspace. O lockfile mudou para resolver esse peer opcional também em pacotes já presentes. `pnpm supply-chain:check` passou.
+O SDK não existia como dependência direta. Foram adicionados somente pacotes oficiais OpenTelemetry para NodeSDK, recursos, logs, métricas, traces e exporters OTLP HTTP, todos pinados e vendor-neutral. API e worker continuam usando a dependência workspace. O build opcional de `protobufjs` permanece explicitamente negado no workspace; o runtime HTTP/protobuf e `pnpm supply-chain:check` passaram.
 
-O código de instrumentação consome o provider global da API OTel. Sem SDK inicializado antes da aplicação, o comportamento é deliberadamente no-op; endpoint, headers e exporter reais permanecem responsabilidade do ambiente de integração.
+Configuração ausente ou inválida impede o boot antes de criar a aplicação/worker. Os executáveis reais foram testados em subprocesso e retornam exit 1 com mensagem genérica, sem imprimir headers ou segredos.
 
 ## Task 39 — carga e soak
 
@@ -81,10 +94,10 @@ O código de instrumentação consome o provider global da API OTel. Sem SDK ini
 
 ## Gate consolidado
 
-- Testes focados: API 10/10, worker 4/4, load 12/12.
+- Testes focados: observability 4/4, API 16/16, worker 8/8, load 12/12.
 - Turbo `typecheck` + `build`: 15/15 tasks para API, worker, Ops, observability e dependências.
 - Build Ops/Vite: `459,44 kB`, gzip `129,77 kB` no chunk principal.
-- Biome focado: pacote observability, API, worker, Ops e `load/` sem findings.
+- Biome focado: pacote observability, arquivos alterados de API/worker e `infra/observability` + `load/` sem findings.
 - JSON: budgets, dashboard e fixture válidos.
 - YAML: Collector, alerts e synthetics válidos via PyYAML 6.0.3; Collector validado também pelo comando `validate` da imagem oficial `otel/opentelemetry-collector-contrib:0.157.0`.
 - Supply chain: aprovado.
@@ -94,13 +107,14 @@ O código de instrumentação consome o provider global da API OTel. Sem SDK ini
 
 ## Limites e concerns
 
-- Os boundaries de API e worker estão ligados, mas o SDK/provider global OTel permanece responsabilidade do ambiente. Sem ele, métricas e traces usam o no-op oficial; nenhum monitoramento externo é declarado ativo.
-- O Collector foi validado sintaticamente e pela imagem oficial, mas não inicializado contra exporter/endpoint real.
+- O SDK/provider passa a ser inicializado pelos próprios entrypoints. Ainda assim, sem endpoint OTLP válido o boot falha por desenho e nenhum monitoramento externo é declarado ativo neste trabalho.
+- Um receptor OTLP HTTP local confirmou payloads dos três sinais e a imagem oficial confirmou a configuração do Collector; não houve conexão com upstream/provider real.
 - `k6 inspect` valida parse, imports e opções; não faz request. Não houve API local com duas sessões/fixtures reais disponível para executar o smoke HTTP.
 - `target`, `spike` e `soak` foram modelados e documentados, mas não executados. Nenhum resultado pesado é alegado.
 - O exemplo de fixture contém UUIDs deliberadamente não produtivos e precisa ser substituído por IDs de seed local descartável.
 - Cookies de carga ainda vêm de variáveis de ambiente por contrato do brief. Eles não são logados; um executor futuro pode adotar `k6/secrets` sem mudar a fixture.
 - Nenhum provider, segredo, push, deploy ou prontidão de produção foi declarado.
+- Não houve mudança visual; screenshots não se aplicam a esta correção de runtime.
 
 ## Referências técnicas
 
