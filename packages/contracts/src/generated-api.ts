@@ -6734,6 +6734,118 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Authoritative sync outcomes, pending cloud commands and operational snapshot. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            acceptedEventIds: string[];
+            rejectedEvents: {
+              /** Format: uuid */
+              id: string;
+              code: string;
+            }[];
+            eventResults: {
+              /** Format: uuid */
+              id: string;
+              replayed: boolean;
+              result: {
+                status: string;
+                code?: string;
+              } & {
+                [key: string]: unknown;
+              };
+            }[];
+            commands: {
+              /** Format: uuid */
+              id: string;
+              type: string;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              expiresAt: string;
+            }[];
+            snapshot: {
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: date-time */
+              capturedAt: string;
+              approvals: {
+                /** Format: date-time */
+                validUntil: string;
+                actors: {
+                  [key: string]: unknown;
+                }[];
+                managers: {
+                  [key: string]: unknown;
+                }[];
+              };
+              catalog: {
+                categories: {
+                  [key: string]: unknown;
+                }[];
+                products: {
+                  [key: string]: unknown;
+                }[];
+                modifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                modifierOptions: {
+                  [key: string]: unknown;
+                }[];
+                productModifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                prices: {
+                  [key: string]: unknown;
+                }[];
+                availability: {
+                  [key: string]: unknown;
+                }[];
+                productStations: {
+                  [key: string]: unknown;
+                }[];
+              };
+              floor: {
+                rooms: {
+                  [key: string]: unknown;
+                }[];
+                tables: {
+                  [key: string]: unknown;
+                }[];
+                openTabs: {
+                  [key: string]: unknown;
+                }[];
+              };
+              tabs: {
+                [key: string]: unknown;
+              }[];
+              tabDetails: {
+                [key: string]: {
+                  [key: string]: unknown;
+                };
+              };
+              kds: {
+                tickets: {
+                  [key: string]: unknown;
+                }[];
+                items: {
+                  [key: string]: unknown;
+                }[];
+              };
+            };
+            /** Format: date-time */
+            serverTime: string;
+          };
+        };
+      };
       /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
       400: {
         headers: {
@@ -6875,6 +6987,118 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Authoritative sync outcomes, pending cloud commands and operational snapshot. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            acceptedEventIds: string[];
+            rejectedEvents: {
+              /** Format: uuid */
+              id: string;
+              code: string;
+            }[];
+            eventResults: {
+              /** Format: uuid */
+              id: string;
+              replayed: boolean;
+              result: {
+                status: string;
+                code?: string;
+              } & {
+                [key: string]: unknown;
+              };
+            }[];
+            commands: {
+              /** Format: uuid */
+              id: string;
+              type: string;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              expiresAt: string;
+            }[];
+            snapshot: {
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: date-time */
+              capturedAt: string;
+              approvals: {
+                /** Format: date-time */
+                validUntil: string;
+                actors: {
+                  [key: string]: unknown;
+                }[];
+                managers: {
+                  [key: string]: unknown;
+                }[];
+              };
+              catalog: {
+                categories: {
+                  [key: string]: unknown;
+                }[];
+                products: {
+                  [key: string]: unknown;
+                }[];
+                modifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                modifierOptions: {
+                  [key: string]: unknown;
+                }[];
+                productModifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                prices: {
+                  [key: string]: unknown;
+                }[];
+                availability: {
+                  [key: string]: unknown;
+                }[];
+                productStations: {
+                  [key: string]: unknown;
+                }[];
+              };
+              floor: {
+                rooms: {
+                  [key: string]: unknown;
+                }[];
+                tables: {
+                  [key: string]: unknown;
+                }[];
+                openTabs: {
+                  [key: string]: unknown;
+                }[];
+              };
+              tabs: {
+                [key: string]: unknown;
+              }[];
+              tabDetails: {
+                [key: string]: {
+                  [key: string]: unknown;
+                };
+              };
+              kds: {
+                tickets: {
+                  [key: string]: unknown;
+                }[];
+                items: {
+                  [key: string]: unknown;
+                }[];
+              };
+            };
+            /** Format: date-time */
+            serverTime: string;
+          };
+        };
+      };
       /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
       400: {
         headers: {

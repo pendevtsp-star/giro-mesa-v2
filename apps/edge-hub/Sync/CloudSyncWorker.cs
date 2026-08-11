@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using GiroMesa.EdgeHub.Storage;
@@ -421,8 +422,8 @@ public sealed class CloudSyncWorker(
             !(mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
               mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)))
             return false;
-        var requestUri = httpClient.BaseAddress;
-        var authorization = httpClient.DefaultRequestHeaders.Authorization;
+        var requestUri = response.RequestMessage?.RequestUri;
+        var authorization = response.RequestMessage?.Headers.Authorization;
         var configuredBase = Uri.TryCreate(_options.CloudApiBaseUrl, UriKind.Absolute, out var value) ? value : null;
         return configuredBase is not null &&
             configuredBase.Scheme == Uri.UriSchemeHttps &&
@@ -430,8 +431,17 @@ public sealed class CloudSyncWorker(
             requestUri.Scheme == Uri.UriSchemeHttps &&
             requestUri.Host.Equals(configuredBase.Host, StringComparison.OrdinalIgnoreCase) &&
             requestUri.Port == configuredBase.Port &&
-            authorization?.Scheme == "GiroMesaHub" &&
-            !string.IsNullOrEmpty(authorization.Parameter);
+            authorization?.Scheme.Equals("GiroMesaHub", StringComparison.OrdinalIgnoreCase) == true &&
+            !string.IsNullOrEmpty(authorization.Parameter) &&
+            !string.IsNullOrEmpty(_options.CloudSyncKey) &&
+            SecretsEqual(authorization.Parameter, _options.CloudSyncKey);
+    }
+
+    private static bool SecretsEqual(string actual, string expected)
+    {
+        var actualDigest = SHA256.HashData(Encoding.UTF8.GetBytes(actual));
+        var expectedDigest = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+        return CryptographicOperations.FixedTimeEquals(actualDigest, expectedDigest);
     }
 
     private static async Task<byte[]?> ReadBoundedProblemBodyAsync(

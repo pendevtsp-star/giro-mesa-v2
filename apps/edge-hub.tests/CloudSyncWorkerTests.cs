@@ -286,9 +286,18 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         var valid = ValidCommand();
         await store.AcceptCommandAsync(hiddenInvalid);
         await store.AcceptCommandAsync(valid);
+        var cloudCommandId = Guid.NewGuid().ToString();
+        await store.SaveCloudCommandsAsync([
+            new CloudCommand(
+                cloudCommandId,
+                "refresh",
+                JsonDocument.Parse("{}").RootElement.Clone(),
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddMinutes(5)),
+        ]);
         await PromoteToLargeV2Async(options.Value, hiddenInvalid.Id, BuildLargeOrder(1), 1);
         await PromoteToLargeV2Async(options.Value, valid.Id, BuildLargeOrder(1), 1);
-        var handler = new HiddenSchemaHandler(hiddenInvalid.Id);
+        var handler = new HiddenSchemaHandler(hiddenInvalid.Id, cloudCommandId);
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
@@ -297,12 +306,14 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
 
         await worker.SyncOnceAsync();
 
-        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(3, handler.CallCount);
+        Assert.Equal(1, handler.AcknowledgementOnlyCalls);
         Assert.Equal([valid.Id], handler.UploadedIds);
         Assert.Equal("reconciling", worker.Status);
         Assert.Contains(await store.GetReconciliationAsync(10), item =>
             item.Id == hiddenInvalid.Id && item.Reason == "SYNC_EVENT_SCHEMA_INVALID");
         Assert.Empty(await store.GetPendingAsync(10));
+        Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
     }
 
     [Theory]
@@ -312,6 +323,10 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
     [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_BATCH_SCHEMA_INVALID\",\"scope\":\"batch\"}")]
     [InlineData(HttpStatusCode.UnprocessableEntity, "application/json", "{\"code\":\"SYNC_ACK_SCHEMA_INVALID\",\"scope\":\"ack\"}")]
     [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0,0]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[1,0]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0.5]}")]
+    [InlineData(HttpStatusCode.BadRequest, "application/json", "{")]
     [InlineData(HttpStatusCode.BadRequest, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0],\"eventId\":\"forged\"}")]
     [InlineData(HttpStatusCode.UnprocessableEntity, "application/json", "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[2]}")]
     public async Task DoesNotIsolateUnclassifiedOrMalformed400And422(
@@ -346,6 +361,67 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.Empty(await store.GetReconciliationAsync(10));
     }
 
+    [Fact]
+    public async Task DoesNotIsolateProblemBodyLargerThanEightKiB()
+    {
+        var exactProblem =
+            "{\"code\":\"SYNC_EVENT_SCHEMA_INVALID\",\"scope\":\"event\",\"eventIndexes\":[0]}";
+        await AssertUntrustedFailurePreservesBatchAsync(
+            new UnclassifiedFailureHandler(
+                HttpStatusCode.BadRequest,
+                "application/json",
+                exactProblem + new string(' ', 8_193)));
+    }
+
+    [Theory]
+    [InlineData("http://cloud.example/api/v1/sync/batches", "GiroMesaHub", "cloud-sync-secret")]
+    [InlineData("https://other.example/api/v1/sync/batches", "GiroMesaHub", "cloud-sync-secret")]
+    [InlineData("https://cloud.example:444/api/v1/sync/batches", "GiroMesaHub", "cloud-sync-secret")]
+    [InlineData("https://cloud.example/api/v1/sync/batches", null, null)]
+    [InlineData("https://cloud.example/api/v1/sync/batches", "Bearer", "cloud-sync-secret")]
+    [InlineData("https://cloud.example/api/v1/sync/batches", "GiroMesaHub", "altered-secret")]
+    public async Task DoesNotTrustEventProblemWhenActualResponseRequestOriginOrAuthDiffers(
+        string responseRequestUri,
+        string? authScheme,
+        string? authParameter)
+    {
+        await AssertUntrustedFailurePreservesBatchAsync(
+            new TamperedResponseRequestHandler(responseRequestUri, authScheme, authParameter));
+    }
+
+    [Fact]
+    public async Task RedirectResponsePreservesWholeBatchWithoutFanout()
+    {
+        await AssertUntrustedFailurePreservesBatchAsync(new RedirectFailureHandler());
+    }
+
+    [Theory]
+    [InlineData("{\"code\":\"SYNC_BATCH_SCHEMA_INVALID\",\"scope\":\"batch\"}")]
+    [InlineData("{\"code\":\"SYNC_ACK_SCHEMA_INVALID\",\"scope\":\"ack\"}")]
+    public async Task AckOnlyBatchOrAckFailureCannotCondemnAnEvent(string responseBody)
+    {
+        var options = TestOptions(Path.Combine(_directory, Guid.NewGuid().ToString("N")));
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var localEvent = ValidCommand();
+        await store.AcceptCommandAsync(localEvent);
+        var cloudCommandId = Guid.NewGuid().ToString();
+        var handler = new AckOnlyFailureHandler(localEvent.Id, cloudCommandId, responseBody);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.Equal("offline", worker.Status);
+        Assert.Empty(await store.GetPendingAsync(10));
+        Assert.Empty(await store.GetReconciliationAsync(10));
+        Assert.Equal([cloudCommandId], await store.GetPendingCloudAcknowledgementsAsync(10));
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.TooManyRequests)]
@@ -375,6 +451,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.Equal(1, handler.CallCount);
         Assert.Equal("offline", worker.Status);
         Assert.Equal(2, (await store.GetPendingAsync(10)).Count);
+        Assert.Empty(await store.GetReconciliationAsync(10));
     }
 
     [Fact]
@@ -426,6 +503,44 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         1,
         DateTimeOffset.UtcNow,
         $"edge-{Guid.NewGuid():N}");
+
+    private static IOptions<HubOptions> TestOptions(string dataDirectory) => Options.Create(new HubOptions
+    {
+        DataDirectory = dataDirectory,
+        DatabaseKey = "test-database-key-32-characters-long",
+        CloudApiBaseUrl = "https://cloud.example",
+        CloudSyncKey = "cloud-sync-secret",
+    });
+
+    private static async Task AssertUntrustedFailurePreservesBatchAsync(CountingHandler handler)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "giromesa-edgehub-sync-untrusted", Guid.NewGuid().ToString("N"));
+        var options = TestOptions(directory);
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        try
+        {
+            await store.InitializeAsync();
+            await store.AcceptCommandAsync(ValidCommand());
+            await store.AcceptCommandAsync(ValidCommand());
+            var worker = new CloudSyncWorker(
+                new HttpClient(handler),
+                store,
+                options,
+                NullLogger<CloudSyncWorker>.Instance);
+
+            await worker.SyncOnceAsync();
+
+            Assert.Equal(1, handler.CallCount);
+            Assert.Equal("offline", worker.Status);
+            Assert.Equal(2, (await store.GetPendingAsync(10)).Count);
+            Assert.Empty(await store.GetReconciliationAsync(10));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
 
     private static PendingEvent OrderedPending(
         IReadOnlyList<ResourcePrecondition> resources,
@@ -771,9 +886,10 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         }
     }
 
-    private sealed class HiddenSchemaHandler(string hiddenId) : HttpMessageHandler
+    private sealed class HiddenSchemaHandler(string hiddenId, string expectedAcknowledgementId) : HttpMessageHandler
     {
         public int CallCount { get; private set; }
+        public int AcknowledgementOnlyCalls { get; private set; }
         public List<string> UploadedIds { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -787,14 +903,35 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                     ? commandId.GetString()!
                     : item.GetProperty("id").GetString()!)
                 .ToArray();
+            var acknowledgements = body.RootElement.GetProperty("acknowledgedCommandIds")
+                .EnumerateArray().Select(item => item.GetString()!).ToArray();
+            if (ids.Length == 0)
+            {
+                AcknowledgementOnlyCalls += 1;
+                Assert.Equal([expectedAcknowledgementId], acknowledgements);
+                return JsonResponse(HttpStatusCode.OK, new
+                {
+                    acceptedEventIds = Array.Empty<string>(),
+                    rejectedEvents = Array.Empty<object>(),
+                    eventResults = Array.Empty<object>(),
+                    commands = Array.Empty<object>(),
+                    serverTime = DateTimeOffset.UtcNow,
+                });
+            }
             var hiddenIndex = Array.IndexOf(ids, hiddenId);
             if (hiddenIndex >= 0)
-                return JsonResponse(HttpStatusCode.BadRequest, new
+            {
+                Assert.Equal([expectedAcknowledgementId], acknowledgements);
+                var response = JsonResponse(HttpStatusCode.BadRequest, new
                 {
                     code = "SYNC_EVENT_SCHEMA_INVALID",
                     scope = "event",
                     eventIndexes = new[] { hiddenIndex },
                 });
+                response.RequestMessage = request;
+                return response;
+            }
+            Assert.Empty(acknowledgements);
             UploadedIds.AddRange(ids);
             return JsonResponse(HttpStatusCode.OK, new
             {
@@ -819,13 +956,16 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         }
     }
 
+    private abstract class CountingHandler : HttpMessageHandler
+    {
+        public int CallCount { get; protected set; }
+    }
+
     private sealed class UnclassifiedFailureHandler(
         HttpStatusCode statusCode,
         string contentType,
-        string responseBody) : HttpMessageHandler
+        string responseBody) : CountingHandler
     {
-        public int CallCount { get; private set; }
-
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -835,6 +975,97 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, contentType),
             });
+        }
+    }
+
+    private sealed class TamperedResponseRequestHandler(
+        string responseRequestUri,
+        string? authScheme,
+        string? authParameter) : CountingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            request.RequestUri = new Uri(responseRequestUri, UriKind.Absolute);
+            request.Headers.Authorization = authScheme is null
+                ? null
+                : new System.Net.Http.Headers.AuthenticationHeaderValue(authScheme, authParameter);
+            var response = JsonResponse(HttpStatusCode.BadRequest, new
+            {
+                code = "SYNC_EVENT_SCHEMA_INVALID",
+                scope = "event",
+                eventIndexes = new[] { 0 },
+            });
+            response.RequestMessage = request;
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class RedirectFailureHandler : CountingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            var response = new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                RequestMessage = request,
+            };
+            response.Headers.Location = new Uri("https://other.example/api/v1/sync/batches");
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class AckOnlyFailureHandler(
+        string localEventId,
+        string cloudCommandId,
+        string responseBody) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var events = body.RootElement.GetProperty("events").EnumerateArray().ToArray();
+            if (CallCount == 1)
+            {
+                Assert.Single(events);
+                return JsonResponse(HttpStatusCode.OK, new
+                {
+                    acceptedEventIds = new[] { localEventId },
+                    rejectedEvents = Array.Empty<object>(),
+                    eventResults = Array.Empty<object>(),
+                    commands = new[]
+                    {
+                        new
+                        {
+                            id = cloudCommandId,
+                            type = "refresh",
+                            payload = new { },
+                            createdAt = DateTimeOffset.UtcNow,
+                            expiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                        },
+                    },
+                    serverTime = DateTimeOffset.UtcNow,
+                });
+            }
+
+            Assert.Empty(events);
+            Assert.Equal(
+                [cloudCommandId],
+                body.RootElement.GetProperty("acknowledgedCommandIds")
+                    .EnumerateArray().Select(item => item.GetString()!).ToArray());
+            return new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(responseBody, Encoding.UTF8, "application/json"),
+                RequestMessage = request,
+            };
         }
     }
 

@@ -21,7 +21,11 @@ builder.Services.AddSingleton<IFiscalGateway>(services =>
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
 builder.Services.AddSingleton<IPrinterGateway, DisabledPrinterGateway>();
-builder.Services.AddHttpClient<CloudSyncWorker>();
+builder.Services.AddHttpClient<CloudSyncWorker>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+    });
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
 
 var app = builder.Build();

@@ -1,6 +1,11 @@
 import { MAX_SYNC_BATCH_EVENTS } from "@giromesa/domain";
 import { Body, Controller, Headers, HttpCode, Post } from "@nestjs/common";
-import { ApiBadRequestResponse, ApiResponse, type OpenAPIObject } from "@nestjs/swagger";
+import {
+  ApiBadRequestResponse,
+  ApiOkResponse,
+  ApiResponse,
+  type OpenAPIObject,
+} from "@nestjs/swagger";
 import { type SyncBatchInput, syncBatchSchema } from "./sync.schemas.js";
 import { SyncService } from "./sync.service.js";
 import {
@@ -53,6 +58,159 @@ const syncValidationProblemSchema: OpenApiSchema = {
   ],
 };
 
+const jsonRecordSchema: OpenApiSchema = {
+  type: "object",
+  additionalProperties: true,
+};
+
+const dateTimeSchema: OpenApiSchema = {
+  type: "string",
+  format: "date-time",
+};
+
+const syncSuccessResponseSchema: OpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "acceptedEventIds",
+    "rejectedEvents",
+    "eventResults",
+    "commands",
+    "snapshot",
+    "serverTime",
+  ],
+  properties: {
+    acceptedEventIds: {
+      type: "array",
+      items: { type: "string", format: "uuid" },
+    },
+    rejectedEvents: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "code"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string" },
+        },
+      },
+    },
+    eventResults: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "replayed", "result"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          replayed: { type: "boolean" },
+          result: {
+            type: "object",
+            required: ["status"],
+            properties: {
+              status: { type: "string" },
+              code: { type: "string" },
+            },
+            additionalProperties: true,
+          },
+        },
+      },
+    },
+    commands: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "type", "payload", "createdAt", "expiresAt"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          type: { type: "string" },
+          payload: jsonRecordSchema,
+          createdAt: dateTimeSchema,
+          expiresAt: dateTimeSchema,
+        },
+      },
+    },
+    snapshot: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "organizationId",
+        "unitId",
+        "capturedAt",
+        "approvals",
+        "catalog",
+        "floor",
+        "tabs",
+        "tabDetails",
+        "kds",
+      ],
+      properties: {
+        organizationId: { type: "string", format: "uuid" },
+        unitId: { type: "string", format: "uuid" },
+        capturedAt: dateTimeSchema,
+        approvals: {
+          type: "object",
+          additionalProperties: false,
+          required: ["validUntil", "actors", "managers"],
+          properties: {
+            validUntil: dateTimeSchema,
+            actors: { type: "array", items: jsonRecordSchema },
+            managers: { type: "array", items: jsonRecordSchema },
+          },
+        },
+        catalog: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "categories",
+            "products",
+            "modifierGroups",
+            "modifierOptions",
+            "productModifierGroups",
+            "prices",
+            "availability",
+            "productStations",
+          ],
+          properties: {
+            categories: { type: "array", items: jsonRecordSchema },
+            products: { type: "array", items: jsonRecordSchema },
+            modifierGroups: { type: "array", items: jsonRecordSchema },
+            modifierOptions: { type: "array", items: jsonRecordSchema },
+            productModifierGroups: { type: "array", items: jsonRecordSchema },
+            prices: { type: "array", items: jsonRecordSchema },
+            availability: { type: "array", items: jsonRecordSchema },
+            productStations: { type: "array", items: jsonRecordSchema },
+          },
+        },
+        floor: {
+          type: "object",
+          additionalProperties: false,
+          required: ["rooms", "tables", "openTabs"],
+          properties: {
+            rooms: { type: "array", items: jsonRecordSchema },
+            tables: { type: "array", items: jsonRecordSchema },
+            openTabs: { type: "array", items: jsonRecordSchema },
+          },
+        },
+        tabs: { type: "array", items: jsonRecordSchema },
+        tabDetails: { type: "object", additionalProperties: jsonRecordSchema },
+        kds: {
+          type: "object",
+          additionalProperties: false,
+          required: ["tickets", "items"],
+          properties: {
+            tickets: { type: "array", items: jsonRecordSchema },
+            items: { type: "array", items: jsonRecordSchema },
+          },
+        },
+      },
+    },
+    serverTime: dateTimeSchema,
+  },
+};
+
 export function hubSyncKey(authorization: string | undefined) {
   if (!authorization?.startsWith("GiroMesaHub ")) return undefined;
   return authorization.slice("GiroMesaHub ".length).trim() || undefined;
@@ -64,6 +222,10 @@ export class SyncController {
 
   @HttpCode(200)
   @Post("batches")
+  @ApiOkResponse({
+    description: "Authoritative sync outcomes, pending cloud commands and operational snapshot.",
+    schema: syncSuccessResponseSchema,
+  })
   @ApiBadRequestResponse({
     description:
       "Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section.",

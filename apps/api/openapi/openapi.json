@@ -3870,6 +3870,329 @@
         "operationId": "SyncController_synchronize[0]",
         "parameters": [],
         "responses": {
+          "200": {
+            "description": "Authoritative sync outcomes, pending cloud commands and operational snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "acceptedEventIds",
+                    "rejectedEvents",
+                    "eventResults",
+                    "commands",
+                    "snapshot",
+                    "serverTime"
+                  ],
+                  "properties": {
+                    "acceptedEventIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "rejectedEvents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "code"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "eventResults": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "replayed",
+                          "result"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "replayed": {
+                            "type": "boolean"
+                          },
+                          "result": {
+                            "type": "object",
+                            "required": [
+                              "status"
+                            ],
+                            "properties": {
+                              "status": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": true
+                          }
+                        }
+                      }
+                    },
+                    "commands": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "type",
+                          "payload",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "snapshot": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "organizationId",
+                        "unitId",
+                        "capturedAt",
+                        "approvals",
+                        "catalog",
+                        "floor",
+                        "tabs",
+                        "tabDetails",
+                        "kds"
+                      ],
+                      "properties": {
+                        "organizationId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "unitId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "capturedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "approvals": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "validUntil",
+                            "actors",
+                            "managers"
+                          ],
+                          "properties": {
+                            "validUntil": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "actors": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "managers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "catalog": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "categories",
+                            "products",
+                            "modifierGroups",
+                            "modifierOptions",
+                            "productModifierGroups",
+                            "prices",
+                            "availability",
+                            "productStations"
+                          ],
+                          "properties": {
+                            "categories": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "products": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "modifierGroups": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "modifierOptions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "productModifierGroups": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "prices": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "availability": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "productStations": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "floor": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "rooms",
+                            "tables",
+                            "openTabs"
+                          ],
+                          "properties": {
+                            "rooms": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "tables": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "openTabs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "tabs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "tabDetails": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "kds": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tickets",
+                            "items"
+                          ],
+                          "properties": {
+                            "tickets": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "serverTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "400": {
             "description": "Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section.",
             "content": {
@@ -4354,6 +4677,329 @@
         "operationId": "SyncController_synchronize[1]",
         "parameters": [],
         "responses": {
+          "200": {
+            "description": "Authoritative sync outcomes, pending cloud commands and operational snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "acceptedEventIds",
+                    "rejectedEvents",
+                    "eventResults",
+                    "commands",
+                    "snapshot",
+                    "serverTime"
+                  ],
+                  "properties": {
+                    "acceptedEventIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "rejectedEvents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "code"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "eventResults": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "replayed",
+                          "result"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "replayed": {
+                            "type": "boolean"
+                          },
+                          "result": {
+                            "type": "object",
+                            "required": [
+                              "status"
+                            ],
+                            "properties": {
+                              "status": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": true
+                          }
+                        }
+                      }
+                    },
+                    "commands": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "type",
+                          "payload",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "snapshot": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "organizationId",
+                        "unitId",
+                        "capturedAt",
+                        "approvals",
+                        "catalog",
+                        "floor",
+                        "tabs",
+                        "tabDetails",
+                        "kds"
+                      ],
+                      "properties": {
+                        "organizationId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "unitId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "capturedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "approvals": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "validUntil",
+                            "actors",
+                            "managers"
+                          ],
+                          "properties": {
+                            "validUntil": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "actors": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "managers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "catalog": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "categories",
+                            "products",
+                            "modifierGroups",
+                            "modifierOptions",
+                            "productModifierGroups",
+                            "prices",
+                            "availability",
+                            "productStations"
+                          ],
+                          "properties": {
+                            "categories": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "products": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "modifierGroups": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "modifierOptions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "productModifierGroups": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "prices": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "availability": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "productStations": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "floor": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "rooms",
+                            "tables",
+                            "openTabs"
+                          ],
+                          "properties": {
+                            "rooms": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "tables": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "openTabs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        },
+                        "tabs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "tabDetails": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "kds": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tickets",
+                            "items"
+                          ],
+                          "properties": {
+                            "tickets": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "serverTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "400": {
             "description": "Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section.",
             "content": {
