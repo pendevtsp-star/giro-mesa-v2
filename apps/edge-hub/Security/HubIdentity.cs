@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using GiroMesa.EdgeHub.Storage;
@@ -56,9 +55,9 @@ public sealed class HubIdentity(IOptions<HubOptions> options, HubStore store)
     {
         var installationId = RequireCanonicalId(_options.InstallationId, "HUB_INSTALLATION_ID_REQUIRED");
         var unitId = RequireCanonicalId(_options.UnitId, "HUB_UNIT_ID_REQUIRED");
-        var thumbprint = NormalizeThumbprint(_options.ClientCertificateThumbprint);
+        var thumbprint = NormalizeThumbprint(_options.CloudClientCertificateThumbprint);
         if (_options.RequireMutualTls && thumbprint.Length != 64)
-            throw new HubIdentityException("HUB_MTLS_CERTIFICATE_REQUIRED");
+            throw new HubIdentityException("HUB_CLOUD_CLIENT_CERTIFICATE_REQUIRED");
         if (string.IsNullOrWhiteSpace(_options.DatabaseKey) || _options.DatabaseKey.Length < 32)
             throw new HubIdentityException("HUB_DATABASE_KEY_REQUIRED");
 
@@ -97,14 +96,6 @@ public sealed class HubIdentity(IOptions<HubOptions> options, HubStore store)
             throw new HubIdentityException("HUB_CLONE_DETECTED");
         if (anchor.StateGeneration > database.StateGeneration)
             throw new HubIdentityException("HUB_ROLLBACK_DETECTED");
-    }
-
-    public bool IsCertificateAuthorized(X509Certificate2? certificate)
-    {
-        if (!_options.RequireMutualTls) return !State.Revoked;
-        if (certificate is null || State.Revoked) return false;
-        var presented = certificate.GetCertHashString(HashAlgorithmName.SHA256);
-        return FixedEquals(NormalizeThumbprint(presented), State.CertificateThumbprint);
     }
 
     public async Task RevokeAsync(string reason)

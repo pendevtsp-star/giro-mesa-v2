@@ -6894,9 +6894,9 @@
             }
           },
           {
-            "name": "token",
+            "name": "x-preview-token",
             "required": true,
-            "in": "query",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -6925,9 +6925,9 @@
             }
           },
           {
-            "name": "token",
+            "name": "x-preview-token",
             "required": true,
-            "in": "query",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -7615,12 +7615,20 @@
         }
       }
     },
-    "/api/v1/public/menus/{slug}/commands": {
-      "post": {
-        "operationId": "PublicMenuController_command[0]",
+    "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
+      "get": {
+        "operationId": "PublicMenuAdminController_tableCapabilities[0]",
         "parameters": [
           {
-            "name": "slug",
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
             "required": true,
             "in": "path",
             "schema": {
@@ -7629,12 +7637,41 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
         "tags": [
-          "PublicMenu"
+          "PublicMenuAdmin"
+        ]
+      },
+      "put": {
+        "operationId": "PublicMenuAdminController_configureTableCapabilities[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PublicMenuAdmin"
         ],
         "requestBody": {
           "required": true,
@@ -7643,35 +7680,48 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "place_order",
-                      "call_waiter",
-                      "request_check"
-                    ]
+                  "callWaiterEnabled": {
+                    "type": "boolean"
                   },
-                  "payload": {
-                    "default": {},
-                    "type": "object",
-                    "additionalProperties": {}
+                  "requestBillEnabled": {
+                    "type": "boolean"
+                  },
+                  "viewPartialEnabled": {
+                    "type": "boolean"
+                  },
+                  "expectedResourceVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
-                  "type"
-                ]
+                  "callWaiterEnabled",
+                  "requestBillEnabled",
+                  "viewPartialEnabled",
+                  "expectedResourceVersion"
+                ],
+                "additionalProperties": false
               }
             }
           }
         }
       }
     },
-    "/public/v1/menus/{slug}/commands": {
-      "post": {
-        "operationId": "PublicMenuController_command[1]",
+    "/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
+      "get": {
+        "operationId": "PublicMenuAdminController_tableCapabilities[1]",
         "parameters": [
           {
-            "name": "slug",
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
             "required": true,
             "in": "path",
             "schema": {
@@ -7680,12 +7730,41 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
         "tags": [
-          "PublicMenu"
+          "PublicMenuAdmin"
+        ]
+      },
+      "put": {
+        "operationId": "PublicMenuAdminController_configureTableCapabilities[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PublicMenuAdmin"
         ],
         "requestBody": {
           "required": true,
@@ -7694,23 +7773,28 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "place_order",
-                      "call_waiter",
-                      "request_check"
-                    ]
+                  "callWaiterEnabled": {
+                    "type": "boolean"
                   },
-                  "payload": {
-                    "default": {},
-                    "type": "object",
-                    "additionalProperties": {}
+                  "requestBillEnabled": {
+                    "type": "boolean"
+                  },
+                  "viewPartialEnabled": {
+                    "type": "boolean"
+                  },
+                  "expectedResourceVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
-                  "type"
-                ]
+                  "callWaiterEnabled",
+                  "requestBillEnabled",
+                  "viewPartialEnabled",
+                  "expectedResourceVersion"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -10489,6 +10573,182 @@
         }
       }
     },
+    "/api/v1/sync/dispatch-outcomes": {
+      "post": {
+        "operationId": "SyncController_dispatchOutcomes[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Idempotent dispatch outcomes accepted from the authenticated Hub."
+          }
+        },
+        "tags": [
+          "Sync"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcomes": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "effectId": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "deliveryKey": {
+                          "type": "string",
+                          "minLength": 8,
+                          "maxLength": 240
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "delivered",
+                            "acked",
+                            "failed",
+                            "canceled",
+                            "dlq"
+                          ]
+                        },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "occurredAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "effectId",
+                        "deliveryKey",
+                        "state",
+                        "occurredAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "outcomes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sync/dispatch-outcomes": {
+      "post": {
+        "operationId": "SyncController_dispatchOutcomes[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Idempotent dispatch outcomes accepted from the authenticated Hub."
+          }
+        },
+        "tags": [
+          "Sync"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcomes": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "effectId": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "deliveryKey": {
+                          "type": "string",
+                          "minLength": 8,
+                          "maxLength": 240
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "delivered",
+                            "acked",
+                            "failed",
+                            "canceled",
+                            "dlq"
+                          ]
+                        },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "occurredAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "effectId",
+                        "deliveryKey",
+                        "state",
+                        "occurredAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "outcomes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog": {
       "get": {
         "operationId": "PilotCatalogController_list[0]",
@@ -12655,6 +12915,712 @@
         "tags": [
           "PilotPos"
         ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+      "get": {
+        "operationId": "PilotPosController_listDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+      "get": {
+        "operationId": "PilotPosController_listDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+      "post": {
+        "operationId": "PilotPosController_ensureDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+      "post": {
+        "operationId": "PilotPosController_ensureDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+      "post": {
+        "operationId": "PilotPosController_reprintDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+      "post": {
+        "operationId": "PilotPosController_reprintDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+      "post": {
+        "operationId": "PilotPosController_cancelDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approval": {
+                    "type": "object",
+                    "properties": {
+                      "approverMembershipId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{4,8}$"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "approverMembershipId",
+                      "pin",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "approval"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+      "post": {
+        "operationId": "PilotPosController_cancelDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approval": {
+                    "type": "object",
+                    "properties": {
+                      "approverMembershipId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{4,8}$"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "approverMembershipId",
+                      "pin",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "approval"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+      "post": {
+        "operationId": "PilotPosController_acknowledgeDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acknowledgementKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "acknowledgementKey"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+      "post": {
+        "operationId": "PilotPosController_acknowledgeDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acknowledgementKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "acknowledgementKey"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+      "post": {
+        "operationId": "PilotPosController_reconcileDispatch[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedResourceVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "retry",
+                      "cancel"
+                    ]
+                  }
+                },
+                "required": [
+                  "expectedResourceVersion",
+                  "action"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+      "post": {
+        "operationId": "PilotPosController_reconcileDispatch[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedResourceVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "retry",
+                      "cancel"
+                    ]
+                  }
+                },
+                "required": [
+                  "expectedResourceVersion",
+                  "action"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/transfer": {
@@ -19454,6 +20420,14 @@
         "operationId": "PublicMediaController_asset[0]",
         "parameters": [
           {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "assetId",
             "required": true,
             "in": "path",
@@ -19476,6 +20450,14 @@
       "get": {
         "operationId": "PublicMediaController_asset[1]",
         "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "assetId",
             "required": true,

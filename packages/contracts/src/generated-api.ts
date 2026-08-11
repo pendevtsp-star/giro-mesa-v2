@@ -1748,32 +1748,32 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/menus/{slug}/commands": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: operations["PublicMenuController_command[0]"];
+    get: operations["PublicMenuAdminController_tableCapabilities[0]"];
+    put: operations["PublicMenuAdminController_configureTableCapabilities[0]"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/menus/{slug}/commands": {
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: operations["PublicMenuController_command[1]"];
+    get: operations["PublicMenuAdminController_tableCapabilities[1]"];
+    put: operations["PublicMenuAdminController_configureTableCapabilities[1]"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2030,6 +2030,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["SyncController_synchronize[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sync/dispatch-outcomes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_dispatchOutcomes[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sync/dispatch-outcomes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_dispatchOutcomes[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2542,6 +2574,198 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_sendOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listDispatch[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listDispatch[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_ensureDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_ensureDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reconcileDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reconcileDispatch[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -8942,10 +9166,10 @@ export interface operations {
   };
   "PublicMenuController_preview[0]": {
     parameters: {
-      query: {
-        token: string;
+      query?: never;
+      header: {
+        "x-preview-token": string;
       };
-      header?: never;
       path: {
         slug: string;
       };
@@ -8963,10 +9187,10 @@ export interface operations {
   };
   "PublicMenuController_preview[1]": {
     parameters: {
-      query: {
-        token: string;
+      query?: never;
+      header: {
+        "x-preview-token": string;
       };
-      header?: never;
       path: {
         slug: string;
       };
@@ -9304,29 +9528,19 @@ export interface operations {
       };
     };
   };
-  "PublicMenuController_command[0]": {
+  "PublicMenuAdminController_tableCapabilities[0]": {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        slug: string;
+        organizationId: string;
+        unitId: string;
       };
       cookie?: never;
     };
-    requestBody: {
-      content: {
-        "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
-          };
-        };
-      };
-    };
+    requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -9334,29 +9548,77 @@ export interface operations {
       };
     };
   };
-  "PublicMenuController_command[1]": {
+  "PublicMenuAdminController_configureTableCapabilities[0]": {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        slug: string;
+        organizationId: string;
+        unitId: string;
       };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
-          };
+          callWaiterEnabled: boolean;
+          requestBillEnabled: boolean;
+          viewPartialEnabled: boolean;
+          expectedResourceVersion: number;
         };
       };
     };
     responses: {
-      201: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_tableCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_configureTableCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          callWaiterEnabled: boolean;
+          requestBillEnabled: boolean;
+          viewPartialEnabled: boolean;
+          expectedResourceVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -10288,6 +10550,72 @@ export interface operations {
       };
     };
   };
+  "SyncController_dispatchOutcomes[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          outcomes: {
+            id: string;
+            effectId: string;
+            deliveryKey: string;
+            /** @enum {string} */
+            state: "delivered" | "acked" | "failed" | "canceled" | "dlq";
+            error?: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      /** @description Idempotent dispatch outcomes accepted from the authenticated Hub. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SyncController_dispatchOutcomes[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          outcomes: {
+            id: string;
+            effectId: string;
+            deliveryKey: string;
+            /** @enum {string} */
+            state: "delivered" | "acked" | "failed" | "canceled" | "dlq";
+            error?: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      /** @description Idempotent dispatch outcomes accepted from the authenticated Hub. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotCatalogController_list[0]": {
     parameters: {
       query?: never;
@@ -11207,6 +11535,324 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_listDispatch[0]": {
+    parameters: {
+      query: {
+        state: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_listDispatch[1]": {
+    parameters: {
+      query: {
+        state: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_ensureDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_ensureDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_cancelDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_cancelDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeDispatch[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgementKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeDispatch[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgementKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reconcileDispatch[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedResourceVersion: number;
+          /** @enum {string} */
+          action: "retry" | "cancel";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reconcileDispatch[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedResourceVersion: number;
+          /** @enum {string} */
+          action: "retry" | "cancel";
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -14163,6 +14809,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
+        slug: string;
         assetId: string;
       };
       cookie?: never;
@@ -14182,6 +14829,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
+        slug: string;
         assetId: string;
       };
       cookie?: never;

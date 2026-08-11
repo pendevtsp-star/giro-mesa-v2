@@ -1,6 +1,4 @@
 using System.Text.Json;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using GiroMesa.EdgeHub;
 using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Security;
@@ -10,14 +8,25 @@ using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 var builder = WebApplication.CreateBuilder(args);
 var startupOptions = builder.Configuration.GetSection(HubOptions.Section).Get<HubOptions>() ?? new HubOptions();
-if (startupOptions.RequireMutualTls)
+HubTlsConfiguration.Validate(startupOptions);
+var serverCertificate = startupOptions.RequireMutualTls
+    ? HubTlsConfiguration.LoadServerCertificate(startupOptions)
+    : null;
+builder.WebHost.ConfigureKestrel(options =>
 {
-    builder.WebHost.ConfigureKestrel(options => options.ConfigureHttpsDefaults(https =>
+    options.ListenAnyIP(startupOptions.HttpsPort, listen =>
     {
-        https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
-        https.CheckCertificateRevocation = true;
-    }));
-}
+        if (!startupOptions.RequireMutualTls) return;
+        listen.UseHttps(https =>
+        {
+            https.ServerCertificate = serverCertificate;
+            https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+            https.CheckCertificateRevocation = true;
+            https.ClientCertificateValidation = (certificate, _, _) =>
+                HubTlsConfiguration.IsTrustedDeviceCertificate(certificate, startupOptions);
+        });
+    });
+});
 builder.Host.UseWindowsService(options => options.ServiceName = "GiroMesa Edge Hub");
 builder.Services.Configure<HubOptions>(builder.Configuration.GetSection(HubOptions.Section));
 builder.Services.AddSingleton<HubStore>();
@@ -33,7 +42,7 @@ builder.Services.AddSingleton<IFiscalGateway>(services =>
         ? services.GetRequiredService<FocusFiscalGateway>()
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
-builder.Services.AddSingleton<IPrinterGateway, DisabledPrinterGateway>();
+builder.Services.AddSingleton<IPrinterGateway, WindowsSpoolPrinterGateway>();
 builder.Services.AddSingleton<IKitchenDispatchGateway, LocalKitchenDispatchGateway>();
 builder.Services.AddSingleton<DispatchProcessor>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DispatchProcessor>());
@@ -42,7 +51,7 @@ builder.Services.AddHttpClient<CloudSyncWorker>()
     {
         var handler = new HttpClientHandler { AllowAutoRedirect = false, CheckCertificateRevocationList = true };
         if (startupOptions.RequireMutualTls && !string.IsNullOrWhiteSpace(startupOptions.CloudApiBaseUrl))
-            handler.ClientCertificates.Add(LoadClientCertificate(startupOptions));
+            handler.ClientCertificates.Add(HubTlsConfiguration.LoadCloudClientCertificate(startupOptions));
         return handler;
     });
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
@@ -274,28 +283,6 @@ static IResult SnapshotSection(
     snapshot is null
         ? Results.NotFound(new { code = "OFFLINE_SNAPSHOT_UNAVAILABLE" })
         : Results.Ok(select(snapshot));
-
-static X509Certificate2 LoadClientCertificate(HubOptions options)
-{
-    var location = string.Equals(options.ClientCertificateStoreLocation, "LocalMachine", StringComparison.OrdinalIgnoreCase)
-        ? StoreLocation.LocalMachine
-        : StoreLocation.CurrentUser;
-    using var store = new X509Store(StoreName.My, location);
-    store.Open(OpenFlags.ReadOnly);
-    var expected = new string((options.ClientCertificateThumbprint ?? string.Empty)
-        .Where(Uri.IsHexDigit)
-        .Select(char.ToUpperInvariant)
-        .ToArray());
-    if (expected.Length != 64) throw new InvalidOperationException("HUB_MTLS_CERTIFICATE_REQUIRED");
-    var certificate = store.Certificates
-        .OfType<X509Certificate2>()
-        .FirstOrDefault(candidate => candidate.HasPrivateKey && candidate.NotBefore <= DateTime.UtcNow &&
-            candidate.NotAfter >= DateTime.UtcNow &&
-            CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(candidate.GetCertHashString(HashAlgorithmName.SHA256)),
-                Convert.FromHexString(expected)));
-    return certificate ?? throw new InvalidOperationException("HUB_MTLS_PRIVATE_CERTIFICATE_NOT_FOUND");
-}
 
 public partial class Program;
 

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { publicMenuSlugSchema } from "@giromesa/contracts";
 import { z } from "zod";
 import {
   Body,
@@ -52,10 +53,11 @@ export class PublicMediaController {
 
   @Get(":slug/assets/:assetId")
   async asset(
+    @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
     @Param("assetId", ParseUUIDPipe) assetId: string,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const asset = await this.media.publicAsset(assetId);
+    const asset = await this.media.publicAsset(slug, assetId);
     if (!asset)
       throw new NotFoundException({ code: "MEDIA_NOT_FOUND", message: "Imagem não encontrada." });
     reply.header("Content-Type", asset.mimeType);

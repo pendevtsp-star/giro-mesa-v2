@@ -25,7 +25,7 @@ public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore s
             return new(false, null, "INVALID_DEVICE", StatusCodes.Status400BadRequest);
         }
 
-        if (_options.RequireMutualTls && (hubIdentity is null || !hubIdentity.IsCertificateAuthorized(certificate)))
+        if (!HubTlsConfiguration.IsTrustedDeviceCertificate(certificate, _options) || hubIdentity?.State.Revoked == true)
         {
             return new(false, null, "HUB_MTLS_REQUIRED", StatusCodes.Status401Unauthorized);
         }
@@ -43,7 +43,8 @@ public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore s
     }
 
     public async Task<bool> IsAuthorizedAsync(string? token, X509Certificate2? certificate = null) =>
-        (!_options.RequireMutualTls || (hubIdentity is not null && hubIdentity.IsCertificateAuthorized(certificate))) &&
+        HubTlsConfiguration.IsTrustedDeviceCertificate(certificate, _options) &&
+        hubIdentity?.State.Revoked != true &&
         !string.IsNullOrWhiteSpace(token) &&
         await store.HasActiveTokenAsync(Hash(token));
 

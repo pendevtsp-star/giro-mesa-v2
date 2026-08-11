@@ -145,6 +145,17 @@ public sealed class DispatchLedgerTests : IAsyncLifetime
             now,
             now.AddMinutes(5));
 
+    [Fact]
+    public async Task RawPrinterGatewayFailsClosedOutsideWindows()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var printer = new WindowsSpoolPrinterGateway();
+        Assert.False(printer.Capability.Configured);
+        var result = await printer.PrintAsync(new PrintRequest("delivery-1", "printer-1", "kitchen", "Order"));
+        Assert.False(result.Success);
+        Assert.Equal("PRINTER_PLATFORM_UNAVAILABLE", result.ErrorCode);
+    }
+
     private sealed class RecordingPrinterGateway : IPrinterGateway
     {
         public CapabilityState Capability { get; } = new(true, "test-printer", "ready");

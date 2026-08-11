@@ -18,14 +18,6 @@ public sealed class DisabledFiscalGateway : IFiscalGateway
         Task.FromResult(new FiscalResult(false, "unavailable", null, "FOCUS_NOT_CONFIGURED"));
 }
 
-public sealed class DisabledPrinterGateway : IPrinterGateway
-{
-    public CapabilityState Capability => new(false, "escpos", "No printer has been paired with this hub.");
-
-    public Task<PrintResult> PrintAsync(PrintRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new PrintResult(false, "unavailable", "PRINTER_NOT_CONFIGURED"));
-}
-
 public sealed class LocalKitchenDispatchGateway(HubStore store) : IKitchenDispatchGateway
 {
     public CapabilityState Capability { get; } = new(

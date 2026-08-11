@@ -1,6 +1,6 @@
 namespace GiroMesa.EdgeHub;
 
-public sealed class HubOptions
+public sealed record HubOptions
 {
     public const string Section = "Hub";
 
@@ -10,8 +10,12 @@ public sealed class HubOptions
     public string? DatabaseKey { get; init; }
     public string? EnrollmentCode { get; init; }
     public bool RequireMutualTls { get; init; } = true;
-    public string? ClientCertificateThumbprint { get; init; }
-    public string ClientCertificateStoreLocation { get; init; } = "CurrentUser";
+    public int HttpsPort { get; init; } = 43120;
+    public string? ServerCertificateThumbprint { get; init; }
+    public string ServerCertificateStoreLocation { get; init; } = "LocalMachine";
+    public string? CloudClientCertificateThumbprint { get; init; }
+    public string CloudClientCertificateStoreLocation { get; init; } = "LocalMachine";
+    public string[] DeviceClientCertificateThumbprints { get; init; } = [];
     public long MinimumFreeDiskBytes { get; init; } = 536_870_912;
     public int MaximumClockSkewSeconds { get; init; } = 120;
     public string? BackupDirectory { get; init; }

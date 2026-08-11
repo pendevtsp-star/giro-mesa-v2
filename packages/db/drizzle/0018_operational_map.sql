@@ -311,6 +311,12 @@ CREATE INDEX table_service_call_receipts_call_idx
 CREATE INDEX table_service_calls_cooldown_idx
   ON public.table_service_calls(organization_id, unit_id, occupancy_id, occupancy_epoch, kind, created_at DESC)
   WHERE state IN ('received','routed');--> statement-breakpoint
+CREATE INDEX table_layout_versions_published_idx
+  ON public.table_layout_versions(organization_id, unit_id, room_id, state, version DESC);--> statement-breakpoint
+CREATE INDEX area_assignments_routing_idx
+  ON public.area_assignments(organization_id, unit_id, shift_id, area_id);--> statement-breakpoint
+CREATE INDEX staff_presence_leases_routing_idx
+  ON public.staff_presence_leases(organization_id, unit_id, identity_id, expires_at DESC);--> statement-breakpoint
 CREATE TRIGGER table_service_call_receipts_append_only
 BEFORE UPDATE OR DELETE ON public.table_service_call_receipts FOR EACH ROW
 EXECUTE FUNCTION public.giromesa_append_only_service_call_event();--> statement-breakpoint
@@ -327,8 +333,9 @@ BEGIN
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tenant_table);
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO giromesa_app', tenant_table);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO giromesa_legacy_transition', tenant_table);
+    EXECUTE format('REVOKE ALL PRIVILEGES ON public.%I FROM giromesa_app', tenant_table);
+    EXECUTE format('REVOKE ALL PRIVILEGES ON public.%I FROM giromesa_legacy_transition', tenant_table);
+    EXECUTE format('GRANT SELECT ON public.%I TO giromesa_app, giromesa_legacy_transition', tenant_table);
     EXECUTE format(
       'CREATE POLICY giromesa_tenant_scope ON public.%I FOR ALL TO giromesa_app '
       || 'USING (organization_id = nullif(current_setting(''app.current_organization_id'', true), '''')::uuid '
@@ -344,3 +351,17 @@ BEGIN
     );
   END LOOP;
 END $$;
+--> statement-breakpoint
+GRANT INSERT, UPDATE ON public.service_areas TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.table_layout_versions TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, DELETE ON public.table_layout_nodes TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.service_shifts, public.area_assignments TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.table_occupancies TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.table_occupancy_events TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.staff_presence_leases, public.salon_exceptions TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.public_table_service_settings TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.public_table_sessions TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.public_table_session_nonces TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.public_table_session_rate_limits TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.table_service_calls TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.table_service_call_events, public.table_service_call_receipts TO giromesa_app, giromesa_legacy_transition;

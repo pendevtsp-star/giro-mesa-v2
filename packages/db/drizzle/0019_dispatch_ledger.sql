@@ -115,8 +115,9 @@ BEGIN
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tenant_table);
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO giromesa_app', tenant_table);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO giromesa_legacy_transition', tenant_table);
+    EXECUTE format('REVOKE ALL PRIVILEGES ON public.%I FROM giromesa_app', tenant_table);
+    EXECUTE format('REVOKE ALL PRIVILEGES ON public.%I FROM giromesa_legacy_transition', tenant_table);
+    EXECUTE format('GRANT SELECT ON public.%I TO giromesa_app, giromesa_legacy_transition', tenant_table);
     EXECUTE format(
       'CREATE POLICY giromesa_tenant_scope ON public.%I FOR ALL TO giromesa_app '
       || 'USING (organization_id = nullif(current_setting(''app.current_organization_id'', true), '''')::uuid '
@@ -132,3 +133,9 @@ BEGIN
     );
   END LOOP;
 END $$;
+--> statement-breakpoint
+GRANT INSERT, UPDATE ON public.production_station_routes TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.dispatch_effects TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.dispatch_attempts, public.dispatch_acknowledgements, public.dispatch_outcomes
+  TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT, UPDATE ON public.dispatch_dead_letters TO giromesa_app, giromesa_legacy_transition;

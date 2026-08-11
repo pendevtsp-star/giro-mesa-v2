@@ -21,8 +21,9 @@ public sealed class HubRecoveryTests : IAsyncLifetime
     [Fact]
     public async Task RequiresThePinnedMutualTlsIdentityAndHonorsRevocation()
     {
-        using var certificate = CreateCertificate("CN=giromesa-edge-test");
-        var options = CreateOptions(certificate);
+        using var cloudCertificate = CreateCertificate("CN=giromesa-cloud-client-test");
+        using var deviceCertificate = CreateCertificate("CN=giromesa-device-test");
+        var options = CreateOptions(cloudCertificate, deviceCertificate);
         var store = CreateStore(options);
         await store.InitializeAsync();
         var identity = new HubIdentity(Options.Create(options), store);
@@ -30,14 +31,41 @@ public sealed class HubRecoveryTests : IAsyncLifetime
         var authenticator = new DeviceAuthenticator(Options.Create(options), store, identity);
 
         var pairing = await authenticator.PairAsync(
-            new PairDeviceRequest(Guid.NewGuid().ToString(), "Caixa 01", "654321"), certificate);
+            new PairDeviceRequest(Guid.NewGuid().ToString(), "Caixa 01", "654321"), deviceCertificate);
         Assert.True(pairing.IsSuccess);
-        Assert.True(await authenticator.IsAuthorizedAsync(pairing.Token, certificate));
+        Assert.True(await authenticator.IsAuthorizedAsync(pairing.Token, deviceCertificate));
 
         using var cloneCertificate = CreateCertificate("CN=cloned-edge");
         Assert.False(await authenticator.IsAuthorizedAsync(pairing.Token, cloneCertificate));
         await identity.RevokeAsync("unit decommissioned");
-        Assert.False(await authenticator.IsAuthorizedAsync(pairing.Token, certificate));
+        Assert.False(await authenticator.IsAuthorizedAsync(pairing.Token, deviceCertificate));
+    }
+
+    [Fact]
+    public void TlsRolesAreCompleteDistinctAndHttpsOnly()
+    {
+        using var server = CreateCertificate("CN=giromesa-server-test");
+        using var cloud = CreateCertificate("CN=giromesa-cloud-test");
+        using var device = CreateCertificate("CN=giromesa-device-test");
+        var valid = CreateOptions(cloud, device) with
+        {
+            ServerCertificateThumbprint = Fingerprint(server),
+            CloudApiBaseUrl = "https://cloud.example",
+        };
+        HubTlsConfiguration.Validate(valid);
+
+        Assert.Equal(
+            "HUB_TLS_CERTIFICATE_ROLES_MUST_BE_DISTINCT",
+            Assert.Throws<InvalidOperationException>(() => HubTlsConfiguration.Validate(valid with
+            {
+                DeviceClientCertificateThumbprints = [valid.CloudClientCertificateThumbprint!],
+            })).Message);
+        Assert.Equal(
+            "HUB_CLOUD_HTTPS_REQUIRED",
+            Assert.Throws<InvalidOperationException>(() => HubTlsConfiguration.Validate(valid with
+            {
+                CloudApiBaseUrl = "http://cloud.example",
+            })).Message);
     }
 
     [Fact]
@@ -106,7 +134,7 @@ public sealed class HubRecoveryTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HubOptions CreateOptions(X509Certificate2 certificate) => new()
+    private HubOptions CreateOptions(X509Certificate2 cloudCertificate, params X509Certificate2[] deviceCertificates) => new()
     {
         DataDirectory = _directory,
         DatabaseKey = "test-database-key-32-characters-long",
@@ -114,10 +142,17 @@ public sealed class HubRecoveryTests : IAsyncLifetime
         InstallationId = _installationId,
         UnitId = _unitId,
         RequireMutualTls = true,
-        ClientCertificateThumbprint = certificate.GetCertHashString(HashAlgorithmName.SHA256),
+        ServerCertificateThumbprint = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+        CloudClientCertificateThumbprint = Fingerprint(cloudCertificate),
+        DeviceClientCertificateThumbprints = deviceCertificates.Length == 0
+            ? [Convert.ToHexString(RandomNumberGenerator.GetBytes(32))]
+            : deviceCertificates.Select(Fingerprint).ToArray(),
         MinimumFreeDiskBytes = 1024,
         MaximumClockSkewSeconds = 60,
     };
+
+    private static string Fingerprint(X509Certificate2 certificate) =>
+        certificate.GetCertHashString(HashAlgorithmName.SHA256);
 
     private HubStore CreateStore(HubOptions options) => new(
         Options.Create(options),

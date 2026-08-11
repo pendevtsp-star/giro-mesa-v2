@@ -14,7 +14,6 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
-  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -109,7 +108,7 @@ export class PublicMenuController {
   @Get(":slug/preview")
   preview(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
-    @Query("token") token: string,
+    @Headers("x-preview-token") token: string,
   ) {
     return this.publicMenuService.preview(slug, token);
   }

@@ -8,28 +8,28 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
 using System;
-namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Commands
+namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel
 {
     /// <summary>
-    /// Builds and executes requests for operations under \public\v1\menus\{slug}\commands
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\pilot\dispatch\{effectId}\cancel
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-    public partial class CommandsRequestBuilder : BaseRequestBuilder
+    public partial class CancelRequestBuilder : BaseRequestBuilder
     {
         /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsRequestBuilder"/> and sets the default values.
+        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelRequestBuilder"/> and sets the default values.
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public CommandsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/public/v1/menus/{slug}/commands", pathParameters)
+        public CancelRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel", pathParameters)
         {
         }
         /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsRequestBuilder"/> and sets the default values.
+        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelRequestBuilder"/> and sets the default values.
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public CommandsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/public/v1/menus/{slug}/commands", rawUrl)
+        public CancelRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel", rawUrl)
         {
         }
         /// <param name="body">The request body</param>
@@ -37,11 +37,11 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Commands
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task PostAsync(global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task PostAsync(global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
@@ -53,11 +53,11 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Commands
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public RequestInformation ToPostRequestInformation(global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
+        public RequestInformation ToPostRequestInformation(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
         {
 #nullable restore
 #else
-        public RequestInformation ToPostRequestInformation(global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
+        public RequestInformation ToPostRequestInformation(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
@@ -69,18 +69,18 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Commands
         /// <summary>
         /// Returns a request builder with the provided arbitrary URL. Using this method means any other path or query parameters are ignored.
         /// </summary>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsRequestBuilder"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelRequestBuilder"/></returns>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
-        public global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsRequestBuilder WithUrl(string rawUrl)
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelRequestBuilder WithUrl(string rawUrl)
         {
-            return new global::GiroMesa.ApiClient.Public.V1.Menus.Item.Commands.CommandsRequestBuilder(rawUrl, RequestAdapter);
+            return new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Dispatch.Item.Cancel.CancelRequestBuilder(rawUrl, RequestAdapter);
         }
         /// <summary>
         /// Configuration for the request such as headers, query parameters, and middleware options.
         /// </summary>
         [Obsolete("This class is deprecated. Please use the generic RequestConfiguration class generated by the generator.")]
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class CommandsRequestBuilderPostRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
+        public partial class CancelRequestBuilderPostRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
         {
         }
     }

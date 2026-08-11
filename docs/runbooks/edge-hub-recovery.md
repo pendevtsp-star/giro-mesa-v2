@@ -3,7 +3,7 @@
 ## Invariantes
 
 - Cada instalação recebe um `Hub:InstallationId` UUID exclusivo e uma identidade persistida no banco SQLCipher. Nunca reutilize esse UUID em outra máquina.
-- HTTPS exige certificado de cliente quando `Hub:RequireMutualTls=true`. O certificado válido deve estar no repositório `My` do Windows, possuir chave privada e corresponder ao SHA-256 configurado em `Hub:ClientCertificateThumbprint`.
+- Quando `Hub:RequireMutualTls=true`, o Hub abre somente o listener HTTPS próprio. O certificado do servidor, o certificado cliente usado contra a nuvem e os certificados clientes confiáveis dos dispositivos têm pins SHA-256 distintos; o processo recusa configuração ausente ou reutilizada entre papéis.
 - O arquivo `hub-installation.anchor.json` fica junto ao diretório de dados, mas fora do banco. Ele é autenticado por HMAC com `Hub:DatabaseKey` e ancora a geração monotônica. Não o regenere manualmente.
 - Divergência de instalação, certificado ou unidade falha fechada. Geração do anchor maior que a do banco é rollback e impede a inicialização.
 - Backups contêm o banco criptografado, manifesto assinado, hash e geração. PAN, CVV, token de pareamento e chave do banco nunca devem entrar em ticket, log ou cópia separada.
@@ -13,11 +13,13 @@
 Defina por secret store/ACL do serviço, não no repositório:
 
 - `Hub:InstallationId`, `Hub:UnitId` e `Hub:DatabaseKey`;
-- `Hub:RequireMutualTls=true`, `Hub:ClientCertificateThumbprint` e `Hub:ClientCertificateStoreLocation`;
+- `Hub:RequireMutualTls=true`, `Hub:HttpsPort`, `Hub:ServerCertificateThumbprint` e `Hub:ServerCertificateStoreLocation`;
+- `Hub:CloudClientCertificateThumbprint` e `Hub:CloudClientCertificateStoreLocation` para a conexão de saída com a nuvem;
+- a allowlist `Hub:DeviceClientCertificateThumbprints` para os dispositivos que podem parear e chamar o Hub;
 - `Hub:DataDirectory`, `Hub:BackupDirectory`, `Hub:MinimumFreeDiskBytes` e `Hub:MaximumClockSkewSeconds`;
 - endpoint HTTPS da nuvem e credencial de sync quando a sincronização estiver habilitada.
 
-Conceda leitura da chave privada somente à conta do serviço. Publique apenas HTTPS; HTTP local não satisfaz mTLS e deve ser bloqueado no firewall/reverse proxy.
+Os certificados de servidor e cliente da nuvem devem possuir chave privada no repositório `My`; os pins de dispositivos são apenas confiança de entrada. Conceda leitura de cada chave privada somente à conta do serviço. O endpoint da nuvem deve ser HTTPS. Não reutilize um certificado de dispositivo como identidade da nuvem ou do servidor.
 
 ## Backup operacional
 

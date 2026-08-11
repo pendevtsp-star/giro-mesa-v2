@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { publicMenuMediaAssets } from "@giromesa/db";
+import { publicMenuMediaAssets, publicMenus, publicMenuVersions } from "@giromesa/db";
 import {
   BadRequestException,
   ConflictException,
@@ -129,62 +129,90 @@ export class MediaService {
       throw error;
     }
 
-    const quotaBytes = Number(process.env.PUBLIC_MEDIA_QUOTA_BYTES ?? 100 * 1024 * 1024);
-    const [usage] = await this.database.db
-      .select({ bytes: sql<number>`coalesce(sum(${publicMenuMediaAssets.byteSize}), 0)` })
-      .from(publicMenuMediaAssets)
-      .where(
-        and(
-          eq(publicMenuMediaAssets.organizationId, organizationId),
-          eq(publicMenuMediaAssets.unitId, unitId),
-        ),
-      );
-    if (Number(usage?.bytes ?? 0) + recoded.bytes.length > quotaBytes)
-      throw new ConflictException({
-        code: "MEDIA_QUOTA_EXCEEDED",
-        message: "A cota de imagens da unidade foi atingida.",
-      });
-
     const storageKey = `${organizationId}/${unitId}/${input.kind}/${recoded.sha256}.webp`;
-    const [created] = await this.database.db
-      .insert(publicMenuMediaAssets)
-      .values({
-        organizationId,
-        unitId,
-        kind: input.kind,
-        sha256: recoded.sha256,
-        storageKey,
-        mimeType: recoded.mimeType,
-        width: recoded.width,
-        height: recoded.height,
-        byteSize: recoded.bytes.length,
-        bytes: recoded.bytes,
-        createdByIdentityId: identityId,
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (created) return this.publicMetadata(created);
-    const [existing] = await this.database.db
-      .select()
-      .from(publicMenuMediaAssets)
-      .where(
-        and(
-          eq(publicMenuMediaAssets.organizationId, organizationId),
-          eq(publicMenuMediaAssets.unitId, unitId),
-          eq(publicMenuMediaAssets.kind, input.kind),
-          eq(publicMenuMediaAssets.sha256, recoded.sha256),
-        ),
-      )
-      .limit(1);
-    if (!existing) throw new Error("Media deduplication conflict without an asset");
-    return this.publicMetadata(existing);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`media-quota:${organizationId}:${unitId}`}))`,
+      );
+      const [existing] = await tx
+        .select()
+        .from(publicMenuMediaAssets)
+        .where(
+          and(
+            eq(publicMenuMediaAssets.organizationId, organizationId),
+            eq(publicMenuMediaAssets.unitId, unitId),
+            eq(publicMenuMediaAssets.kind, input.kind),
+            eq(publicMenuMediaAssets.sha256, recoded.sha256),
+          ),
+        )
+        .limit(1);
+      if (existing) return this.publicMetadata(existing);
+
+      const quotaBytes = Number(process.env.PUBLIC_MEDIA_QUOTA_BYTES ?? 100 * 1024 * 1024);
+      const [usage] = await tx
+        .select({ bytes: sql<number>`coalesce(sum(${publicMenuMediaAssets.byteSize}), 0)` })
+        .from(publicMenuMediaAssets)
+        .where(
+          and(
+            eq(publicMenuMediaAssets.organizationId, organizationId),
+            eq(publicMenuMediaAssets.unitId, unitId),
+          ),
+        );
+      if (Number(usage?.bytes ?? 0) + recoded.bytes.length > quotaBytes)
+        throw new ConflictException({
+          code: "MEDIA_QUOTA_EXCEEDED",
+          message: "A cota de imagens da unidade foi atingida.",
+        });
+
+      const [created] = await tx
+        .insert(publicMenuMediaAssets)
+        .values({
+          organizationId,
+          unitId,
+          kind: input.kind,
+          sha256: recoded.sha256,
+          storageKey,
+          mimeType: recoded.mimeType,
+          width: recoded.width,
+          height: recoded.height,
+          byteSize: recoded.bytes.length,
+          bytes: recoded.bytes,
+          createdByIdentityId: identityId,
+        })
+        .returning();
+      if (!created) throw new Error("Media insert failed without a row");
+      return this.publicMetadata(created);
+    });
   }
 
-  async publicAsset(assetId: string) {
+  async publicAsset(slug: string, assetId: string) {
+    const [publication] = await this.database.db
+      .select({
+        organizationId: publicMenus.organizationId,
+        unitId: publicMenus.unitId,
+        branding: publicMenuVersions.branding,
+        items: publicMenuVersions.items,
+      })
+      .from(publicMenus)
+      .innerJoin(publicMenuVersions, eq(publicMenuVersions.id, publicMenus.publishedVersionId))
+      .where(and(eq(publicMenus.slug, slug), eq(publicMenus.active, true)))
+      .limit(1);
+    if (!publication) return null;
+    const referenced =
+      publication.branding.logoAssetId === assetId ||
+      publication.branding.coverAssetId === assetId ||
+      publication.items.some((item) => item.imageAssetId === assetId);
+    if (!referenced) return null;
     const [asset] = await this.database.db
       .select()
       .from(publicMenuMediaAssets)
-      .where(eq(publicMenuMediaAssets.id, assetId))
+      .where(
+        and(
+          eq(publicMenuMediaAssets.id, assetId),
+          eq(publicMenuMediaAssets.organizationId, publication.organizationId),
+          eq(publicMenuMediaAssets.unitId, publication.unitId),
+        ),
+      )
       .limit(1);
     return asset ?? null;
   }
