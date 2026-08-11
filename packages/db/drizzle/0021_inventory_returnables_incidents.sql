@@ -84,11 +84,13 @@ CREATE TABLE "management_returnable_serials" (
   "asset_id" uuid NOT NULL,
   "serial_number" varchar(120) NOT NULL,
   "state" varchar(24) DEFAULT 'available' NOT NULL,
+  "version" integer DEFAULT 1 NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "management_returnable_serials_scope_id_unique" UNIQUE("organization_id", "unit_id", "id"),
   CONSTRAINT "management_returnable_serials_number_unique" UNIQUE("organization_id", "unit_id", "asset_id", "serial_number"),
   CONSTRAINT "management_returnable_serials_state_check" CHECK ("state" IN ('available','in_custody','with_supplier','broken','lost'))
+  ,CONSTRAINT "management_returnable_serials_version_check" CHECK ("version" > 0)
 );
 CREATE TABLE "management_returnable_movements" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

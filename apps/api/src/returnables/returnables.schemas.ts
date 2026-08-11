@@ -35,13 +35,34 @@ export const returnableMovementSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }),
 });
 
-export const returnableReconciliationSchema = z.object({
-  assetId: id,
-  custody,
-  physicalQuantity: z.number().int().nonnegative().max(1_000_000),
-  occurredAt: z.string().datetime({ offset: true }),
-  reason: z.string().trim().min(15).max(240),
-});
+export const returnableReconciliationSchema = z
+  .object({
+    assetId: id,
+    custody,
+    physicalQuantity: z.number().int().nonnegative().max(1_000_000).optional(),
+    physicalSerialIds: z.array(id).max(1_000).optional(),
+    occurredAt: z.string().datetime({ offset: true }),
+    reason: z.string().trim().min(15).max(240),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.physicalQuantity === undefined && value.physicalSerialIds === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "Informe a quantidade física ou os seriais encontrados.",
+      });
+    }
+    if (
+      value.physicalQuantity !== undefined &&
+      value.physicalSerialIds !== undefined &&
+      value.physicalQuantity !== value.physicalSerialIds.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A quantidade física deve corresponder aos seriais encontrados.",
+      });
+    }
+  });
 
 export type CreateReturnableAssetInput = z.infer<typeof createReturnableAssetSchema>;
 export type ReturnableMovementInput = z.infer<typeof returnableMovementSchema>;

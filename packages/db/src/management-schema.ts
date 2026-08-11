@@ -717,6 +717,7 @@ export const managementReturnableSerials = pgTable(
       .$type<"available" | "in_custody" | "with_supplier" | "broken" | "lost">()
       .notNull()
       .default("available"),
+    version: integer("version").notNull().default(1),
     ...timestamps,
   },
   (table) => [
@@ -744,6 +745,7 @@ export const managementReturnableSerials = pgTable(
       "management_returnable_serials_state_check",
       sql`${table.state} in ('available','in_custody','with_supplier','broken','lost')`,
     ),
+    check("management_returnable_serials_version_check", sql`${table.version} > 0`),
   ],
 );
 

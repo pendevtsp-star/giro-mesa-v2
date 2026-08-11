@@ -95,6 +95,50 @@ it("tracks serialized and aggregate custody with idempotent physical reconciliat
     assert.equal(replay.movementId, received.movementId);
     assert.equal(replay.idempotentReplay, true);
 
+    const concurrentMoves = await Promise.allSettled([
+      service.move(identity.id, organization.id, unit.id, "returnable-race-table-a", {
+        assetId: keg.assetId,
+        serialId: keg.serials[0]?.serialId,
+        movementType: "circulate",
+        quantity: 1,
+        fromCustody: { type: "location", id: "stock-main" },
+        toCustody: { type: "table", id: "table-a" },
+        occurredAt: "2026-08-11T12:01:00.000Z",
+      }),
+      service.move(identity.id, organization.id, unit.id, "returnable-race-table-b", {
+        assetId: keg.assetId,
+        serialId: keg.serials[0]?.serialId,
+        movementType: "circulate",
+        quantity: 1,
+        fromCustody: { type: "location", id: "stock-main" },
+        toCustody: { type: "table", id: "table-b" },
+        occurredAt: "2026-08-11T12:01:00.000Z",
+      }),
+    ]);
+    assert.equal(concurrentMoves.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(concurrentMoves.filter((result) => result.status === "rejected").length, 1);
+    const winningMovement = concurrentMoves.find((result) => result.status === "fulfilled");
+    assert.ok(winningMovement?.status === "fulfilled");
+    const serializedReconciliation = await service.reconcile(
+      identity.id,
+      organization.id,
+      unit.id,
+      "returnable-serialized-reconcile-0001",
+      {
+        assetId: keg.assetId,
+        custody: {
+          type: winningMovement.value.toCustodyType as "table",
+          id: winningMovement.value.toCustodyId as string,
+        },
+        physicalSerialIds: [],
+        occurredAt: "2026-08-11T12:02:00.000Z",
+        reason: "Contagem serial individual aprovada no fechamento.",
+      },
+    );
+    assert.equal(serializedReconciliation.expectedQuantity, 1);
+    assert.equal(serializedReconciliation.adjustmentQuantity, -1);
+    assert.equal(serializedReconciliation.movementIds.length, 1);
+
     const crate = await service.createAsset(
       identity.id,
       organization.id,
