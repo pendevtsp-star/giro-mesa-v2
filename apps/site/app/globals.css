@@ -48,6 +48,56 @@ summary:focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 3px;
 }
+.pwa-connectivity,
+.pwa-update {
+  position: fixed;
+  z-index: 180;
+  left: 50%;
+  bottom: 18px;
+  width: min(720px, calc(100% - 28px));
+  transform: translateX(-50%);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(13, 48, 40, 0.2);
+}
+.pwa-connectivity {
+  padding: 13px 16px;
+  background: #fff0dc;
+  color: #713712;
+}
+.pwa-update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--forest-2);
+  color: #fff;
+}
+.pwa-update > div {
+  display: grid;
+}
+.pwa-update span {
+  color: #d8e7e0;
+  font-size: 12px;
+}
+.pwa-update button {
+  min-height: 48px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lime);
+  color: var(--forest-2);
+  font-weight: 800;
+  cursor: pointer;
+}
+.pwa-update button:last-child {
+  background: transparent;
+  color: #fff;
+}
+.pwa-update button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
 .container {
   width: min(1180px, calc(100% - 40px));
   margin-inline: auto;
@@ -102,6 +152,10 @@ summary:focus-visible {
   color: var(--lime);
   font-size: 17px;
 }
+.logo-mark .gm-icon {
+  width: 18px;
+  height: 18px;
+}
 .desktop-nav {
   display: flex;
   gap: 28px;
@@ -137,6 +191,10 @@ summary:focus-visible {
     background 160ms ease,
     color 160ms ease,
     border-color 160ms ease;
+}
+.button .gm-icon {
+  width: 17px;
+  height: 17px;
 }
 .button:hover {
   transform: translateY(-2px);
@@ -205,7 +263,7 @@ summary:focus-visible {
   gap: 62px;
 }
 .hero-copy h1 {
-  margin: 18px 0 24px;
+  margin: 0 0 24px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(49px, 5.4vw, 78px);
   line-height: 0.97;
@@ -239,16 +297,88 @@ summary:focus-visible {
     var(--shadow);
   transform: rotate(1.2deg);
 }
+.product-carousel-frame {
+  position: relative;
+  aspect-ratio: 3 / 2;
+}
+.product-carousel:focus-within .product-carousel-frame {
+  outline: 3px solid var(--orange);
+  outline-offset: 8px;
+}
 .hero-product-frame img {
   width: 100%;
   height: auto;
   display: block;
+}
+.product-carousel-frame img {
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+.product-carousel-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  box-shadow: 0 5px 18px rgba(13, 48, 40, 0.18);
 }
 .hero-product figcaption {
   margin: 18px 8px 0;
   display: flex;
   align-items: center;
   gap: 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.product-carousel figcaption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+}
+.carousel-copy {
+  display: grid;
+  gap: 2px;
+}
+.carousel-copy strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+.carousel-copy > span {
+  color: var(--muted);
+}
+.carousel-position {
+  color: var(--forest);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.carousel-controls {
+  display: flex;
+  gap: 7px;
+}
+.carousel-controls button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(23, 34, 29, 0.2);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--forest);
+  cursor: pointer;
+}
+.carousel-controls button:hover:not(:disabled) {
+  border-color: var(--forest);
+  background: #eef1e9;
+}
+.carousel-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.carousel-controls .gm-icon {
+  width: 17px;
+  height: 17px;
+  margin: auto;
+}
+.carousel-motion-note {
+  display: block;
+  margin: 8px 8px 0;
   color: var(--muted);
   font-size: 11px;
 }
@@ -492,8 +622,14 @@ summary:focus-visible {
 .plan li {
   margin: 11px 0;
   font-size: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
-.plan li::first-letter {
+.plan li .gm-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
   color: var(--orange);
 }
 .plan .button {
@@ -526,8 +662,9 @@ summary:focus-visible {
   border-radius: var(--radius);
   background: var(--paper);
 }
-.trust-cards article > span {
-  font-size: 27px;
+.trust-cards article > .gm-icon {
+  width: 27px;
+  height: 27px;
   color: var(--orange);
 }
 .trust-cards h3 {
@@ -597,6 +734,11 @@ summary:focus-visible {
   color: #839189;
   font-size: 11px;
 }
+.footer-contact {
+  color: #dbe6e0;
+  font-size: 13px;
+  font-weight: 750;
+}
 .site-footer h2 {
   margin: 4px 0 18px;
   font-size: 12px;
@@ -644,8 +786,9 @@ summary:focus-visible {
   text-decoration: none;
   box-shadow: 0 12px 30px rgba(14, 75, 43, 0.32);
 }
-.whatsapp span {
-  font-size: 20px;
+.whatsapp .gm-icon {
+  width: 20px;
+  height: 20px;
 }
 .whatsapp-label {
   font-size: 12px;
@@ -695,16 +838,18 @@ summary:focus-visible {
   list-style: none;
 }
 .feature-checks li {
+  align-items: flex-start;
+  display: flex;
+  gap: 9px;
   margin: 13px 0;
-  padding-left: 29px;
-  position: relative;
+  padding-left: 0;
 }
-.feature-checks li::before {
-  position: absolute;
-  left: 0;
-  content: "✓";
+.feature-checks .gm-icon {
   color: var(--orange);
-  font-weight: 900;
+  flex: 0 0 auto;
+  height: 20px;
+  margin-top: 1px;
+  width: 20px;
 }
 .lead-form,
 .auth-form {
@@ -841,9 +986,8 @@ summary:focus-visible {
   border-color: var(--line);
   background: #fff;
 }
-.google-button span {
-  font-size: 19px;
-  color: #3971e7;
+.google-mark {
+  flex: 0 0 auto;
 }
 .divider {
   margin: 24px 0;
@@ -925,8 +1069,9 @@ summary:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
-.support-grid article > span:first-child {
-  font-size: 24px;
+.support-grid article > .gm-icon {
+  width: 24px;
+  height: 24px;
   color: var(--orange);
 }
 .support-grid h2 {
@@ -1213,6 +1358,12 @@ summary:focus-visible {
   .hero-product figcaption {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .product-carousel figcaption {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .carousel-controls {
+    grid-column: 1 / -1;
   }
   .product-gallery {
     grid-template-columns: 1fr;

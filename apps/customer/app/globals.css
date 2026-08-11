@@ -35,6 +35,56 @@ textarea:focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 3px;
 }
+.pwa-connectivity,
+.pwa-update {
+  position: fixed;
+  z-index: 180;
+  left: 50%;
+  bottom: 16px;
+  width: min(720px, calc(100% - 28px));
+  transform: translateX(-50%);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(13, 48, 40, 0.2);
+}
+.pwa-connectivity {
+  padding: 13px 16px;
+  background: #fff0e7;
+  color: #783619;
+}
+.pwa-update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--green-dark);
+  color: #fff;
+}
+.pwa-update > div {
+  display: grid;
+}
+.pwa-update span {
+  color: #d8e7e0;
+  font-size: 12px;
+}
+.pwa-update button {
+  min-height: 48px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--green-dark);
+  font-weight: 800;
+  cursor: pointer;
+}
+.pwa-update button:last-child {
+  background: transparent;
+  color: #fff;
+}
+.pwa-update button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -302,6 +352,15 @@ textarea:focus-visible {
     linear-gradient(145deg, #e8decf, #c5d1bd);
   text-shadow: 0 8px 15px rgba(60, 40, 20, 0.18);
 }
+.food-visual .gm-icon {
+  width: 72px;
+  height: 72px;
+  color: var(--green);
+}
+.customer-visual-copy {
+  font-size: 42px;
+  line-height: 1;
+}
 .food-croquete,
 .food-steak {
   background: linear-gradient(145deg, #d8bd9b, #7e9a79);
@@ -377,8 +436,9 @@ textarea:focus-visible {
   text-align: center;
   color: var(--muted);
 }
-.empty-state span {
-  font-size: 40px;
+.empty-state .gm-icon {
+  width: 40px;
+  height: 40px;
 }
 .empty-state h3 {
   color: var(--ink);
@@ -421,9 +481,11 @@ textarea:focus-visible {
   font-weight: 750;
   cursor: pointer;
 }
-.table-actions button span {
+.table-actions button .gm-icon {
   display: block;
-  font-size: 19px;
+  width: 21px;
+  height: 21px;
+  margin: 0 auto 4px;
 }
 .table-actions button:disabled {
   color: #7c8580;
@@ -499,7 +561,9 @@ textarea:focus-visible {
   font-size: 10px;
 }
 .service-card-action {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-top: 13px;
   color: var(--green);
   font-size: 11px;
@@ -526,11 +590,10 @@ textarea:focus-visible {
   color: var(--green);
   font-size: 14px;
 }
-.menu-footer b span {
+.menu-footer b > .gm-icon {
   width: 21px;
   height: 21px;
-  display: grid;
-  place-items: center;
+  padding: 3px;
   border-radius: 6px;
   background: var(--green);
   color: #dcf182;
@@ -627,6 +690,9 @@ textarea:focus-visible {
   font-weight: 750;
 }
 .preference-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--green);
   font-weight: 750;
 }
@@ -772,6 +838,11 @@ dialog::backdrop {
   font-size: 100px;
   background: linear-gradient(145deg, #e8decf, #c5d1bd);
 }
+.product-hero .gm-icon {
+  width: 108px;
+  height: 108px;
+  color: var(--green);
+}
 .product-hero > button {
   position: absolute;
   top: 15px;
@@ -890,6 +961,10 @@ fieldset label input {
   font-size: 20px;
   cursor: pointer;
 }
+.quantity button .gm-icon {
+  width: 18px;
+  height: 18px;
+}
 .quantity output {
   min-width: 28px;
   text-align: center;
@@ -975,6 +1050,11 @@ fieldset label input {
   border-radius: 10px;
   background: var(--cream);
   font-size: 26px;
+}
+.cart-visual .gm-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
 }
 .cart-lines h3 {
   margin: 0;
@@ -1179,10 +1259,11 @@ fieldset label input {
   background: #f1f7f2;
   text-align: center;
 }
-.order-receipt > span {
-  display: inline-grid;
+.order-receipt-icon {
+  display: inline-block;
   width: 42px;
   height: 42px;
+  padding: 9px;
   place-items: center;
   border-radius: 50%;
   background: var(--green);

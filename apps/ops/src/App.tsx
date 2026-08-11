@@ -1,5 +1,14 @@
-import { Badge, Button, Card, EmptyState, Progress, VisuallyHidden } from "@giromesa/ui";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  type IconName,
+  Progress,
+  VisuallyHidden,
+} from "@giromesa/ui";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ApiClientError,
   api,
@@ -65,6 +74,7 @@ import {
 } from "./operational-dispatch";
 import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./operations";
 import { RealPlatformPage } from "./platform";
+import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { parseRoute, routeHref } from "./router";
 import {
@@ -106,33 +116,27 @@ const browserRuntime: DeviceContext = {
   platform: "web",
 };
 
-const navItems: { route: RouteId; label: string; icon: ReactNode }[] = [
-  { route: "dashboard", label: "Visão geral", icon: "⌂" },
-  { route: "onboarding", label: "Configurar operação", icon: <OnboardingNavIcon /> },
-  { route: "salon", label: "Salão", icon: "◫" },
-  { route: "counter", label: "Balcão", icon: "＋" },
-  { route: "catalog", label: "Cardápio", icon: "▦" },
-  { route: "kds", label: "Produção", icon: "▤" },
-  { route: "cash", label: "Caixa", icon: "◉" },
-  { route: "inventory", label: "Estoque", icon: "◇" },
-  { route: "purchases", label: "Compras", icon: "▱" },
-  { route: "finance", label: "Financeiro", icon: "↗" },
-  { route: "people", label: "Pessoas", icon: "♙" },
-  { route: "delivery", label: "Delivery", icon: "▻" },
-  { route: "reservations", label: "Reservas e espera", icon: "◷" },
-  { route: "crm", label: "Clientes e campanhas", icon: "♡" },
-  { route: "multiunit", label: "Multiunidade", icon: "⌘" },
-  { route: "platform", label: "Plataforma", icon: "◎" },
-  { route: "alerts", label: "Alertas", icon: "!" },
-];
+const SEAT_MARKERS = ["one", "two", "three", "four", "five", "six"] as const;
 
-function OnboardingNavIcon() {
-  return (
-    <svg aria-hidden="true" className="nav-icon__svg" viewBox="0 0 24 24">
-      <path d="M5 4h14v16H5V4Zm4 0V2h6v2M8 9h8M8 13h5M8 17h4" />
-    </svg>
-  );
-}
+const navItems: { route: RouteId; label: string; icon: IconName }[] = [
+  { route: "dashboard", label: "Visão geral", icon: "home" },
+  { route: "onboarding", label: "Configurar operação", icon: "clipboard" },
+  { route: "salon", label: "Salão", icon: "dish" },
+  { route: "counter", label: "Balcão", icon: "counter" },
+  { route: "catalog", label: "Cardápio", icon: "menu" },
+  { route: "kds", label: "Produção", icon: "kitchen" },
+  { route: "cash", label: "Caixa", icon: "wallet" },
+  { route: "inventory", label: "Estoque", icon: "box" },
+  { route: "purchases", label: "Compras", icon: "package" },
+  { route: "finance", label: "Financeiro", icon: "trend-up" },
+  { route: "people", label: "Pessoas", icon: "users" },
+  { route: "delivery", label: "Delivery", icon: "truck" },
+  { route: "reservations", label: "Reservas e espera", icon: "calendar" },
+  { route: "crm", label: "Clientes e campanhas", icon: "heart" },
+  { route: "multiunit", label: "Multiunidade", icon: "building" },
+  { route: "platform", label: "Plataforma", icon: "platform" },
+  { route: "alerts", label: "Alertas", icon: "alert" },
+];
 
 function rejectedEventCount(payload: unknown): number {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return 0;
@@ -208,6 +212,7 @@ export function App() {
       () => {
         setSession(null);
         setScopeSource(null);
+        void clearPwaRuntimeState();
       },
       session?.demo ? undefined : () => api.logout(),
     );
@@ -326,9 +331,7 @@ function BootstrapError({ message, onRetry }: { message: string; onRetry: () => 
   return (
     <main className="fatal-state">
       <Card>
-        <span aria-hidden="true" className="action-icon action-icon--danger">
-          !
-        </span>
+        <Icon className="action-icon action-icon--danger" name="alert" />
         <h1>Não foi possível iniciar o GiroMesa</h1>
         <p>{message}</p>
         <Button onClick={onRetry}>Tentar novamente</Button>
@@ -585,7 +588,7 @@ function LoginScreen({
                 : challengeToken
                   ? "Confirmar acesso"
                   : "Entrar no GiroMesa"}{" "}
-              <span aria-hidden="true">→</span>
+              <Icon name="arrow-right" />
             </Button>
             {!challengeToken && (
               <Button
@@ -966,14 +969,16 @@ function OperationalApp({
       if (replaying) return;
       replaying = true;
       setSyncState("syncing");
-      const remaining = await replayOperationalQueue(
-        {
-          organizationId: session.organizationId,
-          unitId: session.unitId,
-          actorId: session.identityId,
-        },
-        runtime,
-      );
+      const replay = () =>
+        replayOperationalQueue(
+          {
+            organizationId: session.organizationId,
+            unitId: session.unitId,
+            actorId: session.identityId,
+          },
+          runtime,
+        );
+      const remaining = runtime.embedded ? await withPwaMutation(replay) : await replay();
       replaying = false;
       if (cancelled) return;
       setQueuedCommands(remaining);
@@ -1002,17 +1007,19 @@ function OperationalApp({
   const dispatchPilot = useCallback<PilotDispatcher>(
     async (type, payload, execute) => {
       try {
-        const result = await dispatchOperationalMutation({
-          scope: {
-            organizationId: session.organizationId,
-            unitId: session.unitId,
-            actorId: session.identityId,
-          },
-          runtime,
-          type,
-          payload,
-          execute,
-        });
+        const dispatch = () =>
+          dispatchOperationalMutation({
+            scope: {
+              organizationId: session.organizationId,
+              unitId: session.unitId,
+              actorId: session.identityId,
+            },
+            runtime,
+            type,
+            payload,
+            execute,
+          });
+        const result = runtime.embedded ? await withPwaMutation(dispatch) : await dispatch();
         setRuntimeError(null);
         return result;
       } catch (error) {
@@ -1047,11 +1054,8 @@ function OperationalApp({
         return;
       }
       if (runtime.embedded) {
-        const result = await sendShellCommand(
-          session.organizationId,
-          session.unitId,
-          session.identityId,
-          command,
+        const result = await withPwaMutation(() =>
+          sendShellCommand(session.organizationId, session.unitId, session.identityId, command),
         );
         if (!result?.success) {
           setQueuedCommands(enqueueCommand(command));
@@ -1095,7 +1099,7 @@ function OperationalApp({
             onClick={() => setNavOpen(false)}
             type="button"
           >
-            ×
+            <Icon name="close" />
           </button>
         </div>
         <div className="unit-chip">
@@ -1115,7 +1119,7 @@ function OperationalApp({
               onClick={() => setNavOpen(false)}
             >
               <span aria-hidden="true" className="nav-icon">
-                {item.icon}
+                <Icon className="nav-icon__svg" name={item.icon} />
               </span>
               {item.label}
               {item.route === "alerts" && visibleAlertCount > 0 && (
@@ -1126,7 +1130,7 @@ function OperationalApp({
         </nav>
         <div className="sidebar__footer">
           <button className="support-link" onClick={() => setHelpOpen(true)} type="button">
-            <span aria-hidden="true">?</span> Central de ajuda
+            <Icon name="help" /> Central de ajuda
           </button>
           <small>GiroMesa Operação · {session.demo ? "demo local" : "ambiente seguro"}</small>
         </div>
@@ -1149,7 +1153,7 @@ function OperationalApp({
             onClick={() => setNavOpen(true)}
             type="button"
           >
-            ☰
+            <Icon name="menu" />
           </button>
           <div className="topbar__title">
             <span>{organization?.name}</span>
@@ -1187,7 +1191,8 @@ function OperationalApp({
               {session.demo && syncState === "syncing" && "Sincronizando…"}
             </button>
             <a aria-label="Ver alertas" className="alert-button" href={routeHref("alerts")}>
-              !{visibleAlertCount > 0 && <span>{visibleAlertCount}</span>}
+              <Icon name="alert" />
+              {visibleAlertCount > 0 && <span>{visibleAlertCount}</span>}
             </a>
             <div className="profile-menu">
               <button
@@ -1202,7 +1207,7 @@ function OperationalApp({
                   <strong>{session.profile.name}</strong>
                   <small>{session.profile.role}</small>
                 </span>
-                <span aria-hidden="true">⌄</span>
+                <Icon name="chevron-down" />
               </button>
               {profileMenu && (
                 <div className="profile-popover">
@@ -1262,7 +1267,7 @@ function OperationalApp({
           <div className="runtime-error" role="alert">
             <strong>Atenção:</strong> {runtimeError}
             <button aria-label="Fechar aviso" onClick={() => setRuntimeError(null)} type="button">
-              ×
+              <Icon name="close" />
             </button>
           </div>
         )}
@@ -1565,7 +1570,7 @@ function DemoFeaturePage({ title }: { title: string }) {
 function UnavailableRealPage({ title }: { title: string }) {
   return (
     <EmptyState
-      icon="◇"
+      icon={<Icon name="box" />}
       title={`${title} sem fonte autenticada`}
       description="Esta V2 não exibe fixtures em sessões reais. A tela será ativada quando houver um endpoint autenticado correspondente."
     />
@@ -1704,7 +1709,7 @@ function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => void })
             onClick={onClose}
             type="button"
           >
-            ×
+            <Icon name="close" />
           </button>
         </div>
         <p className="muted">
@@ -1765,38 +1770,38 @@ function Dashboard({
         <div className="action-list">
           {urgentTable && (
             <a className="action-link" href={routeHref("salon")}>
-              <span className="action-icon action-icon--danger">!</span>
+              <Icon className="action-icon action-icon--danger" name="alert" />
               <span>
                 <strong>Atender chamado da {urgentTable.name}</strong>
                 <small>
                   Aberta há {urgentTable.openedMinutes} min · responsável {urgentTable.server}
                 </small>
               </span>
-              <span aria-hidden="true">→</span>
+              <Icon name="arrow-right" />
             </a>
           )}
           {lateTicket && (
             <a className="action-link" href={routeHref("kds")}>
-              <span className="action-icon action-icon--warning">◷</span>
+              <Icon className="action-icon action-icon--warning" name="clock" />
               <span>
                 <strong>Produção acima do tempo</strong>
                 <small>
                   {lateTicket.reference} · {lateTicket.elapsedMinutes} minutos
                 </small>
               </span>
-              <span aria-hidden="true">→</span>
+              <Icon name="arrow-right" />
             </a>
           )}
           <a
             className="action-link"
             href={routeHref(canAccess(profile, "inventory") ? "inventory" : "alerts")}
           >
-            <span className="action-icon">◇</span>
+            <Icon className="action-icon" name="box" />
             <span>
               <strong>Repor três insumos críticos</strong>
               <small>Um item está zerado e afeta o cardápio</small>
             </span>
-            <span aria-hidden="true">→</span>
+            <Icon name="arrow-right" />
           </a>
         </div>
       </Card>
@@ -1948,7 +1953,9 @@ function SalonPage({
                 </Badge>
               </span>
               <span className="table-tile__seats" aria-label={`${table.seats} lugares`} role="img">
-                {"●".repeat(Math.min(table.seats, 6))}
+                {SEAT_MARKERS.slice(0, Math.min(table.seats, SEAT_MARKERS.length)).map((marker) => (
+                  <Icon key={`${table.id}-seat-${marker}`} name="user" />
+                ))}
               </span>
               {table.status === "free" || table.status === "reserved" ? (
                 <small>
@@ -1969,7 +1976,7 @@ function SalonPage({
       <Card className="table-drawer">
         {!selected ? (
           <EmptyState
-            icon="◫"
+            icon={<Icon name="dish" />}
             title="Selecione uma mesa"
             description="Veja a comanda, lance itens ou atenda chamados."
           />
@@ -1986,7 +1993,7 @@ function SalonPage({
             </div>
             {selected.status === "free" ? (
               <EmptyState
-                icon="＋"
+                icon={<Icon name="plus" />}
                 title="Mesa disponível"
                 description={`${selected.seats} lugares prontos para atendimento.`}
                 action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
@@ -2141,13 +2148,13 @@ function OrderWorkspace({
       <section className="catalog-panel">
         {compact && (
           <Button onClick={onBack} size="sm" variant="ghost">
-            ← Voltar para comanda
+            <Icon name="arrow-left" /> Voltar para comanda
           </Button>
         )}
         <div className="catalog-toolbar">
           <label className="search-field">
             <VisuallyHidden>Buscar produto</VisuallyHidden>
-            <span aria-hidden="true">⌕</span>
+            <Icon name="search" />
             <input
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar produto"
@@ -2214,7 +2221,7 @@ function OrderWorkspace({
         )}
         {!cart.length ? (
           <EmptyState
-            icon="＋"
+            icon={<Icon name="plus" />}
             title="Comanda vazia"
             description="Toque em um produto para começar o pedido."
           />
@@ -2237,7 +2244,7 @@ function OrderWorkspace({
                     onClick={() => changeQuantity(item.id, -1)}
                     type="button"
                   >
-                    −
+                    <Icon name="minus" />
                   </button>
                   <strong>{item.quantity}</strong>
                   <button
@@ -2245,7 +2252,7 @@ function OrderWorkspace({
                     onClick={() => changeQuantity(item.id, 1)}
                     type="button"
                   >
-                    +
+                    <Icon name="plus" />
                   </button>
                 </div>
                 <strong>
@@ -2307,7 +2314,7 @@ function ModifierDialog({
             <h2 id="modifier-title">{product.name}</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            ×
+            <Icon name="close" />
           </button>
         </div>
         <fieldset className="modifier-list">
@@ -2508,7 +2515,7 @@ function CashPage({ onCommand }: { onCommand: CommandRecorder }) {
               className={`cash-row ${received.includes(tab.id) ? "cash-row--done" : ""}`}
               key={tab.id}
             >
-              <span className="action-icon">◉</span>
+              <Icon className="action-icon" name="wallet" />
               <span>
                 <strong>{tab.reference}</strong>
                 <small>
@@ -2579,7 +2586,7 @@ function InventoryPage() {
           </div>
           <label className="search-field search-field--small">
             <VisuallyHidden>Buscar insumo</VisuallyHidden>
-            <span>⌕</span>
+            <Icon name="search" />
             <input
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar insumo"
@@ -2844,9 +2851,10 @@ function FinancePage() {
           </div>
           {entries.map((entry) => (
             <div className="finance-row" key={entry.name}>
-              <span className={`action-icon ${entry.value < 0 ? "action-icon--warning" : ""}`}>
-                {entry.value < 0 ? "↓" : "↑"}
-              </span>
+              <Icon
+                className={`action-icon ${entry.value < 0 ? "action-icon--warning" : ""}`}
+                name={entry.value < 0 ? "arrow-down" : "arrow-up"}
+              />
               <span>
                 <strong>{entry.name}</strong>
                 <small>
@@ -2905,7 +2913,7 @@ function DeliveryPage() {
   return (
     <div>
       <div className="channel-notice">
-        <span className="action-icon">i</span>
+        <Icon className="action-icon" name="info" />
         <span>
           <strong>Modo demonstrativo</strong> Marketplaces e pagamento online só serão exibidos após
           credenciais e homologação.
@@ -3038,11 +3046,10 @@ function AlertsPage() {
             className={`alert-row ${resolved.includes(alert.id) ? "alert-row--resolved" : ""}`}
             key={alert.id}
           >
-            <span
+            <Icon
               className={`action-icon action-icon--${alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "info"}`}
-            >
-              {alert.severity === "info" ? "i" : "!"}
-            </span>
+              name={alert.severity === "info" ? "info" : "alert"}
+            />
             <span>
               <strong>{alert.title}</strong>
               <small>{resolved.includes(alert.id) ? "Resolvido nesta sessão" : alert.detail}</small>
@@ -3113,7 +3120,7 @@ function PinDialog({
             <h2 id="pin-title">Trocar colaborador</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            ×
+            <Icon name="close" />
           </button>
         </div>
         <div className="scope-profile">

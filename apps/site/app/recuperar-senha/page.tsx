@@ -1,7 +1,9 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function ForgotPasswordPage() {
   const [message, setMessage] = useState("");
@@ -22,7 +24,7 @@ export default function ForgotPasswordPage() {
     }
     const email = new FormData(event.currentTarget).get("email");
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/password-reset/request`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/password-reset/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -48,7 +50,7 @@ export default function ForgotPasswordPage() {
       return;
     }
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/password-reset/confirm`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/password-reset/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: resetToken, password }),
@@ -115,7 +117,9 @@ export default function ForgotPasswordPage() {
           {message}
         </p>
         <p className="auth-footer">
-          <Link href="/login">← Voltar para o login</Link>
+          <Link href="/login">
+            <Icon name="arrow-left" /> Voltar para o login
+          </Link>
         </p>
       </section>
     </main>

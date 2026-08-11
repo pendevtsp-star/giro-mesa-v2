@@ -1,4 +1,4 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
@@ -284,7 +284,7 @@ export function RealDeliveryPage({ scope }: { scope: GrowthScope }) {
         {(zones) =>
           zones.length === 0 ? (
             <EmptyState
-              icon="⌖"
+              icon={<Icon name="pin" />}
               title="Nenhuma zona configurada"
               description="Defina zonas, taxa e pedido mínimo antes de ativar a entrega própria."
             />
@@ -362,7 +362,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="◷"
+                  icon={<Icon name="calendar" />}
                   title="Sem reservas"
                   description="Nenhuma reserva persistida para esta unidade."
                 />
@@ -462,7 +462,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="◷"
+                  icon={<Icon name="clock" />}
                   title="Fila vazia"
                   description="Nenhum cliente aguarda mesa neste momento."
                 />
@@ -592,7 +592,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="♡"
+                  icon={<Icon name="heart" />}
                   title="Sem clientes"
                   description="O cadastro de clientes ainda não possui registros."
                 />
@@ -643,7 +643,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="✉"
+                  icon={<Icon name="mail" />}
                   title="Sem campanhas"
                   description="Nenhuma campanha foi criada para esta organização."
                 />
@@ -699,7 +699,7 @@ export function RealMultiunitPage({ scope }: { scope: GrowthScope }) {
           </Card>
           {summary.units.length === 0 ? (
             <EmptyState
-              icon="⌘"
+              icon={<Icon name="building" />}
               title="Sem unidades ativas"
               description="Nenhuma unidade foi retornada no consolidado."
             />

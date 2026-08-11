@@ -1,3 +1,4 @@
+import { createPwaFetch, type PwaMutationContext } from "@giromesa/ui/pwa-mutation";
 import type {
   ApiError,
   ApiOperations,
@@ -94,6 +95,7 @@ export class ApiClientError extends Error {
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replace(/\/$/, "");
+const pwaFetch = createPwaFetch();
 
 export function resolveSecurityUrl(
   rawSiteUrl = import.meta.env.VITE_SITE_URL ?? "http://localhost:3100",
@@ -110,7 +112,11 @@ export function resolveSecurityUrl(
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  mutationContext?: PwaMutationContext,
+): Promise<T> {
   const controller = new AbortController();
   const externalSignal = init.signal;
   let timedOut = false;
@@ -122,16 +128,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     controller.abort();
   }, 8_000);
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      credentials: "include",
-      signal: controller.signal,
-      headers: {
-        accept: "application/json",
-        ...(init.body ? { "content-type": "application/json" } : {}),
-        ...init.headers,
+    const response = await pwaFetch(
+      `${baseUrl}${path}`,
+      {
+        ...init,
+        credentials: "include",
+        signal: controller.signal,
+        headers: {
+          accept: "application/json",
+          ...(init.body ? { "content-type": "application/json" } : {}),
+          ...init.headers,
+        },
       },
-    });
+      mutationContext,
+    );
     if (!response.ok) {
       const body = await safeJson<ApiError>(response);
       throw new ApiClientError(
@@ -312,7 +322,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
-  logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
+  logout: (mutationContext?: PwaMutationContext) =>
+    request<void>("/v1/auth/logout", { method: "POST" }, mutationContext),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
   createOrganization: (body: CreateOrganizationInput) =>

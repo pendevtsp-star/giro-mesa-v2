@@ -1,4 +1,4 @@
-import { Button, Card } from "@giromesa/ui";
+import { Button, Card, Icon } from "@giromesa/ui";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -17,9 +17,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     return (
       <main className="fatal-state">
         <Card>
-          <span aria-hidden="true" className="action-icon action-icon--danger">
-            !
-          </span>
+          <Icon className="action-icon action-icon--danger" name="alert" />
           <h1>Não foi possível exibir esta tela</h1>
           <p>
             Seus comandos já registrados continuam preservados. Recarregue para tentar novamente.

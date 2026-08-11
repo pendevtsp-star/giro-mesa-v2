@@ -33,6 +33,13 @@ test("rejeita cardápio remoto incompleto antes de renderizar", () => {
   assert.deepEqual(normalizePublicMenu({ items: demoMenu.slice(0, 1) }), demoMenu.slice(0, 1));
 });
 
+test("separa ícones controlados do produto do conteúdo visual livre do cliente", () => {
+  assert.ok(demoMenu.every((item) => item.icon && item.visual === undefined));
+
+  const customerVisual = { ...demoMenu[0], icon: undefined, visual: "Arte autoral da casa" };
+  assert.deepEqual(normalizePublicMenu({ items: [customerVisual] }), [customerVisual]);
+});
+
 test("limita o cardápio demonstrativo ao slug explícito ou ao slug de QA", () => {
   assert.equal(isDemoMenuSlug("demo"), true);
   assert.equal(isDemoMenuSlug("qa-amora", "qa-amora"), true);

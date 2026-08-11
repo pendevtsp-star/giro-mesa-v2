@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import { type FormEvent, useRef, useState } from "react";
 import { formatMoney } from "../lib/menu";
 import {
@@ -8,6 +9,7 @@ import {
   readCouponValidation,
   resolveMutationAttempt,
 } from "../lib/public-contracts";
+import { customerFetch } from "../lib/pwa-fetch";
 
 type MutationKind = "reservation" | "waitlist";
 type Message = { tone: "success" | "warning"; text: string } | null;
@@ -41,7 +43,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy(kind);
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/${path}`,
         {
           method: "POST",
@@ -129,7 +131,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy("coupon");
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/coupons/validate`,
         {
           method: "POST",
@@ -164,7 +166,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
   return (
     <main className="public-service-page">
       <a className="preference-back" href={`/m/${menuSlug}`}>
-        ← Voltar ao cardápio
+        <Icon name="arrow-left" /> Voltar ao cardápio
       </a>
       <p className="preference-eyebrow">Serviços da unidade</p>
       <h1>Solicite sem perder o contexto.</h1>

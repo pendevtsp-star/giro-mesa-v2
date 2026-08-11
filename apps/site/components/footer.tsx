@@ -38,6 +38,9 @@ const groups = [
 ] as const;
 
 export function Footer() {
+  const configuredEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() ?? "";
+  const contactEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuredEmail) ? configuredEmail : null;
+
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
@@ -47,6 +50,12 @@ export function Footer() {
           <p className="footer-note">
             Produto em desenvolvimento. Integrações dependem de contratação e homologação.
           </p>
+          <Link
+            className="footer-contact"
+            href={contactEmail ? `mailto:${contactEmail}` : "/contato"}
+          >
+            {contactEmail ?? "Contato por e-mail"}
+          </Link>
         </div>
         {groups.map((group) => (
           <div key={group.title}>

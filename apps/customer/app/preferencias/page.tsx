@@ -1,3 +1,4 @@
+import { Icon } from "@giromesa/ui";
 import { OptOutForm } from "../../components/opt-out-form";
 import { normalizeOptOutToken } from "../../lib/public-contracts";
 
@@ -12,7 +13,7 @@ export default async function PreferencesPage({
   return (
     <main className="preference-page">
       <a className="preference-back" href="/m/demo">
-        ← Voltar ao cardápio
+        <Icon name="arrow-left" /> Voltar ao cardápio
       </a>
       <p className="preference-eyebrow">Privacidade e comunicação</p>
       <h1>Gerencie sua preferência.</h1>

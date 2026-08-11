@@ -1,9 +1,12 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { GoogleMark } from "../../components/google-mark";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
 import { buildMfaProof, readMfaChallenge } from "../../lib/mfa";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +44,7 @@ export default function LoginPage() {
     }
     const data = new FormData(event.currentTarget);
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/login`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -84,7 +87,7 @@ export default function LoginPage() {
     const data = new FormData(event.currentTarget);
     const value = String(data.get("mfaProof") ?? "").trim();
     try {
-      const response = await fetch(
+      const response = await siteFetch(
         `${apiUrl}/v1/auth/${oauthMfa ? "mfa/oauth/verify" : "mfa/challenge/verify"}`,
         {
           method: "POST",
@@ -140,7 +143,7 @@ export default function LoginPage() {
           {!challengeToken && !oauthMfa && (
             <>
               <button className="button google-button" type="button" onClick={startGoogleLogin}>
-                <span aria-hidden="true">G</span> Continuar com Google
+                <GoogleMark /> Continuar com Google
               </button>
               <div className="divider">
                 <span>ou com e-mail</span>
@@ -163,7 +166,7 @@ export default function LoginPage() {
                 />
               </label>
               <button className="button button-primary" type="submit">
-                Confirmar acesso →
+                Confirmar acesso <Icon name="arrow-right" />
               </button>
               <button
                 className="button button-secondary"
@@ -217,7 +220,7 @@ export default function LoginPage() {
                 <Link href="/recuperar-senha">Esqueci minha senha</Link>
               </div>
               <button className="button button-primary" type="submit">
-                Entrar →
+                Entrar <Icon name="arrow-right" />
               </button>
             </form>
           )}

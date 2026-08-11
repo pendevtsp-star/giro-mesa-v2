@@ -857,6 +857,62 @@ html {
 body {
   min-height: 100vh;
 }
+.pwa-connectivity {
+  background: #fff0ce;
+  bottom: 1rem;
+  color: #704d16;
+  left: 50%;
+  max-width: min(680px, calc(100% - 2rem));
+  padding: 0.8rem 1rem;
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 140;
+}
+.pwa-update {
+  align-items: center;
+  background: #123c2d;
+  bottom: 1rem;
+  box-shadow: 0 18px 45px rgb(4 22 15 / 24%);
+  color: #fff;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  left: 50%;
+  max-width: min(760px, calc(100% - 2rem));
+  padding: 0.9rem 1rem;
+  position: fixed;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 145;
+}
+.pwa-update > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.pwa-update span {
+  color: #d9eee5;
+  font-size: 0.75rem;
+}
+.pwa-update button {
+  background: #fff;
+  border: 0;
+  border-radius: var(--gm-radius-sm);
+  color: #123c2d;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
+  min-height: 48px;
+  padding: 0.65rem 0.85rem;
+}
+.pwa-update button:last-child {
+  background: transparent;
+  color: #fff;
+}
+.pwa-update button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
 /* biome-ignore lint/style/noDescendingSpecificity: regra base preservada após os componentes */
 button {
   color: inherit;
@@ -1920,8 +1976,12 @@ small {
 }
 .table-tile__seats {
   color: #bec5c0;
-  font-size: 0.55rem;
-  letter-spacing: 0.2rem;
+  display: flex;
+  gap: 2px;
+}
+.table-tile__seats .gm-icon {
+  width: 9px;
+  height: 9px;
 }
 .table-tile > strong {
   font-family: var(--gm-display);
@@ -2820,6 +2880,13 @@ small {
 }
 
 @media (max-width: 640px) {
+  .pwa-update {
+    align-items: stretch;
+    grid-template-columns: 1fr 1fr;
+  }
+  .pwa-update > div {
+    grid-column: 1 / -1;
+  }
   .auth-story {
     min-height: 350px;
     padding: 1.5rem;

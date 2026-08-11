@@ -26,6 +26,32 @@ interface HybridWebViewApi {
   InvokeDotNet?<T>(method: string, args?: unknown[]): Promise<T>;
 }
 
+type BridgeScript = {
+  src: string;
+  dataset: Record<string, string>;
+  addEventListener(type: "load" | "error", listener: () => void, options?: { once: boolean }): void;
+};
+
+type BridgeWindow = {
+  HybridWebView?: HybridWebViewApi;
+  chrome?: { webview?: { postMessage?: (message: string) => void } };
+  webkit?: {
+    messageHandlers?: { webwindowinterop?: { postMessage?: (message: string) => void } };
+  };
+  hybridWebViewHost?: { sendMessage?: (message: string) => void };
+  dispatchEvent(event: unknown): void;
+};
+
+type NativeBridgeEnvironment = {
+  window: BridgeWindow;
+  document: {
+    createElement(tagName: "script"): BridgeScript;
+    head: { appendChild(script: BridgeScript): void };
+    querySelector(selector: string): BridgeScript | null;
+  };
+  createReadyEvent(): unknown;
+};
+
 declare global {
   interface Window {
     HybridWebView?: HybridWebViewApi;
@@ -33,6 +59,42 @@ declare global {
 }
 
 const standaloneDeviceKey = "giromesa.ops.device-id";
+
+export function loadNativeBridge(
+  environment: NativeBridgeEnvironment = {
+    window: window as unknown as BridgeWindow,
+    document: document as unknown as NativeBridgeEnvironment["document"],
+    createReadyEvent: () => new Event("GiroMesaHybridWebViewReady"),
+  },
+): "browser" | "loading" | "ready" {
+  const host = environment.window;
+  if (host.HybridWebView) {
+    environment.window.dispatchEvent(environment.createReadyEvent());
+    return "ready";
+  }
+
+  if (!hasNativeBridgeTransport(host)) return "browser";
+  if (environment.document.querySelector('script[data-giromesa-bridge="true"]')) return "loading";
+
+  const bridgeScript = environment.document.createElement("script");
+  bridgeScript.src = "./_framework/hybridwebview.js";
+  bridgeScript.dataset.giromesaBridge = "true";
+  bridgeScript.addEventListener(
+    "load",
+    () => environment.window.dispatchEvent(environment.createReadyEvent()),
+    { once: true },
+  );
+  environment.document.head.appendChild(bridgeScript);
+  return "loading";
+}
+
+function hasNativeBridgeTransport(host: BridgeWindow): boolean {
+  return Boolean(
+    host.chrome?.webview?.postMessage ||
+      host.webkit?.messageHandlers?.webwindowinterop?.postMessage ||
+      host.hybridWebViewHost?.sendMessage,
+  );
+}
 
 export function connectShell(onContext: (context: DeviceContext) => void): () => void {
   const onMessage = (event: Event) => {

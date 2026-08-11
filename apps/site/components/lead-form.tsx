@@ -1,6 +1,8 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { siteFetch } from "../lib/pwa-fetch";
+import { withSitePwaMutation } from "./pwa-client";
 
 type PlanSlug = "operacao" | "crescimento" | "rede";
 type LeadFormProps = { kind: "trial" | "contact"; initialPlan?: PlanSlug };
@@ -40,11 +42,17 @@ export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
               message: form.get("message"),
               privacyAccepted: form.has("consent"),
             };
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await withSitePwaMutation((context) =>
+        siteFetch(
+          endpoint,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+          context,
+        ),
+      );
       setStatus(response.ok ? "success" : "error");
       if (response.ok) formElement.reset();
     } catch {

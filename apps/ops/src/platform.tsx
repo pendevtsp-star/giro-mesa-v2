@@ -1,4 +1,4 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
@@ -180,7 +180,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
           </div>
           {data.recentTrialApplications.length === 0 ? (
             <EmptyState
-              icon="◇"
+              icon={<Icon name="clipboard" />}
               title="Sem solicitações recentes"
               description="Nenhuma adesão recente foi persistida."
             />
@@ -213,7 +213,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
           </div>
           {data.recentContacts.length === 0 ? (
             <EmptyState
-              icon="?"
+              icon={<Icon name="mail" />}
               title="Sem contatos recentes"
               description="Nenhum contato comercial foi persistido."
             />
@@ -245,7 +245,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
         </div>
         {data.recentOrganizations.length === 0 ? (
           <EmptyState
-            icon="◎"
+            icon={<Icon name="building" />}
             title="Sem organizações"
             description="Nenhuma organização foi criada."
           />

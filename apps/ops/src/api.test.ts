@@ -1,3 +1,4 @@
+import { getPwaMutationCount, withPwaMutation } from "@giromesa/ui/pwa-mutation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiClientError, api } from "./api";
 
@@ -109,5 +110,24 @@ describe("fronteira runtime da API de onboarding", () => {
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     await expect(pending).rejects.not.toBeInstanceOf(ApiClientError);
+  });
+
+  it("mantém mutação atrasada do Ops ativa sem dupla contagem", async () => {
+    let finish: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    );
+
+    const pending = withPwaMutation((context) => api.logout(context));
+    expect(getPwaMutationCount()).toBe(1);
+    finish?.(new Response(null, { status: 204 }));
+    await pending;
+    expect(getPwaMutationCount()).toBe(0);
   });
 });
