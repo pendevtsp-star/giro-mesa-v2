@@ -22,6 +22,7 @@ import {
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { createPriceReference } from "./price-reference.js";
 
 @Injectable()
 export class OperationalSnapshotService {
@@ -245,9 +246,27 @@ export class OperationalSnapshotService {
         categories,
         products,
         modifierGroups,
-        modifierOptions,
+        modifierOptions: modifierOptions.map((option) => ({
+          ...option,
+          priceReference: createPriceReference({
+            kind: "modifier-option",
+            entityId: option.id,
+            organizationId,
+            unitId,
+            priceCents: option.priceDeltaCents,
+          }),
+        })),
         productModifierGroups,
-        prices,
+        prices: prices.map((price) => ({
+          ...price,
+          priceReference: createPriceReference({
+            kind: "product",
+            entityId: price.productId,
+            organizationId,
+            unitId,
+            priceCents: price.priceCents,
+          }),
+        })),
         availability,
         productStations,
       },

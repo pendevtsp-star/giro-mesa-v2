@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { DatabaseService } from "../database/database.module.js";
 import { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
+import { PilotResourceConflict } from "../pilot-operations/pilot-resource-boundary.js";
 import {
   approvalSchema,
   discountSchema,
@@ -22,6 +23,7 @@ import {
   tipSchema,
   transferTabSchema,
 } from "../pilot-operations/pilot-schemas.js";
+import { verifyPriceReference } from "./price-reference.js";
 import { stableOperationalId } from "./stable-operational-id.js";
 import type { NormalizedSyncEventInput, SyncEventInput } from "./sync.schemas.js";
 
@@ -105,12 +107,14 @@ export class SyncPilotService {
     event: NormalizedSyncEventInput | SyncEventInput,
     scope: { organizationId: string; unitId: string },
   ): Promise<Record<string, unknown> | null> {
+    if (event.payload.kind !== "pilot.mutation") return null;
     if (!isPilotCommandType(event.type)) {
       throw new PilotConflictException({
         outcome: "reject",
         code: "UNSUPPORTED_PILOT_COMMAND",
       });
     }
+    const commandType = event.type;
     const envelope = pilotEnvelopeSchema.parse(event.payload);
     if (eventTypeByAction[envelope.action] !== event.type) {
       throw new z.ZodError([
@@ -123,39 +127,45 @@ export class SyncPilotService {
       ]);
     }
     const lookup = this.resourceLookup(envelope.action, envelope.data, event.id);
-    const resource = await this.readResource(lookup, scope);
     const ordered = "aggregate" in event && event.aggregate.type !== "legacy.operational_command";
-    if (
-      ordered &&
-      (event.aggregate.type !== "tab" ||
-        event.aggregate.id !== (resource?.id ?? lookup.expectedTabId))
-    ) {
-      throw new PilotConflictException({ outcome: "reject", code: "AGGREGATE_SCOPE_MISMATCH" });
+    if (ordered) {
+      const primary = event.resourcePreconditions.find(
+        (resource) => resource.type === event.aggregate.type && resource.id === event.aggregate.id,
+      );
+      if (
+        event.aggregate.type !== "tab" ||
+        !primary ||
+        primary.occupancyEpoch !== event.occupancyEpoch ||
+        primary.resourceVersion !== event.resourceVersion
+      )
+        throw new PilotConflictException({
+          outcome: "reject",
+          code: "AGGREGATE_SCOPE_MISMATCH",
+        });
+    } else {
+      const resource = await this.readResource(lookup, scope);
+      const resourceState: PilotResourceState = !resource
+        ? "missing"
+        : resource.status === "open"
+          ? "active"
+          : "terminal";
+      const conflict = decidePilotConflict({
+        commandType,
+        delivery: "new",
+        protocol: "legacy",
+        commandEpoch: null,
+        currentEpoch: resource?.occupancyEpoch ?? null,
+        commandVersion: null,
+        currentVersion: resource?.resourceVersion ?? null,
+        resourceState,
+      });
+      if (conflict.outcome !== "apply") throw new PilotConflictException(conflict);
     }
-    const resourceState: PilotResourceState = !resource
-      ? "missing"
-      : resource.status === "open"
-        ? "active"
-        : "terminal";
-    const conflict = decidePilotConflict({
-      commandType: event.type,
-      delivery: "new",
-      protocol: ordered ? "ordered" : "legacy",
-      commandEpoch: ordered ? event.occupancyEpoch : null,
-      currentEpoch: resource?.occupancyEpoch ?? null,
-      commandVersion: ordered ? event.resourceVersion : null,
-      currentVersion: resource?.resourceVersion ?? null,
-      resourceState,
-    });
-    if (conflict.outcome !== "apply") throw new PilotConflictException(conflict);
 
     switch (envelope.action) {
       case "open-tab": {
         const { body } = openTabDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.openTab(
             event.actorId,
             scope.organizationId,
@@ -168,10 +178,8 @@ export class SyncPilotService {
       }
       case "create-order": {
         const { tabId, body } = createOrderDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        const authoritativePrices = this.authoritativePrices(event, body, scope);
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.createOrder(
             event.actorId,
             scope.organizationId,
@@ -187,15 +195,13 @@ export class SyncPilotService {
               modifierIdForOption: (itemId, optionId) =>
                 stableOperationalId(event.id, "order-modifier", `${itemId}:${optionId}`),
             },
+            authoritativePrices,
           ),
         );
       }
       case "send-order": {
         const { orderId } = sendOrderDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.sendOrder(
             event.actorId,
             scope.organizationId,
@@ -211,10 +217,7 @@ export class SyncPilotService {
       }
       case "transfer-tab": {
         const { tabId, body } = transferTabDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.transferTab(
             event.actorId,
             scope.organizationId,
@@ -227,10 +230,7 @@ export class SyncPilotService {
       }
       case "merge-tabs": {
         const { body } = mergeTabsDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.mergeTabs(
             event.actorId,
             scope.organizationId,
@@ -242,10 +242,7 @@ export class SyncPilotService {
       }
       case "split-tab": {
         const { tabId, body } = splitTabDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.splitTab(
             event.actorId,
             scope.organizationId,
@@ -266,10 +263,7 @@ export class SyncPilotService {
       }
       case "service-charge": {
         const { tabId, basisPoints } = serviceChargeDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.setServiceCharge(
             event.actorId,
             scope.organizationId,
@@ -282,10 +276,7 @@ export class SyncPilotService {
       }
       case "tip": {
         const { tabId, tipCents } = tipDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.setTip(
             event.actorId,
             scope.organizationId,
@@ -298,10 +289,7 @@ export class SyncPilotService {
       }
       case "discount-item": {
         const { itemId, body } = discountItemDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.discountItem(
             event.actorId,
             scope.organizationId,
@@ -315,10 +303,7 @@ export class SyncPilotService {
       }
       case "cancel-item": {
         const { itemId, approval } = cancelItemDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.cancelItem(
             event.actorId,
             scope.organizationId,
@@ -332,10 +317,7 @@ export class SyncPilotService {
       }
       case "transition-kds": {
         const { ticketId, state } = transitionKdsDataSchema.parse(envelope.data);
-        return this.applyAndAdvance(
-          event,
-          lookup.expectedTabId,
-          resource,
+        return this.applyWithBoundary(event, commandType, () =>
           this.pilot.transitionKds(
             event.actorId,
             scope.organizationId,
@@ -413,7 +395,6 @@ export class SyncPilotService {
           where tab.organization_id = ${scope.organizationId}
             and tab.unit_id = ${scope.unitId}
             and tab.id = ${lookup.entityId}
-          for update
         `);
         break;
       case "order":
@@ -425,7 +406,6 @@ export class SyncPilotService {
           where ord.organization_id = ${scope.organizationId}
             and ord.unit_id = ${scope.unitId}
             and ord.id = ${lookup.entityId}
-          for update of tab
         `);
         break;
       case "item":
@@ -439,7 +419,6 @@ export class SyncPilotService {
           where item.organization_id = ${scope.organizationId}
             and item.unit_id = ${scope.unitId}
             and item.id = ${lookup.entityId}
-          for update of tab
         `);
         break;
       case "ticket":
@@ -453,7 +432,6 @@ export class SyncPilotService {
           where ticket.organization_id = ${scope.organizationId}
             and ticket.unit_id = ${scope.unitId}
             and ticket.id = ${lookup.entityId}
-          for update of tab
         `);
         break;
       default:
@@ -470,34 +448,68 @@ export class SyncPilotService {
       : null;
   }
 
-  private async applyAndAdvance(
+  private async applyWithBoundary(
     event: NormalizedSyncEventInput | SyncEventInput,
-    tabId: string,
-    resource: PilotResource | null,
-    effectPromise: Promise<Record<string, unknown>>,
+    commandType: Parameters<PilotPosService["withSyncPreconditions"]>[0],
+    effect: () => Promise<Record<string, unknown>>,
   ) {
-    const effect = await effectPromise;
     const ordered = "aggregate" in event && event.aggregate.type !== "legacy.operational_command";
-    let updated: Iterable<{ id: string }>;
-    if (!resource && ordered) {
-      updated = await this.database.db.execute<{ id: string }>(sql`
-        update pos_tabs set occupancy_epoch = ${event.occupancyEpoch}, resource_version = 1,
-          updated_at = now()
-        where id = ${tabId} and resource_version = 0
-        returning id
-      `);
-    } else if (resource) {
-      updated = await this.database.db.execute<{ id: string }>(sql`
-        update pos_tabs set resource_version = resource_version + 1, updated_at = now()
-        where id = ${resource.id}
-          and occupancy_epoch = ${resource.occupancyEpoch}
-          and resource_version = ${resource.resourceVersion}
-        returning id
-      `);
-    } else {
-      return effect;
+    try {
+      return ordered
+        ? await this.pilot.withSyncPreconditions(commandType, event.resourcePreconditions, effect)
+        : await effect();
+    } catch (error) {
+      if (error instanceof PilotResourceConflict) {
+        throw new PilotConflictException({ outcome: error.outcome, code: error.code });
+      }
+      throw error;
     }
-    if ([...updated].length !== 1) throw new Error("PILOT_RESOURCE_VERSION_RACE");
-    return effect;
+  }
+
+  private authoritativePrices(
+    event: NormalizedSyncEventInput | SyncEventInput,
+    body: z.infer<typeof orderSchema>,
+    scope: { organizationId: string; unitId: string },
+  ) {
+    if (!("aggregate" in event) || event.aggregate.type === "legacy.operational_command") {
+      throw new PilotConflictException({ outcome: "reject", code: "PRICE_REFERENCE_REQUIRED" });
+    }
+    const references = new Map(
+      event.priceReferences.map((reference) => [
+        `${reference.kind}:${reference.entityId}`,
+        reference,
+      ]),
+    );
+    const products = new Map<string, number>();
+    const modifierOptions = new Map<string, number>();
+    try {
+      for (const item of body.items) {
+        const productReference = references.get(`product:${item.productId}`);
+        if (!productReference) throw new Error("PRICE_REFERENCE_REQUIRED");
+        products.set(
+          item.productId,
+          verifyPriceReference(productReference.token, {
+            kind: "product",
+            entityId: item.productId,
+            ...scope,
+          }),
+        );
+        for (const optionId of item.modifierOptionIds) {
+          const optionReference = references.get(`modifier-option:${optionId}`);
+          if (!optionReference) throw new Error("PRICE_REFERENCE_REQUIRED");
+          modifierOptions.set(
+            optionId,
+            verifyPriceReference(optionReference.token, {
+              kind: "modifier-option",
+              entityId: optionId,
+              ...scope,
+            }),
+          );
+        }
+      }
+    } catch {
+      throw new PilotConflictException({ outcome: "reject", code: "PRICE_REFERENCE_INVALID" });
+    }
+    return { products, modifierOptions };
   }
 }

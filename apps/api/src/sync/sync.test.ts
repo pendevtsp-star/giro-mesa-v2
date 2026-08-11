@@ -110,6 +110,61 @@ describe("edge sync boundaries", () => {
     );
   });
 
+  it("accepts a bounded sorted multi-resource vector without changing singular compatibility", () => {
+    const tab = {
+      type: "tab",
+      id: crypto.randomUUID(),
+      occupancyEpoch: crypto.randomUUID(),
+      resourceVersion: 4,
+    };
+    const table = {
+      type: "table",
+      id: crypto.randomUUID(),
+      occupancyEpoch: crypto.randomUUID(),
+      resourceVersion: 2,
+    };
+    const parsed = normalizeSyncBatch({
+      protocolVersion: 2,
+      hubVersion: "2.1.0",
+      events: [
+        {
+          commandId: crypto.randomUUID(),
+          actorId: crypto.randomUUID(),
+          deviceId: crypto.randomUUID(),
+          idempotencyKey: "ordered-transfer-1",
+          type: "pos.tab.transfer_requested",
+          payload: {},
+          aggregate: { type: tab.type, id: tab.id },
+          occupancyEpoch: tab.occupancyEpoch,
+          resourceVersion: tab.resourceVersion,
+          aggregateSequence: 5,
+          resourcePreconditions: [tab, table].sort((left, right) =>
+            `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+          ),
+          priceReferences: [],
+          occurredAt: new Date().toISOString(),
+        },
+      ],
+    });
+    assert.equal(parsed.events[0]?.resourcePreconditions.length, 2);
+    assert.deepEqual(parsed.events[0]?.aggregate, { type: "tab", id: tab.id });
+    assert.equal(
+      syncBatchSchema.safeParse({
+        protocolVersion: 2,
+        hubVersion: "2.1.0",
+        events: [
+          {
+            ...parsed.events[0],
+            id: undefined,
+            version: undefined,
+            resourcePreconditions: [table, tab],
+          },
+        ],
+      }).success,
+      false,
+    );
+  });
+
   it("accepts only the dedicated authorization scheme", () => {
     assert.equal(hubSyncKey("GiroMesaHub one-time-secret"), "one-time-secret");
     assert.equal(hubSyncKey("Bearer one-time-secret"), undefined);

@@ -10,6 +10,19 @@ export type CommandAggregate = Readonly<{
   id: string;
 }>;
 
+export type ResourcePrecondition = Readonly<{
+  type: string;
+  id: string;
+  occupancyEpoch: string;
+  resourceVersion: number;
+}>;
+
+export type PriceReference = Readonly<{
+  kind: "product" | "modifier-option";
+  entityId: string;
+  token: string;
+}>;
+
 export type EdgeCommandInput<TPayload extends Record<string, unknown> = Record<string, unknown>> =
   Readonly<{
     commandId: string;
@@ -21,6 +34,8 @@ export type EdgeCommandInput<TPayload extends Record<string, unknown> = Record<s
     occupancyEpoch: string;
     resourceVersion: number;
     aggregateSequence: number;
+    resourcePreconditions?: readonly ResourcePrecondition[];
+    priceReferences?: readonly PriceReference[];
     occurredAt: string;
     payload: TPayload;
   }>;
@@ -69,6 +84,33 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
     type: boundedText(input.aggregate.type, "aggregate.type", 1, 80),
     id: requiredUuid(input.aggregate.id, "aggregate.id"),
   });
+  const resourcePreconditions = Object.freeze(
+    (input.resourcePreconditions ?? []).map((resource) =>
+      Object.freeze({
+        type: boundedText(resource.type, "resourcePreconditions.type", 1, 80),
+        id: requiredUuid(resource.id, "resourcePreconditions.id"),
+        occupancyEpoch: requiredUuid(
+          resource.occupancyEpoch,
+          "resourcePreconditions.occupancyEpoch",
+        ),
+        resourceVersion: boundedInteger(
+          resource.resourceVersion,
+          "resourcePreconditions.resourceVersion",
+          0,
+          MAX_RESOURCE_VERSION,
+        ),
+      }),
+    ),
+  );
+  const priceReferences = Object.freeze(
+    (input.priceReferences ?? []).map((reference) =>
+      Object.freeze({
+        kind: reference.kind,
+        entityId: requiredUuid(reference.entityId, "priceReferences.entityId"),
+        token: boundedText(reference.token, "priceReferences.token", 32, 2_048),
+      }),
+    ),
+  );
   return Object.freeze({
     commandId: requiredUuid(input.commandId, "commandId"),
     idempotencyKey: boundedText(input.idempotencyKey, "idempotencyKey", 8, 160),
@@ -91,6 +133,8 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
       1,
       MAX_AGGREGATE_SEQUENCE,
     ),
+    resourcePreconditions,
+    priceReferences,
     occurredAt: timestamp(input.occurredAt, "occurredAt"),
     receivedAt: timestamp(context.receivedAt, "receivedAt"),
     payload: input.payload,

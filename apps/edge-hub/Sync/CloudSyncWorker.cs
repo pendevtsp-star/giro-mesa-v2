@@ -111,6 +111,7 @@ public sealed class CloudSyncWorker(
     ILogger<CloudSyncWorker> logger) : BackgroundService
 {
     private readonly HubOptions _options = options.Value;
+    private readonly Dictionary<string, ServerEventOutcome> _authoritativeOutcomes = new(StringComparer.Ordinal);
     private bool _configured;
     public string Status { get; private set; } = "not-configured";
     public IReadOnlyList<ServerEventOutcome> AuthoritativeOutcomes { get; private set; } = [];
@@ -143,17 +144,28 @@ public sealed class CloudSyncWorker(
         {
             Status = "syncing";
             var pending = await store.GetPendingAsync(100, includeSecrets: true);
-            var acknowledgements = await store.GetPendingCloudAcknowledgementsAsync(100);
-            var response = await PostBatchAsync(pending, acknowledgements, cancellationToken);
+            var pendingAcknowledgements = await store.GetPendingCloudAcknowledgementsAsync(100);
+            IReadOnlyList<string> acknowledgements = pendingAcknowledgements;
+            var responses = new List<SyncResponse>();
+            foreach (var group in pending.GroupBy(item => item.ProtocolVersion).OrderBy(group => group.Key))
+            {
+                responses.Add(await PostBatchAsync(group.ToArray(), acknowledgements, group.Key, cancellationToken));
+                acknowledgements = [];
+            }
+            if (responses.Count == 0)
+                responses.Add(await PostBatchAsync([], acknowledgements, 2, cancellationToken));
 
-            var needsReconciliation = await ApplyResponseAsync(response);
-            await store.MarkCloudAcknowledgementsAsync(acknowledgements);
+            var needsReconciliation = false;
+            foreach (var response in responses)
+                needsReconciliation = await ApplyResponseAsync(response, needsReconciliation);
+            await store.MarkCloudAcknowledgementsAsync(pendingAcknowledgements);
 
-            var receivedCommandIds = response.Commands.Select(command => command.Id).Distinct().ToArray();
+            var receivedCommandIds = responses.SelectMany(response => response.Commands)
+                .Select(command => command.Id).Distinct().ToArray();
             if (receivedCommandIds.Length > 0)
             {
-                var acknowledgementResponse = await PostBatchAsync([], receivedCommandIds, cancellationToken);
-                needsReconciliation |= await ApplyResponseAsync(acknowledgementResponse);
+                var acknowledgementResponse = await PostBatchAsync([], receivedCommandIds, 2, cancellationToken);
+                needsReconciliation = await ApplyResponseAsync(acknowledgementResponse, needsReconciliation);
                 await store.MarkCloudAcknowledgementsAsync(receivedCommandIds);
             }
             Status = needsReconciliation ? "reconciling" : "idle";
@@ -169,29 +181,32 @@ public sealed class CloudSyncWorker(
         }
     }
 
-    private async Task<bool> ApplyResponseAsync(SyncResponse response)
+    private async Task<bool> ApplyResponseAsync(SyncResponse response, bool priorReconciliation)
     {
         await store.SaveCloudCommandsAsync(response.Commands);
         var authoritative = response.EventResults ?? [];
-        if (authoritative.Count > 0) AuthoritativeOutcomes = authoritative;
         var classifiedIds = authoritative.Select(outcome => outcome.Id).ToHashSet(StringComparer.Ordinal);
-        var needsReconciliation = false;
+        var needsReconciliation = priorReconciliation;
         foreach (var outcome in authoritative)
         {
             switch (outcome.Status)
             {
                 case "applied":
                     await store.AcknowledgeAsync(outcome.Id);
+                    _authoritativeOutcomes.Remove(outcome.Id);
                     break;
                 case "rejected":
                     await store.RejectEventAsync(outcome.Id, outcome.Code ?? "COMMAND_REJECTED");
+                    _authoritativeOutcomes.Remove(outcome.Id);
                     break;
                 case "quarantined":
                 case "reconcile":
                     needsReconciliation = true;
+                    _authoritativeOutcomes[outcome.Id] = outcome;
                     break;
                 default:
                     needsReconciliation = true;
+                    _authoritativeOutcomes[outcome.Id] = outcome;
                     logger.LogWarning(
                         "Cloud returned unknown authoritative outcome {Outcome} for event {EventId}",
                         outcome.Status,
@@ -202,11 +217,14 @@ public sealed class CloudSyncWorker(
         foreach (var eventId in response.AcceptedEventIds.Where(id => !classifiedIds.Contains(id)))
         {
             await store.AcknowledgeAsync(eventId);
+            _authoritativeOutcomes.Remove(eventId);
         }
         foreach (var rejection in response.RejectedEvents.Where(item => !classifiedIds.Contains(item.Id)))
         {
             await store.RejectEventAsync(rejection.Id, rejection.Code);
+            _authoritativeOutcomes.Remove(rejection.Id);
         }
+        AuthoritativeOutcomes = _authoritativeOutcomes.Values.OrderBy(value => value.Id).ToArray();
         if (response.Snapshot is not null && !needsReconciliation)
         {
             if (_options.UnitId != "unconfigured" && response.Snapshot.UnitId != _options.UnitId)
@@ -221,24 +239,47 @@ public sealed class CloudSyncWorker(
     private async Task<SyncResponse> PostBatchAsync(
         IReadOnlyList<PendingEvent> events,
         IReadOnlyList<string> acknowledgedCommandIds,
+        int protocolVersion,
         CancellationToken cancellationToken)
     {
-        var outboundEvents = events.Select(item => new SyncEvent(
-            item.Id,
-            item.ActorId,
-            item.DeviceId,
-            item.IdempotencyKey,
-            item.Type,
-            ParsePayload(item.Payload),
-            item.Version,
-            item.OccurredAt)).ToArray();
+        if (events.Any(item => item.ProtocolVersion != protocolVersion))
+            throw new InvalidOperationException("A sync batch cannot mix protocol versions.");
+        var outboundEvents = events.Select(CreateOutboundEvent).ToArray();
         using var response = await httpClient.PostAsJsonAsync(
             "/api/v1/sync/batches",
-            new SyncBatch(1, HubVersion(), new Dictionary<string, object>(), acknowledgedCommandIds, outboundEvents),
+            new SyncBatch(protocolVersion, HubVersion(), new Dictionary<string, object>(), acknowledgedCommandIds, outboundEvents),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<SyncResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Cloud returned an empty sync acknowledgement.");
+    }
+
+    public static object CreateOutboundEvent(PendingEvent item)
+    {
+        if (item.ProtocolVersion == 1)
+            return new LegacySyncEvent(
+                item.Id, item.ActorId, item.DeviceId, item.IdempotencyKey, item.Type,
+                ParsePayload(item.Payload), item.Version, item.OccurredAt);
+        if (item.ProtocolVersion != 2 || item.ResourcePreconditions is not { Count: > 0 } ||
+            item.AggregateSequence is null)
+            throw new InvalidOperationException("Ordered event metadata is incomplete.");
+        var resources = item.ResourcePreconditions
+            .OrderBy(resource => resource.Type, StringComparer.Ordinal)
+            .ThenBy(resource => resource.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (item.PrimaryResourceId is null)
+            throw new InvalidOperationException("Ordered primary resource is missing.");
+        var primary = resources.Single(resource =>
+            resource.Type == "tab" && resource.Id == item.PrimaryResourceId);
+        return new OrderedSyncEvent(
+            item.Id, item.ActorId, item.DeviceId, item.IdempotencyKey, item.Type,
+            ParsePayload(item.Payload),
+            new CommandAggregate(primary.Type, primary.Id),
+            primary.OccupancyEpoch,
+            primary.ResourceVersion,
+            item.AggregateSequence.Value,
+            resources,
+            item.PriceReferences ?? []);
     }
 
     private bool CanSynchronize() =>
@@ -270,9 +311,9 @@ public sealed record SyncBatch(
     string HubVersion,
     IReadOnlyDictionary<string, object> Metadata,
     IReadOnlyList<string> AcknowledgedCommandIds,
-    IReadOnlyList<SyncEvent> Events);
+    IReadOnlyList<object> Events);
 
-public sealed record SyncEvent(
+public sealed record LegacySyncEvent(
     string Id,
     string ActorId,
     string DeviceId,
@@ -281,6 +322,22 @@ public sealed record SyncEvent(
     JsonElement Payload,
     int Version,
     DateTimeOffset OccurredAt);
+
+public sealed record CommandAggregate(string Type, string Id);
+
+public sealed record OrderedSyncEvent(
+    string CommandId,
+    string ActorId,
+    string DeviceId,
+    string IdempotencyKey,
+    string Type,
+    JsonElement Payload,
+    CommandAggregate Aggregate,
+    string OccupancyEpoch,
+    int ResourceVersion,
+    int AggregateSequence,
+    IReadOnlyList<ResourcePrecondition> ResourcePreconditions,
+    IReadOnlyList<PriceReference> PriceReferences);
 
 public sealed record RejectedEvent(string Id, string Code);
 

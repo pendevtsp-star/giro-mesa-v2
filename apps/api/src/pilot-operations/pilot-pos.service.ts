@@ -66,16 +66,35 @@ import type {
   TipInput,
   TransferTabInput,
 } from "./pilot-schemas.js";
+import {
+  PilotResourceBoundary,
+  type PilotMutationLocator,
+  type PilotResourcePrecondition,
+} from "./pilot-resource-boundary.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
+export type AuthoritativePriceSnapshot = Readonly<{
+  products: ReadonlyMap<string, number>;
+  modifierOptions: ReadonlyMap<string, number>;
+}>;
 
 @Injectable()
 export class PilotPosService {
+  private readonly resourceBoundary = new PilotResourceBoundary();
+
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
   ) {}
+
+  withSyncPreconditions<T>(
+    commandType: Parameters<PilotResourceBoundary["withSyncPreconditions"]>[0]["commandType"],
+    resources: readonly PilotResourcePrecondition[],
+    work: () => Promise<T>,
+  ) {
+    return this.resourceBoundary.withSyncPreconditions({ commandType, resources }, work);
+  }
 
   private async requireAccess(identityId: string, organizationId: string, unitId: string) {
     return this.scope.requireUnitAccess(identityId, organizationId, unitId);
@@ -314,6 +333,7 @@ export class PilotPosService {
       "cashier",
     ]);
     await this.requireOperationalBilling(organizationId);
+    const tabId = offlineIds?.tabId ?? randomUUID();
     return this.idempotent(
       identityId,
       organizationId,
@@ -321,11 +341,9 @@ export class PilotPosService {
       idempotencyKey,
       "tab.open",
       input,
+      { kind: "open", tabId, tableId: input.tableId },
       async (tx) => {
         if (input.tableId) {
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${input.tableId}`}))`,
-          );
           const [table] = await tx
             .select({ id: posDiningTables.id, status: posDiningTables.status })
             .from(posDiningTables)
@@ -356,7 +374,7 @@ export class PilotPosService {
         const [tab] = await tx
           .insert(posTabs)
           .values({
-            ...(offlineIds ? { id: offlineIds.tabId } : {}),
+            id: tabId,
             organizationId,
             unitId,
             tableId: input.tableId,
@@ -399,6 +417,7 @@ export class PilotPosService {
       itemIds: string[];
       modifierIdForOption: (itemId: string, optionId: string) => string;
     },
+    authoritativePrices?: AuthoritativePriceSnapshot,
   ) {
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
@@ -414,6 +433,7 @@ export class PilotPosService {
       idempotencyKey,
       "order.create",
       input,
+      { kind: "tab", tabId },
       async (tx) => {
         if (offlineIds && offlineIds.itemIds.length !== input.items.length) {
           throw new BadRequestException({ code: "INVALID_OFFLINE_ENTITY_IDS" });
@@ -553,10 +573,12 @@ export class PilotPosService {
             }
           }
           const modifierPerUnitCents = options.reduce(
-            (sum, option) => sum + option.priceDeltaCents,
+            (sum, option) =>
+              sum + (authoritativePrices?.modifierOptions.get(option.id) ?? option.priceDeltaCents),
             0,
           );
-          const amounts = itemAmounts(item.quantity, product.priceCents, modifierPerUnitCents);
+          const unitPriceCents = authoritativePrices?.products.get(product.id) ?? product.priceCents;
+          const amounts = itemAmounts(item.quantity, unitPriceCents, modifierPerUnitCents);
           const [created] = await tx
             .insert(posOrderItems)
             .values({
@@ -568,7 +590,7 @@ export class PilotPosService {
               stationId: product.stationId,
               productName: product.name,
               quantity: item.quantity,
-              unitPriceCents: product.priceCents,
+              unitPriceCents,
               modifiersCents: modifierPerUnitCents * item.quantity,
               ...amounts,
               notes: item.notes,
@@ -584,8 +606,11 @@ export class PilotPosService {
                 orderItemId: created.id,
                 optionId: option.id,
                 name: option.name,
-                unitDeltaCents: option.priceDeltaCents,
-                totalDeltaCents: option.priceDeltaCents * item.quantity,
+                unitDeltaCents:
+                  authoritativePrices?.modifierOptions.get(option.id) ?? option.priceDeltaCents,
+                totalDeltaCents:
+                  (authoritativePrices?.modifierOptions.get(option.id) ?? option.priceDeltaCents) *
+                  item.quantity,
               })),
             );
           }
@@ -623,6 +648,7 @@ export class PilotPosService {
       idempotencyKey,
       "order.send",
       { orderId },
+      { kind: "order", orderId },
       async (tx) => {
         const [order] = await tx
           .select()
@@ -735,10 +761,8 @@ export class PilotPosService {
       idempotencyKey,
       "tab.transfer",
       input,
+      { kind: "transfer", tabId, targetTableId: input.tableId },
       async (tx) => {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${input.tableId}`}))`,
-        );
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
         const [destination] = await tx
           .select({ id: posDiningTables.id })
@@ -834,13 +858,8 @@ export class PilotPosService {
       idempotencyKey,
       "tab.merge",
       { ...input, sourceTabIds: sourceIds },
+      { kind: "merge", targetTabId: input.targetTabId, sourceTabIds: sourceIds },
       async (tx) => {
-        const lockIds = [input.targetTabId, ...sourceIds].sort();
-        for (const id of lockIds) {
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${id}`}))`,
-          );
-        }
         const target = await this.requireOpenTab(tx, organizationId, unitId, input.targetTabId);
         const sources = await tx
           .select()
@@ -925,6 +944,7 @@ export class PilotPosService {
     if (new Set(requestedIds).size !== requestedIds.length) {
       throw new BadRequestException({ code: "DUPLICATE_SPLIT_ITEM" });
     }
+    const targetTabId = offlineIds?.targetTabId ?? randomUUID();
     return this.idempotent(
       identityId,
       organizationId,
@@ -932,12 +952,10 @@ export class PilotPosService {
       idempotencyKey,
       "tab.split",
       input,
+      { kind: "split", sourceTabId, targetTabId, targetTableId: input.tableId },
       async (tx) => {
         const source = await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
         if (input.tableId) {
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${input.tableId}`}))`,
-          );
           const [table] = await tx
             .select({ id: posDiningTables.id })
             .from(posDiningTables)
@@ -1002,7 +1020,7 @@ export class PilotPosService {
         const [target] = await tx
           .insert(posTabs)
           .values({
-            id: offlineIds?.targetTabId,
+            id: targetTabId,
             organizationId,
             unitId,
             tableId: input.tableId,
@@ -1172,6 +1190,7 @@ export class PilotPosService {
       idempotencyKey,
       "tab.service_charge",
       input,
+      { kind: "tab", tabId },
       async (tx) => {
         await this.requireOpenTab(tx, organizationId, unitId, tabId);
         await tx
@@ -1220,6 +1239,7 @@ export class PilotPosService {
       idempotencyKey,
       "tab.tip",
       input,
+      { kind: "tab", tabId },
       async (tx) => {
         await this.requireOpenTab(tx, organizationId, unitId, tabId);
         await tx
@@ -1274,6 +1294,7 @@ export class PilotPosService {
       idempotencyKey,
       "item.discount",
       idempotencyInput,
+      { kind: "item", itemId },
       async (tx) => {
         const row = await this.getScopedItem(tx, organizationId, unitId, itemId);
         if (row.item.status === "canceled") throw new ConflictException({ code: "ITEM_CANCELED" });
@@ -1351,6 +1372,7 @@ export class PilotPosService {
       idempotencyKey,
       "item.cancel",
       idempotencyInput,
+      { kind: "item", itemId },
       async (tx) => {
         const row = await this.getScopedItem(tx, organizationId, unitId, itemId);
         if (row.item.status === "canceled")
@@ -1500,6 +1522,7 @@ export class PilotPosService {
       idempotencyKey,
       "kds.transition",
       input,
+      { kind: "ticket", ticketId },
       async (tx) => {
         const [ticket] = await tx
           .select()
@@ -1716,9 +1739,6 @@ export class PilotPosService {
     unitId: string,
     tabId: string,
   ) {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${tabId}`}))`,
-    );
     const [tab] = await tx
       .select()
       .from(posTabs)
@@ -1809,6 +1829,7 @@ export class PilotPosService {
     key: string,
     operation: string,
     input: unknown,
+    locator: PilotMutationLocator,
     work: (tx: Transaction) => Promise<T>,
   ) {
     if (!key || key.trim().length < 8 || key.length > 160) {
@@ -1840,7 +1861,12 @@ export class PilotPosService {
         .limit(1);
       const replay = replayResult<T>(existing, operation, hash);
       if (replay) return replay;
-      const response = await work(tx);
+      const response = await this.resourceBoundary.mutate(
+        tx,
+        { organizationId, unitId },
+        locator,
+        () => work(tx),
+      );
       const stored = JSON.parse(JSON.stringify(response)) as T;
       await tx.insert(posIdempotencyReceipts).values({
         id: randomUUID(),

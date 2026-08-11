@@ -364,6 +364,8 @@ export const posDiningTables = pgTable(
     label: varchar("label", { length: 60 }).notNull(),
     seats: integer("seats").notNull().default(4),
     status: posTableStatus("status").notNull().default("available"),
+    occupancyEpoch: uuid("occupancy_epoch").notNull().defaultRandom(),
+    resourceVersion: integer("resource_version").notNull().default(0),
     active: boolean("active").notNull().default(true),
     ...timestamps,
   },
@@ -376,6 +378,7 @@ export const posDiningTables = pgTable(
       foreignColumns: [posDiningRooms.organizationId, posDiningRooms.unitId, posDiningRooms.id],
     }).onDelete("cascade"),
     check("pos_tables_seats_check", sql`${table.seats} > 0`),
+    check("pos_tables_resource_version_check", sql`${table.resourceVersion} >= 0`),
   ],
 );
 

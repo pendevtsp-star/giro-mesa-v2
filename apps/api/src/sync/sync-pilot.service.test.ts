@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { DatabaseService } from "../database/database.module.js";
 import type { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
+import { PilotResourceConflict } from "../pilot-operations/pilot-resource-boundary.js";
 import { stableOperationalId } from "./stable-operational-id.js";
+import { createPriceReference } from "./price-reference.js";
 import type { NormalizedSyncEventInput, SyncEventInput } from "./sync.schemas.js";
 import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";
 
@@ -13,6 +15,10 @@ const deviceId = "44444444-4444-4444-8444-444444444444";
 const entityId = "55555555-5555-4555-8555-555555555555";
 const secondId = "66666666-6666-4666-8666-666666666666";
 const commandId = "77777777-7777-4777-8777-777777777777";
+process.env.COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION ??= "test-v1";
+process.env.COMMAND_FINGERPRINT_KEYS ??= JSON.stringify({
+  "test-v1": Buffer.alloc(32, 7).toString("base64url"),
+});
 
 type Call = { method: string; args: unknown[] };
 
@@ -24,6 +30,11 @@ function mockPilot(calls: Call[]): PilotPosService {
       return { method: name };
     };
   return {
+    withSyncPreconditions: async (
+      _commandType: unknown,
+      _resources: unknown,
+      work: () => Promise<unknown>,
+    ) => work(),
     openTab: method("openTab"),
     createOrder: method("createOrder"),
     sendOrder: method("sendOrder"),
@@ -51,6 +62,19 @@ function event(type: string, action: string, data: Record<string, unknown>): Syn
   };
 }
 
+function mockPilotConflict(
+  outcome: "reject" | "reconcile",
+  code: string,
+): PilotPosService {
+  const pilot = mockPilot([]) as PilotPosService & {
+    withSyncPreconditions: PilotPosService["withSyncPreconditions"];
+  };
+  pilot.withSyncPreconditions = async () => {
+    throw new PilotResourceConflict(outcome, code);
+  };
+  return pilot;
+}
+
 function orderedEvent(
   type: string,
   action: string,
@@ -58,7 +82,10 @@ function orderedEvent(
   overrides: Partial<NormalizedSyncEventInput> = {},
 ): NormalizedSyncEventInput {
   const aggregateId = action === "open-tab" ? commandId : entityId;
-  return {
+  const createItems = action === "create-order"
+    ? (data.body as { items: Array<{ productId: string; modifierOptionIds: string[] }> }).items
+    : [];
+  const base = {
     commandId,
     id: commandId,
     actorId,
@@ -71,8 +98,44 @@ function orderedEvent(
     resourceVersion: 1,
     version: 1,
     aggregateSequence: 1,
+    resourcePreconditions: [],
+    priceReferences: createItems.flatMap((item) => [
+      {
+        kind: "product" as const,
+        entityId: item.productId,
+        token: createPriceReference({
+          kind: "product",
+          entityId: item.productId,
+          organizationId,
+          unitId,
+          priceCents: 1_000,
+        }),
+      },
+      ...item.modifierOptionIds.map((optionId) => ({
+        kind: "modifier-option" as const,
+        entityId: optionId,
+        token: createPriceReference({
+          kind: "modifier-option",
+          entityId: optionId,
+          organizationId,
+          unitId,
+          priceCents: 0,
+        }),
+      })),
+    ]),
     occurredAt: new Date().toISOString(),
     ...overrides,
+  };
+  return {
+    ...base,
+    resourcePreconditions: overrides.resourcePreconditions ?? [
+      {
+        type: base.aggregate.type,
+        id: base.aggregate.id,
+        occupancyEpoch: base.occupancyEpoch,
+        resourceVersion: base.resourceVersion,
+      },
+    ],
   };
 }
 
@@ -224,8 +287,8 @@ describe("offline pilot replay", () => {
   it("rejects a same-epoch stale destructive command before calling POS", async () => {
     const calls: Call[] = [];
     const service = new SyncPilotService(
-      mockPilot(calls),
-      conflictDatabase([{ resourceVersion: 2 }]),
+      mockPilotConflict("reject", "RESOURCE_VERSION_CONFLICT"),
+      conflictDatabase([]),
     );
     await assert.rejects(
       () =>
@@ -246,8 +309,8 @@ describe("offline pilot replay", () => {
 
   it("quarantines an occupancy epoch mismatch for reconciliation", async () => {
     const service = new SyncPilotService(
-      mockPilot([]),
-      conflictDatabase([{ occupancyEpoch: "99999999-9999-4999-8999-999999999999" }]),
+      mockPilotConflict("reconcile", "OCCUPANCY_EPOCH_MISMATCH"),
+      conflictDatabase([]),
     );
     await assert.rejects(
       () =>

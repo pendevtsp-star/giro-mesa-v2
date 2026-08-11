@@ -64,6 +64,15 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 rejected_at TEXT NULL,
                 rejection_reason TEXT NULL
             );
+            CREATE TABLE IF NOT EXISTS aggregate_sequences (
+                organization_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                aggregate_type TEXT NOT NULL,
+                aggregate_id TEXT NOT NULL,
+                occupancy_epoch TEXT NOT NULL,
+                last_sequence INTEGER NOT NULL,
+                PRIMARY KEY (organization_id, unit_id, aggregate_type, aggregate_id, occupancy_epoch)
+            );
             CREATE INDEX IF NOT EXISTS ix_operational_events_pending
                 ON operational_events (synced_at, accepted_at);
             CREATE TABLE IF NOT EXISTS paired_devices (
@@ -100,6 +109,11 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         await EnsureColumnAsync(connection, "operational_events", "rejected_at", "TEXT NULL");
         await EnsureColumnAsync(connection, "operational_events", "rejection_reason", "TEXT NULL");
         await EnsureColumnAsync(connection, "operational_events", "result", "TEXT NULL");
+        await EnsureColumnAsync(connection, "operational_events", "protocol_version", "INTEGER NOT NULL DEFAULT 1");
+        await EnsureColumnAsync(connection, "operational_events", "resource_preconditions", "TEXT NULL");
+        await EnsureColumnAsync(connection, "operational_events", "aggregate_sequence", "INTEGER NULL");
+        await EnsureColumnAsync(connection, "operational_events", "price_references", "TEXT NULL");
+        await EnsureColumnAsync(connection, "operational_events", "primary_resource_id", "TEXT NULL");
         var backfill = connection.CreateCommand();
         backfill.CommandText = "UPDATE operational_events SET idempotency_key = id WHERE idempotency_key IS NULL";
         await backfill.ExecuteNonQueryAsync();
@@ -173,13 +187,23 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
 
             var acceptedAt = DateTimeOffset.UtcNow;
             JsonElement? localResult = null;
+            PilotSyncMetadata? syncMetadata = null;
+            int? aggregateSequence = null;
             if (OperationalProjection.IsPilotMutation(command.Payload))
             {
                 var snapshot = await ReadSnapshotAsync(connection, transaction, command.OrganizationId, command.UnitId)
                     ?? throw new OperationalConflictException("OFFLINE_SNAPSHOT_UNAVAILABLE");
+                syncMetadata = PilotSyncMetadata.TryDerive(snapshot, command);
+                if (syncMetadata is not null)
+                    aggregateSequence = await NextAggregateSequenceAsync(
+                        connection, transaction, command, syncMetadata.Primary);
                 var projection = OperationalProjection.Apply(snapshot, command, acceptedAt);
                 localResult = projection.Result;
-                await UpsertSnapshotAsync(connection, transaction, projection.Snapshot, acceptedAt);
+                await UpsertSnapshotAsync(
+                    connection,
+                    transaction,
+                    syncMetadata?.AdvanceProjection(projection.Snapshot) ?? projection.Snapshot,
+                    acceptedAt);
             }
 
             var insert = connection.CreateCommand();
@@ -187,9 +211,11 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             insert.CommandText = """
                 INSERT INTO operational_events
                 (id, organization_id, unit_id, actor_id, device_id, idempotency_key, type, payload,
-                 version, occurred_at, accepted_at, result)
+                 version, occurred_at, accepted_at, result, protocol_version, resource_preconditions,
+                 aggregate_sequence, price_references, primary_resource_id)
                 VALUES ($id, $organizationId, $unitId, $actorId, $deviceId, $idempotencyKey, $type, $payload,
-                        $version, $occurredAt, $acceptedAt, $result);
+                        $version, $occurredAt, $acceptedAt, $result, $protocolVersion, $resources,
+                        $aggregateSequence, $priceReferences, $primaryResourceId);
                 """;
             insert.Parameters.AddWithValue("$id", command.Id);
             insert.Parameters.AddWithValue("$organizationId", command.OrganizationId);
@@ -203,6 +229,17 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             insert.Parameters.AddWithValue("$occurredAt", command.OccurredAt.ToString("O"));
             insert.Parameters.AddWithValue("$acceptedAt", acceptedAt.ToString("O"));
             insert.Parameters.AddWithValue("$result", localResult is null ? DBNull.Value : localResult.Value.GetRawText());
+            insert.Parameters.AddWithValue("$protocolVersion", syncMetadata is null ? 1 : 2);
+            insert.Parameters.AddWithValue("$resources", syncMetadata is null
+                ? DBNull.Value
+                : JsonSerializer.Serialize(syncMetadata.Resources, OperationalSnapshot.JsonOptions));
+            insert.Parameters.AddWithValue("$aggregateSequence", aggregateSequence is null ? DBNull.Value : aggregateSequence.Value);
+            insert.Parameters.AddWithValue("$priceReferences", syncMetadata is null
+                ? DBNull.Value
+                : JsonSerializer.Serialize(syncMetadata.PriceReferences, OperationalSnapshot.JsonOptions));
+            insert.Parameters.AddWithValue("$primaryResourceId", syncMetadata is null
+                ? DBNull.Value
+                : syncMetadata.PrimaryResourceId);
             await insert.ExecuteNonQueryAsync();
             await transaction.CommitAsync();
             return new AcceptedCommand(command.Id, acceptedAt, null, true, localResult);
@@ -220,7 +257,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, organization_id, unit_id, actor_id, device_id, idempotency_key, type, payload,
-                   version, occurred_at, accepted_at
+                   version, occurred_at, accepted_at, protocol_version, resource_preconditions,
+                   aggregate_sequence, price_references, primary_resource_id
             FROM operational_events
             WHERE synced_at IS NULL AND rejected_at IS NULL
             ORDER BY accepted_at
@@ -235,7 +273,12 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
                 reader.GetString(4), reader.GetString(5), reader.GetString(6),
                 includeSecrets ? reader.GetString(7) : RedactSensitivePayload(reader.GetString(7)), reader.GetInt32(8),
-                DateTimeOffset.Parse(reader.GetString(9)), DateTimeOffset.Parse(reader.GetString(10))));
+                DateTimeOffset.Parse(reader.GetString(9)), DateTimeOffset.Parse(reader.GetString(10)),
+                reader.GetInt32(11),
+                reader.IsDBNull(12) ? null : DeserializeList<ResourcePrecondition>(reader.GetString(12)),
+                reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                reader.IsDBNull(14) ? null : DeserializeList<PriceReference>(reader.GetString(14)),
+                reader.IsDBNull(15) ? null : reader.GetString(15)));
         }
 
         return events;
@@ -282,7 +325,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             pending.Transaction = transaction;
             pending.CommandText = """
                 SELECT id, organization_id, unit_id, actor_id, device_id, type, payload, version,
-                       occurred_at, idempotency_key, accepted_at
+                       occurred_at, idempotency_key, accepted_at, protocol_version,
+                       resource_preconditions, aggregate_sequence, price_references, primary_resource_id
                 FROM operational_events
                 WHERE organization_id = $organizationId AND unit_id = $unitId
                   AND synced_at IS NULL AND rejected_at IS NULL
@@ -300,7 +344,11 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                     commands.Add((new OperationalCommand(
                         reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
                         reader.GetString(4), reader.GetString(5), payload, reader.GetInt32(7),
-                        DateTimeOffset.Parse(reader.GetString(8)), reader.GetString(9)),
+                        DateTimeOffset.Parse(reader.GetString(8)), reader.GetString(9), reader.GetInt32(11),
+                        reader.IsDBNull(12) ? null : DeserializeList<ResourcePrecondition>(reader.GetString(12)),
+                        reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                        reader.IsDBNull(14) ? null : DeserializeList<PriceReference>(reader.GetString(14)),
+                        reader.IsDBNull(15) ? null : reader.GetString(15)),
                         DateTimeOffset.Parse(reader.GetString(10))));
                 }
             }
@@ -308,10 +356,18 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             {
                 try
                 {
-                    projected = OperationalProjection.Apply(
+                    var projection = OperationalProjection.Apply(
                         projected,
                         pendingCommand.Command,
                         pendingCommand.AcceptedAt).Snapshot;
+                    projected = pendingCommand.Command.ProtocolVersion == 2 &&
+                        pendingCommand.Command.ResourcePreconditions is { Count: > 0 }
+                        ? new PilotSyncMetadata(
+                            pendingCommand.Command.ResourcePreconditions,
+                            pendingCommand.Command.PriceReferences ?? [],
+                            pendingCommand.Command.PrimaryResourceId
+                                ?? throw new InvalidOperationException("ORDERED_PRIMARY_RESOURCE_MISSING")).AdvanceProjection(projection)
+                        : projection;
                 }
                 catch (OperationalConflictException exception)
                 {
@@ -519,6 +575,34 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
         await alter.ExecuteNonQueryAsync();
     }
+
+    private static async Task<int> NextAggregateSequenceAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        OperationalCommand command,
+        ResourcePrecondition primary)
+    {
+        var next = connection.CreateCommand();
+        next.Transaction = transaction;
+        next.CommandText = """
+            INSERT INTO aggregate_sequences
+                (organization_id, unit_id, aggregate_type, aggregate_id, occupancy_epoch, last_sequence)
+            VALUES ($organizationId, $unitId, $type, $id, $epoch, 1)
+            ON CONFLICT (organization_id, unit_id, aggregate_type, aggregate_id, occupancy_epoch)
+            DO UPDATE SET last_sequence = aggregate_sequences.last_sequence + 1
+            RETURNING last_sequence;
+            """;
+        next.Parameters.AddWithValue("$organizationId", command.OrganizationId);
+        next.Parameters.AddWithValue("$unitId", command.UnitId);
+        next.Parameters.AddWithValue("$type", primary.Type);
+        next.Parameters.AddWithValue("$id", primary.Id);
+        next.Parameters.AddWithValue("$epoch", primary.OccupancyEpoch);
+        return Convert.ToInt32(await next.ExecuteScalarAsync());
+    }
+
+    private static IReadOnlyList<T> DeserializeList<T>(string json) =>
+        JsonSerializer.Deserialize<T[]>(json, OperationalSnapshot.JsonOptions)
+        ?? throw new InvalidOperationException("INVALID_OPERATIONAL_EVENT_METADATA");
 
     private static async Task<OperationalSnapshot?> ReadSnapshotAsync(
         SqliteConnection connection,

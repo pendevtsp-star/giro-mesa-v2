@@ -62,7 +62,7 @@ it("applies concurrent ordered commands effectively once with durable denials an
     const migrationFiles = (await readdir(migrationsDirectory))
       .filter((file) => /^\d{4}_.*\.sql$/.test(file))
       .sort();
-    assert.equal(migrationFiles.at(-1), "0010_event_foundation.sql");
+    assert.equal(migrationFiles.at(-1), "0012_clear_unicorn.sql");
     for (const file of migrationFiles) await applyMigration(migrated.client, file);
 
     await admin.unsafe(

@@ -24,6 +24,23 @@ const eventBase = {
   occurredAt: edgeTimestamp,
 };
 
+const resourcePreconditionSchema = z
+  .object({
+    type: z.string().trim().min(1).max(80),
+    id: z.uuid(),
+    occupancyEpoch: z.uuid(),
+    resourceVersion: z.number().int().nonnegative().max(maximumInteger),
+  })
+  .strict();
+
+const priceReferenceSchema = z
+  .object({
+    kind: z.enum(["product", "modifier-option"]),
+    entityId: z.uuid(),
+    token: z.string().trim().min(32).max(2_048),
+  })
+  .strict();
+
 export const legacySyncEventSchema = z
   .object({
     id: z.uuid(),
@@ -40,8 +57,43 @@ export const syncEventSchema = z
     occupancyEpoch: z.uuid(),
     resourceVersion: z.number().int().nonnegative().max(maximumInteger),
     aggregateSequence: z.number().int().positive().max(maximumInteger),
+    resourcePreconditions: z.array(resourcePreconditionSchema).max(64).default([]),
+    priceReferences: z.array(priceReferenceSchema).max(600).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((event, context) => {
+    if (event.resourcePreconditions.length === 0) return;
+    const keys = event.resourcePreconditions.map((resource) => `${resource.type}:${resource.id}`);
+    const sorted = [...keys].sort();
+    if (keys.some((key, index) => key !== sorted[index])) {
+      context.addIssue({
+        code: "custom",
+        path: ["resourcePreconditions"],
+        message: "Resource preconditions must be sorted.",
+      });
+    }
+    if (new Set(keys).size !== keys.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["resourcePreconditions"],
+        message: "Resource preconditions must be unique.",
+      });
+    }
+    const primary = event.resourcePreconditions.find(
+      (resource) => resource.type === event.aggregate.type && resource.id === event.aggregate.id,
+    );
+    if (
+      !primary ||
+      primary.occupancyEpoch !== event.occupancyEpoch ||
+      primary.resourceVersion !== event.resourceVersion
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["resourcePreconditions"],
+        message: "Singular aggregate must match its vector entry.",
+      });
+    }
+  });
 
 const syncBatchBase = {
   hubVersion: z.string().trim().min(1).max(40),
@@ -94,15 +146,27 @@ export function normalizeSyncBatch(input: SyncBatchInput): NormalizedSyncBatchIn
         occupancyEpoch: event.id,
         resourceVersion: event.version,
         aggregateSequence: 1,
+        resourcePreconditions: [],
+        priceReferences: [],
       })),
     } as NormalizedSyncBatchInput;
   }
   return {
     ...batch,
-    events: batch.events.map((event) => ({
-      ...event,
-      id: event.commandId,
-      version: event.resourceVersion,
-    })),
+    events: batch.events.map((event) => {
+      const primary = {
+        type: event.aggregate.type,
+        id: event.aggregate.id,
+        occupancyEpoch: event.occupancyEpoch,
+        resourceVersion: event.resourceVersion,
+      };
+      return {
+        ...event,
+        resourcePreconditions:
+          event.resourcePreconditions.length === 0 ? [primary] : event.resourcePreconditions,
+        id: event.commandId,
+        version: event.resourceVersion,
+      };
+    }),
   } as NormalizedSyncBatchInput;
 }

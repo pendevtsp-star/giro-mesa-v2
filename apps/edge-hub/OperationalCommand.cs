@@ -13,7 +13,12 @@ public sealed record OperationalCommand(
     JsonElement Payload,
     int Version,
     DateTimeOffset OccurredAt,
-    string? IdempotencyKey = null)
+    string? IdempotencyKey = null,
+    int ProtocolVersion = 1,
+    IReadOnlyList<ResourcePrecondition>? ResourcePreconditions = null,
+    int? AggregateSequence = null,
+    IReadOnlyList<PriceReference>? PriceReferences = null,
+    string? PrimaryResourceId = null)
 {
     public string EffectiveIdempotencyKey => IdempotencyKey?.Trim() ?? Id;
 
@@ -100,7 +105,20 @@ public sealed record PendingEvent(
     string Payload,
     int Version,
     DateTimeOffset OccurredAt,
-    DateTimeOffset AcceptedAt);
+    DateTimeOffset AcceptedAt,
+    int ProtocolVersion = 1,
+    IReadOnlyList<ResourcePrecondition>? ResourcePreconditions = null,
+    int? AggregateSequence = null,
+    IReadOnlyList<PriceReference>? PriceReferences = null,
+    string? PrimaryResourceId = null);
+
+public sealed record ResourcePrecondition(
+    string Type,
+    string Id,
+    string OccupancyEpoch,
+    int ResourceVersion);
+
+public sealed record PriceReference(string Kind, string EntityId, string Token);
 
 public sealed record CloudCommand(
     string Id,
