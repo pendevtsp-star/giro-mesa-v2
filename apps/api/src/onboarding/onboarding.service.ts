@@ -41,11 +41,12 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 
@@ -143,6 +144,147 @@ function publicPlan(snapshot: PlanSnapshot) {
   };
 }
 
+function iso(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function sanitizedSystemEvidence(item: ChecklistItem, evidence: Record<string, unknown>) {
+  switch (item) {
+    case "unit":
+      return {
+        selectedUnitId:
+          typeof evidence.selectedUnitId === "string" ? evidence.selectedUnitId : null,
+        selectedUnitActive: evidence.selectedUnitActive === true,
+      };
+    case "team":
+      return {
+        activeMembersObserved:
+          typeof evidence.activeMembersObserved === "number"
+            ? Math.max(0, Math.min(10_000, Math.trunc(evidence.activeMembersObserved)))
+            : 0,
+      };
+    case "qr":
+      return {
+        menuPublished: evidence.menuPublished === true,
+        tablesConfigured: evidence.tablesConfigured === true,
+        capabilitiesConfigured: evidence.capabilitiesConfigured === true,
+        serverTestPassed: evidence.serverTestPassed === true,
+      };
+    case "production": {
+      const requestedMode = evidence.requestedMode ?? evidence.mode;
+      return {
+        configured: evidence.configured === true,
+        serverTestPassed: evidence.serverTestPassed === true,
+        requestedMode: ["off", "kds", "print", "both"].includes(String(requestedMode))
+          ? String(requestedMode)
+          : null,
+      };
+    }
+    case "plan":
+      return {
+        catalogVersion:
+          typeof evidence.catalogVersion === "number"
+            ? Math.max(0, Math.trunc(evidence.catalogVersion))
+            : null,
+        slug: ["operacao", "crescimento", "rede"].includes(String(evidence.slug))
+          ? String(evidence.slug)
+          : null,
+      };
+    default:
+      return {};
+  }
+}
+
+function checklistAuditState(
+  item: ChecklistItem,
+  value: {
+    status: string;
+    source: string;
+    evidenceReference?: string | null;
+    evidence?: Record<string, unknown> | null;
+    actorIdentityId?: string | null;
+    verifiedAt?: Date | null;
+    waiverReason?: string | null;
+  },
+) {
+  return {
+    status: value.status,
+    source: value.source,
+    evidenceReference: value.evidenceReference ?? null,
+    evidence: sanitizedSystemEvidence(item, value.evidence ?? {}),
+    actorIdentityId: value.actorIdentityId ?? null,
+    verifiedAt: iso(value.verifiedAt),
+    waiverReason: value.waiverReason ?? null,
+  };
+}
+
+function selectionAuditSnapshot(record: OnboardingRecord) {
+  if (!record.selectedUnitId || !record.selectedPlanId || !record.selectedAt) return null;
+  const snapshot = record.selectedPlanSnapshot ?? {};
+  const entitlements = Array.isArray(snapshot.entitlements)
+    ? snapshot.entitlements.filter(
+        (value): value is string => typeof value === "string" && value.length <= 120,
+      )
+    : [];
+  return {
+    selectedUnitId: record.selectedUnitId,
+    plan: {
+      id: record.selectedPlanId,
+      slug: ["operacao", "crescimento", "rede"].includes(String(snapshot.slug))
+        ? String(snapshot.slug)
+        : "unavailable",
+      catalogVersion: record.selectedCatalogVersion,
+      monthlyPriceCents:
+        typeof snapshot.monthlyPriceCents === "number" ? snapshot.monthlyPriceCents : null,
+      annualPriceCents:
+        typeof snapshot.annualPriceCents === "number" ? snapshot.annualPriceCents : null,
+      includedUnits: typeof snapshot.includedUnits === "number" ? snapshot.includedUnits : null,
+      entitlements,
+    },
+    revision: record.selectionRevision,
+    selectedAt: iso(record.selectedAt),
+    updatedAt: iso(record.updatedAt),
+  };
+}
+
+function sanitizedChecklistRequest(input: UpdateOnboardingInput) {
+  const checklist = Object.fromEntries(
+    Object.entries(input.checklist ?? {}).map(([item, value]) => [item, value === true]),
+  );
+  const items = Object.fromEntries(
+    Object.entries(input.items ?? {}).flatMap(([item, value]) => {
+      if (!value) return [];
+      const evidence = value.evidence ?? {};
+      const safeEvidence =
+        item === "fiscalChoice"
+          ? { choice: "choice" in evidence ? evidence.choice : undefined }
+          : item === "production"
+            ? { mode: "mode" in evidence ? evidence.mode : undefined }
+            : item === "training" || item === "rehearsal"
+              ? { completed: "completed" in evidence ? evidence.completed === true : undefined }
+              : item === "qr"
+                ? { reason: "reason" in evidence ? evidence.reason : undefined }
+                : "note" in evidence
+                  ? { note: evidence.note }
+                  : {};
+      return [
+        [
+          item,
+          {
+            status: value.status,
+            evidenceReference: value.evidenceReference ?? null,
+            evidence: safeEvidence,
+            waiverReason: "waiverReason" in value ? value.waiverReason : null,
+          },
+        ],
+      ];
+    }),
+  );
+  return { checklist, items };
+}
+
 function isPostgresCode(error: unknown, ...codes: string[]) {
   const candidate = error as { code?: string; cause?: { code?: string } };
   return codes.includes(candidate.cause?.code ?? candidate.code ?? "");
@@ -207,9 +349,10 @@ export class OnboardingService {
     verified: boolean,
     evidenceReference: string,
     evidence: Record<string, unknown> = {},
+    reason = "system_readiness_refresh",
   ) {
     const [existing] = await tx
-      .select({ status: onboardingChecklistItems.status, source: onboardingChecklistItems.source })
+      .select()
       .from(onboardingChecklistItems)
       .where(
         and(
@@ -220,16 +363,36 @@ export class OnboardingService {
       .limit(1);
     if (existing?.status === "not_applicable" && existing.source === "authorized_waiver") return;
     const now = new Date();
+    const next = {
+      status: verified ? ("verified" as const) : ("blocked" as const),
+      source: "system" as const,
+      evidenceReference,
+      evidence: sanitizedSystemEvidence(item, evidence),
+      actorIdentityId: null,
+      waiverReason: null,
+      verifiedAt: verified ? now : null,
+    };
+    const before = checklistAuditState(
+      item,
+      existing ?? {
+        status: "pending",
+        source: "system",
+        evidenceReference: null,
+        evidence: {},
+        actorIdentityId: null,
+        verifiedAt: null,
+        waiverReason: null,
+      },
+    );
+    const comparableAfter = checklistAuditState(item, {
+      ...next,
+      verifiedAt: verified ? (existing?.verifiedAt ?? now) : null,
+    });
+    if (stableJson(before) === stableJson(comparableAfter)) return;
     await tx
       .update(onboardingChecklistItems)
       .set({
-        status: verified ? "verified" : "blocked",
-        source: "system",
-        evidenceReference,
-        evidence,
-        actorIdentityId: null,
-        waiverReason: null,
-        verifiedAt: verified ? now : null,
+        ...next,
         updatedAt: now,
       })
       .where(
@@ -238,6 +401,25 @@ export class OnboardingService {
           eq(onboardingChecklistItems.item, item),
         ),
       );
+    const after = checklistAuditState(item, next);
+    await tx.insert(auditEvents).values({
+      organizationId,
+      actorIdentityId: null,
+      action: "onboarding.system_evidence_changed",
+      entityType: "onboarding_checklist_item",
+      entityId: `${organizationId}:${item}`,
+      occurredAt: now,
+      metadata: {
+        item,
+        before,
+        after,
+        reason,
+        source: "system",
+        evidence: after.evidence,
+        actorIdentityId: null,
+        occurredAt: now.toISOString(),
+      },
+    });
   }
 
   private async revalidateSystemChecklist(
@@ -245,6 +427,7 @@ export class OnboardingService {
     organizationId: string,
     selectedUnitId: string | null,
     pinnedPlan?: PlanSnapshot,
+    reason = "system_readiness_refresh",
   ) {
     await this.ensureChecklistRows(tx, organizationId);
     if (selectedUnitId) {
@@ -347,6 +530,8 @@ export class OnboardingService {
       "business",
       business.length === 1,
       `organization:${organizationId}`,
+      {},
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -358,6 +543,7 @@ export class OnboardingService {
         selectedUnitId,
         selectedUnitActive: selectedUnits.length === 1,
       },
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -365,6 +551,8 @@ export class OnboardingService {
       "catalog",
       catalog.length > 0,
       selectedUnitId ? `unit:${selectedUnitId}:catalog` : `organization:${organizationId}:catalog`,
+      {},
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -372,6 +560,8 @@ export class OnboardingService {
       "tables",
       tables.length > 0,
       selectedUnitId ? `unit:${selectedUnitId}:tables` : `organization:${organizationId}:tables`,
+      {},
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -382,6 +572,7 @@ export class OnboardingService {
       {
         activeMembersObserved: team.length,
       },
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -395,6 +586,7 @@ export class OnboardingService {
         capabilitiesConfigured: false,
         serverTestPassed: false,
       },
+      reason,
     );
     await this.setSystemEvidence(
       tx,
@@ -402,6 +594,8 @@ export class OnboardingService {
       "cashier",
       cashier.length > 0,
       selectedUnitId ? `unit:${selectedUnitId}:cashier` : `organization:${organizationId}:cashier`,
+      {},
+      reason,
     );
     const [production] = await tx
       .select({
@@ -434,6 +628,7 @@ export class OnboardingService {
           serverTestPassed: false,
           requestedMode: production.evidence.mode ?? null,
         },
+        reason,
       );
     }
     if (pinnedPlan) {
@@ -447,6 +642,7 @@ export class OnboardingService {
           catalogVersion: pinnedPlan.catalogVersion,
           slug: pinnedPlan.slug,
         },
+        reason,
       );
     } else {
       await this.setSystemEvidence(
@@ -455,6 +651,8 @@ export class OnboardingService {
         "plan",
         false,
         `organization:${organizationId}:plan-selection`,
+        {},
+        reason,
       );
     }
   }
@@ -523,47 +721,87 @@ export class OnboardingService {
     };
   }
 
-  async get(identityId: string, organizationId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
-    const [record] = await this.database.db
-      .select()
-      .from(onboardingRecords)
-      .where(eq(onboardingRecords.organizationId, organizationId))
-      .limit(1);
-    if (!record) {
-      throw new NotFoundException({
-        code: "ONBOARDING_NOT_FOUND",
-        message: "Onboarding não encontrado.",
+  private async requireMutationRoleInTransaction(
+    tx: TenantTransaction,
+    identityId: string,
+    organizationId: string,
+    allowed: readonly ("owner" | "manager")[],
+  ) {
+    const bindings = await tx
+      .select({ role: roleBindings.role })
+      .from(memberships)
+      .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+      .where(
+        and(
+          eq(memberships.identityId, identityId),
+          eq(memberships.organizationId, organizationId),
+          eq(memberships.status, "active"),
+          inArray(roleBindings.role, [...allowed]),
+        ),
+      );
+    if (bindings.length === 0) {
+      throw new ForbiddenException({
+        code: "ONBOARDING_ROLE_CHANGED",
+        message: "A autorização para alterar o onboarding não está mais ativa.",
       });
     }
-    await this.ensureChecklistRows(this.database.db, organizationId);
-    const selectedPlan = await this.exactSelectedPlan(this.database.db, record);
-    await this.revalidateSystemChecklist(
-      this.database.db,
-      organizationId,
-      record.selectedUnitId,
-      selectedPlan ?? undefined,
-    );
-    const checklist = await this.checklist(this.database.db, organizationId);
-    const [provisioning] = await this.database.db
-      .select()
-      .from(provisioningRuns)
-      .where(eq(provisioningRuns.organizationId, organizationId))
-      .orderBy(desc(provisioningRuns.createdAt))
-      .limit(1);
-    return this.onboardingProjection(record, checklist, selectedPlan, provisioning);
+    return bindings;
+  }
+
+  async get(identityId: string, organizationId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
+    return this.durable(identityId, organizationId, async (tx) => {
+      await this.organizationLock(tx, organizationId);
+      await this.requireMutationRoleInTransaction(tx, identityId, organizationId, [
+        "owner",
+        "manager",
+      ]);
+      const [record] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!record) {
+        throw new NotFoundException({
+          code: "ONBOARDING_NOT_FOUND",
+          message: "Onboarding não encontrado.",
+        });
+      }
+      const selectedPlan = await this.exactSelectedPlan(tx, record);
+      await this.revalidateSystemChecklist(
+        tx,
+        organizationId,
+        record.selectedUnitId,
+        selectedPlan ?? undefined,
+        "onboarding_get_refresh",
+      );
+      const checklist = await this.checklist(tx, organizationId);
+      const [provisioning] = await tx
+        .select()
+        .from(provisioningRuns)
+        .where(eq(provisioningRuns.organizationId, organizationId))
+        .orderBy(desc(provisioningRuns.createdAt))
+        .limit(1);
+      return this.onboardingProjection(record, checklist, selectedPlan, provisioning);
+    });
   }
 
   async select(identityId: string, organizationId: string, input: OnboardingSelectionInput) {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
+      await this.requireMutationRoleInTransaction(tx, identityId, organizationId, ["owner"]);
       const [record] = await tx
         .select()
         .from(onboardingRecords)
         .where(eq(onboardingRecords.organizationId, organizationId))
         .limit(1);
-      if (!record) throw new NotFoundException();
+      if (!record) {
+        throw new NotFoundException({
+          code: "ONBOARDING_NOT_FOUND",
+          message: "Onboarding não encontrado.",
+        });
+      }
       if (record.activatedAt) {
         throw new ConflictException({
           code: "ONBOARDING_ALREADY_ACTIVATED",
@@ -624,7 +862,7 @@ export class OnboardingService {
         });
       }
       const now = new Date();
-      const before = this.selectionProjection(record, beforePlan);
+      const before = selectionAuditSnapshot(record);
       const [updated] = await tx
         .update(onboardingRecords)
         .set({
@@ -641,7 +879,13 @@ export class OnboardingService {
         .where(eq(onboardingRecords.organizationId, organizationId))
         .returning();
       if (!updated) throw new Error("Onboarding selection was not stored");
-      await this.revalidateSystemChecklist(tx, organizationId, input.selectedUnitId, plan);
+      await this.revalidateSystemChecklist(
+        tx,
+        organizationId,
+        input.selectedUnitId,
+        plan,
+        "onboarding_selection_refresh",
+      );
       const after = this.selectionProjection(updated, plan);
       await tx.insert(auditEvents).values({
         organizationId,
@@ -669,124 +913,66 @@ export class OnboardingService {
   }
 
   async update(identityId: string, organizationId: string, input: UpdateOnboardingInput) {
-    const roles = await this.scope.requireOrganizationRole(identityId, organizationId, [
-      "owner",
-      "manager",
-    ]);
-    const [record] = await this.database.db
-      .select()
-      .from(onboardingRecords)
-      .where(eq(onboardingRecords.organizationId, organizationId))
-      .limit(1);
-    if (!record) throw new NotFoundException();
-    if (record.activatedAt) {
-      throw new ConflictException({
-        code: "ONBOARDING_ALREADY_ACTIVATED",
-        message: "O onboarding já foi ativado.",
-      });
-    }
-    await this.ensureChecklistRows(this.database.db, organizationId);
-    const beforeChecklist = await this.checklist(this.database.db, organizationId);
-    const now = new Date();
-    const legacy = input.checklist ?? {};
-    for (const [item, value] of Object.entries(legacy)) {
-      await this.database.db
-        .update(onboardingChecklistItems)
-        .set({
-          status: value ? "in_progress" : "pending",
-          source: "legacy_import",
-          evidenceReference: null,
-          evidence: { legacyValue: value },
-          actorIdentityId: identityId,
-          verifiedAt: null,
-          waiverReason: null,
-          updatedAt: now,
-        })
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
+    return this.durable(identityId, organizationId, async (tx) => {
+      await this.organizationLock(tx, organizationId);
+      const roles = await this.requireMutationRoleInTransaction(tx, identityId, organizationId, [
+        "owner",
+        "manager",
+      ]);
+      const [record] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!record) {
+        throw new NotFoundException({
+          code: "ONBOARDING_NOT_FOUND",
+          message: "Onboarding não encontrado.",
+        });
+      }
+      if (record.activatedAt) {
+        throw new ConflictException({
+          code: "ONBOARDING_ALREADY_ACTIVATED",
+          message: "O onboarding já foi ativado.",
+        });
+      }
+      const [activeRun] = await tx
+        .select({ id: provisioningRuns.id })
+        .from(provisioningRuns)
         .where(
           and(
-            eq(onboardingChecklistItems.organizationId, organizationId),
-            eq(onboardingChecklistItems.item, item),
+            eq(provisioningRuns.organizationId, organizationId),
+            inArray(provisioningRuns.state, [
+              "requested",
+              "validating",
+              "provisioning",
+              "activating",
+              "publishing",
+              "completed",
+            ]),
           ),
-        );
-    }
-
-    const isOwner = roles.some((role) => role.role === "owner");
-    for (const [rawItem, requested] of Object.entries(input.items ?? {})) {
-      const item = rawItem as ChecklistItem;
-      if (!requested) continue;
-      if (requested.status === "not_applicable") {
-        if (!isOwner || !WAIVABLE_ITEMS.has(item) || !requested.waiverReason) {
-          throw new BadRequestException({
-            code: "INVALID_ONBOARDING_WAIVER",
-            message: "A dispensa exige item permitido, justificativa e papel de proprietário.",
-          });
-        }
-        await this.database.db
-          .update(onboardingChecklistItems)
-          .set({
-            status: "not_applicable",
-            source: "authorized_waiver",
-            evidenceReference: requested.evidenceReference ?? `waiver:${item}:${now.toISOString()}`,
-            evidence: requested.evidence ?? {},
-            waiverReason: requested.waiverReason,
-            actorIdentityId: identityId,
-            verifiedAt: now,
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(onboardingChecklistItems.organizationId, organizationId),
-              eq(onboardingChecklistItems.item, item),
-            ),
-          );
-        continue;
+        )
+        .limit(1);
+      if (activeRun) {
+        throw new ConflictException({
+          code: "PROVISIONING_IN_PROGRESS",
+          message: "O checklist não pode mudar durante a ativação.",
+          details: { provisioningRunId: activeRun.id },
+        });
       }
-      if (ATTESTED_ITEMS.has(item) && requested.status === "verified") {
-        const evidence = requested.evidence ?? {};
-        if (item === "production" && ["kds", "print", "both"].includes(String(evidence.mode))) {
-          throw new BadRequestException({
-            code: "PRODUCTION_READINESS_NOT_VERIFIED",
-            message:
-              "KDS e impressão só podem ser ativados após configuração e teste comprovados pelo servidor.",
-          });
-        }
-        const valid =
-          (item === "fiscalChoice" &&
-            ["disabled", "focus", "external"].includes(String(evidence.choice))) ||
-          (item === "production" && evidence.mode === "off") ||
-          ((item === "training" || item === "rehearsal") && evidence.completed === true);
-        if (!valid || !requested.evidenceReference) {
-          throw new BadRequestException({
-            code: "INVALID_ONBOARDING_EVIDENCE",
-            message: `Evidência estruturada inválida para ${item}.`,
-          });
-        }
-        await this.database.db
+      await this.ensureChecklistRows(tx, organizationId);
+      const beforeChecklist = await this.checklist(tx, organizationId);
+      const now = new Date();
+      const legacy = input.checklist ?? {};
+      for (const [item, value] of Object.entries(legacy)) {
+        await tx
           .update(onboardingChecklistItems)
           .set({
-            status: "verified",
-            source: "actor_attestation",
-            evidenceReference: requested.evidenceReference,
-            evidence,
-            actorIdentityId: identityId,
-            verifiedAt: now,
-            waiverReason: null,
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(onboardingChecklistItems.organizationId, organizationId),
-              eq(onboardingChecklistItems.item, item),
-            ),
-          );
-      } else if (!SYSTEM_ITEMS.has(item)) {
-        await this.database.db
-          .update(onboardingChecklistItems)
-          .set({
-            status: requested.status === "blocked" ? "blocked" : "in_progress",
-            source: "actor_attestation",
-            evidenceReference: requested.evidenceReference ?? null,
-            evidence: requested.evidence ?? {},
+            status: value ? "in_progress" : "pending",
+            source: "legacy_import",
+            evidenceReference: null,
+            evidence: { legacyValue: value },
             actorIdentityId: identityId,
             verifiedAt: null,
             waiverReason: null,
@@ -799,45 +985,143 @@ export class OnboardingService {
             ),
           );
       }
-    }
 
-    await this.database.db
-      .update(onboardingRecords)
-      .set({ checklist: { ...record.checklist, ...legacy }, updatedAt: now })
-      .where(eq(onboardingRecords.organizationId, organizationId));
-    const refreshedPlan = await this.exactSelectedPlan(this.database.db, record);
-    await this.revalidateSystemChecklist(
-      this.database.db,
-      organizationId,
-      record.selectedUnitId,
-      refreshedPlan ?? undefined,
-    );
-    const checklist = await this.checklist(this.database.db, organizationId);
-    await this.database.db.insert(auditEvents).values({
-      organizationId,
-      actorIdentityId: identityId,
-      action: "onboarding.updated",
-      entityType: "onboarding",
-      entityId: organizationId,
-      occurredAt: now,
-      metadata: {
-        before: beforeChecklist,
-        after: checklist,
-        reason: "onboarding_checklist_update",
-        source: "owner_or_manager_input",
-        evidence: {
-          requested: input,
-        },
+      const isOwner = roles.some((role) => role.role === "owner");
+      for (const [rawItem, requested] of Object.entries(input.items ?? {})) {
+        const item = rawItem as ChecklistItem;
+        if (!requested) continue;
+        if (requested.status === "not_applicable") {
+          if (!isOwner || !WAIVABLE_ITEMS.has(item) || !requested.waiverReason) {
+            throw new BadRequestException({
+              code: "INVALID_ONBOARDING_WAIVER",
+              message: "A dispensa exige item permitido, justificativa e papel de proprietário.",
+            });
+          }
+          await tx
+            .update(onboardingChecklistItems)
+            .set({
+              status: "not_applicable",
+              source: "authorized_waiver",
+              evidenceReference:
+                requested.evidenceReference ?? `waiver:${item}:${now.toISOString()}`,
+              evidence: requested.evidence ?? {},
+              waiverReason: requested.waiverReason,
+              actorIdentityId: identityId,
+              verifiedAt: now,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(onboardingChecklistItems.organizationId, organizationId),
+                eq(onboardingChecklistItems.item, item),
+              ),
+            );
+          continue;
+        }
+        if (ATTESTED_ITEMS.has(item) && requested.status === "verified") {
+          const evidence = (requested.evidence ?? {}) as Record<string, unknown>;
+          if (item === "production" && ["kds", "print", "both"].includes(String(evidence.mode))) {
+            throw new BadRequestException({
+              code: "PRODUCTION_READINESS_NOT_VERIFIED",
+              message:
+                "KDS e impressão só podem ser ativados após configuração e teste comprovados pelo servidor.",
+            });
+          }
+          const valid =
+            (item === "fiscalChoice" &&
+              ["disabled", "focus", "external"].includes(String(evidence.choice))) ||
+            (item === "production" && evidence.mode === "off") ||
+            ((item === "training" || item === "rehearsal") && evidence.completed === true);
+          if (!valid || !requested.evidenceReference) {
+            throw new BadRequestException({
+              code: "INVALID_ONBOARDING_EVIDENCE",
+              message: `Evidência estruturada inválida para ${item}.`,
+            });
+          }
+          await tx
+            .update(onboardingChecklistItems)
+            .set({
+              status: "verified",
+              source: "actor_attestation",
+              evidence,
+              evidenceReference: requested.evidenceReference,
+              actorIdentityId: identityId,
+              verifiedAt: now,
+              waiverReason: null,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(onboardingChecklistItems.organizationId, organizationId),
+                eq(onboardingChecklistItems.item, item),
+              ),
+            );
+        } else if (!SYSTEM_ITEMS.has(item)) {
+          await tx
+            .update(onboardingChecklistItems)
+            .set({
+              status: requested.status === "blocked" ? "blocked" : "in_progress",
+              source: "actor_attestation",
+              evidenceReference: requested.evidenceReference ?? null,
+              evidence: requested.evidence ?? {},
+              actorIdentityId: identityId,
+              verifiedAt: null,
+              waiverReason: null,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(onboardingChecklistItems.organizationId, organizationId),
+                eq(onboardingChecklistItems.item, item),
+              ),
+            );
+        }
+      }
+
+      const [updatedRecord] = await tx
+        .update(onboardingRecords)
+        .set({ checklist: { ...record.checklist, ...legacy }, updatedAt: now })
+        .where(
+          and(
+            eq(onboardingRecords.organizationId, organizationId),
+            isNull(onboardingRecords.activatedAt),
+          ),
+        )
+        .returning();
+      if (!updatedRecord) {
+        throw new ConflictException({
+          code: "ONBOARDING_ALREADY_ACTIVATED",
+          message: "O onboarding já foi ativado.",
+        });
+      }
+      const refreshedPlan = await this.exactSelectedPlan(tx, updatedRecord);
+      await this.revalidateSystemChecklist(
+        tx,
+        organizationId,
+        updatedRecord.selectedUnitId,
+        refreshedPlan ?? undefined,
+        "onboarding_patch_refresh",
+      );
+      const checklist = await this.checklist(tx, organizationId);
+      await tx.insert(auditEvents).values({
+        organizationId,
         actorIdentityId: identityId,
-        occurredAt: now.toISOString(),
-      },
+        action: "onboarding.updated",
+        entityType: "onboarding",
+        entityId: organizationId,
+        occurredAt: now,
+        metadata: {
+          before: beforeChecklist,
+          after: checklist,
+          reason: "onboarding_checklist_update",
+          source: "owner_or_manager_input",
+          evidence: { requested: sanitizedChecklistRequest(input) },
+          actorIdentityId: identityId,
+          occurredAt: now.toISOString(),
+        },
+      });
+      return this.onboardingProjection(updatedRecord, checklist, refreshedPlan);
     });
-    const updatedRecord = {
-      ...record,
-      checklist: { ...record.checklist, ...legacy },
-      updatedAt: now,
-    };
-    return this.onboardingProjection(updatedRecord, checklist, refreshedPlan);
   }
 
   private async publishedPlan(tx: TenantTransaction, slug: string): Promise<PlanSnapshot | null> {
@@ -1223,7 +1507,13 @@ export class OnboardingService {
           "terminal",
         );
       }
-      await this.revalidateSystemChecklist(tx, organizationId, run.selectedUnitId, pinned);
+      await this.revalidateSystemChecklist(
+        tx,
+        organizationId,
+        run.selectedUnitId,
+        pinned,
+        "provisioning_validation_refresh",
+      );
       const checklist = await this.checklist(tx, organizationId);
       const readiness = activationReadiness(checklist);
       if (!readiness.ready) {
@@ -1276,7 +1566,12 @@ export class OnboardingService {
           ),
         )
         .limit(1);
-      if (!run?.pinnedPlanId || !run.planSnapshot) {
+      if (
+        !run?.pinnedPlanId ||
+        !run.planSnapshot ||
+        !run.planFingerprint ||
+        run.pinnedCatalogVersion === null
+      ) {
         throw new ProvisioningError(
           "PROVISIONING_CHECKPOINT_INVALID",
           "A ativação será retomada.",
@@ -1354,7 +1649,12 @@ export class OnboardingService {
           ),
         )
         .limit(1);
-      if (!run?.pinnedPlanId || !run.planSnapshot) {
+      if (
+        !run?.pinnedPlanId ||
+        !run.planSnapshot ||
+        !run.planFingerprint ||
+        run.pinnedCatalogVersion === null
+      ) {
         throw new ProvisioningError(
           "PROVISIONING_CHECKPOINT_INVALID",
           "A ativação será retomada.",
@@ -1377,7 +1677,37 @@ export class OnboardingService {
           "terminal",
         );
       }
-      await this.revalidateSystemChecklist(tx, organizationId, run.selectedUnitId, pinned);
+      const [onboarding] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!onboarding || onboarding.activatedAt) {
+        throw new ProvisioningError(
+          "ONBOARDING_ALREADY_ACTIVATED",
+          "O onboarding já foi ativado ou não está mais disponível.",
+          "terminal",
+        );
+      }
+      if (
+        onboarding.selectedUnitId !== run.selectedUnitId ||
+        onboarding.selectedPlanId !== run.pinnedPlanId ||
+        onboarding.selectedCatalogVersion !== run.pinnedCatalogVersion ||
+        onboarding.selectedPlanFingerprint !== run.planFingerprint
+      ) {
+        throw new ProvisioningError(
+          "ONBOARDING_SELECTION_DRIFT",
+          "A seleção mudou depois do início da ativação.",
+          "terminal",
+        );
+      }
+      await this.revalidateSystemChecklist(
+        tx,
+        organizationId,
+        run.selectedUnitId,
+        pinned,
+        "provisioning_final_revalidation",
+      );
       const checklist = await this.checklist(tx, organizationId);
       const readiness = activationReadiness(checklist);
       if (!readiness.ready) {
@@ -1401,6 +1731,8 @@ export class OnboardingService {
         );
       }
       const now = new Date();
+      const pinnedCatalogVersion = run.pinnedCatalogVersion;
+      const planFingerprint = run.planFingerprint;
       const window = trialWindow(now);
       const trialId = deterministicUuid(`${run.id}:trial`);
       const subscriptionId = deterministicUuid(`${run.id}:subscription`);
@@ -1452,6 +1784,10 @@ export class OnboardingService {
           and(
             eq(onboardingRecords.organizationId, organizationId),
             isNull(onboardingRecords.activatedAt),
+            eq(onboardingRecords.selectedUnitId, run.selectedUnitId),
+            eq(onboardingRecords.selectedPlanId, run.pinnedPlanId),
+            eq(onboardingRecords.selectedCatalogVersion, pinnedCatalogVersion),
+            eq(onboardingRecords.selectedPlanFingerprint, planFingerprint),
           ),
         )
         .returning({ organizationId: onboardingRecords.organizationId });

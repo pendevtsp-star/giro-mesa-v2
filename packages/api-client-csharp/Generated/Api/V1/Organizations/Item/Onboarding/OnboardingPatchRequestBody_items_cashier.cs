@@ -30,14 +30,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
 #endif
         /// <summary>The status property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_status? Status { get; set; }
-        /// <summary>The waiverReason property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? WaiverReason { get; set; }
-#nullable restore
-#else
-        public string WaiverReason { get; set; }
-#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -59,7 +51,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
                 { "evidence", n => { Evidence = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_evidence>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_evidence.CreateFromDiscriminatorValue); } },
                 { "evidenceReference", n => { EvidenceReference = n.GetStringValue(); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_status>(); } },
-                { "waiverReason", n => { WaiverReason = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -72,7 +63,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_evidence>("evidence", Evidence);
             writer.WriteStringValue("evidenceReference", EvidenceReference);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_cashier_status>("status", Status);
-            writer.WriteStringValue("waiverReason", WaiverReason);
         }
     }
 }

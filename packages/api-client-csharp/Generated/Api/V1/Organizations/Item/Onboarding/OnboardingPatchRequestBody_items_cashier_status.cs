@@ -16,17 +16,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
         #pragma warning disable CS1591
         In_progress,
         #pragma warning restore CS1591
-        [EnumMember(Value = "verified")]
-        #pragma warning disable CS1591
-        Verified,
-        #pragma warning restore CS1591
         [EnumMember(Value = "blocked")]
         #pragma warning disable CS1591
         Blocked,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "not_applicable")]
-        #pragma warning disable CS1591
-        Not_applicable,
         #pragma warning restore CS1591
     }
 }

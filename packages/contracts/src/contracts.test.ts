@@ -146,7 +146,7 @@ describe("public contracts", () => {
           training: {
             status: "verified",
             evidenceReference: "training-session-2026-08-11",
-            evidence: { attendees: 4 },
+            evidence: { completed: true },
           },
         },
       }).success,
@@ -155,6 +155,48 @@ describe("public contracts", () => {
     assert.equal(
       updateOnboardingSchema.safeParse({
         items: { training: { status: "verified", browserVerified: true } },
+      }).success,
+      false,
+    );
+    for (const evidence of [
+      { completed: true, secret: "must-not-be-stored" },
+      { completed: true, notes: "x".repeat(2_000) },
+      { completed: true, nested: { arbitrary: true } },
+    ]) {
+      assert.equal(
+        updateOnboardingSchema.safeParse({
+          items: {
+            training: {
+              status: "verified",
+              evidenceReference: "training-session-2026-08-11",
+              evidence,
+            },
+          },
+        }).success,
+        false,
+      );
+    }
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: {
+          fiscalChoice: {
+            status: "verified",
+            evidenceReference: "fiscal-choice-2026-08-11",
+            evidence: { choice: "focus", apiKey: "secret" },
+          },
+        },
+      }).success,
+      false,
+    );
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: {
+          production: {
+            status: "verified",
+            evidenceReference: "production-route-2026-08-11",
+            evidence: { mode: "off", providerToken: "secret" },
+          },
+        },
       }).success,
       false,
     );

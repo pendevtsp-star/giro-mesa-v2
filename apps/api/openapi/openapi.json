@@ -3043,6 +3043,36 @@
               }
             }
           },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "",
             "content": {
@@ -3082,6 +3112,36 @@
             }
           },
           "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "",
             "content": {
               "application/json": {
@@ -3155,9 +3215,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3167,12 +3225,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3188,9 +3248,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3200,12 +3258,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3221,9 +3281,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3233,12 +3291,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3247,37 +3307,122 @@
                         "additionalProperties": false
                       },
                       "fiscalChoice": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "choice": {
+                                    "type": "string",
+                                    "enum": [
+                                      "disabled",
+                                      "focus",
+                                      "external"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "choice"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "not_applicable"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "external_fiscal",
+                                      "not_required"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "waiverReason": {
+                                "type": "string",
+                                "minLength": 10,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "waiverReason"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "catalog": {
                         "type": "object",
@@ -3287,9 +3432,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3299,12 +3442,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3320,9 +3465,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3332,12 +3475,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3353,9 +3498,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3365,12 +3508,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3379,70 +3524,158 @@
                         "additionalProperties": false
                       },
                       "qr": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "not_applicable"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pilot_without_qr",
+                                      "external_qr",
+                                      "not_required"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "waiverReason": {
+                                "type": "string",
+                                "minLength": 10,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "waiverReason"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "production": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "off"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "mode"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "cashier": {
                         "type": "object",
@@ -3452,9 +3685,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3464,12 +3695,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3478,70 +3711,152 @@
                         "additionalProperties": false
                       },
                       "training": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "completed": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "rehearsal": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "completed": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "additionalProperties": false
@@ -3574,6 +3889,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
                 }
               }
             }
@@ -3626,6 +3971,36 @@
               }
             }
           },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "",
             "content": {
@@ -3690,9 +4065,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3702,12 +4075,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3723,9 +4098,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3735,12 +4108,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3756,9 +4131,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3768,12 +4141,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3782,37 +4157,122 @@
                         "additionalProperties": false
                       },
                       "fiscalChoice": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "choice": {
+                                    "type": "string",
+                                    "enum": [
+                                      "disabled",
+                                      "focus",
+                                      "external"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "choice"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "not_applicable"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "external_fiscal",
+                                      "not_required"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "waiverReason": {
+                                "type": "string",
+                                "minLength": 10,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "waiverReason"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "catalog": {
                         "type": "object",
@@ -3822,9 +4282,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3834,12 +4292,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3855,9 +4315,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3867,12 +4325,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3888,9 +4348,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3900,12 +4358,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -3914,70 +4374,158 @@
                         "additionalProperties": false
                       },
                       "qr": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "not_applicable"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pilot_without_qr",
+                                      "external_qr",
+                                      "not_required"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "waiverReason": {
+                                "type": "string",
+                                "minLength": 10,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "waiverReason"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "production": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "off"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "mode"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "cashier": {
                         "type": "object",
@@ -3987,9 +4535,7 @@
                             "enum": [
                               "pending",
                               "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
+                              "blocked"
                             ]
                           },
                           "evidenceReference": {
@@ -3999,12 +4545,14 @@
                           },
                           "evidence": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                            "properties": {
+                              "note": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -4013,70 +4561,152 @@
                         "additionalProperties": false
                       },
                       "training": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "completed": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "rehearsal": {
-                        "type": "object",
-                        "properties": {
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "verified",
-                              "blocked",
-                              "not_applicable"
-                            ]
-                          },
-                          "evidenceReference": {
-                            "type": "string",
-                            "minLength": 3,
-                            "maxLength": 240
-                          },
-                          "evidence": {
+                        "anyOf": [
+                          {
                             "type": "object",
-                            "additionalProperties": {}
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
                           },
-                          "waiverReason": {
-                            "type": "string",
-                            "minLength": 10,
-                            "maxLength": 500
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "verified"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "completed": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidenceReference",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "additionalProperties": false
@@ -4114,6 +4744,36 @@
             }
           },
           "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "",
             "content": {
               "application/json": {
@@ -4198,6 +4858,36 @@
             }
           },
           "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "",
             "content": {
               "application/json": {
@@ -4300,6 +4990,36 @@
               }
             }
           },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "",
             "content": {
@@ -4390,6 +5110,36 @@
               }
             }
           },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "",
             "content": {
@@ -4469,6 +5219,36 @@
               }
             }
           },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "",
             "content": {
@@ -4513,6 +5293,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProvisioningStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
                 }
               }
             }
@@ -20157,6 +20967,36 @@
           "missingItems"
         ]
       },
+      "OnboardingApiErrorDetails": {
+        "type": "object",
+        "properties": {
+          "provisioningRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "missingItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "formErrors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "OnboardingApiErrorResponse": {
         "type": "object",
         "properties": {
@@ -20170,8 +21010,7 @@
             "type": "string"
           },
           "details": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/OnboardingApiErrorDetails"
           }
         },
         "required": [

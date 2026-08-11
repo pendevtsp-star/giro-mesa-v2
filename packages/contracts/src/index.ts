@@ -105,29 +105,76 @@ export const onboardingChecklistStatusSchema = z.enum([
   "not_applicable",
 ]);
 
-export const onboardingChecklistEvidenceInputSchema = z
+const checklistEvidenceReferenceSchema = z.string().trim().min(3).max(240);
+const checklistProgressEvidenceSchema = z
   .object({
-    status: onboardingChecklistStatusSchema,
-    evidenceReference: z.string().trim().min(3).max(240).optional(),
-    evidence: z.record(z.string(), z.unknown()).optional(),
-    waiverReason: z.string().trim().min(10).max(500).optional(),
+    note: z.string().trim().min(1).max(240).optional(),
   })
   .strict();
+const checklistProgressSchema = z
+  .object({
+    status: z.enum(["pending", "in_progress", "blocked"]),
+    evidenceReference: checklistEvidenceReferenceSchema.optional(),
+    evidence: checklistProgressEvidenceSchema.optional(),
+  })
+  .strict();
+const verifiedChecklistItem = <T extends z.ZodType>(evidence: T) =>
+  z
+    .object({
+      status: z.literal("verified"),
+      evidenceReference: checklistEvidenceReferenceSchema,
+      evidence,
+    })
+    .strict();
+const waivedChecklistItem = <T extends z.ZodType>(evidence: T) =>
+  z
+    .object({
+      status: z.literal("not_applicable"),
+      evidenceReference: checklistEvidenceReferenceSchema.optional(),
+      evidence: evidence.optional(),
+      waiverReason: z.string().trim().min(10).max(500),
+    })
+    .strict();
+
+const fiscalEvidenceSchema = z
+  .object({ choice: z.enum(["disabled", "focus", "external"]) })
+  .strict();
+const productionEvidenceSchema = z.object({ mode: z.literal("off") }).strict();
+const completedEvidenceSchema = z.object({ completed: z.literal(true) }).strict();
+const qrWaiverEvidenceSchema = z
+  .object({ reason: z.enum(["pilot_without_qr", "external_qr", "not_required"]) })
+  .strict();
+const fiscalWaiverEvidenceSchema = z
+  .object({ reason: z.enum(["external_fiscal", "not_required"]) })
+  .strict();
+
+export const onboardingChecklistEvidenceInputSchema = z.union([
+  checklistProgressSchema,
+  verifiedChecklistItem(fiscalEvidenceSchema),
+  verifiedChecklistItem(productionEvidenceSchema),
+  verifiedChecklistItem(completedEvidenceSchema),
+  waivedChecklistItem(qrWaiverEvidenceSchema),
+  waivedChecklistItem(fiscalWaiverEvidenceSchema),
+]);
 
 const onboardingChecklistItemsInputSchema = z
   .object({
-    business: onboardingChecklistEvidenceInputSchema,
-    unit: onboardingChecklistEvidenceInputSchema,
-    plan: onboardingChecklistEvidenceInputSchema,
-    fiscalChoice: onboardingChecklistEvidenceInputSchema,
-    catalog: onboardingChecklistEvidenceInputSchema,
-    tables: onboardingChecklistEvidenceInputSchema,
-    team: onboardingChecklistEvidenceInputSchema,
-    qr: onboardingChecklistEvidenceInputSchema,
-    production: onboardingChecklistEvidenceInputSchema,
-    cashier: onboardingChecklistEvidenceInputSchema,
-    training: onboardingChecklistEvidenceInputSchema,
-    rehearsal: onboardingChecklistEvidenceInputSchema,
+    business: checklistProgressSchema,
+    unit: checklistProgressSchema,
+    plan: checklistProgressSchema,
+    fiscalChoice: z.union([
+      checklistProgressSchema,
+      verifiedChecklistItem(fiscalEvidenceSchema),
+      waivedChecklistItem(fiscalWaiverEvidenceSchema),
+    ]),
+    catalog: checklistProgressSchema,
+    tables: checklistProgressSchema,
+    team: checklistProgressSchema,
+    qr: z.union([checklistProgressSchema, waivedChecklistItem(qrWaiverEvidenceSchema)]),
+    production: z.union([checklistProgressSchema, verifiedChecklistItem(productionEvidenceSchema)]),
+    cashier: checklistProgressSchema,
+    training: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),
+    rehearsal: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),
   })
   .partial()
   .strict();

@@ -4596,13 +4596,20 @@ export interface components {
       selection?: components["schemas"]["OnboardingSelectionResponse"] | null;
       provisioning?: components["schemas"]["ProvisioningSummaryResponse"] | null;
     };
+    OnboardingApiErrorDetails: {
+      /** Format: uuid */
+      provisioningRunId?: string;
+      missingItems?: string[];
+      fieldErrors?: {
+        [key: string]: string[];
+      };
+      formErrors?: string[];
+    };
     OnboardingApiErrorResponse: {
       statusCode: number;
       code: string;
       message: string;
-      details?: {
-        [key: string]: unknown;
-      };
+      details?: components["schemas"]["OnboardingApiErrorDetails"];
     };
     TrialActivationResponse: {
       /** Format: uuid */
@@ -6514,6 +6521,30 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingResponse"];
         };
       };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       404: {
         headers: {
           [name: string]: unknown;
@@ -6550,112 +6581,161 @@ export interface operations {
           items?: {
             business?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             unit?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             plan?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            fiscalChoice?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            fiscalChoice?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    choice: "disabled" | "focus" | "external";
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "external_fiscal" | "not_required";
+                  };
+                  waiverReason: string;
+                };
             catalog?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             tables?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             team?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            qr?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
-            production?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            qr?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "pilot_without_qr" | "external_qr" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            production?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    mode: "off";
+                  };
+                };
             cashier?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            training?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
-            rehearsal?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            training?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+            rehearsal?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
           };
         };
       };
@@ -6670,6 +6750,30 @@ export interface operations {
         };
       };
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -6704,6 +6808,30 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
       404: {
@@ -6742,112 +6870,161 @@ export interface operations {
           items?: {
             business?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             unit?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             plan?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            fiscalChoice?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            fiscalChoice?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    choice: "disabled" | "focus" | "external";
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "external_fiscal" | "not_required";
+                  };
+                  waiverReason: string;
+                };
             catalog?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             tables?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
             team?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            qr?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
-            production?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            qr?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "pilot_without_qr" | "external_qr" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            production?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    mode: "off";
+                  };
+                };
             cashier?: {
               /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              status: "pending" | "in_progress" | "blocked";
               evidenceReference?: string;
               evidence?: {
-                [key: string]: unknown;
+                note?: string;
               };
-              waiverReason?: string;
             };
-            training?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
-            rehearsal?: {
-              /** @enum {string} */
-              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
-              evidenceReference?: string;
-              evidence?: {
-                [key: string]: unknown;
-              };
-              waiverReason?: string;
-            };
+            training?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+            rehearsal?:
+              | {
+                  /** @enum {string} */
+                  status: "pending" | "in_progress" | "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
           };
         };
       };
@@ -6862,6 +7039,30 @@ export interface operations {
         };
       };
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -6917,6 +7118,30 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       409: {
         headers: {
           [name: string]: unknown;
@@ -6965,6 +7190,30 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       409: {
         headers: {
           [name: string]: unknown;
@@ -7005,6 +7254,30 @@ export interface operations {
         };
       };
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -7067,6 +7340,30 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       409: {
         headers: {
           [name: string]: unknown;
@@ -7105,6 +7402,30 @@ export interface operations {
           "application/json": components["schemas"]["ProvisioningStatusResponse"];
         };
       };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       404: {
         headers: {
           [name: string]: unknown;
@@ -7133,6 +7454,30 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ProvisioningStatusResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
       404: {

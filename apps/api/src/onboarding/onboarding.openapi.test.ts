@@ -93,7 +93,47 @@ describe("onboarding generated contract", () => {
         ),
         { $ref: "#/components/schemas/ProvisioningStatusResponse" },
       );
+      const errorResponses = [
+        [base, "get", ["400", "401", "403", "404"]],
+        [base, "patch", ["400", "401", "403", "404", "409"]],
+        [`${base}/selection`, "put", ["400", "401", "403", "404", "409"]],
+        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "503"]],
+        [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404"]],
+      ] as const;
+      for (const [path, method, statuses] of errorResponses) {
+        for (const status of statuses) {
+          assert.deepEqual(
+            property(
+              document,
+              "paths",
+              path,
+              method,
+              "responses",
+              status,
+              "content",
+              "application/json",
+              "schema",
+            ),
+            { $ref: "#/components/schemas/OnboardingApiErrorResponse" },
+          );
+        }
+      }
     }
+    assert.deepEqual(
+      property(document, "components", "schemas", "OnboardingApiErrorResponse", "required"),
+      ["statusCode", "code", "message"],
+    );
+    assert.deepEqual(
+      property(
+        document,
+        "components",
+        "schemas",
+        "OnboardingApiErrorResponse",
+        "properties",
+        "details",
+      ),
+      { $ref: "#/components/schemas/OnboardingApiErrorDetails" },
+    );
   });
 
   it("generates DTO-returning C# clients instead of void or streams", async () => {
@@ -113,6 +153,18 @@ describe("onboarding generated contract", () => {
       const source = await readFile(new URL(path, csharpRoot), "utf8");
       assert.match(source, expected);
       assert.doesNotMatch(source, /Task<(?:Stream|void)\??>/i);
+    }
+    const activate = await readFile(
+      new URL("Activate/ActivateRequestBuilder.cs", csharpRoot),
+      "utf8",
+    );
+    for (const status of ["400", "401", "403", "404", "409", "503"]) {
+      assert.match(
+        activate,
+        new RegExp(
+          `\\{ "${status}", global::GiroMesa\\.ApiClient\\.Models\\.OnboardingApiErrorResponse\\.CreateFromDiscriminatorValue \\}`,
+        ),
+      );
     }
   });
 });

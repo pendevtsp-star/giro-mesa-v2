@@ -30,7 +30,7 @@ import {
   trials,
   units,
 } from "@giromesa/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { OnboardingService } from "./onboarding.service.js";
@@ -261,7 +261,14 @@ describe("durable onboarding provisioning", () => {
           }) ?? Promise.reject(new Error("service unavailable")),
       );
     }
-    return { organizationId, unitId, ownerIdentityId };
+    return {
+      organizationId,
+      unitId,
+      ownerIdentityId,
+      cashierIdentityId,
+      ownerMembershipId,
+      cashierMembershipId,
+    };
   }
 
   async function installFailureTrigger(
@@ -313,6 +320,70 @@ describe("durable onboarding provisioning", () => {
       create trigger ${name} before insert on ${table}
       for each row execute function ${name}()
     `);
+  }
+
+  async function installAdvisoryGateTrigger(
+    table: "trials" | "onboarding_checklist_items",
+    organizationId: string,
+    name: string,
+    salt: number,
+    operation: "insert" | "update",
+    extraGuard = "true",
+  ) {
+    if (!owner) throw new Error("owner unavailable");
+    await owner.client.unsafe(`
+      create function ${name}() returns trigger language plpgsql as $$
+      begin
+        if new.organization_id = '${organizationId}'::uuid and (${extraGuard}) then
+          perform pg_advisory_xact_lock(hashtextextended(new.organization_id::text, ${salt}));
+        end if;
+        return new;
+      end
+      $$
+    `);
+    await owner.client.unsafe(`
+      create trigger ${name} before ${operation} on ${table}
+      for each row execute function ${name}()
+    `);
+  }
+
+  async function holdAdvisoryGate(organizationId: string, salt: number) {
+    if (!owner) throw new Error("owner unavailable");
+    const acquired = deferred<void>();
+    const release = deferred<void>();
+    const completed = owner.client.begin(async (transaction) => {
+      await transaction.unsafe(
+        `select pg_advisory_xact_lock(hashtextextended('${organizationId}', ${salt}))`,
+      );
+      acquired.resolve();
+      await release.promise;
+    });
+    await acquired.promise;
+    return {
+      async release() {
+        release.resolve();
+        await completed;
+      },
+    };
+  }
+
+  async function assertAdvisoryWaits(minimum: number, timeoutMilliseconds = 4_000) {
+    if (!owner) throw new Error("owner unavailable");
+    const ownerConnection = owner;
+    await waitUntil(
+      async () => {
+        const [activity] = await ownerConnection.client<{ waits: number }[]>`
+          select count(*)::int waits
+          from pg_stat_activity
+          where datname = current_database()
+            and pid <> pg_backend_pid()
+            and lower(coalesce(wait_event, '')) = 'advisory'
+        `;
+        return (activity?.waits ?? 0) >= minimum;
+      },
+      timeoutMilliseconds,
+      `${minimum} advisory waiter(s)`,
+    );
   }
 
   async function assertForcedOverlap(timeoutMilliseconds = 4_000) {
@@ -541,7 +612,7 @@ describe("durable onboarding provisioning", () => {
                 evidence: { mode: "kds", browserTested: true },
               },
             },
-          }) ?? Promise.reject(new Error("service unavailable")),
+          } as never) ?? Promise.reject(new Error("service unavailable")),
       ),
       errorContains("PRODUCTION_READINESS_NOT_VERIFIED"),
     );
@@ -569,7 +640,7 @@ describe("durable onboarding provisioning", () => {
               evidence: { browserTested: true },
             },
           },
-        }) ?? Promise.reject(new Error("service unavailable")),
+        } as never) ?? Promise.reject(new Error("service unavailable")),
     );
     const onboarding = await invoke(
       subject.ownerIdentityId,
@@ -666,6 +737,10 @@ describe("durable onboarding provisioning", () => {
       organizationId: subject.organizationId,
       name: "Audit Filial",
     });
+    await owner.db
+      .update(onboardingRecords)
+      .set({ selectedPlanFingerprint: "f".repeat(64) })
+      .where(eq(onboardingRecords.organizationId, subject.organizationId));
     await assert.rejects(
       invoke(
         subject.ownerIdentityId,
@@ -710,7 +785,7 @@ describe("durable onboarding provisioning", () => {
             training: {
               status: "verified",
               evidenceReference: "audit-training-repeat",
-              evidence: { completed: true, cohort: "B" },
+              evidence: { completed: true },
             },
           },
         }) ?? Promise.reject(new Error("service unavailable")),
@@ -730,6 +805,14 @@ describe("durable onboarding provisioning", () => {
     assert.ok(updateEvent.metadata.after);
     assert.equal(updateEvent.metadata.actorIdentityId, subject.ownerIdentityId);
     assert.ok(updateEvent.metadata.occurredAt);
+    const reselectionEvent = history.find(
+      (event) => event.action === "onboarding.selection_reselected",
+    );
+    assert.equal(
+      (reselectionEvent?.metadata.before as { selectedUnitId?: string } | undefined)
+        ?.selectedUnitId,
+      subject.unitId,
+    );
     await assert.rejects(
       invoke(
         subject.ownerIdentityId,
@@ -748,6 +831,246 @@ describe("durable onboarding provisioning", () => {
       .where(eq(auditEvents.organizationId, subject.organizationId));
     assert.equal(preserved.length, history.length);
     assert.ok(preserved.every((event) => event.metadata.overwritten !== true));
+  });
+
+  it("audits every automatic readiness drift in the same refresh without duplicate noise", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("System Audit");
+    const waiterIdentityId = randomUUID();
+    const waiterMembershipId = randomUUID();
+    await owner.db.insert(identities).values({
+      id: waiterIdentityId,
+      email: `system-audit-waiter-${suffix}@example.test`,
+      displayName: "System Audit Waiter",
+      emailVerifiedAt: new Date(),
+    });
+    await owner.db.insert(memberships).values({
+      id: waiterMembershipId,
+      identityId: waiterIdentityId,
+      organizationId: subject.organizationId,
+      status: "active",
+    });
+    await owner.db.insert(roleBindings).values({
+      membershipId: waiterMembershipId,
+      unitId: subject.unitId,
+      role: "waiter",
+    });
+
+    const refresh = () =>
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.get(subject.ownerIdentityId, subject.organizationId) ??
+          Promise.reject(new Error("service unavailable")),
+      );
+    await refresh();
+    await owner.db
+      .delete(posProductPrices)
+      .where(eq(posProductPrices.organizationId, subject.organizationId));
+    await refresh();
+    await owner.db
+      .update(posDiningTables)
+      .set({ active: false })
+      .where(eq(posDiningTables.organizationId, subject.organizationId));
+    await refresh();
+    await owner.db
+      .update(memberships)
+      .set({ status: "disabled" })
+      .where(eq(memberships.id, subject.cashierMembershipId));
+    await refresh();
+    await owner.db
+      .update(memberships)
+      .set({ status: "disabled" })
+      .where(eq(memberships.id, waiterMembershipId));
+    await refresh();
+
+    const history = (
+      await owner.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.organizationId, subject.organizationId))
+    ).filter((event) => event.action === "onboarding.system_evidence_changed");
+    for (const item of ["catalog", "tables", "cashier", "team"]) {
+      const transitions = history.filter((event) => event.metadata.item === item);
+      assert.ok(transitions.length >= 1, `missing ${item} system audit`);
+      const last = transitions.at(-1);
+      assert.equal((last?.metadata.after as { status?: string } | undefined)?.status, "blocked");
+      assert.ok(last?.metadata.before);
+      assert.equal(last?.actorIdentityId, null);
+      assert.equal(last?.metadata.actorIdentityId, null);
+      assert.equal(last?.metadata.reason, "onboarding_get_refresh");
+    }
+    const countBeforeNoopRefresh = history.length;
+    await refresh();
+    const countAfterNoopRefresh = (
+      await owner.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.organizationId, subject.organizationId))
+    ).filter((event) => event.action === "onboarding.system_evidence_changed").length;
+    assert.equal(countAfterNoopRefresh, countBeforeNoopRefresh);
+  });
+
+  it("rechecks owner after the organization lock and preserves the selection after demotion", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Owner TOCTOU");
+    const before = await owner.db
+      .select()
+      .from(onboardingRecords)
+      .where(eq(onboardingRecords.organizationId, subject.organizationId));
+    const blocker = await holdAdvisoryGate(subject.organizationId, 7107);
+    const selection = invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.select(subject.ownerIdentityId, subject.organizationId, {
+          planSlug: "crescimento",
+          selectedUnitId: subject.unitId,
+          reselect: true,
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    selection.catch(() => undefined);
+    try {
+      await assertAdvisoryWaits(1);
+      await owner.db
+        .update(roleBindings)
+        .set({ role: "manager" })
+        .where(eq(roleBindings.membershipId, subject.ownerMembershipId));
+    } finally {
+      await blocker.release();
+    }
+    await assert.rejects(selection, errorContains("ONBOARDING_ROLE_CHANGED"));
+    const after = await owner.db
+      .select()
+      .from(onboardingRecords)
+      .where(eq(onboardingRecords.organizationId, subject.organizationId));
+    assert.equal(after[0]?.selectedPlanId, before[0]?.selectedPlanId);
+    assert.equal(after[0]?.selectionRevision, before[0]?.selectionRevision);
+  });
+
+  it("serializes final activation before PATCH and rejects the late mutation without changing evidence", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Activation Wins");
+    const trigger = `task7_final_gate_${suffix.slice(0, 8)}`;
+    const salt = 7121;
+    await installAdvisoryGateTrigger("trials", subject.organizationId, trigger, salt, "insert");
+    const blocker = await holdAdvisoryGate(subject.organizationId, salt);
+    const activation = invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.activate(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          "activation-wins-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    activation.catch(() => undefined);
+    let patch: Promise<unknown> | undefined;
+    try {
+      await assertAdvisoryWaits(1);
+      patch = invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.update(subject.ownerIdentityId, subject.organizationId, {
+            items: { training: { status: "blocked", evidence: { note: "late mutation" } } },
+          }) ?? Promise.reject(new Error("service unavailable")),
+      );
+      patch.catch(() => undefined);
+      await assertAdvisoryWaits(2);
+    } finally {
+      await blocker.release();
+    }
+    try {
+      assert.equal((await activation).state, "completed");
+      await assert.rejects(
+        patch ?? Promise.resolve(),
+        errorContains("ONBOARDING_ALREADY_ACTIVATED"),
+      );
+    } finally {
+      await removeFailureTrigger("trials", trigger);
+    }
+    const [training] = await owner.db
+      .select()
+      .from(onboardingChecklistItems)
+      .where(
+        and(
+          eq(onboardingChecklistItems.organizationId, subject.organizationId),
+          eq(onboardingChecklistItems.item, "training"),
+        ),
+      );
+    assert.notEqual(training?.evidenceReference, null);
+    assert.equal(
+      (
+        await owner.db
+          .select()
+          .from(trials)
+          .where(eq(trials.organizationId, subject.organizationId))
+      ).length,
+      1,
+    );
+  });
+
+  it("commits a readiness-invalidating PATCH first and makes the waiting activation revalidate", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Patch Wins");
+    const trigger = `task7_patch_gate_${suffix.slice(0, 8)}`;
+    const salt = 7122;
+    await installAdvisoryGateTrigger(
+      "onboarding_checklist_items",
+      subject.organizationId,
+      trigger,
+      salt,
+      "update",
+      "new.item = 'training'",
+    );
+    const blocker = await holdAdvisoryGate(subject.organizationId, salt);
+    const patch = invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.update(subject.ownerIdentityId, subject.organizationId, {
+          items: { training: { status: "blocked", evidence: { note: "readiness removed" } } },
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    patch.catch(() => undefined);
+    let activation: Promise<unknown> | undefined;
+    try {
+      await assertAdvisoryWaits(1);
+      activation = invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.activate(
+            subject.ownerIdentityId,
+            subject.organizationId,
+            "patch-wins-key-0001",
+            {},
+          ) ?? Promise.reject(new Error("service unavailable")),
+      );
+      activation.catch(() => undefined);
+      await assertAdvisoryWaits(2);
+    } finally {
+      await blocker.release();
+    }
+    try {
+      await patch;
+      await assert.rejects(activation ?? Promise.resolve(), errorContains("ONBOARDING_INCOMPLETE"));
+    } finally {
+      await removeFailureTrigger("onboarding_checklist_items", trigger);
+    }
+    assert.equal(
+      (
+        await owner.db
+          .select()
+          .from(trials)
+          .where(eq(trials.organizationId, subject.organizationId))
+      ).length,
+      0,
+    );
   });
 
   it("recovers after a committed checkpoint, starts the trial only in the final commit, and replays the response", async (context) => {

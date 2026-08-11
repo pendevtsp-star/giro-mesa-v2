@@ -26,10 +26,10 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The details property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse_details? Details { get; set; }
+        public global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails? Details { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse_details Details { get; set; }
+        public global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails Details { get; set; }
 #endif
         /// <summary>The primary error message.</summary>
         public override string Message { get => MessageEscaped ?? string.Empty; }
@@ -69,7 +69,7 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "code", n => { Code = n.GetStringValue(); } },
-                { "details", n => { Details = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse_details>(global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse_details.CreateFromDiscriminatorValue); } },
+                { "details", n => { Details = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails>(global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails.CreateFromDiscriminatorValue); } },
                 { "message", n => { MessageEscaped = n.GetStringValue(); } },
                 { "statusCode", n => { StatusCode = n.GetDoubleValue(); } },
             };
@@ -82,7 +82,7 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("code", Code);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse_details>("details", Details);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails>("details", Details);
             writer.WriteStringValue("message", MessageEscaped);
             writer.WriteDoubleValue("statusCode", StatusCode);
             writer.WriteAdditionalData(AdditionalData);

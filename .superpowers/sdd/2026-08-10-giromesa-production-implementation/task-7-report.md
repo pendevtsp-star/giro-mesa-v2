@@ -70,3 +70,35 @@ O onboarding agora usa evidencias normalizadas e uma saga persistida por organiz
 - As projecoes publicas foram revisadas por allowlist e os testes recusam os nomes internos conhecidos.
 - Nao existem failpoints de producao: crash, espera e barreiras vivem somente no harness de integracao.
 - Nao houve push, deploy, provider real nem expansao para a UI da Task 8.
+
+## Fix round 2
+
+### RED capturado
+
+- O teste de contratos aceitou inicialmente `evidence` com chave `secret` e objeto arbitrario. O RED confirmou que `z.record(unknown)` permitia dados sem contrato e potencialmente sensiveis no checklist.
+- Os testes PostgreSQL de corrida foram escritos com gates transacionais antes da correcao: PATCH e ativacao podiam observar readiness em instantes diferentes, e a selecao nao revalidava o papel owner depois de aguardar o lock.
+
+### Correcoes aplicadas
+
+- GET/refresh, PATCH, selecao e ativacao usam o mesmo advisory lock por organizacao. PATCH revalida ativacao/run dentro do lock; o commit final revalida readiness e o pin e usa CAS para impedir commit sobre estado alterado.
+- Selecao revalida membership ativa e papel owner dentro da transacao, depois do lock. Democao concorrente falha fechado e nao muda o pin.
+- Toda mudanca automatica de evidencia de sistema grava auditoria append-only na mesma transacao, com before/after allowlisted, motivo, evidencia, ator system/null e horario. Refresh sem mudanca nao gera spam; GET, validacao e revalidacao final estao cobertos.
+- Reselecao apos drift preserva o pin/snapshot persistido como `before`, classifica corretamente `reselected` e registra apenas snapshots sanitizados.
+- O boundary HTTP do onboarding normaliza erros reais em `{ statusCode, code, message, details? }`, com details allowlisted. Zod de header/body, UUID, not found, conflito, readiness incompleto e indisponibilidade foram exercitados nos aliases `/api/v1` e `/v1`.
+- Evidencias do navegador agora sao unions estritas por item/status, com enums e limites. Chaves extras, payload oversized e campos com aparencia de segredo retornam 400 e nao chegam ao service. OpenAPI e clientes TypeScript/C# foram regenerados com erros tipados.
+
+### Gates do fix
+
+- PostgreSQL 17: integracao Task 7 **15/15**, incluindo as duas ordens PATCH/ativacao, democao owner, auditoria de drift e historico, fresh migration e upgrade.
+- PostgreSQL 16: o mesmo gate **15/15**.
+- Pos-formatacao, o teste PostgreSQL focado de auditoria automatica passou **1/1**.
+- Contratos: **7/7**; API: **126 total, 90 pass, 36 skips, 0 fail**; HTTP real: **2/2**; OpenAPI gerado: **2/2**.
+- `pnpm test`: **12/12 tasks** e **25/25** gates de baseline/supply-chain; `turbo run typecheck`: **12/12 tasks**; `pnpm build`: **8/8 tasks**.
+- C# gerado compilou com **0 warnings e 0 errors**. Biome focado dos arquivos alterados e `git diff --check` ficaram verdes.
+- `pnpm lint` integral permanece vermelho somente pelo baseline CRLF preexistente fora deste patch (domain/site e outros pacotes). Nenhum arquivo fora do escopo foi reformatado.
+
+### Self-review
+
+- As escritas de readiness nao escapam do lock comum e as auditorias pertencem a mesma transacao da evidencia; refresh no-op e idempotente.
+- Respostas e auditorias usam allowlists: nenhuma evidencia arbitraria, segredo, lease, fingerprint bruto ou payload interno e refletido.
+- Nao houve push, deploy, provider real ou alteracao de containers compartilhados.

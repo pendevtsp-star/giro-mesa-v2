@@ -18,21 +18,43 @@ import {
   Post,
   Put,
   Req,
+  UseFilters,
   UseGuards,
 } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiProperty,
   ApiServiceUnavailableResponse,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { OnboardingService } from "./onboarding.service.js";
+import { OnboardingExceptionFilter } from "./onboarding-exception.filter.js";
+
+class OnboardingApiErrorDetails {
+  @ApiProperty({ required: false, format: "uuid" })
+  declare provisioningRunId?: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  declare missingItems?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    additionalProperties: { type: "array", items: { type: "string" } },
+  })
+  declare fieldErrors?: Record<string, string[]>;
+
+  @ApiProperty({ required: false, type: [String] })
+  declare formErrors?: string[];
+}
 
 class OnboardingApiErrorResponse {
   @ApiProperty()
@@ -44,8 +66,8 @@ class OnboardingApiErrorResponse {
   @ApiProperty()
   declare message: string;
 
-  @ApiProperty({ required: false, type: Object, additionalProperties: true })
-  declare details?: Record<string, unknown>;
+  @ApiProperty({ required: false, type: () => OnboardingApiErrorDetails })
+  declare details?: OnboardingApiErrorDetails;
 }
 
 class OnboardingPlanResponse {
@@ -128,6 +150,7 @@ class TrialActivationResponse {
 }
 
 @UseGuards(SessionGuard)
+@UseFilters(OnboardingExceptionFilter)
 @Controller([
   "api/v1/organizations/:organizationId/onboarding",
   "v1/organizations/:organizationId/onboarding",
@@ -137,6 +160,9 @@ export class OnboardingController {
 
   @Get()
   @ApiOkResponse({ type: OnboardingResponse })
+  @ApiBadRequestResponse({ type: OnboardingApiErrorResponse })
+  @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
+  @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   get(
     @Req() request: AuthenticatedRequest,
@@ -148,6 +174,9 @@ export class OnboardingController {
   @Patch()
   @ApiOkResponse({ type: OnboardingResponse })
   @ApiBadRequestResponse({ type: OnboardingApiErrorResponse })
+  @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
+  @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
+  @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
   update(
     @Req() request: AuthenticatedRequest,
@@ -160,6 +189,9 @@ export class OnboardingController {
   @Put("selection")
   @ApiOkResponse({ type: OnboardingSelectionResponse })
   @ApiBadRequestResponse({ type: OnboardingApiErrorResponse })
+  @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
+  @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
+  @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
   select(
     @Req() request: AuthenticatedRequest,
@@ -172,6 +204,9 @@ export class OnboardingController {
   @Post("activate")
   @ApiCreatedResponse({ type: TrialActivationResponse })
   @ApiBadRequestResponse({ type: OnboardingApiErrorResponse })
+  @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
+  @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
+  @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
   @ApiServiceUnavailableResponse({ type: OnboardingApiErrorResponse })
   @ApiHeader({
@@ -196,6 +231,9 @@ export class OnboardingController {
 
   @Get("provisioning/:runId")
   @ApiOkResponse({ type: ProvisioningStatusResponse })
+  @ApiBadRequestResponse({ type: OnboardingApiErrorResponse })
+  @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
+  @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   provisioningStatus(
     @Req() request: AuthenticatedRequest,
