@@ -426,9 +426,10 @@ export class RemunerationService {
         .limit(1);
       if (!set || set.kind !== input.kind)
         throw new ConflictException({ code: "REMUNERATION_ENGINE_KIND_MISMATCH" });
+      const periodStartInstant = new Date(`${periodStart}T00:00:00.000Z`);
       const periodEndInstant = new Date(`${periodEnd}T23:59:59.999Z`);
       if (
-        version.effectiveFrom > periodEndInstant ||
+        version.effectiveFrom > periodStartInstant ||
         (version.effectiveUntil !== null && version.effectiveUntil <= periodEndInstant)
       )
         throw new ConflictException({ code: "REMUNERATION_RULE_NOT_EFFECTIVE" });

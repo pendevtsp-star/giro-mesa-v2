@@ -15,6 +15,19 @@ import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { RemunerationService } from "./remuneration.service.js";
 
+function hasCode(expectedCode: string) {
+  return (error: unknown) => {
+    if (!error || typeof error !== "object" || !("getResponse" in error)) return false;
+    const response = (error as { getResponse(): unknown }).getResponse();
+    return (
+      typeof response === "object" &&
+      response !== null &&
+      "code" in response &&
+      response.code === expectedCode
+    );
+  };
+}
+
 it("separates service, commission and profit sharing through estimated, approved and closed reports", async (context) => {
   const databaseUrl = process.env.REMUNERATION_DATABASE_URL;
   if (!databaseUrl) {
@@ -129,6 +142,38 @@ it("separates service, commission and profit sharing through estimated, approved
       assert.equal(run.status, "estimated");
       runIds.push(run.runId);
     }
+
+    const midPeriodRule = await service.createRule(
+      creator.id,
+      organization.id,
+      unit.id,
+      "remuneration-mid-period-rule-0001",
+      {
+        kind: "commission",
+        name: "Regra iniciada no meio do período",
+        expression: { type: "constant", value: 1_000 },
+        effectiveFrom: "2026-07-15T00:00:00.000Z",
+      },
+    );
+    await assert.rejects(
+      () =>
+        service.calculate(
+          creator.id,
+          organization.id,
+          unit.id,
+          "remuneration-mid-period-run-0001",
+          {
+            kind: "commission",
+            periodStart: "2026-07-01",
+            periodEnd: "2026-07-31",
+            ruleVersionId: midPeriodRule.ruleVersionId,
+            metrics: zeroMetrics,
+            sourceReferences: ["ledger:commission:2026-07"],
+            recipients: [{ reference: "person-a", label: "Pessoa A", basisPoints: 10_000 }],
+          },
+        ),
+      hasCode("REMUNERATION_RULE_NOT_EFFECTIVE"),
+    );
 
     const firstRuleVersion = await database.db
       .select()
