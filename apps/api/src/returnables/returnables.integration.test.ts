@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   identities,
   managementReturnableMovements,
+  managementReturnableSerials,
   memberships,
   organizations,
   roleBindings,
@@ -13,6 +14,19 @@ import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ReturnablesService } from "./returnables.service.js";
+
+function hasCode(expectedCode: string) {
+  return (error: unknown) => {
+    if (!error || typeof error !== "object" || !("getResponse" in error)) return false;
+    const response = (error as { getResponse(): unknown }).getResponse();
+    return (
+      typeof response === "object" &&
+      response !== null &&
+      "code" in response &&
+      response.code === expectedCode
+    );
+  };
+}
 
 it("tracks serialized and aggregate custody with idempotent physical reconciliation", async (context) => {
   const databaseUrl = process.env.RETURNABLES_DATABASE_URL;
@@ -179,6 +193,132 @@ it("tracks serialized and aggregate custody with idempotent physical reconciliat
     );
     assert.equal(
       (await service.ledger(identity.id, organization.id, unit.id, crate.assetId)).length,
+      2,
+    );
+
+    const aggregateRaceAsset = await service.createAsset(
+      identity.id,
+      organization.id,
+      unit.id,
+      "returnable-asset-aggregate-race-0001",
+      {
+        sku: `AGG-${randomUUID().slice(0, 8)}`,
+        name: "Caixa agregada concorrente",
+        trackingMode: "aggregate",
+        serialNumbers: [],
+      },
+    );
+    await service.move(identity.id, organization.id, unit.id, "aggregate-race-receive-0001", {
+      assetId: aggregateRaceAsset.assetId,
+      movementType: "receive",
+      quantity: 10,
+      fromCustody: { type: "supplier", id: "supplier-a" },
+      toCustody: { type: "location", id: "aggregate-stock" },
+      occurredAt: "2026-08-11T14:00:00.000Z",
+    });
+    await assert.rejects(
+      () =>
+        service.move(identity.id, organization.id, unit.id, "aggregate-overspend-0001", {
+          assetId: aggregateRaceAsset.assetId,
+          movementType: "circulate",
+          quantity: 11,
+          fromCustody: { type: "location", id: "aggregate-stock" },
+          toCustody: { type: "table", id: "aggregate-table" },
+          occurredAt: "2026-08-11T14:01:00.000Z",
+        }),
+      hasCode("RETURNABLE_INSUFFICIENT_BALANCE"),
+    );
+    const aggregateRace = await Promise.allSettled([
+      service.move(identity.id, organization.id, unit.id, "aggregate-race-out-a-0001", {
+        assetId: aggregateRaceAsset.assetId,
+        movementType: "circulate",
+        quantity: 7,
+        fromCustody: { type: "location", id: "aggregate-stock" },
+        toCustody: { type: "table", id: "aggregate-table-a" },
+        occurredAt: "2026-08-11T14:02:00.000Z",
+      }),
+      service.move(identity.id, organization.id, unit.id, "aggregate-race-out-b-0001", {
+        assetId: aggregateRaceAsset.assetId,
+        movementType: "circulate",
+        quantity: 7,
+        fromCustody: { type: "location", id: "aggregate-stock" },
+        toCustody: { type: "table", id: "aggregate-table-b" },
+        occurredAt: "2026-08-11T14:02:00.000Z",
+      }),
+    ]);
+    assert.equal(aggregateRace.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(aggregateRace.filter((result) => result.status === "rejected").length, 1);
+    const rejectedAggregateMove = aggregateRace.find((result) => result.status === "rejected");
+    assert.ok(rejectedAggregateMove?.status === "rejected");
+    assert.equal(hasCode("RETURNABLE_INSUFFICIENT_BALANCE")(rejectedAggregateMove.reason), true);
+    await assert.rejects(
+      () =>
+        service.move(identity.id, organization.id, unit.id, "aggregate-backdated-0001", {
+          assetId: aggregateRaceAsset.assetId,
+          movementType: "circulate",
+          quantity: 1,
+          fromCustody: { type: "location", id: "aggregate-stock" },
+          toCustody: { type: "table", id: "aggregate-table-c" },
+          occurredAt: "2026-08-11T13:59:00.000Z",
+        }),
+      hasCode("RETURNABLE_MOVEMENT_BACKDATED"),
+    );
+
+    const atomicSerialAsset = await service.createAsset(
+      identity.id,
+      organization.id,
+      unit.id,
+      "returnable-asset-atomic-reconcile-0001",
+      {
+        sku: `SER-${randomUUID().slice(0, 8)}`,
+        name: "Seriais para reconciliação atômica",
+        trackingMode: "serialized",
+        serialNumbers: ["ATOMIC-001", "ATOMIC-002"],
+      },
+    );
+    const serialRows = await database.db
+      .select()
+      .from(managementReturnableSerials)
+      .where(eq(managementReturnableSerials.assetId, atomicSerialAsset.assetId));
+    assert.equal(serialRows.length, 2);
+    await service.move(identity.id, organization.id, unit.id, "atomic-serial-receive-0001", {
+      assetId: atomicSerialAsset.assetId,
+      serialId: serialRows[0]?.id,
+      movementType: "receive",
+      quantity: 1,
+      fromCustody: { type: "supplier", id: "supplier-a" },
+      toCustody: { type: "location", id: "atomic-stock" },
+      occurredAt: "2026-08-11T15:00:00.000Z",
+    });
+    await service.move(identity.id, organization.id, unit.id, "atomic-serial-receive-0002", {
+      assetId: atomicSerialAsset.assetId,
+      serialId: serialRows[1]?.id,
+      movementType: "receive",
+      quantity: 1,
+      fromCustody: { type: "supplier", id: "supplier-a" },
+      toCustody: { type: "location", id: "atomic-stock" },
+      occurredAt: "2026-08-11T15:02:00.000Z",
+    });
+    await assert.rejects(
+      () =>
+        service.reconcile(
+          identity.id,
+          organization.id,
+          unit.id,
+          "returnable-atomic-reconcile-0001",
+          {
+            assetId: atomicSerialAsset.assetId,
+            custody: { type: "location", id: "atomic-stock" },
+            physicalSerialIds: [],
+            occurredAt: "2026-08-11T15:01:00.000Z",
+            reason: "Reconciliação deve reverter todos os ajustes se um deles falhar.",
+          },
+        ),
+      hasCode("RETURNABLE_MOVEMENT_BACKDATED"),
+    );
+    assert.equal(
+      (await service.ledger(identity.id, organization.id, unit.id, atomicSerialAsset.assetId))
+        .length,
       2,
     );
     await assert.rejects(() =>

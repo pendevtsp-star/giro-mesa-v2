@@ -1,4 +1,5 @@
 import {
+  type Database,
   managementReturnableAssets,
   managementReturnableMovements,
   managementReturnableSerials,
@@ -35,6 +36,22 @@ type MovementType =
   | "broken"
   | "lost"
   | "reconcile_adjustment";
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type MovementInput = {
+  assetId: string;
+  serialId?: string;
+  movementType: MovementType;
+  quantity: number;
+  fromCustody: Custody;
+  toCustody: Custody;
+  supplierReference?: string;
+  lotReference?: string;
+  reason?: string;
+  occurredAt: string;
+};
+type NormalizedMovementInput = Omit<MovementInput, "occurredAt"> & {
+  occurredAt: string;
+};
 
 function requiredKey(value: string) {
   const key = value.trim();
@@ -58,6 +75,37 @@ function custody(value: Custody | undefined, field: string) {
       message: `${field} exige tipo e identificador de custódia válidos.`,
     });
   return { type: value.type, id: value.id.trim() };
+}
+
+function normalizeMovement(input: MovementInput): NormalizedMovementInput {
+  const from = custody(input.fromCustody, "fromCustody");
+  const to = custody(input.toCustody, "toCustody");
+  const occurredAt = new Date(input.occurredAt);
+  if (
+    !Number.isSafeInteger(input.quantity) ||
+    input.quantity <= 0 ||
+    Number.isNaN(occurredAt.valueOf()) ||
+    (from.type === to.type && from.id === to.id) ||
+    (input.reason !== undefined && (input.reason.trim().length < 3 || input.reason.length > 240))
+  )
+    throw new BadRequestException({
+      code: "RETURNABLE_MOVEMENT_INVALID",
+      message: "Movimento retornável exige quantidade, data e custódias distintas válidas.",
+    });
+  return {
+    ...input,
+    fromCustody: from,
+    toCustody: to,
+    occurredAt: occurredAt.toISOString(),
+  };
+}
+
+function isExternalOrigin(input: NormalizedMovementInput) {
+  return (
+    ((input.movementType === "receive" || input.movementType === "receive_supplier") &&
+      input.fromCustody.type === "supplier") ||
+    (input.movementType === "reconcile_adjustment" && input.fromCustody.type === "reconciliation")
+  );
 }
 
 @Injectable()
@@ -228,6 +276,9 @@ export class ReturnablesService {
     const requestHash = managementRequestHash("returnable-movement", normalized);
     return this.database.db.transaction(async (tx) => {
       await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`returnable-asset-ledger:${organizationId}:${unitId}:${input.assetId}`}))`,
+      );
+      await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`returnable-movement:${organizationId}:${unitId}:${key}`}))`,
       );
       const [existing] = await tx
@@ -306,8 +357,8 @@ export class ReturnablesService {
           )
           .limit(1);
         if (
-          latest?.toCustodyType &&
-          (latest.toCustodyType !== from.type || latest.toCustodyId !== from.id)
+          (latest && (latest.toCustodyType !== from.type || latest.toCustodyId !== from.id)) ||
+          (!latest && !isExternalOrigin(normalized))
         )
           throw new ConflictException({
             code: "RETURNABLE_CUSTODY_CHAIN_MISMATCH",
@@ -318,11 +369,42 @@ export class ReturnablesService {
             code: "RETURNABLE_MOVEMENT_BACKDATED",
             message: "Movimento serial não pode anteceder a última custódia registrada.",
           });
-      } else if (input.serialId) {
-        throw new BadRequestException({
-          code: "RETURNABLE_SERIAL_NOT_ALLOWED",
-          message: "Ativo agregado não aceita serial individual.",
-        });
+      } else {
+        if (input.serialId)
+          throw new BadRequestException({
+            code: "RETURNABLE_SERIAL_NOT_ALLOWED",
+            message: "Ativo agregado não aceita serial individual.",
+          });
+        const rows = await tx
+          .select()
+          .from(managementReturnableMovements)
+          .where(eq(managementReturnableMovements.assetId, asset.id))
+          .orderBy(
+            asc(managementReturnableMovements.occurredAt),
+            asc(managementReturnableMovements.createdAt),
+          );
+        const latest = rows.at(-1);
+        if (latest && occurredAt < latest.occurredAt)
+          throw new ConflictException({
+            code: "RETURNABLE_MOVEMENT_BACKDATED",
+            message: "Aggregate movement cannot predate the latest asset event.",
+          });
+        if (!isExternalOrigin(normalized)) {
+          const available = rows.reduce((balance, movement) => {
+            const incoming =
+              movement.toCustodyType === from.type && movement.toCustodyId === from.id;
+            const outgoing =
+              movement.fromCustodyType === from.type && movement.fromCustodyId === from.id;
+            return (
+              balance + (incoming ? movement.quantity : 0) - (outgoing ? movement.quantity : 0)
+            );
+          }, 0);
+          if (available < input.quantity)
+            throw new ConflictException({
+              code: "RETURNABLE_INSUFFICIENT_BALANCE",
+              message: "Source custody has insufficient balance for this movement.",
+            });
+        }
       }
       const [movement] = await tx
         .insert(managementReturnableMovements)
@@ -375,6 +457,181 @@ export class ReturnablesService {
     });
   }
 
+  private async moveReconciliationInTransaction(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    key: string,
+    input: NormalizedMovementInput,
+  ) {
+    const occurredAt = new Date(input.occurredAt);
+    const requestHash = managementRequestHash("returnable-movement", input);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`returnable-movement:${organizationId}:${unitId}:${key}`}))`,
+    );
+    const [existing] = await tx
+      .select()
+      .from(managementReturnableMovements)
+      .where(
+        and(
+          eq(managementReturnableMovements.organizationId, organizationId),
+          eq(managementReturnableMovements.unitId, unitId),
+          eq(managementReturnableMovements.idempotencyKey, key),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      if (existing.requestHash !== requestHash)
+        throw new ConflictException({
+          code: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+          message: "Idempotency key was already used with another returnable movement.",
+        });
+      return this.movementDto(existing, true);
+    }
+    const [asset] = await tx
+      .select()
+      .from(managementReturnableAssets)
+      .where(
+        and(
+          eq(managementReturnableAssets.organizationId, organizationId),
+          eq(managementReturnableAssets.unitId, unitId),
+          eq(managementReturnableAssets.id, input.assetId),
+          eq(managementReturnableAssets.active, true),
+        ),
+      )
+      .limit(1);
+    if (!asset)
+      throw new NotFoundException({
+        code: "RETURNABLE_ASSET_NOT_FOUND",
+        message: "Returnable asset not found.",
+      });
+
+    let serial: typeof managementReturnableSerials.$inferSelect | undefined;
+    if (asset.trackingMode === "serialized") {
+      if (!input.serialId || input.quantity !== 1)
+        throw new BadRequestException({
+          code: "RETURNABLE_SERIAL_REQUIRED",
+          message: "Serialized assets require one serial and quantity one.",
+        });
+      [serial] = await tx
+        .select()
+        .from(managementReturnableSerials)
+        .where(
+          and(
+            eq(managementReturnableSerials.organizationId, organizationId),
+            eq(managementReturnableSerials.unitId, unitId),
+            eq(managementReturnableSerials.assetId, asset.id),
+            eq(managementReturnableSerials.id, input.serialId),
+          ),
+        )
+        .limit(1);
+      if (!serial)
+        throw new NotFoundException({
+          code: "RETURNABLE_SERIAL_NOT_FOUND",
+          message: "Returnable serial not found.",
+        });
+      const [latest] = await tx
+        .select()
+        .from(managementReturnableMovements)
+        .where(eq(managementReturnableMovements.serialId, serial.id))
+        .orderBy(
+          desc(managementReturnableMovements.occurredAt),
+          desc(managementReturnableMovements.createdAt),
+        )
+        .limit(1);
+      if (
+        (latest &&
+          (latest.toCustodyType !== input.fromCustody.type ||
+            latest.toCustodyId !== input.fromCustody.id)) ||
+        (!latest && !isExternalOrigin(input))
+      )
+        throw new ConflictException({
+          code: "RETURNABLE_CUSTODY_CHAIN_MISMATCH",
+          message: "Source does not match the serial custody chain.",
+        });
+      if (latest && occurredAt < latest.occurredAt)
+        throw new ConflictException({
+          code: "RETURNABLE_MOVEMENT_BACKDATED",
+          message: "Serialized movement cannot predate the latest custody event.",
+        });
+    } else {
+      if (input.serialId)
+        throw new BadRequestException({
+          code: "RETURNABLE_SERIAL_NOT_ALLOWED",
+          message: "Aggregate assets do not accept a serial.",
+        });
+      const rows = await tx
+        .select()
+        .from(managementReturnableMovements)
+        .where(eq(managementReturnableMovements.assetId, asset.id))
+        .orderBy(
+          asc(managementReturnableMovements.occurredAt),
+          asc(managementReturnableMovements.createdAt),
+        );
+      const latest = rows.at(-1);
+      if (latest && occurredAt < latest.occurredAt)
+        throw new ConflictException({
+          code: "RETURNABLE_MOVEMENT_BACKDATED",
+          message: "Aggregate movement cannot predate the latest asset event.",
+        });
+      if (!isExternalOrigin(input)) {
+        const available = rows.reduce((balance, movement) => {
+          const incoming =
+            movement.toCustodyType === input.fromCustody.type &&
+            movement.toCustodyId === input.fromCustody.id;
+          const outgoing =
+            movement.fromCustodyType === input.fromCustody.type &&
+            movement.fromCustodyId === input.fromCustody.id;
+          return balance + (incoming ? movement.quantity : 0) - (outgoing ? movement.quantity : 0);
+        }, 0);
+        if (available < input.quantity)
+          throw new ConflictException({
+            code: "RETURNABLE_INSUFFICIENT_BALANCE",
+            message: "Source custody has insufficient balance for this movement.",
+          });
+      }
+    }
+
+    const [movement] = await tx
+      .insert(managementReturnableMovements)
+      .values({
+        organizationId,
+        unitId,
+        assetId: asset.id,
+        serialId: serial?.id,
+        movementType: "reconcile_adjustment",
+        quantity: input.quantity,
+        fromCustodyType: input.fromCustody.type,
+        fromCustodyId: input.fromCustody.id,
+        toCustodyType: input.toCustody.type,
+        toCustodyId: input.toCustody.id,
+        reason: input.reason?.trim(),
+        idempotencyKey: key,
+        requestHash,
+        actorIdentityId: identityId,
+        approverIdentityId: identityId,
+        occurredAt,
+      })
+      .returning();
+    if (!movement) throw new Error("Returnable reconciliation insert returned no row.");
+    if (serial) {
+      const [updatedSerial] = await tx
+        .update(managementReturnableSerials)
+        .set({ state: "in_custody", version: serial.version + 1, updatedAt: new Date() })
+        .where(
+          and(
+            eq(managementReturnableSerials.id, serial.id),
+            eq(managementReturnableSerials.version, serial.version),
+          ),
+        )
+        .returning({ id: managementReturnableSerials.id });
+      if (!updatedSerial)
+        throw new ConflictException({ code: "RETURNABLE_SERIAL_VERSION_CONFLICT" });
+    }
+    return this.movementDto(movement, false);
+  }
+
   async reconcile(
     identityId: string,
     organizationId: string,
@@ -392,147 +649,202 @@ export class ReturnablesService {
     await this.requireRole(identityId, organizationId, unitId);
     const key = requiredKey(idempotencyKey);
     const target = custody(input.custody, "custody");
-    const [asset] = await this.database.db
-      .select()
-      .from(managementReturnableAssets)
-      .where(
-        and(
-          eq(managementReturnableAssets.organizationId, organizationId),
-          eq(managementReturnableAssets.unitId, unitId),
-          eq(managementReturnableAssets.id, input.assetId),
-          eq(managementReturnableAssets.active, true),
-        ),
-      )
-      .limit(1);
-    if (!asset)
-      throw new NotFoundException({
-        code: "RETURNABLE_ASSET_NOT_FOUND",
-        message: "Ativo não encontrado.",
-      });
-    const movements = await this.ledger(identityId, organizationId, unitId, input.assetId);
-    if (asset.trackingMode === "serialized") {
-      const physicalSerialIds = input.physicalSerialIds;
-      if (
-        !physicalSerialIds ||
-        new Set(physicalSerialIds).size !== physicalSerialIds.length ||
-        (input.physicalQuantity !== undefined &&
-          input.physicalQuantity !== physicalSerialIds.length)
-      )
-        throw new BadRequestException({
-          code: "RETURNABLE_SERIAL_INVENTORY_INVALID",
-          message: "A reconciliação serializada exige seriais únicos e contagem coerente.",
-        });
-      const serials = await this.database.db
-        .select()
-        .from(managementReturnableSerials)
-        .where(
-          and(
-            eq(managementReturnableSerials.organizationId, organizationId),
-            eq(managementReturnableSerials.unitId, unitId),
-            eq(managementReturnableSerials.assetId, asset.id),
-          ),
-        );
-      const serialById = new Map(serials.map((serial) => [serial.id, serial]));
-      if (physicalSerialIds.some((serialId) => !serialById.has(serialId)))
-        throw new BadRequestException({
-          code: "RETURNABLE_SERIAL_INVENTORY_INVALID",
-          message: "A contagem contém serial que não pertence ao ativo.",
-        });
-      const latestBySerial = new Map<string, typeof managementReturnableMovements.$inferSelect>();
-      for (const movement of movements) {
-        if (movement.serialId) latestBySerial.set(movement.serialId, movement);
-      }
-      const expectedSerialIds = serials
-        .filter((serial) => {
-          const latest = latestBySerial.get(serial.id);
-          return latest?.toCustodyType === target.type && latest.toCustodyId === target.id;
-        })
-        .map((serial) => serial.id);
-      const physical = new Set(physicalSerialIds);
-      const expected = new Set(expectedSerialIds);
-      const missing = expectedSerialIds.filter((serialId) => !physical.has(serialId));
-      const unexpected = physicalSerialIds.filter((serialId) => !expected.has(serialId));
-      const reconciliationCustody: Custody = { type: "reconciliation", id: "physical-count" };
-      const adjustments: Awaited<ReturnType<ReturnablesService["move"]>>[] = [];
-      for (const serialId of [...missing, ...unexpected]) {
-        const missingFromTarget = expected.has(serialId);
-        const latest = latestBySerial.get(serialId);
-        const fromCustody: Custody = missingFromTarget
-          ? target
-          : latest?.toCustodyType && latest.toCustodyId
-            ? { type: latest.toCustodyType as Custody["type"], id: latest.toCustodyId }
-            : reconciliationCustody;
-        const toCustody = missingFromTarget ? reconciliationCustody : target;
-        const movementKey = `returnable-serial-reconcile:${managementRequestHash(
-          "returnable-serial-reconcile",
-          { key, serialId, fromCustody, toCustody },
-        )}`;
-        adjustments.push(
-          await this.move(identityId, organizationId, unitId, movementKey, {
-            assetId: asset.id,
-            serialId,
-            movementType: "reconcile_adjustment",
-            quantity: 1,
-            fromCustody,
-            toCustody,
-            occurredAt: input.occurredAt,
-            reason: input.reason,
-          }),
-        );
-      }
-      return {
-        expectedQuantity: expectedSerialIds.length,
-        physicalQuantity: physicalSerialIds.length,
-        adjustmentQuantity: physicalSerialIds.length - expectedSerialIds.length,
-        movementId: adjustments[0]?.movementId ?? null,
-        movementIds: adjustments.map((movement) => movement.movementId),
-        idempotentReplay:
-          adjustments.length > 0 && adjustments.every((movement) => movement.idempotentReplay),
-      };
-    }
+    const occurredAt = new Date(input.occurredAt);
     if (
-      input.physicalSerialIds !== undefined ||
-      !Number.isSafeInteger(input.physicalQuantity) ||
-      (input.physicalQuantity ?? -1) < 0
+      Number.isNaN(occurredAt.valueOf()) ||
+      input.reason.trim().length < 3 ||
+      input.reason.length > 240
     )
       throw new BadRequestException({
-        code: "RETURNABLE_PHYSICAL_COUNT_INVALID",
-        message: "A contagem física deve ser um inteiro não negativo.",
+        code: "RETURNABLE_RECONCILIATION_INVALID",
+        message: "Reconciliation requires a valid timestamp and reason.",
       });
-    const physicalQuantity = input.physicalQuantity as number;
-    const expectedQuantity = movements.reduce((balance, movement) => {
-      const incoming = movement.toCustodyType === target.type && movement.toCustodyId === target.id;
-      const outgoing =
-        movement.fromCustodyType === target.type && movement.fromCustodyId === target.id;
-      return balance + (incoming ? movement.quantity : 0) - (outgoing ? movement.quantity : 0);
-    }, 0);
-    const adjustmentQuantity = physicalQuantity - expectedQuantity;
-    if (adjustmentQuantity === 0)
+
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`returnable-asset-ledger:${organizationId}:${unitId}:${input.assetId}`}))`,
+      );
+      await tx.execute(
+        sql`select id from management_returnable_assets where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.assetId}::uuid for update`,
+      );
+      const [asset] = await tx
+        .select()
+        .from(managementReturnableAssets)
+        .where(
+          and(
+            eq(managementReturnableAssets.organizationId, organizationId),
+            eq(managementReturnableAssets.unitId, unitId),
+            eq(managementReturnableAssets.id, input.assetId),
+            eq(managementReturnableAssets.active, true),
+          ),
+        )
+        .limit(1);
+      if (!asset)
+        throw new NotFoundException({
+          code: "RETURNABLE_ASSET_NOT_FOUND",
+          message: "Returnable asset not found.",
+        });
+      const movements = await tx
+        .select()
+        .from(managementReturnableMovements)
+        .where(eq(managementReturnableMovements.assetId, asset.id))
+        .orderBy(
+          asc(managementReturnableMovements.occurredAt),
+          asc(managementReturnableMovements.createdAt),
+        );
+
+      if (asset.trackingMode === "serialized") {
+        const physicalSerialIds = input.physicalSerialIds;
+        if (
+          !physicalSerialIds ||
+          new Set(physicalSerialIds).size !== physicalSerialIds.length ||
+          (input.physicalQuantity !== undefined &&
+            input.physicalQuantity !== physicalSerialIds.length)
+        )
+          throw new BadRequestException({
+            code: "RETURNABLE_SERIAL_INVENTORY_INVALID",
+            message: "Serialized reconciliation requires unique serials and a coherent count.",
+          });
+        await tx.execute(
+          sql`select id from management_returnable_serials where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and asset_id=${asset.id}::uuid order by id for update`,
+        );
+        const serials = await tx
+          .select()
+          .from(managementReturnableSerials)
+          .where(
+            and(
+              eq(managementReturnableSerials.organizationId, organizationId),
+              eq(managementReturnableSerials.unitId, unitId),
+              eq(managementReturnableSerials.assetId, asset.id),
+            ),
+          )
+          .orderBy(asc(managementReturnableSerials.id));
+        const serialById = new Map(serials.map((serial) => [serial.id, serial]));
+        if (physicalSerialIds.some((serialId) => !serialById.has(serialId)))
+          throw new BadRequestException({
+            code: "RETURNABLE_SERIAL_INVENTORY_INVALID",
+            message: "Physical count contains a serial outside this asset.",
+          });
+        const latestBySerial = new Map<string, typeof managementReturnableMovements.$inferSelect>();
+        for (const movement of movements) {
+          if (movement.serialId) latestBySerial.set(movement.serialId, movement);
+        }
+        const expectedSerialIds = serials
+          .filter((serial) => {
+            const latest = latestBySerial.get(serial.id);
+            return latest?.toCustodyType === target.type && latest.toCustodyId === target.id;
+          })
+          .map((serial) => serial.id);
+        const physical = new Set(physicalSerialIds);
+        const expected = new Set(expectedSerialIds);
+        const missing = expectedSerialIds.filter((serialId) => !physical.has(serialId));
+        const unexpected = physicalSerialIds.filter((serialId) => !expected.has(serialId));
+        const reconciliationCustody: Custody = {
+          type: "reconciliation",
+          id: "physical-count",
+        };
+        const adjustments: Awaited<
+          ReturnType<ReturnablesService["moveReconciliationInTransaction"]>
+        >[] = [];
+        for (const serialId of [...missing, ...unexpected]) {
+          const missingFromTarget = expected.has(serialId);
+          const latest = latestBySerial.get(serialId);
+          const fromCustody: Custody = missingFromTarget
+            ? target
+            : latest?.toCustodyType && latest.toCustodyId
+              ? { type: latest.toCustodyType as CustodyType, id: latest.toCustodyId }
+              : reconciliationCustody;
+          const toCustody = missingFromTarget ? reconciliationCustody : target;
+          const movementKey = `returnable-serial-reconcile:${managementRequestHash(
+            "returnable-serial-reconcile",
+            { key, serialId, fromCustody, toCustody },
+          )}`;
+          adjustments.push(
+            await this.moveReconciliationInTransaction(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              movementKey,
+              normalizeMovement({
+                assetId: asset.id,
+                serialId,
+                movementType: "reconcile_adjustment",
+                quantity: 1,
+                fromCustody,
+                toCustody,
+                occurredAt: input.occurredAt,
+                reason: input.reason,
+              }),
+            ),
+          );
+        }
+        return {
+          expectedQuantity: expectedSerialIds.length,
+          physicalQuantity: physicalSerialIds.length,
+          adjustmentQuantity: physicalSerialIds.length - expectedSerialIds.length,
+          movementId: adjustments[0]?.movementId ?? null,
+          movementIds: adjustments.map((movement) => movement.movementId),
+          idempotentReplay:
+            adjustments.length > 0 && adjustments.every((movement) => movement.idempotentReplay),
+        };
+      }
+
+      if (
+        input.physicalSerialIds !== undefined ||
+        !Number.isSafeInteger(input.physicalQuantity) ||
+        (input.physicalQuantity ?? -1) < 0
+      )
+        throw new BadRequestException({
+          code: "RETURNABLE_PHYSICAL_COUNT_INVALID",
+          message: "Physical count must be a non-negative integer.",
+        });
+      const physicalQuantity = input.physicalQuantity as number;
+      const expectedQuantity = movements.reduce((balance, movement) => {
+        const incoming =
+          movement.toCustodyType === target.type && movement.toCustodyId === target.id;
+        const outgoing =
+          movement.fromCustodyType === target.type && movement.fromCustodyId === target.id;
+        return balance + (incoming ? movement.quantity : 0) - (outgoing ? movement.quantity : 0);
+      }, 0);
+      const adjustmentQuantity = physicalQuantity - expectedQuantity;
+      if (adjustmentQuantity === 0)
+        return {
+          expectedQuantity,
+          physicalQuantity,
+          adjustmentQuantity,
+          movementId: null,
+          movementIds: [],
+        };
+      const reconciliationCustody: Custody = {
+        type: "reconciliation",
+        id: "physical-count",
+      };
+      const movement = await this.moveReconciliationInTransaction(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        key,
+        normalizeMovement({
+          assetId: input.assetId,
+          movementType: "reconcile_adjustment",
+          quantity: Math.abs(adjustmentQuantity),
+          fromCustody: adjustmentQuantity > 0 ? reconciliationCustody : target,
+          toCustody: adjustmentQuantity > 0 ? target : reconciliationCustody,
+          occurredAt: input.occurredAt,
+          reason: input.reason,
+        }),
+      );
       return {
         expectedQuantity,
         physicalQuantity,
         adjustmentQuantity,
-        movementId: null,
-        movementIds: [],
+        movementId: movement.movementId,
+        movementIds: [movement.movementId],
+        idempotentReplay: movement.idempotentReplay,
       };
-    const reconciliationCustody: Custody = { type: "reconciliation", id: "physical-count" };
-    const movement = await this.move(identityId, organizationId, unitId, key, {
-      assetId: input.assetId,
-      movementType: "reconcile_adjustment",
-      quantity: Math.abs(adjustmentQuantity),
-      fromCustody: adjustmentQuantity > 0 ? reconciliationCustody : target,
-      toCustody: adjustmentQuantity > 0 ? target : reconciliationCustody,
-      occurredAt: input.occurredAt,
-      reason: input.reason,
     });
-    return {
-      expectedQuantity,
-      physicalQuantity,
-      adjustmentQuantity,
-      movementId: movement.movementId,
-      movementIds: [movement.movementId],
-      idempotentReplay: movement.idempotentReplay,
-    };
   }
 
   async ledger(identityId: string, organizationId: string, unitId: string, assetId: string) {
