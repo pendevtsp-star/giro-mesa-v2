@@ -902,7 +902,7 @@ body {
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 800;
-  min-height: 44px;
+  min-height: 48px;
   padding: 0.65rem 0.85rem;
 }
 .pwa-update button:last-child {

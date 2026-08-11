@@ -81,7 +81,7 @@ summary:focus-visible {
   font-size: 12px;
 }
 .pwa-update button {
-  min-height: 44px;
+  min-height: 48px;
   padding: 9px 13px;
   border: 0;
   border-radius: 10px;
@@ -834,16 +834,18 @@ summary:focus-visible {
   list-style: none;
 }
 .feature-checks li {
+  align-items: flex-start;
+  display: flex;
+  gap: 9px;
   margin: 13px 0;
-  padding-left: 29px;
-  position: relative;
+  padding-left: 0;
 }
-.feature-checks li::before {
-  position: absolute;
-  left: 0;
-  content: "✓";
+.feature-checks .gm-icon {
   color: var(--orange);
-  font-weight: 900;
+  flex: 0 0 auto;
+  height: 20px;
+  margin-top: 1px;
+  width: 20px;
 }
 .lead-form,
 .auth-form {
@@ -980,9 +982,8 @@ summary:focus-visible {
   border-color: var(--line);
   background: #fff;
 }
-.google-button span {
-  font-size: 19px;
-  color: #3971e7;
+.google-mark {
+  flex: 0 0 auto;
 }
 .divider {
   margin: 24px 0;

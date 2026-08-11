@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { GoogleMark } from "../../components/google-mark";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
 import { siteFetch } from "../../lib/pwa-fetch";
 
@@ -103,7 +104,7 @@ export default function CreateAccountPage() {
           onClick={startGoogleSignup}
           disabled={!termsAccepted}
         >
-          <span aria-hidden="true">G</span> Criar com Google
+          <GoogleMark /> Criar com Google
         </button>
         <div className="divider">
           <span>ou com e-mail</span>

@@ -3,6 +3,7 @@
 import { Icon } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { GoogleMark } from "../../components/google-mark";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
 import { buildMfaProof, readMfaChallenge } from "../../lib/mfa";
 import { siteFetch } from "../../lib/pwa-fetch";
@@ -142,7 +143,7 @@ export default function LoginPage() {
           {!challengeToken && !oauthMfa && (
             <>
               <button className="button google-button" type="button" onClick={startGoogleLogin}>
-                <span aria-hidden="true">G</span> Continuar com Google
+                <GoogleMark /> Continuar com Google
               </button>
               <div className="divider">
                 <span>ou com e-mail</span>

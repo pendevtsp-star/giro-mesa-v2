@@ -1,3 +1,4 @@
+import { Icon } from "@giromesa/ui";
 import type { Metadata } from "next";
 import { LeadForm } from "../../components/lead-form";
 
@@ -22,9 +23,15 @@ export default async function TrialPage({
             período gratuito.
           </p>
           <ul className="feature-checks">
-            <li>Configuração e treinamento remoto incluídos</li>
-            <li>Plano escolhido liberado durante o teste</li>
-            <li>Sem cobrança automática ou surpresa</li>
+            <li>
+              <Icon name="check" /> Configuração e treinamento remoto incluídos
+            </li>
+            <li>
+              <Icon name="check" /> Plano escolhido liberado durante o teste
+            </li>
+            <li>
+              <Icon name="check" /> Sem cobrança automática ou surpresa
+            </li>
           </ul>
         </div>
         <aside>
