@@ -165,7 +165,7 @@ export class PlatformService {
           eq(auditEvents.entityType, "platform_action"),
         ),
       )
-      .orderBy(asc(auditEvents.occurredAt), asc(auditEvents.id));
+      .orderBy(sql`(${auditEvents.metadata}->>'version')::int`, asc(auditEvents.id));
     const grouped = new Map<string, ActionEvent[]>();
     for (const row of rows) {
       if (!row.entityId) continue;
@@ -724,7 +724,7 @@ export class PlatformService {
           eq(auditEvents.entityId, proposalId),
         ),
       )
-      .orderBy(asc(auditEvents.occurredAt), asc(auditEvents.id));
+      .orderBy(sql`(${auditEvents.metadata}->>'version')::int`, asc(auditEvents.id));
     if (events.length === 0) throw new NotFoundException("PLATFORM_ACTION_NOT_FOUND");
     try {
       return platformActionFromAuditEvents(organizationId, proposalId, events);
