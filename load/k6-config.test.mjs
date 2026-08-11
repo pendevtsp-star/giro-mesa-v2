@@ -42,10 +42,14 @@ it("builds a light smoke profile and explicit reliability thresholds", () => {
       },
     },
     thresholds: {
-      checks: ["rate>0.999"],
-      http_req_failed: ["rate<0.001"],
-      "http_req_duration{kind:read}": ["p(95)<300"],
-      "http_req_duration{kind:write}": ["p(95)<500"],
+      checks: [{ threshold: "rate>0.999", abortOnFail: true, delayAbortEval: "30s" }],
+      http_req_failed: [{ threshold: "rate<0.001", abortOnFail: true, delayAbortEval: "30s" }],
+      "http_req_duration{kind:read}": [
+        { threshold: "p(95)<300", abortOnFail: true, delayAbortEval: "1m" },
+      ],
+      "http_req_duration{kind:write}": [
+        { threshold: "p(95)<500", abortOnFail: true, delayAbortEval: "1m" },
+      ],
     },
   });
 });
@@ -73,7 +77,7 @@ it("models the approved target, two-times spike and soak without running them", 
     multitenant_soak: { executor: "constant-vus", vus: 150, duration: "2h" },
   });
   assert.deepEqual(buildK6Options("multitenant", "target", 2).thresholds.isolation_breach, [
-    "rate==0",
+    { threshold: "rate==0", abortOnFail: true, delayAbortEval: "0s" },
   ]);
 });
 

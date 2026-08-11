@@ -16,11 +16,19 @@ const TENANT_FIELDS = new Set([
 ]);
 
 const thresholds = (kind) => ({
-  checks: ["rate>0.999"],
-  http_req_failed: ["rate<0.001"],
-  "http_req_duration{kind:read}": ["p(95)<300"],
-  "http_req_duration{kind:write}": ["p(95)<500"],
-  ...(kind === "multitenant" ? { isolation_breach: ["rate==0"] } : {}),
+  checks: [{ threshold: "rate>0.999", abortOnFail: true, delayAbortEval: "30s" }],
+  http_req_failed: [{ threshold: "rate<0.001", abortOnFail: true, delayAbortEval: "30s" }],
+  "http_req_duration{kind:read}": [
+    { threshold: "p(95)<300", abortOnFail: true, delayAbortEval: "1m" },
+  ],
+  "http_req_duration{kind:write}": [
+    { threshold: "p(95)<500", abortOnFail: true, delayAbortEval: "1m" },
+  ],
+  ...(kind === "multitenant"
+    ? {
+        isolation_breach: [{ threshold: "rate==0", abortOnFail: true, delayAbortEval: "0s" }],
+      }
+    : {}),
 });
 
 export function profileRequirements(profile) {

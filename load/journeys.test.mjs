@@ -21,7 +21,7 @@ const tenantB = {
 };
 
 it("models a real operational read/open/read journey with bounded tags", () => {
-  assert.deepEqual(operationalRequests(tenantA, 1, 0), [
+  assert.deepEqual(operationalRequests(tenantA, 1, {}), [
     {
       name: "floor.read",
       kind: "read",
@@ -51,10 +51,36 @@ it("models a real operational read/open/read journey with bounded tags", () => {
 });
 
 it("opens each table once and then keeps the steady-state journey read-only", () => {
+  const state = {};
+  operationalRequests(tenantA, 1, state);
   assert.deepEqual(
-    operationalRequests(tenantA, 1, 1).map((request) => request.name),
+    operationalRequests(tenantA, 1, state).map((request) => request.name),
     ["floor.read", "tabs.read"],
   );
+  assert.deepEqual(state, {
+    openAttempted: true,
+    tableId: "d1111111-1111-4111-8111-111111111111",
+  });
+});
+
+it("assigns exclusive tables to the second wave of operational spike VUs", () => {
+  const tenant = {
+    ...tenantA,
+    terminalIds: Array.from({ length: 50 }, (_, index) => `terminal-${index}`),
+    tableIds: Array.from({ length: 500 }, (_, index) => `table-${index}`),
+  };
+
+  const firstWave = operationalRequests(tenant, 1, {});
+  const secondWave = operationalRequests(tenant, 51, {});
+
+  assert.deepEqual(firstWave.find((request) => request.name === "tab.open")?.body, {
+    tableId: "table-0",
+    guestCount: 2,
+  });
+  assert.deepEqual(secondWave.find((request) => request.name === "tab.open")?.body, {
+    tableId: "table-50",
+    guestCount: 2,
+  });
 });
 
 it("models public QR sessions without credentials or tenant tags", () => {
@@ -91,7 +117,7 @@ it("models a negative cross-tenant probe that only accepts forbidden or not-foun
 
 it("keeps secrets outside journey descriptors", () => {
   const serialized = JSON.stringify([
-    ...operationalRequests(tenantA, 1, 0),
+    ...operationalRequests(tenantA, 1, {}),
     ...publicQrRequests(tenantA),
     ...multitenantRequests(tenantA, tenantB),
   ]);

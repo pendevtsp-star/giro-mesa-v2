@@ -2,10 +2,9 @@ function pilotPath(tenant, resource) {
   return `/v1/organizations/${encodeURIComponent(tenant.organizationId)}/units/${encodeURIComponent(tenant.unitId)}/pilot/${resource}`;
 }
 
-export function operationalRequests(tenant, vuNumber, iteration) {
-  const terminalIndex = (vuNumber - 1) % tenant.terminalIds.length;
-  const tableIndex = iteration * tenant.terminalIds.length + terminalIndex;
-  const tableId = tenant.tableIds[tableIndex];
+export function operationalRequests(tenant, vuNumber, state) {
+  const tableId = state.tableId ?? tenant.tableIds[vuNumber - 1];
+  state.tableId = tableId;
   const requests = [
     {
       name: "floor.read",
@@ -15,7 +14,8 @@ export function operationalRequests(tenant, vuNumber, iteration) {
       expectedStatuses: [200],
     },
   ];
-  if (tableId) {
+  if (tableId && !state.openAttempted) {
+    state.openAttempted = true;
     requests.push({
       name: "tab.open",
       kind: "write",

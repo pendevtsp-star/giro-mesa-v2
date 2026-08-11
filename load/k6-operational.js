@@ -13,6 +13,7 @@ const profile = __ENV.K6_PROFILE ?? "smoke";
 const fixture = parseLoadFixture(open(fixturePath(__ENV)), profile);
 
 export const options = buildK6Options("operational", profile, fixture.tenants.length);
+const operationalState = {};
 
 export default function operationalScenario() {
   const { tenant, tenantVuNumber } = fixtureTenantSlot(fixture, __VU);
@@ -20,7 +21,7 @@ export default function operationalScenario() {
   runRequests(
     context.metadata.baseUrl,
     context.requestHeaders,
-    operationalRequests(tenant, tenantVuNumber, __ITER),
+    operationalRequests(tenant, tenantVuNumber, operationalState),
   );
   sleep(1);
 }

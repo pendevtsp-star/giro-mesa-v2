@@ -4,7 +4,7 @@
 
 O harness em `load/` cobre três jornadas independentes:
 
-- `k6-operational.js`: leitura do salão, abertura idempotente de mesa e releitura de comandas.
+- `k6-operational.js`: leitura do salão, abertura exclusiva de mesa e releitura de comandas.
 - `k6-public-qr.js`: leitura pública de menu, representando sessões originadas por QR.
 - `k6-multitenant.js`: acesso ao próprio tenant e probe negativo contra outro tenant.
 
@@ -29,7 +29,7 @@ Com múltiplas unidades, a concorrência é multiplicada pelo número de entrada
 - escrita: p95 menor que 500 ms;
 - isolamento: `isolation_breach == 0`.
 
-Cada mesa é aberta uma única vez antes de a jornada entrar em leitura sustentada. Status 409 indica fixture suja ou distribuição incorreta e reprova a execução. Qualquer 200 no probe estrangeiro é violação de isolamento e aborta a aprovação.
+Cada VU operacional mantém estado isolado, recebe uma mesa exclusiva pelo seu índice local — inclusive os VUs 51–100 do spike — e tenta abri-la somente na primeira iteração. As iterações seguintes reutilizam a sessão aberta e permanecem em leitura; não repetem `tab.open`. Status 409 indica fixture suja ou distribuição incorreta e reprova a execução. Qualquer 200 no probe estrangeiro é violação de isolamento e aborta a aprovação.
 
 ## Pré-requisitos e dados
 
@@ -76,12 +76,12 @@ Abortar imediatamente quando ocorrer qualquer um:
 
 - `isolation_breach > 0`, resposta com dado de outro tenant ou efeito cruzado;
 - perda, duplicação indevida ou corrupção operacional;
-- erro igual ou superior a 0,1% após aquecimento;
-- p95 de leitura igual ou superior a 300 ms ou escrita igual ou superior a 500 ms por 10 minutos;
+- erro igual ou superior a 0,1% após 30 segundos de aquecimento;
+- p95 de leitura igual ou superior a 300 ms ou escrita igual ou superior a 500 ms após 1 minuto;
 - CPU sustentada acima de 85%, memória acima de 80%, pool acima de 85% ou fila sem drenagem;
 - necessidade de copiar secret/payload para investigar.
 
-O abort preserva métricas e evidências sanitizadas, mas não autoriza apagar fila, inbox, outbox ou dados de auditoria.
+Os thresholds do k6 usam `abortOnFail`: isolamento tem `delayAbortEval: 0s`, checks e erro usam `30s`, e latência usa `1m`. Os gates de integridade e saturação que dependem de observação externa continuam sob responsabilidade do operador. O abort preserva métricas e evidências sanitizadas, mas não autoriza apagar fila, inbox, outbox ou dados de auditoria.
 
 ## Leitura e registro do resultado
 
