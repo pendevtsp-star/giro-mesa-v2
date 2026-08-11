@@ -1,4 +1,4 @@
-import { demoMenu, MENU_ICON_NAMES, type MenuItem } from "./menu.ts";
+import { demoMenu, MENU_ICON_NAMES, type MenuBranding, type MenuItem } from "./menu.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -38,17 +38,46 @@ function isMenuItem(value: unknown): value is MenuItem {
     (value.priceCents as number) >= 0 &&
     (value.visual === undefined || typeof value.visual === "string") &&
     (value.icon === undefined || MENU_ICON_NAMES.some((icon) => icon === value.icon)) &&
+    (value.imageUrl === undefined || value.imageUrl === null || typeof value.imageUrl === "string") &&
     typeof value.available === "boolean" &&
     validTags &&
     validGroups
   );
 }
 
-export function normalizePublicMenu(payload: unknown): MenuItem[] | null {
+export function normalizePublicMenu(
+  payload: unknown,
+): { items: MenuItem[]; branding: MenuBranding | null } | null {
   if (!isRecord(payload) || !Array.isArray(payload.items) || !payload.items.every(isMenuItem)) {
     return null;
   }
-  return payload.items;
+  const branding = payload.branding;
+  const validBranding =
+    branding === null ||
+    (isRecord(branding) &&
+      typeof branding.name === "string" &&
+      typeof branding.description === "string" &&
+      typeof branding.primaryColor === "string" &&
+      typeof branding.surfaceColor === "string" &&
+      typeof branding.textColor === "string" &&
+      (branding.logoUrl === null || typeof branding.logoUrl === "string") &&
+      (branding.coverUrl === null || typeof branding.coverUrl === "string"));
+  if (!validBranding) return null;
+  return {
+    branding: branding as MenuBranding | null,
+    items: (payload.items as Array<Omit<MenuItem, "visual"> & { visual?: MenuItem["visual"] }>).map(
+      (item) => ({
+        ...item,
+        visual:
+          item.visual ??
+          (/bebida|drink|bar/i.test(item.category)
+            ? "drink"
+            : /sobremesa|doce|dessert/i.test(item.category)
+              ? "dessert"
+              : "plate"),
+      }),
+    ),
+  };
 }
 
 export function isDemoMenuSlug(slug: string, configuredQaSlug?: string): boolean {
@@ -57,23 +86,27 @@ export function isDemoMenuSlug(slug: string, configuredQaSlug?: string): boolean
 
 export async function getPublicMenu(
   slug: string,
-): Promise<{ items: MenuItem[]; source: "api" | "demo" | "unavailable" }> {
+): Promise<{
+  items: MenuItem[];
+  branding: MenuBranding | null;
+  source: "api" | "demo" | "unavailable";
+}> {
   if (isDemoMenuSlug(slug, process.env.CUSTOMER_QA_DEMO_SLUG)) {
-    return { items: demoMenu, source: "demo" };
+    return { items: demoMenu, branding: null, source: "demo" };
   }
   const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
   if (!apiUrl || process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED !== "true") {
-    return { items: [], source: "unavailable" };
+    return { items: [], branding: null, source: "unavailable" };
   }
   try {
     const response = await fetch(`${apiUrl}/public/v1/menus/${encodeURIComponent(slug)}`, {
       next: { revalidate: 60 },
     });
     if (!response.ok) throw new Error("Menu indisponível");
-    const items = normalizePublicMenu(await response.json());
-    if (!items) throw new Error("Menu inválido");
-    return { items, source: "api" };
+    const menu = normalizePublicMenu(await response.json());
+    if (!menu) throw new Error("Menu inválido");
+    return { ...menu, source: "api" };
   } catch {
-    return { items: [], source: "unavailable" };
+    return { items: [], branding: null, source: "unavailable" };
   }
 }

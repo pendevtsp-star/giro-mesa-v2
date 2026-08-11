@@ -9,6 +9,7 @@ import { GrowthModule } from "./growth/growth.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ManagementModule } from "./management/management.module.js";
 import { ObservabilityModule } from "./observability/observability.module.js";
+import { MediaModule } from "./media/media.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
@@ -16,6 +17,7 @@ import { PilotOperationsModule } from "./pilot-operations/pilot-operations.modul
 import { PlatformModule } from "./platform/platform.module.js";
 import { PublicMenuModule } from "./public-menu/public-menu.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { SalonModule } from "./salon/salon.module.js";
 import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
@@ -31,9 +33,11 @@ import { SyncModule } from "./sync/sync.module.js";
     OperationsModule,
     PublicMenuModule,
     RealtimeModule,
+    SalonModule,
     PilotOperationsModule,
     PlatformModule,
     ManagementModule,
+    MediaModule,
     GrowthModule,
     SyncModule,
   ],

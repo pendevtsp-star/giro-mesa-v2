@@ -56,6 +56,7 @@ import {
   RealMultiunitPage,
   RealReservationsPage,
 } from "./growth-pages";
+import { KdsBoard, type KdsBoardTicket } from "./kds-board";
 import {
   RealCashPage,
   RealDashboard,
@@ -77,13 +78,8 @@ import { RealPlatformPage } from "./platform";
 import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { parseRoute, routeHref } from "./router";
-import {
-  calculateCartTotal,
-  canAccess,
-  formatMoney,
-  isValidTerminalPin,
-  nextTicketStatus,
-} from "./rules";
+import { calculateCartTotal, canAccess, formatMoney, isValidTerminalPin } from "./rules";
+import { SalonMap, type SalonMapTable } from "./salon-map";
 
 type Session = {
   identityId: string;
@@ -1897,9 +1893,7 @@ function SalonPage({
   setTables: (tables: DiningTable[]) => void;
   onCommand: CommandRecorder;
 }) {
-  const [area, setArea] = useState<DiningTable["area"] | "Todas">("Todas");
   const [selected, setSelected] = useState<DiningTable | null>(null);
-  const visible = tables.filter((table) => area === "Todas" || table.area === area);
 
   function occupy(table: DiningTable) {
     const updated = {
@@ -1914,106 +1908,76 @@ function SalonPage({
     onCommand("table.opened", { tableId: table.id });
   }
 
+  const statusByDemoStatus: Record<TableStatus, SalonMapTable["status"]> = {
+    free: "available",
+    occupied: "occupied",
+    attention: "attention",
+    closing: "paying",
+    reserved: "reserved",
+  };
+  const mapTables: SalonMapTable[] = tables.map((table, index) => ({
+    id: table.id,
+    label: table.name,
+    seats: table.seats,
+    status: statusByDemoStatus[table.status],
+    x: 70 + (index % 4) * 210,
+    y: 85 + Math.floor(index / 4) * 165,
+    width: 168,
+    height: 124,
+    areaId: table.area,
+    totalCents: table.totalCents,
+    elapsedMinutes: table.openedMinutes,
+    ownerName: table.server,
+  }));
+
   return (
-    <div className="salon-layout">
-      <section>
-        <div className="filters-row">
-          <fieldset className="segmented">
-            <legend className="gm-sr-only">Filtrar área</legend>
-            {(["Todas", "Salão principal", "Varanda", "Balcão"] as const).map((item) => (
-              <button
-                aria-pressed={area === item}
-                key={item}
-                onClick={() => setArea(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-          </fieldset>
-          <div className="legend">
-            <span className="dot dot--free" />
-            Livre <span className="dot dot--busy" />
-            Ocupada <span className="dot dot--attention" />
-            Atenção
-          </div>
-        </div>
-        <div className="table-grid">
-          {visible.map((table) => (
-            <button
-              className={`table-tile table-tile--${table.status} ${selected?.id === table.id ? "selected" : ""}`}
-              key={table.id}
-              onClick={() => setSelected(table)}
-              type="button"
-            >
-              <span className="table-tile__top">
-                <strong>{table.name}</strong>
-                <Badge tone={tableStatus[table.status].tone}>
-                  {tableStatus[table.status].label}
-                </Badge>
-              </span>
-              <span className="table-tile__seats" aria-label={`${table.seats} lugares`} role="img">
-                {SEAT_MARKERS.slice(0, Math.min(table.seats, SEAT_MARKERS.length)).map((marker) => (
-                  <Icon key={`${table.id}-seat-${marker}`} name="user" />
-                ))}
-              </span>
-              {table.status === "free" || table.status === "reserved" ? (
-                <small>
-                  {table.seats} lugares · {table.area}
-                </small>
-              ) : (
-                <>
-                  <strong>{formatMoney(table.totalCents ?? 0)}</strong>
-                  <small>
-                    {table.server} · {table.openedMinutes} min
-                  </small>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-      </section>
-      <Card className="table-drawer">
-        {!selected ? (
-          <EmptyState
-            icon={<Icon name="dish" />}
-            title="Selecione uma mesa"
-            description="Veja a comanda, lance itens ou atenda chamados."
-          />
-        ) : (
-          <>
-            <div className="card-header">
-              <div>
-                <p className="eyebrow">{selected.area}</p>
-                <h2>{selected.name}</h2>
-              </div>
-              <Badge tone={tableStatus[selected.status].tone}>
-                {tableStatus[selected.status].label}
-              </Badge>
-            </div>
-            {selected.status === "free" ? (
-              <EmptyState
-                icon={<Icon name="plus" />}
-                title="Mesa disponível"
-                description={`${selected.seats} lugares prontos para atendimento.`}
-                action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
-              />
-            ) : selected.status === "reserved" ? (
-              <>
-                <div className="reservation-info">
-                  <span>Reserva</span>
-                  <strong>Camila · 20:30</strong>
-                  <small>2 pessoas · confirmação por telefone</small>
+    <SalonMap
+      tables={mapTables}
+      selectedTableId={selected?.id ?? null}
+      onSelect={(tableId) => setSelected(tables.find((table) => table.id === tableId) ?? null)}
+      details={
+        <Card className="table-drawer">
+          {!selected ? (
+            <EmptyState
+              icon={<Icon name="dish" />}
+              title="Selecione uma mesa"
+              description="Veja a comanda, lance itens ou atenda chamados."
+            />
+          ) : (
+            <>
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">{selected.area}</p>
+                  <h2>{selected.name}</h2>
                 </div>
-                <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
-              </>
-            ) : (
-              <TableTab table={selected} onCommand={onCommand} />
-            )}
-          </>
-        )}
-      </Card>
-    </div>
+                <Badge tone={tableStatus[selected.status].tone}>
+                  {tableStatus[selected.status].label}
+                </Badge>
+              </div>
+              {selected.status === "free" ? (
+                <EmptyState
+                  icon={<Icon name="plus" />}
+                  title="Mesa disponível"
+                  description={`${selected.seats} lugares prontos para atendimento.`}
+                  action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
+                />
+              ) : selected.status === "reserved" ? (
+                <>
+                  <div className="reservation-info">
+                    <span>Reserva</span>
+                    <strong>Camila · 20:30</strong>
+                    <small>2 pessoas · confirmação por telefone</small>
+                  </div>
+                  <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
+                </>
+              ) : (
+                <TableTab table={selected} onCommand={onCommand} />
+              )}
+            </>
+          )}
+        </Card>
+      }
+    />
   );
 }
 
@@ -2379,97 +2343,35 @@ function KdsPage({
   setTickets: (tickets: KitchenTicket[]) => void;
   onCommand: CommandRecorder;
 }) {
-  const [station, setStation] = useState<"Todas" | KitchenTicket["station"]>("Todas");
-  const visible = tickets.filter((ticket) => station === "Todas" || ticket.station === station);
-  function advance(ticket: KitchenTicket) {
-    setTickets(
-      tickets.map((item) =>
-        item.id === ticket.id ? { ...item, status: nextTicketStatus(item.status) } : item,
-      ),
-    );
-    onCommand("kds.ticket_advanced", {
-      ticketId: ticket.id,
-      status: nextTicketStatus(ticket.status),
-    });
-  }
-  const columns = ["new", "preparing", "ready"] as const;
+  const boardTickets: KdsBoardTicket[] = tickets.map((ticket) => ({
+    id: ticket.id,
+    reference: ticket.reference,
+    station: ticket.station,
+    status: ticket.status === "new" ? "pending" : ticket.status,
+    elapsedMinutes: ticket.elapsedMinutes,
+    priority: ticket.priority,
+    items: ticket.items.map((item, index) => ({ id: `${ticket.id}-${index}`, label: item })),
+  }));
   return (
-    <div>
-      <div className="filters-row">
-        <div className="segmented">
-          {(["Todas", "Cozinha", "Bar"] as const).map((item) => (
-            <button
-              aria-pressed={station === item}
-              key={item}
-              onClick={() => setStation(item)}
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="kds-clock">
-          <span className="dot dot--free" /> Turno 18:42 · média 17 min
-        </div>
-      </div>
-      <div className="kds-board">
-        {columns.map((status) => (
-          <section className={`kds-column kds-column--${status}`} key={status}>
-            <header>
-              <h2>
-                {status === "new" ? "Novos" : status === "preparing" ? "Em preparo" : "Prontos"}
-              </h2>
-              <Badge
-                tone={status === "new" ? "info" : status === "preparing" ? "warning" : "success"}
-              >
-                {visible.filter((item) => item.status === status).length}
-              </Badge>
-            </header>
-            <div>
-              {visible
-                .filter((item) => item.status === status)
-                .map((ticket) => (
-                  <Card
-                    className={`ticket ${ticket.elapsedMinutes >= 20 && status !== "ready" ? "ticket--late" : ""}`}
-                    key={ticket.id}
-                  >
-                    <div className="ticket__header">
-                      <span>
-                        <Badge tone={ticket.station === "Bar" ? "info" : "neutral"}>
-                          {ticket.station}
-                        </Badge>
-                        {ticket.priority && <Badge tone="danger">Prioridade</Badge>}
-                      </span>
-                      <strong>{ticket.elapsedMinutes} min</strong>
-                    </div>
-                    <h3>{ticket.reference}</h3>
-                    <ul>
-                      {ticket.items.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                    {status !== "ready" ? (
-                      <Button onClick={() => advance(ticket)}>
-                        {status === "new" ? "Iniciar preparo" : "Marcar pronto"}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          setTickets(tickets.filter((item) => item.id !== ticket.id));
-                          onCommand("kds.ticket_collected", { ticketId: ticket.id });
-                        }}
-                        variant="secondary"
-                      >
-                        Confirmar retirada
-                      </Button>
-                    )}
-                  </Card>
-                ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
+    <KdsBoard
+      deviceState={navigator.onLine ? "online" : "offline"}
+      onAdvance={(ticket, state) => {
+        if (state === "done") {
+          setTickets(tickets.filter((item) => item.id !== ticket.id));
+          onCommand("kds.ticket_collected", { ticketId: ticket.id });
+          return;
+        }
+        setTickets(
+          tickets.map((item) =>
+            item.id === ticket.id
+              ? { ...item, status: state === "preparing" ? "preparing" : "ready" }
+              : item,
+          ),
+        );
+        onCommand("kds.ticket_advanced", { ticketId: ticket.id, status: state });
+      }}
+      tickets={boardTickets}
+    />
   );
 }
 

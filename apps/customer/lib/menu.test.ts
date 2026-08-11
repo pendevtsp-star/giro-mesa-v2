@@ -30,7 +30,10 @@ test("busca considera nome, descrição e tags", () => {
 
 test("rejeita cardápio remoto incompleto antes de renderizar", () => {
   assert.equal(normalizePublicMenu({ items: [{ id: "sem-campos" }] }), null);
-  assert.deepEqual(normalizePublicMenu({ items: demoMenu.slice(0, 1) }), demoMenu.slice(0, 1));
+  assert.deepEqual(normalizePublicMenu({ items: demoMenu.slice(0, 1), branding: null }), {
+    items: demoMenu.slice(0, 1),
+    branding: null,
+  });
 });
 
 test("separa ícones controlados do produto do conteúdo visual livre do cliente", () => {

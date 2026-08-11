@@ -5,6 +5,11 @@ import {
   commandInbox,
   commandQuarantine,
   deviceEnrollments,
+  dispatchAcknowledgements,
+  dispatchAttempts,
+  dispatchDeadLetters,
+  dispatchEffects,
+  dispatchOutcomes,
   hubCommands,
   hubHeartbeats,
   operationalCommands,
@@ -34,6 +39,7 @@ import { OperationalSnapshotService } from "./operational-snapshot.service.js";
 import {
   type NormalizedSyncEventInput,
   normalizeSyncBatch,
+  type DispatchOutcomeBatchInput,
   type SyncBatchInput,
 } from "./sync.schemas.js";
 import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";
@@ -77,23 +83,9 @@ export class SyncService {
   ) {}
 
   async synchronize(syncKey: string | undefined, rawInput: SyncBatchInput) {
-    if (!syncKey) throw this.invalidHubKey();
     const input = normalizeSyncBatch(rawInput);
     const fingerprintKeyring = loadCommandFingerprintKeyring();
-    const hub = await this.database.withRoleContext("internal", null, async (tx) => {
-      const resolved = await tx.execute<{
-        hub_id: string;
-        organization_id: string;
-        unit_id: string;
-      }>(sql`select * from public.giromesa_resolve_sync_hub(${hashSyncKey(syncKey)})`);
-      const [scope] = [...resolved];
-      if (!scope) throw this.invalidHubKey();
-      return {
-        id: scope.hub_id,
-        organizationId: scope.organization_id,
-        unitId: scope.unit_id,
-      };
-    });
+    const hub = await this.resolveHub(syncKey);
     await this.database.withTenantContext(
       {
         source: "internal",
@@ -215,6 +207,238 @@ export class SyncService {
     );
 
     return { acceptedEventIds, rejectedEvents, eventResults, commands, snapshot, serverTime: now };
+  }
+
+  async applyDispatchOutcomes(
+    syncKey: string | undefined,
+    outcomes: DispatchOutcomeBatchInput["outcomes"],
+  ) {
+    const hub = await this.resolveHub(syncKey);
+    const acceptedOutcomeIds: string[] = [];
+    await this.database.withTenantContext(
+      {
+        source: "internal",
+        organizationId: hub.organizationId,
+        unitId: hub.unitId,
+        actorIdentityId: null,
+      },
+      async (tx) => {
+        for (const outcome of outcomes) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`dispatch-outcome:${hub.organizationId}:${hub.unitId}:${outcome.effectId}`}))`,
+          );
+          const [effect] = await tx
+            .select()
+            .from(dispatchEffects)
+            .where(
+              and(
+                eq(dispatchEffects.id, outcome.effectId),
+                eq(dispatchEffects.organizationId, hub.organizationId),
+                eq(dispatchEffects.unitId, hub.unitId),
+              ),
+            )
+            .limit(1);
+          if (!effect) throw new ConflictException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+          const [attempt] = await tx
+            .select()
+            .from(dispatchAttempts)
+            .where(
+              and(
+                eq(dispatchAttempts.effectId, effect.id),
+                eq(dispatchAttempts.deliveryKey, outcome.deliveryKey),
+              ),
+            )
+            .limit(1);
+          if (!attempt) throw new ConflictException({ code: "DISPATCH_ATTEMPT_NOT_FOUND" });
+
+          const [inserted] = await tx
+            .insert(dispatchOutcomes)
+            .values({
+              id: outcome.id,
+              organizationId: hub.organizationId,
+              unitId: hub.unitId,
+              effectId: effect.id,
+              deliveryKey: outcome.deliveryKey,
+              state: outcome.state,
+              error: outcome.error ?? null,
+              occurredAt: new Date(outcome.occurredAt),
+            })
+            .onConflictDoNothing()
+            .returning({ id: dispatchOutcomes.id });
+          if (!inserted) {
+            const [known] = await tx
+              .select()
+              .from(dispatchOutcomes)
+              .where(
+                or(
+                  eq(dispatchOutcomes.id, outcome.id),
+                  and(
+                    eq(dispatchOutcomes.effectId, effect.id),
+                    eq(dispatchOutcomes.deliveryKey, outcome.deliveryKey),
+                    eq(dispatchOutcomes.state, outcome.state),
+                  ),
+                ),
+              )
+              .limit(1);
+            if (
+              !known ||
+              known.effectId !== effect.id ||
+              known.deliveryKey !== outcome.deliveryKey ||
+              known.state !== outcome.state ||
+              known.error !== (outcome.error ?? null)
+            ) {
+              throw new ConflictException({ code: "DISPATCH_OUTCOME_IDEMPOTENCY_CONFLICT" });
+            }
+            acceptedOutcomeIds.push(outcome.id);
+            continue;
+          }
+
+          const now = new Date();
+          if (outcome.state === "acked") {
+            await tx
+              .insert(dispatchAcknowledgements)
+              .values({
+                organizationId: hub.organizationId,
+                unitId: hub.unitId,
+                effectId: effect.id,
+                acknowledgementKey: `edge:${outcome.deliveryKey}`,
+                acknowledgedAt: new Date(outcome.occurredAt),
+              })
+              .onConflictDoNothing();
+            if (!(["acked", "canceled", "dlq"] as const).includes(effect.state as never)) {
+              await tx
+                .update(dispatchEffects)
+                .set({
+                  state: "acked",
+                  deliveredAt: effect.deliveredAt ?? new Date(outcome.occurredAt),
+                  acknowledgedAt: new Date(outcome.occurredAt),
+                  resourceVersion: effect.resourceVersion + 1,
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    eq(dispatchEffects.id, effect.id),
+                    eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                    inArray(dispatchEffects.state, ["pending", "delivered"]),
+                  ),
+                );
+            }
+          } else if (outcome.state === "delivered") {
+            if (effect.state === "pending") {
+              await tx
+                .update(dispatchEffects)
+                .set({
+                  state: "delivered",
+                  deliveredAt: new Date(outcome.occurredAt),
+                  resourceVersion: effect.resourceVersion + 1,
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    eq(dispatchEffects.id, effect.id),
+                    eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                    eq(dispatchEffects.state, "pending"),
+                  ),
+                );
+            }
+          } else if (outcome.state === "failed") {
+            if (effect.state === "pending") {
+              if (attempt.attemptNumber >= 3) {
+                await tx
+                  .insert(dispatchDeadLetters)
+                  .values({
+                    organizationId: hub.organizationId,
+                    unitId: hub.unitId,
+                    effectId: effect.id,
+                    reason: outcome.error ?? "DISPATCH_TERMINAL_FAILURE",
+                  })
+                  .onConflictDoNothing();
+                await tx
+                  .update(dispatchEffects)
+                  .set({
+                    state: "dlq",
+                    lastError: outcome.error ?? "DISPATCH_TERMINAL_FAILURE",
+                    resourceVersion: effect.resourceVersion + 1,
+                    updatedAt: now,
+                  })
+                  .where(
+                    and(
+                      eq(dispatchEffects.id, effect.id),
+                      eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                      eq(dispatchEffects.state, "pending"),
+                    ),
+                  );
+              } else {
+                const nextAttempt = attempt.attemptNumber + 1;
+                await tx
+                  .insert(dispatchAttempts)
+                  .values({
+                    organizationId: hub.organizationId,
+                    unitId: hub.unitId,
+                    effectId: effect.id,
+                    attemptNumber: nextAttempt,
+                    deliveryKey: `${effect.effectKey}:${nextAttempt}`,
+                    state: "scheduled",
+                  })
+                  .onConflictDoNothing();
+                await tx
+                  .update(dispatchEffects)
+                  .set({
+                    attemptCount: nextAttempt,
+                    lastError: outcome.error ?? "DISPATCH_FAILED",
+                    nextAttemptAt: now,
+                    resourceVersion: effect.resourceVersion + 1,
+                    updatedAt: now,
+                  })
+                  .where(
+                    and(
+                      eq(dispatchEffects.id, effect.id),
+                      eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                      eq(dispatchEffects.state, "pending"),
+                    ),
+                  );
+              }
+            }
+          } else if (outcome.state === "canceled" && effect.state !== "acked") {
+            await tx
+              .update(dispatchEffects)
+              .set({
+                state: "canceled",
+                canceledAt: new Date(outcome.occurredAt),
+                resourceVersion: effect.resourceVersion + 1,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(dispatchEffects.id, effect.id),
+                  eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                  inArray(dispatchEffects.state, ["pending", "delivered"]),
+                ),
+              );
+          }
+          acceptedOutcomeIds.push(outcome.id);
+        }
+      },
+    );
+    return { acceptedOutcomeIds };
+  }
+
+  private async resolveHub(syncKey: string | undefined) {
+    if (!syncKey) throw this.invalidHubKey();
+    return this.database.withRoleContext("internal", null, async (tx) => {
+      const resolved = await tx.execute<{
+        hub_id: string;
+        organization_id: string;
+        unit_id: string;
+      }>(sql`select * from public.giromesa_resolve_sync_hub(${hashSyncKey(syncKey)})`);
+      const [scope] = [...resolved];
+      if (!scope) throw this.invalidHubKey();
+      return {
+        id: scope.hub_id,
+        organizationId: scope.organization_id,
+        unitId: scope.unit_id,
+      };
+    });
   }
 
   private async applyEnvelope(

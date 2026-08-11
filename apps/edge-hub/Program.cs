@@ -4,11 +4,33 @@ using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Security;
 using GiroMesa.EdgeHub.Storage;
 using GiroMesa.EdgeHub.Sync;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 var builder = WebApplication.CreateBuilder(args);
+var startupOptions = builder.Configuration.GetSection(HubOptions.Section).Get<HubOptions>() ?? new HubOptions();
+HubTlsConfiguration.Validate(startupOptions);
+var serverCertificate = startupOptions.RequireMutualTls
+    ? HubTlsConfiguration.LoadServerCertificate(startupOptions)
+    : null;
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(startupOptions.HttpsPort, listen =>
+    {
+        if (!startupOptions.RequireMutualTls) return;
+        listen.UseHttps(https =>
+        {
+            https.ServerCertificate = serverCertificate;
+            https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+            https.CheckCertificateRevocation = true;
+            https.ClientCertificateValidation = (certificate, _, _) =>
+                HubTlsConfiguration.IsTrustedDeviceCertificate(certificate, startupOptions);
+        });
+    });
+});
 builder.Host.UseWindowsService(options => options.ServiceName = "GiroMesa Edge Hub");
 builder.Services.Configure<HubOptions>(builder.Configuration.GetSection(HubOptions.Section));
 builder.Services.AddSingleton<HubStore>();
+builder.Services.AddSingleton<HubIdentity>();
 builder.Services.AddSingleton<DeviceAuthenticator>();
 builder.Services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
 builder.Services.AddHttpClient<FocusFiscalGateway>();
@@ -20,17 +42,25 @@ builder.Services.AddSingleton<IFiscalGateway>(services =>
         ? services.GetRequiredService<FocusFiscalGateway>()
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
-builder.Services.AddSingleton<IPrinterGateway, DisabledPrinterGateway>();
+builder.Services.AddSingleton<IPrinterGateway, WindowsSpoolPrinterGateway>();
+builder.Services.AddSingleton<IKitchenDispatchGateway, LocalKitchenDispatchGateway>();
+builder.Services.AddSingleton<DispatchProcessor>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DispatchProcessor>());
 builder.Services.AddHttpClient<CloudSyncWorker>()
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    .ConfigurePrimaryHttpMessageHandler(() =>
     {
-        AllowAutoRedirect = false,
+        var handler = new HttpClientHandler { AllowAutoRedirect = false, CheckCertificateRevocationList = true };
+        if (startupOptions.RequireMutualTls && !string.IsNullOrWhiteSpace(startupOptions.CloudApiBaseUrl))
+            handler.ClientCertificates.Add(HubTlsConfiguration.LoadCloudClientCertificate(startupOptions));
+        return handler;
     });
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
 
 var app = builder.Build();
 var store = app.Services.GetRequiredService<HubStore>();
 await store.InitializeAsync();
+var hubIdentity = app.Services.GetRequiredService<HubIdentity>();
+await hubIdentity.InitializeAsync();
 
 app.Use(async (context, next) =>
 {
@@ -42,7 +72,8 @@ app.Use(async (context, next) =>
     }
 
     var authenticator = context.RequestServices.GetRequiredService<DeviceAuthenticator>();
-    if (!await authenticator.IsAuthorizedAsync(context.Request.Headers["X-GiroMesa-Device-Token"]))
+    var certificate = await context.Connection.GetClientCertificateAsync();
+    if (!await authenticator.IsAuthorizedAsync(context.Request.Headers["X-GiroMesa-Device-Token"], certificate))
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         await context.Response.WriteAsJsonAsync(new { code = "DEVICE_AUTH_REQUIRED" });
@@ -52,30 +83,70 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapGet("/health", async (HubStore hubStore, CloudSyncWorker sync) => Results.Ok(new
+app.MapGet("/health", async (HubStore hubStore, HubIdentity identity, CloudSyncWorker sync) =>
 {
-    status = "ok",
-    service = "giromesa-edge-hub",
-    database = await hubStore.CheckAsync() ? "ready" : "unavailable",
-    cloud = sync.Status,
-    now = DateTimeOffset.UtcNow,
-}));
+    var databaseReady = await hubStore.CheckAsync();
+    var health = await identity.CheckHealthAsync(DateTimeOffset.UtcNow);
+    var payload = new
+    {
+        status = databaseReady && health.Status == "ready" ? "ok" : "blocked",
+        service = "giromesa-edge-hub",
+        database = databaseReady ? "ready" : "unavailable",
+        identity = health.Status,
+        findings = health.Findings,
+        availableDiskBytes = health.AvailableDiskBytes,
+        cloud = sync.Status,
+        now = DateTimeOffset.UtcNow,
+    };
+    return payload.status == "ok"
+        ? Results.Ok(payload)
+        : Results.Json(payload, statusCode: StatusCodes.Status503ServiceUnavailable);
+});
 
-app.MapPost("/v1/pair", async (PairDeviceRequest request, DeviceAuthenticator auth) =>
+app.MapPost("/v1/pair", async (PairDeviceRequest request, DeviceAuthenticator auth, HttpContext context) =>
 {
-    var result = await auth.PairAsync(request);
+    var result = await auth.PairAsync(request, await context.Connection.GetClientCertificateAsync());
     return result.IsSuccess
         ? Results.Ok(new { deviceToken = result.Token, pairedAt = DateTimeOffset.UtcNow })
         : Results.Json(new { code = result.Error }, statusCode: result.StatusCode);
 });
 
-app.MapGet("/v1/capabilities", (IPaymentGateway payment, IFiscalGateway fiscal, IPrinterGateway printer) =>
+app.MapGet("/v1/capabilities", (
+    IPaymentGateway payment,
+    IFiscalGateway fiscal,
+    IPrinterGateway printer,
+    IKitchenDispatchGateway kitchen) =>
     Results.Ok(new
     {
         payment = payment.Capability,
         fiscal = fiscal.Capability,
         printing = printer.Capability,
+        kitchen = kitchen.Capability,
     }));
+
+app.MapPost("/v1/backups", async (HubIdentity identity) =>
+{
+    var backup = await identity.CreateBackupAsync();
+    return Results.Ok(new
+    {
+        backup.StateGeneration,
+        databaseFile = Path.GetFileName(backup.DatabasePath),
+        manifestFile = Path.GetFileName(backup.ManifestPath),
+    });
+});
+
+app.MapPost("/v1/identity/revoke", async (HubRevocationRequest request, HubIdentity identity) =>
+{
+    try
+    {
+        await identity.RevokeAsync(request.Reason);
+        return Results.NoContent();
+    }
+    catch (HubIdentityException exception) when (exception.Code == "HUB_REVOCATION_REASON_REQUIRED")
+    {
+        return Results.BadRequest(new { code = exception.Code });
+    }
+});
 
 app.MapPost("/v1/commands", async (OperationalCommand command, HubStore hubStore) =>
 {
@@ -185,6 +256,25 @@ app.MapPost("/v1/print-jobs", async (PrintRequest request, IPrinterGateway gatew
         : Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
 });
 
+app.MapGet("/v1/dispatch/kds", async (HubStore hubStore, int? limit) =>
+    Results.Ok(await hubStore.GetPendingKitchenDispatchAsync(Math.Clamp(limit ?? 100, 1, 500))));
+
+app.MapPost("/v1/dispatch/{effectId}/ack", async (
+    string effectId,
+    DispatchAcknowledgement request,
+    HubStore hubStore) =>
+    await hubStore.AcknowledgeDispatchAsync(effectId, request.AcknowledgementKey)
+        ? Results.NoContent()
+        : Results.Conflict(new { code = "DISPATCH_ACK_CONFLICT" }));
+
+app.MapGet("/v1/dispatch/dlq", async (HubStore hubStore, int? limit) =>
+    Results.Ok(await hubStore.GetDeadLettersAsync(Math.Clamp(limit ?? 100, 1, 500))));
+
+app.MapPost("/v1/dispatch/{effectId}/reconcile", async (string effectId, HubStore hubStore) =>
+    await hubStore.RequeueDeadLetterAsync(effectId)
+        ? Results.Accepted()
+        : Results.Conflict(new { code = "DISPATCH_RECONCILIATION_CONFLICT" }));
+
 app.Run();
 
 static IResult SnapshotSection(
@@ -195,3 +285,5 @@ static IResult SnapshotSection(
         : Results.Ok(select(snapshot));
 
 public partial class Program;
+
+public sealed record DispatchAcknowledgement(string AcknowledgementKey);

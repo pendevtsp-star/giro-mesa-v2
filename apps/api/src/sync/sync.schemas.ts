@@ -195,6 +195,23 @@ export type NormalizedSyncBatchInput = Omit<z.output<typeof syncBatchSchema>, "e
   events: NormalizedSyncEventInput[];
 };
 
+export const dispatchOutcomeSchema = z
+  .object({
+    id: canonicalUuid,
+    effectId: canonicalUuid,
+    deliveryKey: z.string().trim().min(8).max(240),
+    state: z.enum(["delivered", "acked", "failed", "canceled", "dlq"]),
+    error: z.string().trim().min(1).max(1_000).nullable().optional(),
+    occurredAt: edgeTimestamp,
+  })
+  .strict();
+
+export const dispatchOutcomeBatchSchema = z
+  .object({ outcomes: z.array(dispatchOutcomeSchema).min(1).max(100) })
+  .strict();
+
+export type DispatchOutcomeBatchInput = z.infer<typeof dispatchOutcomeBatchSchema>;
+
 export function normalizeSyncBatch(input: SyncBatchInput): NormalizedSyncBatchInput {
   const batch = syncBatchSchema.parse(input);
   if (batch.protocolVersion === 1) {

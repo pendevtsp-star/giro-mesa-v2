@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   auditEvents,
   type Database,
+  dispatchAcknowledgements,
+  dispatchAttempts,
+  dispatchDeadLetters,
+  dispatchEffects,
   memberships,
   organizations,
   outboxEvents,
@@ -18,16 +22,25 @@ import {
   posOrderItems,
   posOrders,
   posProductAvailability,
+  posProductionStations,
   posProductModifierGroups,
   posProductPrices,
   posProductStations,
   posProducts,
   posTabEvents,
   posTabs,
+  productionStationRoutes,
   roleBindings,
+  tableOccupancies,
+  tableOccupancyEvents,
   units,
 } from "@giromesa/db";
-import { billingAccess } from "@giromesa/domain";
+import {
+  billingAccess,
+  type TableOccupancyCommand,
+  TableOccupancyTransitionError,
+  transitionTableOccupancy,
+} from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
@@ -41,6 +54,11 @@ import * as argon2 from "argon2";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import {
+  type PilotMutationLocator,
+  PilotResourceBoundary,
+  type PilotResourcePrecondition,
+} from "./pilot-resource-boundary.js";
 import {
   assertKdsTransition,
   assertTenantScope,
@@ -66,11 +84,6 @@ import type {
   TipInput,
   TransferTabInput,
 } from "./pilot-schemas.js";
-import {
-  PilotResourceBoundary,
-  type PilotMutationLocator,
-  type PilotResourcePrecondition,
-} from "./pilot-resource-boundary.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
@@ -371,6 +384,7 @@ export class PilotPosService {
             .limit(1);
           if (occupied) throw new ConflictException({ code: "TABLE_OCCUPIED", tabId: occupied.id });
         }
+        const occupancyEpoch = randomUUID();
         const [tab] = await tx
           .insert(posTabs)
           .values({
@@ -381,9 +395,26 @@ export class PilotPosService {
             label: input.label,
             guestCount: input.guestCount,
             openedByIdentityId: identityId,
+            occupancyEpoch,
           })
           .returning();
         if (!tab) throw new Error("Tab insert did not return a row");
+        const [occupancy] = input.tableId
+          ? await tx
+              .insert(tableOccupancies)
+              .values({
+                organizationId,
+                unitId,
+                tableId: input.tableId,
+                tabId: tab.id,
+                assignedIdentityId: identityId,
+                state: "open",
+                occupancyEpoch,
+                guestCount: input.guestCount,
+                openedAt: new Date(),
+              })
+              .returning()
+          : [undefined];
         if (input.tableId) {
           await tx
             .update(posDiningTables)
@@ -400,7 +431,7 @@ export class PilotPosService {
           tableId: input.tableId,
           guestCount: input.guestCount,
         });
-        return { tab };
+        return { tab, occupancy };
       },
     );
   }
@@ -577,7 +608,8 @@ export class PilotPosService {
               sum + (authoritativePrices?.modifierOptions.get(option.id) ?? option.priceDeltaCents),
             0,
           );
-          const unitPriceCents = authoritativePrices?.products.get(product.id) ?? product.priceCents;
+          const unitPriceCents =
+            authoritativePrices?.products.get(product.id) ?? product.priceCents;
           const amounts = itemAmounts(item.quantity, unitPriceCents, modifierPerUnitCents);
           const [created] = await tx
             .insert(posOrderItems)
@@ -729,6 +761,7 @@ export class PilotPosService {
                 orderItemId: item.id,
               })),
           );
+          await this.ensureDispatchEffectsTx(tx, organizationId, unitId, orderId, stationId);
         }
         await this.recordEvent(tx, identityId, organizationId, unitId, order.tabId, "order.sent", {
           orderId,
@@ -737,6 +770,600 @@ export class PilotPosService {
         return { orderId, status: "sent", ticketIds };
       },
     );
+  }
+
+  private async ensureDispatchEffectsTx(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    orderId: string,
+    stationId: string,
+  ) {
+    const [route] = await tx
+      .select()
+      .from(productionStationRoutes)
+      .where(
+        and(
+          eq(productionStationRoutes.organizationId, organizationId),
+          eq(productionStationRoutes.unitId, unitId),
+          eq(productionStationRoutes.stationId, stationId),
+          eq(productionStationRoutes.active, true),
+        ),
+      )
+      .limit(1);
+    const mode = route?.mode ?? "kds";
+    const destinations: { destination: "kds" | "printer"; targetRef: string }[] = [];
+    if (mode === "kds" || mode === "both" || mode === "kds_with_contingency_print") {
+      destinations.push({
+        destination: "kds",
+        targetRef: route?.kdsTargetRef ?? `kds:${stationId}`,
+      });
+    }
+    if (mode === "print" || mode === "both") {
+      if (!route?.printerTargetRef) {
+        throw new ConflictException({ code: "DISPATCH_PRINTER_TARGET_REQUIRED", stationId });
+      }
+      destinations.push({ destination: "printer", targetRef: route.printerTargetRef });
+    }
+    const effects = [];
+    for (const destination of destinations) {
+      const effectKey = `${orderId}:${stationId}:${destination.destination}:dispatch`;
+      const [inserted] = await tx
+        .insert(dispatchEffects)
+        .values({
+          organizationId,
+          unitId,
+          orderId,
+          stationId,
+          routeId: route?.id,
+          destination: destination.destination,
+          targetRef: destination.targetRef,
+          effectKey,
+        })
+        .onConflictDoNothing()
+        .returning();
+      const effect =
+        inserted ??
+        (
+          await tx
+            .select()
+            .from(dispatchEffects)
+            .where(
+              and(
+                eq(dispatchEffects.organizationId, organizationId),
+                eq(dispatchEffects.unitId, unitId),
+                eq(dispatchEffects.effectKey, effectKey),
+              ),
+            )
+            .limit(1)
+        )[0];
+      if (!effect) throw new Error("Dispatch effect was not persisted");
+      if (inserted) {
+        await tx.insert(dispatchAttempts).values({
+          organizationId,
+          unitId,
+          effectId: effect.id,
+          attemptNumber: 1,
+          deliveryKey: `${effect.effectKey}:1`,
+          state: "scheduled",
+        });
+        const [scheduled] = await tx
+          .update(dispatchEffects)
+          .set({ attemptCount: 1, resourceVersion: 1, updatedAt: new Date() })
+          .where(and(eq(dispatchEffects.id, effect.id), eq(dispatchEffects.resourceVersion, 0)))
+          .returning();
+        effects.push(scheduled ?? effect);
+      } else {
+        effects.push(effect);
+      }
+    }
+    return effects;
+  }
+
+  async listDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    state?: "pending" | "delivered" | "acked" | "canceled" | "dlq",
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+      "kds",
+    ]);
+    const conditions = [
+      eq(dispatchEffects.organizationId, organizationId),
+      eq(dispatchEffects.unitId, unitId),
+    ];
+    if (state) conditions.push(eq(dispatchEffects.state, state));
+    const effects = await this.database.db
+      .select()
+      .from(dispatchEffects)
+      .where(and(...conditions))
+      .limit(500);
+    const effectIds = effects.map((effect) => effect.id);
+    const attempts = effectIds.length
+      ? await this.database.db
+          .select()
+          .from(dispatchAttempts)
+          .where(
+            and(
+              eq(dispatchAttempts.organizationId, organizationId),
+              eq(dispatchAttempts.unitId, unitId),
+              inArray(dispatchAttempts.effectId, effectIds),
+            ),
+          )
+      : [];
+    const deadLetters = effectIds.length
+      ? await this.database.db
+          .select()
+          .from(dispatchDeadLetters)
+          .where(
+            and(
+              eq(dispatchDeadLetters.organizationId, organizationId),
+              eq(dispatchDeadLetters.unitId, unitId),
+              inArray(dispatchDeadLetters.effectId, effectIds),
+              isNull(dispatchDeadLetters.resolvedAt),
+            ),
+          )
+      : [];
+    return { effects, attempts, deadLetters };
+  }
+
+  async ensureDispatchEffects(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    orderId: string,
+    stationId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
+    if (idempotencyKey.trim().length < 8 || idempotencyKey.length > 160) {
+      throw new BadRequestException({ code: "IDEMPOTENCY_KEY_REQUIRED" });
+    }
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`dispatch:${organizationId}:${unitId}:${orderId}:${stationId}`}))`,
+      );
+      const [order] = await tx
+        .select({ id: posOrders.id })
+        .from(posOrders)
+        .where(
+          and(
+            eq(posOrders.organizationId, organizationId),
+            eq(posOrders.unitId, unitId),
+            eq(posOrders.id, orderId),
+          ),
+        )
+        .limit(1);
+      const [station] = await tx
+        .select({ id: posProductionStations.id })
+        .from(posProductionStations)
+        .where(
+          and(
+            eq(posProductionStations.organizationId, organizationId),
+            eq(posProductionStations.unitId, unitId),
+            eq(posProductionStations.id, stationId),
+          ),
+        )
+        .limit(1);
+      if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+      if (!station) throw new NotFoundException({ code: "STATION_NOT_FOUND" });
+      return {
+        effects: await this.ensureDispatchEffectsTx(tx, organizationId, unitId, orderId, stationId),
+      };
+    });
+  }
+
+  async reprintDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    effectId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    if (idempotencyKey.trim().length < 8 || idempotencyKey.length > 160) {
+      throw new BadRequestException({ code: "IDEMPOTENCY_KEY_REQUIRED" });
+    }
+    return this.database.db.transaction(async (tx) => {
+      const [original] = await tx
+        .select()
+        .from(dispatchEffects)
+        .where(
+          and(
+            eq(dispatchEffects.organizationId, organizationId),
+            eq(dispatchEffects.unitId, unitId),
+            eq(dispatchEffects.id, effectId),
+          ),
+        )
+        .limit(1);
+      if (!original) throw new NotFoundException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+      const effectKey = `${original.effectKey}:reprint:${idempotencyKey.trim()}`;
+      const [created] = await tx
+        .insert(dispatchEffects)
+        .values({
+          organizationId,
+          unitId,
+          orderId: original.orderId,
+          stationId: original.stationId,
+          routeId: original.routeId,
+          destination: original.destination,
+          targetRef: original.targetRef,
+          operation: "reprint",
+          effectKey,
+          attemptCount: 1,
+          resourceVersion: 1,
+        })
+        .onConflictDoNothing()
+        .returning();
+      const result =
+        created ??
+        (
+          await tx
+            .select()
+            .from(dispatchEffects)
+            .where(
+              and(
+                eq(dispatchEffects.organizationId, organizationId),
+                eq(dispatchEffects.unitId, unitId),
+                eq(dispatchEffects.effectKey, effectKey),
+              ),
+            )
+            .limit(1)
+        )[0];
+      if (!result) throw new Error("Reprint effect was not persisted");
+      if (created) {
+        await tx.insert(dispatchAttempts).values({
+          organizationId,
+          unitId,
+          effectId: result.id,
+          attemptNumber: 1,
+          deliveryKey: `${effectKey}:1`,
+          state: "scheduled",
+        });
+      }
+      return result;
+    });
+  }
+
+  async cancelDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    effectId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    if (idempotencyKey.trim().length < 8 || idempotencyKey.length > 160) {
+      throw new BadRequestException({ code: "IDEMPOTENCY_KEY_REQUIRED" });
+    }
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from ${dispatchEffects} where id = ${effectId} for update`);
+      const [original] = await tx
+        .select()
+        .from(dispatchEffects)
+        .where(
+          and(
+            eq(dispatchEffects.organizationId, organizationId),
+            eq(dispatchEffects.unitId, unitId),
+            eq(dispatchEffects.id, effectId),
+          ),
+        )
+        .limit(1);
+      if (!original) throw new NotFoundException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+      if (original.state !== "acked" && original.state !== "dlq" && original.state !== "canceled") {
+        const [canceled] = await tx
+          .update(dispatchEffects)
+          .set({
+            state: "canceled",
+            canceledAt: new Date(),
+            resourceVersion: original.resourceVersion + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(dispatchEffects.id, original.id),
+              eq(dispatchEffects.resourceVersion, original.resourceVersion),
+            ),
+          )
+          .returning();
+        if (!canceled) throw new ConflictException({ code: "DISPATCH_VERSION_CONFLICT" });
+      }
+      const effectKey = `${original.effectKey}:cancel:${idempotencyKey.trim()}`;
+      const [created] = await tx
+        .insert(dispatchEffects)
+        .values({
+          organizationId,
+          unitId,
+          orderId: original.orderId,
+          stationId: original.stationId,
+          routeId: original.routeId,
+          destination: original.destination,
+          targetRef: original.targetRef,
+          operation: "cancel",
+          effectKey,
+          attemptCount: 1,
+          resourceVersion: 1,
+        })
+        .onConflictDoNothing()
+        .returning();
+      const result =
+        created ??
+        (
+          await tx
+            .select()
+            .from(dispatchEffects)
+            .where(
+              and(
+                eq(dispatchEffects.organizationId, organizationId),
+                eq(dispatchEffects.unitId, unitId),
+                eq(dispatchEffects.effectKey, effectKey),
+              ),
+            )
+            .limit(1)
+        )[0];
+      if (!result) throw new Error("Cancel effect was not persisted");
+      if (created) {
+        await tx.insert(dispatchAttempts).values({
+          organizationId,
+          unitId,
+          effectId: result.id,
+          attemptNumber: 1,
+          deliveryKey: `${effectKey}:1`,
+          state: "scheduled",
+        });
+      }
+      return result;
+    });
+  }
+
+  async reconcileDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    effectId: string,
+    expectedResourceVersion: number,
+    action: "retry" | "cancel",
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from ${dispatchEffects} where id = ${effectId} for update`);
+      const [effect] = await tx
+        .select()
+        .from(dispatchEffects)
+        .where(
+          and(
+            eq(dispatchEffects.organizationId, organizationId),
+            eq(dispatchEffects.unitId, unitId),
+            eq(dispatchEffects.id, effectId),
+          ),
+        )
+        .limit(1);
+      if (!effect) throw new NotFoundException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+      if (effect.resourceVersion !== expectedResourceVersion) {
+        throw new ConflictException({ code: "DISPATCH_VERSION_CONFLICT" });
+      }
+      if (effect.state !== "dlq") {
+        throw new ConflictException({ code: "DISPATCH_NOT_IN_DLQ", state: effect.state });
+      }
+      const nextAttempt = effect.attemptCount + 1;
+      if (action === "retry") {
+        await tx.insert(dispatchAttempts).values({
+          organizationId,
+          unitId,
+          effectId,
+          attemptNumber: nextAttempt,
+          deliveryKey: `${effect.effectKey}:${nextAttempt}:reconcile`,
+          state: "scheduled",
+        });
+      }
+      const [updated] = await tx
+        .update(dispatchEffects)
+        .set({
+          state: action === "retry" ? "pending" : "canceled",
+          attemptCount: action === "retry" ? nextAttempt : effect.attemptCount,
+          nextAttemptAt: new Date(),
+          canceledAt: action === "cancel" ? new Date() : null,
+          lastError: null,
+          resourceVersion: effect.resourceVersion + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(dispatchEffects.id, effectId),
+            eq(dispatchEffects.resourceVersion, expectedResourceVersion),
+            eq(dispatchEffects.state, "dlq"),
+          ),
+        )
+        .returning();
+      if (!updated) throw new ConflictException({ code: "DISPATCH_VERSION_CONFLICT" });
+      await tx
+        .update(dispatchDeadLetters)
+        .set({ resolvedByIdentityId: identityId, resolvedAt: new Date() })
+        .where(
+          and(
+            eq(dispatchDeadLetters.organizationId, organizationId),
+            eq(dispatchDeadLetters.unitId, unitId),
+            eq(dispatchDeadLetters.effectId, effectId),
+            isNull(dispatchDeadLetters.resolvedAt),
+          ),
+        );
+      return updated;
+    });
+  }
+
+  async ackDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    effectId: string,
+    acknowledgementKey: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from ${dispatchEffects} where id = ${effectId} for update`);
+      const [effect] = await tx
+        .select()
+        .from(dispatchEffects)
+        .where(
+          and(
+            eq(dispatchEffects.organizationId, organizationId),
+            eq(dispatchEffects.unitId, unitId),
+            eq(dispatchEffects.id, effectId),
+          ),
+        )
+        .limit(1);
+      if (!effect) throw new NotFoundException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+      if (effect.state === "dlq" || effect.state === "canceled") {
+        throw new ConflictException({ code: "DISPATCH_NOT_ACKNOWLEDGEABLE", state: effect.state });
+      }
+      await tx
+        .insert(dispatchAcknowledgements)
+        .values({
+          organizationId,
+          unitId,
+          effectId,
+          acknowledgementKey,
+          acknowledgedByIdentityId: identityId,
+        })
+        .onConflictDoNothing();
+      if (effect.state === "acked") return effect;
+      const [updated] = await tx
+        .update(dispatchEffects)
+        .set({
+          state: "acked",
+          acknowledgedAt: new Date(),
+          resourceVersion: effect.resourceVersion + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(dispatchEffects.id, effectId),
+            eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+          ),
+        )
+        .returning();
+      if (!updated) throw new ConflictException({ code: "DISPATCH_VERSION_CONFLICT" });
+      return updated;
+    });
+  }
+
+  async failDispatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    effectId: string,
+    error: string,
+    terminal: boolean,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from ${dispatchEffects} where id = ${effectId} for update`);
+      const [effect] = await tx
+        .select()
+        .from(dispatchEffects)
+        .where(
+          and(
+            eq(dispatchEffects.organizationId, organizationId),
+            eq(dispatchEffects.unitId, unitId),
+            eq(dispatchEffects.id, effectId),
+          ),
+        )
+        .limit(1);
+      if (!effect) throw new NotFoundException({ code: "DISPATCH_EFFECT_NOT_FOUND" });
+      if (effect.state === "acked" || effect.state === "canceled" || effect.state === "dlq")
+        return effect;
+      const attemptNumber = effect.attemptCount + 1;
+      await tx
+        .insert(dispatchAttempts)
+        .values({
+          organizationId,
+          unitId,
+          effectId,
+          attemptNumber,
+          deliveryKey: `${effect.effectKey}:${attemptNumber}`,
+          state: "failed",
+          error,
+        })
+        .onConflictDoNothing();
+      const [updated] = await tx
+        .update(dispatchEffects)
+        .set({
+          state: terminal ? "dlq" : "pending",
+          attemptCount: attemptNumber,
+          lastError: error,
+          nextAttemptAt: new Date(Date.now() + 5_000),
+          resourceVersion: effect.resourceVersion + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(dispatchEffects.id, effectId),
+            eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+          ),
+        )
+        .returning();
+      if (!updated) throw new ConflictException({ code: "DISPATCH_VERSION_CONFLICT" });
+      if (terminal) {
+        await tx
+          .insert(dispatchDeadLetters)
+          .values({ organizationId, unitId, effectId, reason: error })
+          .onConflictDoNothing();
+        if (effect.destination === "kds" && effect.routeId) {
+          const [route] = await tx
+            .select()
+            .from(productionStationRoutes)
+            .where(
+              and(
+                eq(productionStationRoutes.organizationId, organizationId),
+                eq(productionStationRoutes.unitId, unitId),
+                eq(productionStationRoutes.id, effect.routeId),
+              ),
+            )
+            .limit(1);
+          if (route?.mode === "kds_with_contingency_print" && route.printerTargetRef) {
+            const contingencyKey = `${effect.orderId}:${effect.stationId}:printer:contingency`;
+            const [contingency] = await tx
+              .insert(dispatchEffects)
+              .values({
+                organizationId,
+                unitId,
+                orderId: effect.orderId,
+                stationId: effect.stationId,
+                routeId: route.id,
+                destination: "printer",
+                targetRef: route.printerTargetRef,
+                operation: "contingency",
+                effectKey: contingencyKey,
+                attemptCount: 1,
+                resourceVersion: 1,
+              })
+              .onConflictDoNothing()
+              .returning();
+            if (contingency) {
+              await tx.insert(dispatchAttempts).values({
+                organizationId,
+                unitId,
+                effectId: contingency.id,
+                attemptNumber: 1,
+                deliveryKey: `${contingencyKey}:1`,
+                state: "scheduled",
+              });
+            }
+          }
+        }
+      }
+      return updated;
+    });
   }
 
   async transferTab(
@@ -1879,6 +2506,123 @@ export class PilotPosService {
         response: stored,
       });
       return { ...stored, idempotentReplay: false };
+    });
+  }
+
+  async transitionOccupancy(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    occupancyId: string,
+    idempotencyKey: string,
+    command: TableOccupancyCommand,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
+    const hash = requestHash("occupancy.transition", command);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from ${tableOccupancies} where id = ${occupancyId} for update`,
+      );
+      const [replay] = await tx
+        .select({
+          requestHash: tableOccupancyEvents.requestHash,
+          after: tableOccupancyEvents.after,
+        })
+        .from(tableOccupancyEvents)
+        .where(
+          and(
+            eq(tableOccupancyEvents.organizationId, organizationId),
+            eq(tableOccupancyEvents.unitId, unitId),
+            eq(tableOccupancyEvents.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (replay) {
+        if (replay.requestHash !== hash)
+          throw new ConflictException({
+            code: "IDEMPOTENCY_KEY_REUSED",
+            message: "A chave idempotente já foi usada com outro conteúdo.",
+          });
+        return { occupancy: replay.after, idempotentReplay: true };
+      }
+      const [current] = await tx
+        .select()
+        .from(tableOccupancies)
+        .where(
+          and(
+            eq(tableOccupancies.organizationId, organizationId),
+            eq(tableOccupancies.unitId, unitId),
+            eq(tableOccupancies.id, occupancyId),
+          ),
+        )
+        .limit(1);
+      if (!current)
+        throw new NotFoundException({
+          code: "OCCUPANCY_NOT_FOUND",
+          message: "Ocupação não encontrada.",
+        });
+      let next: ReturnType<typeof transitionTableOccupancy>;
+      try {
+        next = transitionTableOccupancy(
+          {
+            state: current.state,
+            occupancyEpoch: current.occupancyEpoch,
+            resourceVersion: current.resourceVersion,
+            tableId: current.tableId,
+            groupId: current.groupId,
+          },
+          command,
+        );
+      } catch (error) {
+        if (error instanceof TableOccupancyTransitionError)
+          throw new ConflictException({ code: error.code, message: error.message });
+        throw error;
+      }
+      const now = new Date();
+      const [updated] = await tx
+        .update(tableOccupancies)
+        .set({
+          state: next.state,
+          occupancyEpoch: next.occupancyEpoch,
+          resourceVersion: next.resourceVersion,
+          tableId: next.tableId,
+          groupId: next.groupId,
+          openedAt: next.state === "open" && current.openedAt === null ? now : current.openedAt,
+          closedAt: next.state === "closed" ? now : null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(tableOccupancies.id, occupancyId),
+            eq(tableOccupancies.occupancyEpoch, current.occupancyEpoch),
+            eq(tableOccupancies.resourceVersion, current.resourceVersion),
+          ),
+        )
+        .returning();
+      if (!updated)
+        throw new ConflictException({
+          code: "OCCUPANCY_VERSION_CONFLICT",
+          message: "A ocupação mudou em outro terminal.",
+        });
+      await tx.insert(tableOccupancyEvents).values({
+        organizationId,
+        unitId,
+        occupancyId,
+        occupancyEpoch: current.occupancyEpoch,
+        sequence: next.resourceVersion,
+        type: command.type,
+        actorIdentityId: identityId,
+        idempotencyKey,
+        requestHash: hash,
+        before: current,
+        after: updated,
+      });
+      return { occupancy: updated, idempotentReplay: false };
     });
   }
 

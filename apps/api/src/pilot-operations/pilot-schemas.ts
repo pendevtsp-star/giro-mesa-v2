@@ -164,6 +164,14 @@ export const managerPinSchema = z.object({ pin: z.string().regex(/^\d{4,8}$/) })
 export const kdsStateSchema = z.object({
   state: z.enum(["preparing", "ready", "done", "canceled"]),
 });
+export const dispatchReconcileSchema = z.object({
+  expectedResourceVersion: z.number().int().nonnegative(),
+  action: z.enum(["retry", "cancel"]),
+});
+export const dispatchAcknowledgementSchema = z.object({
+  acknowledgementKey: z.string().trim().min(8).max(160),
+});
+export const dispatchStateSchema = z.enum(["pending", "delivered", "acked", "canceled", "dlq"]);
 
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type AllergenInput = z.infer<typeof allergenSchema>;
@@ -184,3 +192,5 @@ export type DiscountInput = z.infer<typeof discountSchema>;
 export type CancelItemInput = z.infer<typeof cancelItemSchema>;
 export type ManagerPinInput = z.infer<typeof managerPinSchema>;
 export type KdsStateInput = z.infer<typeof kdsStateSchema>;
+export type DispatchReconcileInput = z.infer<typeof dispatchReconcileSchema>;
+export type DispatchAcknowledgementInput = z.infer<typeof dispatchAcknowledgementSchema>;

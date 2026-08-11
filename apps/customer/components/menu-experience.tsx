@@ -1,21 +1,19 @@
 "use client";
 
 import { Icon } from "@giromesa/ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   type CartItem,
   cartTotal,
   filterMenu,
   formatMoney,
+  type MenuBranding,
   type MenuItem,
   type Modifier,
   type ModifierGroup,
 } from "../lib/menu";
-import {
-  isCommandAccepted,
-  type MutationAttempt,
-  resolveMutationAttempt,
-} from "../lib/public-contracts";
+import { type MutationAttempt, resolveMutationAttempt } from "../lib/public-contracts";
 import {
   type PublicOrderOptions,
   type PublicOrderReceipt,
@@ -33,17 +31,21 @@ type OrderOptionsState =
   | { status: "unavailable" }
   | { status: "ready"; data: PublicOrderOptions };
 
-function MenuVisual({ item }: { item: MenuItem }) {
-  if (item.visual) return <span className="customer-visual-copy">{item.visual}</span>;
-  return <Icon name={item.icon ?? "dish"} />;
+function MenuItemVisual({ item }: { item: MenuItem }) {
+  if (item.imageUrl) {
+    return <Image src={item.imageUrl} alt="" fill sizes="(max-width: 560px) 45vw, 260px" />;
+  }
+  return <Icon name={item.icon ?? (item.visual === "drink" ? "glass" : "dish")} />;
 }
 
 export function MenuExperience({
   initialItems,
+  branding,
   menuSlug,
   demo,
 }: {
   initialItems: MenuItem[];
+  branding: MenuBranding | null;
   menuSlug: string;
   demo: boolean;
 }) {
@@ -57,9 +59,7 @@ export function MenuExperience({
   const [cartOpen, setCartOpen] = useState(false);
   const [hub, setHub] = useState<HubState>("checking");
   const [notice, setNotice] = useState<Notice>(null);
-  const [pendingCommand, setPendingCommand] = useState<
-    "public_order" | "call_waiter" | "request_check" | null
-  >(null);
+  const [pendingCommand, setPendingCommand] = useState<"public_order" | null>(null);
   const [orderOptions, setOrderOptions] = useState<OrderOptionsState>({ status: "loading" });
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [customerName, setCustomerName] = useState("");
@@ -90,6 +90,11 @@ export function MenuExperience({
   );
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const demoAck = demo && process.env.NEXT_PUBLIC_DEMO_HUB_ACK === "true";
+  const menuStyle = {
+    "--green": branding?.primaryColor ?? "#173f35",
+    "--paper": branding?.surfaceColor ?? "#fffdfa",
+    "--ink": branding?.textColor ?? "#17231f",
+  } as CSSProperties;
 
   useEffect(() => {
     let active = true;
@@ -225,65 +230,6 @@ export function MenuExperience({
     );
   }
 
-  async function sendCommand(type: "call_waiter" | "request_check", payload: object = {}) {
-    if (pendingCommand) return false;
-    if (hub !== "online") {
-      setNotice({
-        tone: "warning",
-        text: "Atendimento digital pausado. Chame a equipe presencialmente.",
-      });
-      return false;
-    }
-    if (demoAck) {
-      setNotice({
-        tone: "success",
-        text: "Ação demonstrada. Nenhum chamado real foi enviado.",
-      });
-      return true;
-    }
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    const apiEnabled = process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
-    if (!apiUrl || !apiEnabled) return false;
-    setPendingCommand(type);
-    try {
-      return await withCustomerPwaMutation(async (context) => {
-        const response = await customerFetch(
-          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Idempotency-Key": crypto.randomUUID(),
-            },
-            body: JSON.stringify({ type, payload }),
-          },
-          context,
-        );
-        const result: unknown = await response.json();
-        if (!response.ok || !isCommandAccepted(result)) {
-          throw new Error("Sem confirmação do hub");
-        }
-        setNotice({
-          tone: "success",
-          text:
-            type === "call_waiter"
-              ? "A equipe recebeu o chamado da mesa."
-              : "A operação recebeu o pedido da conta.",
-        });
-        return true;
-      });
-    } catch {
-      setHub("offline");
-      setNotice({
-        tone: "warning",
-        text: "Não recebemos confirmação da operação. Nenhum pedido foi registrado.",
-      });
-      return false;
-    } finally {
-      setPendingCommand(null);
-    }
-  }
-
   async function placePublicOrder() {
     if (!cart.length) return;
     if (demo) {
@@ -376,18 +322,36 @@ export function MenuExperience({
       (fulfillment === "pickup" || Boolean(selectedZone && deliveryAddressComplete)));
 
   return (
-    <main className="menu-app">
+    <main className="menu-app" style={menuStyle}>
       <a className="skip-link" href="#cardapio">
         Pular para o cardápio
       </a>
-      <header className="restaurant-header">
+      <header className={`restaurant-header${branding?.coverUrl ? " has-cover" : ""}`}>
+        {branding?.coverUrl && (
+          <Image
+            className="restaurant-cover"
+            src={branding.coverUrl}
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 620px) 100vw, 620px"
+            aria-hidden="true"
+          />
+        )}
         <div className="restaurant-mark" aria-hidden="true">
-          A
+          {branding?.logoUrl ? (
+            <Image src={branding.logoUrl} alt="" fill sizes="58px" />
+          ) : (
+            (branding?.name ?? "Amora Cozinha").slice(0, 1).toLocaleUpperCase("pt-BR")
+          )}
         </div>
         <div>
           <p>{demo ? "Restaurante demonstrativo" : "Cardápio digital"}</p>
-          <h1>{demo ? "Amora Cozinha" : "Cardápio da unidade"}</h1>
-          <span>{demo ? "Mesa 12 · Jantar" : "Consulte os dados informados pela equipe"}</span>
+          <h1>{branding?.name ?? (demo ? "Amora Cozinha" : "Cardápio da unidade")}</h1>
+          <span>
+            {branding?.description ||
+              (demo ? "Mesa 12 · Jantar" : "Consulte os dados informados pela equipe")}
+          </span>
         </div>
         <button
           type="button"
@@ -474,7 +438,7 @@ export function MenuExperience({
                 aria-label={`${item.name}, ${formatMoney(item.priceCents)}${item.available ? "" : ", indisponível"}`}
               >
                 <span className={`food-visual food-${item.id}`} aria-hidden="true">
-                  <MenuVisual item={item} />
+                  <MenuItemVisual item={item} />
                 </span>
                 <span className="menu-card-copy">
                   <span className="item-name">{item.name}</span>
@@ -505,20 +469,9 @@ export function MenuExperience({
           <h2 id="table-actions-title">Atendimento na mesa</h2>
         </div>
         <div>
-          <button
-            type="button"
-            disabled={pendingCommand !== null}
-            onClick={() => void sendCommand("call_waiter")}
-          >
-            <Icon name="bell" /> Chamar garçom
-          </button>
-          <button
-            type="button"
-            disabled={pendingCommand !== null}
-            onClick={() => void sendCommand("request_check")}
-          >
-            <Icon name="receipt" /> Pedir a conta
-          </button>
+          <a href={`/m/${menuSlug}/servicos#mesa`}>
+            Atendimento seguro pelo QR
+          </a>
         </div>
       </section>
       <section className="public-services" aria-labelledby="public-services-title">
@@ -623,7 +576,7 @@ export function MenuExperience({
           <div className="dialog-shell">
             <div className={`product-hero food-${selected.id}`}>
               <span aria-hidden="true">
-                <MenuVisual item={selected} />
+                <MenuItemVisual item={selected} />
               </span>
               <button type="button" aria-label="Fechar" onClick={closeProduct}>
                 <Icon name="close" />
@@ -755,7 +708,7 @@ export function MenuExperience({
                   {cart.map((line) => (
                     <article key={line.lineId}>
                       <span className="cart-visual" aria-hidden="true">
-                        <MenuVisual item={line.item} />
+                        <MenuItemVisual item={line.item} />
                       </span>
                       <div>
                         <h3>{line.item.name}</h3>

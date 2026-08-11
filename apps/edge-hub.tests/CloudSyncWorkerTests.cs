@@ -44,7 +44,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         await worker.SyncOnceAsync();
 
         Assert.Equal("idle", worker.Status);
-        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(1, handler.CallCount);
         Assert.Empty(await store.GetPendingAsync(10));
         Assert.True(await store.HasCloudCommandAsync(cloudCommandId));
         Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
@@ -297,7 +297,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         ]);
         await PromoteToLargeV2Async(options.Value, hiddenInvalid.Id, BuildLargeOrder(1), 1);
         await PromoteToLargeV2Async(options.Value, valid.Id, BuildLargeOrder(1), 1);
-        var handler = new HiddenSchemaHandler(hiddenInvalid.Id, cloudCommandId);
+        var handler = new HiddenSchemaHandler(hiddenInvalid.Id);
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
@@ -306,8 +306,8 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
 
         await worker.SyncOnceAsync();
 
-        Assert.Equal(3, handler.CallCount);
-        Assert.Equal(1, handler.AcknowledgementOnlyCalls);
+        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(0, handler.AcknowledgementOnlyCalls);
         Assert.Equal([valid.Id], handler.UploadedIds);
         Assert.Equal("reconciling", worker.Status);
         Assert.Contains(await store.GetReconciliationAsync(10), item =>
@@ -395,10 +395,8 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         await AssertUntrustedFailurePreservesBatchAsync(new RedirectFailureHandler());
     }
 
-    [Theory]
-    [InlineData("{\"code\":\"SYNC_BATCH_SCHEMA_INVALID\",\"scope\":\"batch\"}")]
-    [InlineData("{\"code\":\"SYNC_ACK_SCHEMA_INVALID\",\"scope\":\"ack\"}")]
-    public async Task AckOnlyBatchOrAckFailureCannotCondemnAnEvent(string responseBody)
+    [Fact]
+    public async Task UnprocessedCloudCommandIsNotAcknowledged()
     {
         var options = TestOptions(Path.Combine(_directory, Guid.NewGuid().ToString("N")));
         var store = new HubStore(options, NullLogger<HubStore>.Instance);
@@ -406,7 +404,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         var localEvent = ValidCommand();
         await store.AcceptCommandAsync(localEvent);
         var cloudCommandId = Guid.NewGuid().ToString();
-        var handler = new AckOnlyFailureHandler(localEvent.Id, cloudCommandId, responseBody);
+        var handler = new AckOnlyFailureHandler(localEvent.Id, cloudCommandId);
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
@@ -415,11 +413,11 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
 
         await worker.SyncOnceAsync();
 
-        Assert.Equal(2, handler.CallCount);
-        Assert.Equal("offline", worker.Status);
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal("idle", worker.Status);
         Assert.Empty(await store.GetPendingAsync(10));
         Assert.Empty(await store.GetReconciliationAsync(10));
-        Assert.Equal([cloudCommandId], await store.GetPendingCloudAcknowledgementsAsync(10));
+        Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
     }
 
     [Theory]
@@ -886,7 +884,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         }
     }
 
-    private sealed class HiddenSchemaHandler(string hiddenId, string expectedAcknowledgementId) : HttpMessageHandler
+    private sealed class HiddenSchemaHandler(string hiddenId) : HttpMessageHandler
     {
         public int CallCount { get; private set; }
         public int AcknowledgementOnlyCalls { get; private set; }
@@ -908,20 +906,12 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             if (ids.Length == 0)
             {
                 AcknowledgementOnlyCalls += 1;
-                Assert.Equal([expectedAcknowledgementId], acknowledgements);
-                return JsonResponse(HttpStatusCode.OK, new
-                {
-                    acceptedEventIds = Array.Empty<string>(),
-                    rejectedEvents = Array.Empty<object>(),
-                    eventResults = Array.Empty<object>(),
-                    commands = Array.Empty<object>(),
-                    serverTime = DateTimeOffset.UtcNow,
-                });
+                throw new InvalidOperationException("Unprocessed cloud commands must not be acknowledged.");
             }
             var hiddenIndex = Array.IndexOf(ids, hiddenId);
             if (hiddenIndex >= 0)
             {
-                Assert.Equal([expectedAcknowledgementId], acknowledgements);
+                Assert.Empty(acknowledgements);
                 var response = JsonResponse(HttpStatusCode.BadRequest, new
                 {
                     code = "SYNC_EVENT_SCHEMA_INVALID",
@@ -1021,8 +1011,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
 
     private sealed class AckOnlyFailureHandler(
         string localEventId,
-        string cloudCommandId,
-        string responseBody) : HttpMessageHandler
+        string cloudCommandId) : HttpMessageHandler
     {
         public int CallCount { get; private set; }
 
@@ -1056,16 +1045,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                 });
             }
 
-            Assert.Empty(events);
-            Assert.Equal(
-                [cloudCommandId],
-                body.RootElement.GetProperty("acknowledgedCommandIds")
-                    .EnumerateArray().Select(item => item.GetString()!).ToArray());
-            return new HttpResponseMessage(HttpStatusCode.BadRequest)
-            {
-                Content = new StringContent(responseBody, Encoding.UTF8, "application/json"),
-                RequestMessage = request,
-            };
+            throw new InvalidOperationException("Unprocessed cloud commands must not be acknowledged.");
         }
     }
 

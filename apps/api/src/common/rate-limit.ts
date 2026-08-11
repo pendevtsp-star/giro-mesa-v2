@@ -46,7 +46,7 @@ export function requestRateLimit(method: string, url: string) {
   const path = new URL(url, "http://localhost").pathname.replace(/\/+$/, "");
   if (
     method.toUpperCase() === "POST" &&
-    (/^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:commands|orders|reservations|waitlist|coupons\/validate)$/.test(
+    (/^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:orders|reservations|waitlist|coupons\/validate)$/.test(
       path,
     ) ||
       /^\/(?:api\/v1\/public|public\/v1)\/(?:trial-applications|contact)$/.test(path))

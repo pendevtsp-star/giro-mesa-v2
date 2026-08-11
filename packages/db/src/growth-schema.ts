@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -9,6 +10,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -16,8 +18,14 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { posTabs } from "./operations-schema.js";
-import { identities, organizations, units } from "./schema.js";
+import { posDiningTables, posTabs, tableOccupancies } from "./operations-schema.js";
+import { identities, organizations, publicMenus, units } from "./schema.js";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -71,6 +79,18 @@ export const transferStatus = pgEnum("growth_transfer_status", [
   "draft",
   "in_transit",
   "received",
+  "canceled",
+]);
+export const publicMenuAssetKind = pgEnum("public_menu_asset_kind", [
+  "logo",
+  "cover",
+  "product",
+]);
+export const tableServiceCallKind = pgEnum("table_service_call_kind", ["waiter", "bill"]);
+export const tableServiceCallState = pgEnum("table_service_call_state", [
+  "received",
+  "routed",
+  "attended",
   "canceled",
 ]);
 
@@ -815,6 +835,381 @@ export const growthIntegrations = pgTable(
   ],
 );
 
+export type PublicMenuBranding = {
+  name: string;
+  description: string;
+  primaryColor: string;
+  surfaceColor: string;
+  textColor: string;
+  logoAssetId: string | null;
+  coverAssetId: string | null;
+};
+
+export type PublicMenuItemSnapshot = {
+  id: string;
+  category: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  available: boolean;
+  imageAssetId: string | null;
+  tags?: string[];
+  modifierGroups?: Array<{
+    id: string;
+    name: string;
+    required: boolean;
+    maxSelections: number;
+    options: Array<{ id: string; name: string; priceCents: number }>;
+  }>;
+};
+
+export const publicMenuMediaAssets = pgTable(
+  "public_menu_media_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: publicMenuAssetKind("kind").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    storageKey: varchar("storage_key", { length: 240 }).notNull(),
+    mimeType: varchar("mime_type", { length: 40 }).notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    bytes: bytea("bytes").notNull(),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_menu_media_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("public_menu_media_scope_hash_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sha256,
+      table.kind,
+    ),
+    uniqueIndex("public_menu_media_storage_key_unique").on(table.storageKey),
+    check("public_menu_media_dimensions_check", sql`${table.width} > 0 and ${table.height} > 0`),
+    check("public_menu_media_byte_size_check", sql`${table.byteSize} > 0`),
+    foreignKey({
+      name: "public_menu_media_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicMenuDrafts = pgTable(
+  "public_menu_drafts",
+  {
+    menuId: uuid("menu_id")
+      .primaryKey()
+      .references(() => publicMenus.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    branding: jsonb("branding").$type<PublicMenuBranding>().notNull(),
+    items: jsonb("items").$type<PublicMenuItemSnapshot[]>().notNull().default([]),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    previewTokenHash: varchar("preview_token_hash", { length: 64 }),
+    previewExpiresAt: timestamp("preview_expires_at", { withTimezone: true }),
+    updatedByIdentityId: uuid("updated_by_identity_id").references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("public_menu_drafts_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.menuId,
+    ),
+    check("public_menu_drafts_resource_version_check", sql`${table.resourceVersion} >= 0`),
+    foreignKey({
+      name: "public_menu_drafts_menu_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicMenuVersions = pgTable(
+  "public_menu_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    version: integer("version").notNull(),
+    sourceResourceVersion: integer("source_resource_version").notNull(),
+    checksum: varchar("checksum", { length: 64 }).notNull(),
+    branding: jsonb("branding").$type<PublicMenuBranding>().notNull(),
+    items: jsonb("items").$type<PublicMenuItemSnapshot[]>().notNull(),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_menu_versions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("public_menu_versions_menu_version_unique").on(table.menuId, table.version),
+    uniqueIndex("public_menu_versions_menu_checksum_unique").on(table.menuId, table.checksum),
+    check("public_menu_versions_version_check", sql`${table.version} > 0`),
+    foreignKey({
+      name: "public_menu_versions_menu_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export type PublicTableCapability = "call_waiter" | "request_bill" | "view_partial";
+
+export const publicTableServiceSettings = pgTable(
+  "public_table_service_settings",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    callWaiterEnabled: boolean("call_waiter_enabled").notNull().default(false),
+    requestBillEnabled: boolean("request_bill_enabled").notNull().default(false),
+    viewPartialEnabled: boolean("view_partial_enabled").notNull().default(false),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId] }),
+    foreignKey({
+      name: "public_table_service_settings_unit_scope_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "public_table_service_settings_version_check",
+      sql`${table.resourceVersion} >= 0`,
+    ),
+  ],
+);
+
+export const publicTableSessions = pgTable(
+  "public_table_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    tableId: uuid("table_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull(),
+    nonceHash: varchar("nonce_hash", { length: 64 }).notNull(),
+    capabilities: jsonb("capabilities")
+      .$type<PublicTableCapability[]>()
+      .notNull()
+      .default(["call_waiter", "request_bill", "view_partial"]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokeReason: varchar("revoke_reason", { length: 80 }),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_table_sessions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("public_table_sessions_nonce_unique").on(table.nonceHash),
+    index("public_table_sessions_occupancy_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.occupancyId,
+      table.expiresAt,
+    ),
+    check("public_table_sessions_version_check", sql`${table.resourceVersion} >= 0`),
+    foreignKey({
+      name: "public_table_sessions_menu_scope_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "public_table_sessions_table_scope_fk",
+      columns: [table.organizationId, table.unitId, table.tableId],
+      foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "public_table_sessions_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [
+        tableOccupancies.organizationId,
+        tableOccupancies.unitId,
+        tableOccupancies.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const publicTableSessionNonces = pgTable(
+  "public_table_session_nonces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    nonceHash: varchar("nonce_hash", { length: 64 }).notNull(),
+    purpose: varchar("purpose", { length: 60 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("public_table_session_nonces_unique").on(table.sessionId, table.nonceHash),
+    foreignKey({
+      name: "public_table_session_nonces_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [
+        publicTableSessions.organizationId,
+        publicTableSessions.unitId,
+        publicTableSessions.id,
+      ],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicTableSessionRateLimits = pgTable(
+  "public_table_session_rate_limits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    bucketHash: varchar("bucket_hash", { length: 64 }).notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    requestCount: integer("request_count").notNull().default(1),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_table_session_rate_bucket_unique").on(
+      table.menuId,
+      table.bucketHash,
+      table.windowStartedAt,
+    ),
+    check("public_table_session_rate_count_check", sql`${table.requestCount} > 0`),
+    foreignKey({
+      name: "public_table_session_rate_menu_scope_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const tableServiceCalls = pgTable(
+  "table_service_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull(),
+    tableId: uuid("table_id").notNull(),
+    kind: tableServiceCallKind("kind").notNull(),
+    state: tableServiceCallState("state").notNull().default("received"),
+    routedIdentityId: uuid("routed_identity_id").references(() => identities.id),
+    routeSource: varchar("route_source", { length: 20 }).$type<"primary" | "support" | "fallback" | "unassigned">().notNull(),
+    attendedByIdentityId: uuid("attended_by_identity_id").references(() => identities.id),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    routedAt: timestamp("routed_at", { withTimezone: true }),
+    attendedAt: timestamp("attended_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_service_calls_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("table_service_calls_idempotency_unique").on(table.sessionId, table.idempotencyKey),
+    index("table_service_calls_open_idx").on(table.organizationId, table.unitId, table.state, table.createdAt),
+    foreignKey({
+      name: "table_service_calls_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [publicTableSessions.organizationId, publicTableSessions.unitId, publicTableSessions.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_service_calls_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [tableOccupancies.organizationId, tableOccupancies.unitId, tableOccupancies.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableServiceCallEvents = pgTable(
+  "table_service_call_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    callId: uuid("call_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    state: tableServiceCallState("state").notNull(),
+    actorIdentityId: uuid("actor_identity_id").references(() => identities.id),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("table_service_call_events_sequence_unique").on(table.callId, table.sequence),
+    foreignKey({
+      name: "table_service_call_events_call_scope_fk",
+      columns: [table.organizationId, table.unitId, table.callId],
+      foreignColumns: [tableServiceCalls.organizationId, tableServiceCalls.unitId, tableServiceCalls.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableServiceCallReceipts = pgTable(
+  "table_service_call_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    callId: uuid("call_id").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    cooldownDeduplicated: boolean("cooldown_deduplicated").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("table_service_call_receipts_idempotency_unique").on(
+      table.sessionId,
+      table.idempotencyKey,
+    ),
+    index("table_service_call_receipts_call_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.callId,
+    ),
+    foreignKey({
+      name: "table_service_call_receipts_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [
+        publicTableSessions.organizationId,
+        publicTableSessions.unitId,
+        publicTableSessions.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_service_call_receipts_call_scope_fk",
+      columns: [table.organizationId, table.unitId, table.callId],
+      foreignColumns: [
+        tableServiceCalls.organizationId,
+        tableServiceCalls.unitId,
+        tableServiceCalls.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
 // RLS is declared in Drizzle as well as in the hand-authored policy migration so
 // a later schema generation cannot silently remove the live tenant boundary.
 export const growthTenantTables = [
@@ -840,6 +1235,16 @@ export const growthTenantTables = [
   webhookEndpoints,
   webhookPublications,
   growthIntegrations,
+  publicMenuMediaAssets,
+  publicMenuDrafts,
+  publicMenuVersions,
+  publicTableSessions,
+  publicTableServiceSettings,
+  publicTableSessionNonces,
+  publicTableSessionRateLimits,
+  tableServiceCalls,
+  tableServiceCallEvents,
+  tableServiceCallReceipts,
 ] as const;
 
 for (const table of growthTenantTables) table.enableRLS();

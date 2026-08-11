@@ -67,7 +67,7 @@ test("envia somente referências e quantidades para o servidor recalcular preço
           name: "Executivo",
           description: "Descrição exibida",
           priceCents: 1,
-          visual: "🍽️",
+          visual: "plate",
           available: true,
         },
         quantity: 2,

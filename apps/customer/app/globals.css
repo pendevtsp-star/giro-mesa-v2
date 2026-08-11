@@ -119,6 +119,8 @@ textarea:focus-visible {
   box-shadow: 0 0 70px rgba(14, 40, 31, 0.13);
 }
 .restaurant-header {
+  position: relative;
+  isolation: isolate;
   min-height: 126px;
   padding: 24px 22px;
   display: grid;
@@ -129,7 +131,27 @@ textarea:focus-visible {
   background:
     radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.26), transparent 32%), var(--green);
 }
+.restaurant-header.has-cover {
+  min-height: 190px;
+  align-items: end;
+}
+.restaurant-cover {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.restaurant-header.has-cover::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, rgba(8, 20, 17, 0.16), rgba(8, 20, 17, 0.88));
+}
 .restaurant-mark {
+  position: relative;
   width: 58px;
   height: 58px;
   display: grid;
@@ -140,6 +162,12 @@ textarea:focus-visible {
   font:
     italic 31px Georgia,
     serif;
+}
+.restaurant-mark img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 .restaurant-header p,
 .restaurant-header h1,
@@ -343,14 +371,23 @@ textarea:focus-visible {
   box-shadow: 0 10px 25px rgba(30, 49, 41, 0.1);
 }
 .food-visual {
+  position: relative;
   height: 150px;
   display: grid;
   place-items: center;
-  font-size: 64px;
+  color: color-mix(in srgb, var(--green) 84%, white);
   background:
     radial-gradient(circle at 45% 45%, #f9d7a4 0 18%, transparent 19%),
     linear-gradient(145deg, #e8decf, #c5d1bd);
-  text-shadow: 0 8px 15px rgba(60, 40, 20, 0.18);
+}
+.food-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.food-visual svg {
+  width: 58px;
+  height: 58px;
 }
 .food-visual .gm-icon {
   width: 72px;
@@ -430,6 +467,28 @@ textarea:focus-visible {
 .menu-card:has(.sold-out) .food-visual {
   filter: grayscale(0.7);
   opacity: 0.65;
+}
+.product-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.product-hero,
+.cart-visual {
+  position: relative;
+}
+.product-hero svg {
+  width: 76px;
+  height: 76px;
+}
+.cart-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cart-visual svg {
+  width: 28px;
+  height: 28px;
 }
 .empty-state {
   padding: 60px 20px;
@@ -1466,6 +1525,47 @@ fieldset label input {
 .public-service-form > button:disabled {
   background: #a5aaa6;
   cursor: not-allowed;
+}
+.public-service-table-actions {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+.public-service-table-actions button {
+  background: var(--menu-accent, #136c52);
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: 750;
+  min-height: 48px;
+  padding: 0.75rem;
+}
+.public-service-table-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.public-service-partial {
+  background: #f4f7f5;
+  border: 1px solid #dce4df;
+  border-radius: 14px;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+.public-service-partial h3 { margin: 0; }
+.public-service-partial > div {
+  align-items: center;
+  border-top: 1px solid #dce4df;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 0.65rem;
+}
+@media (max-width: 560px) {
+  .public-service-table-actions { grid-template-columns: 1fr; }
 }
 .public-service-dependencies {
   margin-top: 24px;
