@@ -17,23 +17,64 @@ import { FiscalSimulatorAdapter } from "./adapters/simulator.adapter.js";
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const FISCAL_ROLES = ["owner", "manager", "cashier"] as const;
 
-function assertNoCardData(value: unknown, path = "fiscal") {
+const SENSITIVE_FISCAL_KEY =
+  /(?:^|_)(?:pan|card_number|cvv|cvc|cid|track_?1|track_?2|track_data|pin|password|passphrase|secret|token|api_key|access_key|private_key)(?:$|_)/i;
+const CARD_CANDIDATE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
+const TRACK_DATA = /(?:%B\d{12,19}\^|;\d{12,19}=)/i;
+const SECRET_VALUE = /(?:\bBearer\s+[A-Za-z0-9._~+/=-]{12,}|\bsk_(?:live|test)_[A-Za-z0-9]{12,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/i;
+
+function normalizedKey(key: string) {
+  return key.replaceAll(/([a-z])([A-Z])/g, "$1_$2").replaceAll(/[^a-z0-9]+/gi, "_").toLowerCase();
+}
+
+function passesLuhn(digits: string) {
+  let sum = 0;
+  let double = false;
+  for (let index = digits.length - 1; index >= 0; index -= 1) {
+    let digit = Number(digits[index]);
+    if (double) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    double = !double;
+  }
+  return sum % 10 === 0;
+}
+
+function containsPan(value: string) {
+  for (const candidate of value.matchAll(CARD_CANDIDATE)) {
+    const digits = candidate[0].replaceAll(/\D/g, "");
+    if (digits.length >= 13 && digits.length <= 19 && passesLuhn(digits)) return true;
+  }
+  return false;
+}
+
+function rejectSensitiveFiscalData(path: string) {
+  throw new BadRequestException({
+    code: "CARD_DATA_FORBIDDEN",
+    message: `Dado financeiro sensível não pode integrar o documento fiscal (${path}).`,
+  });
+}
+
+export function assertNoSensitiveFiscalData(value: unknown, path = "fiscal") {
   if (Array.isArray(value)) {
     value.forEach((entry, index) => {
-      assertNoCardData(entry, `${path}[${index}]`);
+      assertNoSensitiveFiscalData(entry, `${path}[${index}]`);
     });
+    return;
+  }
+  if (typeof value === "string") {
+    if (TRACK_DATA.test(value) || SECRET_VALUE.test(value) || containsPan(value)) {
+      rejectSensitiveFiscalData(path);
+    }
     return;
   }
   if (!value || typeof value !== "object") return;
   for (const [key, entry] of Object.entries(value)) {
-    const normalized = key.replaceAll(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
-    if (/(?:^|_)(?:pan|cvv|cvc|track1|track2|track_data)(?:$|_)/i.test(normalized)) {
-      throw new BadRequestException({
-        code: "CARD_DATA_FORBIDDEN",
-        message: `Dado de cartão não pode integrar o documento fiscal (${path}.${key}).`,
-      });
-    }
-    assertNoCardData(entry, `${path}.${key}`);
+    const normalized = normalizedKey(key);
+    if (SENSITIVE_FISCAL_KEY.test(normalized)) rejectSensitiveFiscalData(`${path}.${key}`);
+    assertNoSensitiveFiscalData(entry, `${path}.${key}`);
   }
 }
 
@@ -79,7 +120,7 @@ export class FiscalService {
     },
   ) {
     await this.requireRole(identityId, organizationId, unitId);
-    assertNoCardData(input.document);
+    assertNoSensitiveFiscalData(input.document);
     const key = idempotencyKey.trim();
     if (
       key.length < 8 ||
