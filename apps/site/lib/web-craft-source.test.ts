@@ -33,3 +33,12 @@ it("alinha a cor do shell Ops ao manifesto e oferece alvo PWA de 48px nos três 
     assert.match(css, /\.pwa-update button\s*\{[^}]*min-height:\s*48px/s);
   }
 });
+
+it("estabiliza imagens, fontes e layout visual sem sleeps frágeis", async () => {
+  const visualSpec = await readSource("../../../tests/e2e/landing-visual.spec.ts");
+  assert.match(visualSpec, /waitForStableVisualState/);
+  assert.match(visualSpec, /document\.fonts\.ready/);
+  assert.match(visualSpec, /\.decode\(\)/);
+  assert.match(visualSpec, /polling:\s*"raf"/);
+  assert.doesNotMatch(visualSpec, /waitForTimeout|setTimeout/);
+});
