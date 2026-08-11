@@ -1053,6 +1053,94 @@ test("retoma polling automático depois de refresh manual 503 sem timers duplica
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+for (const status of [400, 401, 403, 404] as const) {
+  test(`não rearma polling depois de refresh permanente ${status}`, async ({ page }) => {
+    let failNextRefresh = false;
+    let statusCalls = 0;
+    let markRefreshFailed: (() => void) | undefined;
+    const refreshFailed = new Promise<void>((resolve) => {
+      markRefreshFailed = resolve;
+    });
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now() + 1_000));
+    await page.route(
+      `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+      async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (url.pathname.endsWith(`/provisioning/${runId}`)) {
+          statusCalls += 1;
+          await route.fulfill({
+            status: 500,
+            json: {
+              statusCode: 500,
+              code: "UNEXPECTED_POLL",
+              message: "O polling não deveria ter sido reagendado.",
+            },
+          });
+          return;
+        }
+        if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+          if (failNextRefresh) {
+            failNextRefresh = false;
+            await route.fulfill({
+              status,
+              json: {
+                statusCode: status,
+                code: status === 401 ? "SESSION_EXPIRED" : `REFRESH_${status}`,
+                message: `Refresh permanente ${status}.`,
+              },
+            });
+            markRefreshFailed?.();
+            return;
+          }
+          await route.fulfill({
+            json: onboardingSnapshot({
+              items: verifiedItems(),
+              selection: selectedPlan(1),
+              provisioning: {
+                id: runId,
+                state: "publishing",
+                checkpoint: "activation_committed",
+                attempts: 1,
+                lastErrorCode: null,
+                nextRetryAt: null,
+                completedAt: null,
+                failedAt: null,
+                createdAt: "2026-08-11T10:00:00.000Z",
+                updatedAt: "2026-08-11T10:00:00.000Z",
+              },
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+        });
+      },
+    );
+
+    await enterDemo(page);
+    await openOnboarding(page);
+    const refreshCurrentRun = page
+      .locator("button:not([disabled])")
+      .filter({ hasText: "Atualizar status" })
+      .first();
+    failNextRefresh = true;
+    await refreshCurrentRun.click();
+    await refreshFailed;
+    if (status === 401) {
+      await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
+    } else if (status === 403) {
+      await expect(page.locator(".onboarding-activation").getByRole("checkbox")).toBeDisabled();
+    }
+    await page.waitForTimeout(100);
+    await page.clock.fastForward(10_000);
+    expect(statusCalls).toBe(0);
+  });
+}
+
 test("suprime 409 de ativação antigo depois de refresh autoritativo terminal", async ({ page }) => {
   let completed = false;
   const completedAt = "2026-08-11T10:10:00.000Z";
@@ -1114,6 +1202,74 @@ test("suprime 409 de ativação antigo depois de refresh autoritativo terminal",
   await page.waitForTimeout(150);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
+
+for (const state of ["terminal_failed", "compensated"] as const) {
+  test(`preserva erro público e recuperação após ativação ${state}`, async ({ page }) => {
+    let failed = false;
+    const failedAt = "2026-08-11T10:10:00.000Z";
+    const publicMessage = `A ativação terminou em ${state} e pode ser tentada novamente.`;
+    await page.route(
+      `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+      async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (request.method() === "POST" && url.pathname.endsWith("/activate")) {
+          failed = true;
+          await route.fulfill({
+            status: 409,
+            json: {
+              statusCode: 409,
+              code: "ACTIVATION_PROVISIONING_FAILED",
+              message: publicMessage,
+              details: { provisioningRunId: runId },
+            },
+          });
+          return;
+        }
+        if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+          await route.fulfill({
+            json: onboardingSnapshot({
+              items: verifiedItems(),
+              selection: selectedPlan(1),
+              provisioning: failed
+                ? {
+                    id: runId,
+                    state,
+                    checkpoint: "activation_committed",
+                    attempts: 1,
+                    lastErrorCode: "ACTIVATION_PROVISIONING_FAILED",
+                    nextRetryAt: null,
+                    completedAt: null,
+                    failedAt,
+                    createdAt: failedAt,
+                    updatedAt: failedAt,
+                  }
+                : null,
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+        });
+      },
+    );
+
+    await enterDemo(page);
+    await openOnboarding(page);
+    const activation = page.locator(".onboarding-activation");
+    await activation.getByRole("checkbox").check();
+    await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText(publicMessage);
+    await expect(alert.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
+    await expect(alert).toBeFocused();
+    await expect(activation).toContainText(
+      state === "terminal_failed" ? "Ativação encerrada com falha" : "Ativação compensada",
+    );
+  });
+}
 
 test("não deixa erro de ativação cruzar a troca de unidade durante refresh de recuperação", async ({
   page,

@@ -161,6 +161,29 @@ O terceiro round fecha os três achados importantes e o achado menor da nova rev
 - Biome focado em **8 arquivos TypeScript/TSX: verde**. `git diff --check`: **verde**.
 - A matriz regenerou as quatro capturas desktop/mobile de topo/ativação sem mudança visual regressiva. O detector Impeccable não foi repetido, conforme o limite explícito. OpenAPI usou somente URL PostgreSQL local placeholder de bootstrap; não houve provider, credencial real, push ou deploy.
 
+## Fix round 4 — falha terminal pública e retry transitório
+
+O quarto round corrige os dois achados importantes sem alterar API, contratos, clientes gerados ou escopo posterior à Task 8.
+
+### RED adicional capturado
+
+- Um 409 com `provisioningRunId` seguido por snapshot `terminal_failed` ou `compensated` não deixava alerta algum: a reconciliação tratava qualquer estado terminal como sucesso e descartava a mensagem pública do backend.
+- Uma falha permanente de refresh durante saga `publishing` podia incrementar `pollAttempt`; os casos 403/404 reproduziram um GET de provisioning posterior e substituíram o erro original. A matriz também fixa 400/401 como políticas não transitórias.
+
+### Correções
+
+- Reconciliação de ativação agora considera sucesso autoritativo somente `activatedAt` ou provisioning `completed`. `terminal_failed` e `compensated` reaplicam uma única vez o `code`/`message` público já normalizado pelo boundary, preservam foco no alerta e oferecem `Tentar novamente`; nenhum detalhe fora da allowlist é renderizado. O caso `completed` continua suprimindo o 409 obsoleto.
+- Refresh e polling só incrementam backoff para `ApiClientError.retryable`, conforme a política central atual de 429/5xx e falhas de transporte. 400/401/403/404 nunca reagendam; o lock de 403 é refletido sincronicamente em ref, cancela o scheduler existente e impede retomada mesmo antes do próximo render.
+- O E2E pausa o relógio antes do refresh permanente, aguarda a resposta e avança dez segundos: nenhuma chamada de status ocorre para 400/401/403/404. O cenário 503 permanece verde com exatamente uma retomada e sem timer duplicado.
+
+### Gates do fix round 4
+
+- Ops unit/component: **13 arquivos, 50/50 testes**.
+- Playwright onboarding: **42/42**, 21 cenários em desktop + 21 em mobile; inclui falha terminal/compensada, foco/CTA, sucesso reconciliado, quatro erros permanentes com relógio avançado e retry 503.
+- Workspace typecheck: **12/12 tasks**. Workspace test: **12/12 tasks**; API permaneceu **92 passed, 42 skips declarados, 0 failures**. Workspace build: **8/8 tasks**.
+- Biome focado nos **2 arquivos TypeScript/TSX alterados: verde**. `git diff --check`: **verde**.
+- A matriz regenerou as quatro capturas desktop/mobile de topo/ativação. O detector Impeccable não foi repetido; geração OpenAPI/C# permaneceu intocada. Não houve provider, credencial real, push, deploy ou Task 9+.
+
 ## Limites conhecidos
 
 - O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.

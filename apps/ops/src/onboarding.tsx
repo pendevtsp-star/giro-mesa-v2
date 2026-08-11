@@ -473,10 +473,14 @@ type RefreshOutcome =
   | { status: "applied"; requestOrder: number; snapshot: OnboardingResponse }
   | { status: "failed" | "ignored"; requestOrder: number };
 
-function snapshotResolvedTerminally(snapshot: OnboardingResponse | null) {
-  return Boolean(
-    snapshot?.activatedAt ||
-      (snapshot?.provisioning && isTerminalProvisioningState(snapshot.provisioning.state)),
+function snapshotResolvedSuccessfully(snapshot: OnboardingResponse | null) {
+  return Boolean(snapshot?.activatedAt || snapshot?.provisioning?.state === "completed");
+}
+
+function snapshotFailedTerminally(snapshot: OnboardingResponse | null) {
+  return (
+    snapshot?.provisioning?.state === "terminal_failed" ||
+    snapshot?.provisioning?.state === "compensated"
   );
 }
 
@@ -517,9 +521,10 @@ export function OnboardingPage({
   const snapshotRef = useRef<OnboardingResponse | null>(null);
   const refreshControllerRef = useRef<AbortController | null>(null);
   const pollControllerRef = useRef<AbortController | null>(null);
+  const lockedRef = useRef(false);
 
   const showError = useCallback(
-    (caught: unknown) => {
+    (caught: unknown, action?: string) => {
       const source =
         caught instanceof ApiClientError
           ? {
@@ -530,8 +535,11 @@ export function OnboardingPage({
             }
           : { status: 0, code: "UNEXPECTED_CLIENT_ERROR", message: "Não foi possível continuar." };
       const guidance = errorGuidance(source);
-      setError(guidance);
-      if (guidance.permissionLocked) setLocked(true);
+      setError(action ? { ...guidance, action } : guidance);
+      if (guidance.permissionLocked) {
+        lockedRef.current = true;
+        setLocked(true);
+      }
       if (guidance.sessionEnded) onUnauthorized?.();
     },
     [onUnauthorized],
@@ -628,6 +636,9 @@ export function OnboardingPage({
           showError(caught);
           const currentRun = snapshotRef.current?.provisioning;
           if (
+            caught instanceof ApiClientError &&
+            caught.retryable &&
+            !lockedRef.current &&
             currentRun &&
             shouldPollProvisioning({ online: true, visible: true, state: currentRun.state })
           ) {
@@ -662,6 +673,7 @@ export function OnboardingPage({
     setSnapshot(null);
     setLoading(authorized);
     setBusy(false);
+    lockedRef.current = false;
     setLocked(false);
     setPollAttempt(0);
     setPollPaused(false);
@@ -690,7 +702,7 @@ export function OnboardingPage({
 
   useEffect(() => {
     const run = snapshot?.provisioning;
-    if (!run || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
+    if (!run || locked || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
     if (!shouldPollProvisioning({ online, visible, state: run.state })) return undefined;
     const controller = new AbortController();
     pollControllerRef.current?.abort();
@@ -737,7 +749,9 @@ export function OnboardingPage({
           (snapshotRef.current.selection?.revision ?? null) === expectedRevision
         ) {
           showError(caught);
-          setPollAttempt((attempt) => attempt + 1);
+          if (caught instanceof ApiClientError && caught.retryable && !lockedRef.current) {
+            setPollAttempt((attempt) => attempt + 1);
+          }
         }
       }
     }, pollingDelay(pollAttempt));
@@ -746,7 +760,17 @@ export function OnboardingPage({
       if (pollControllerRef.current === controller) pollControllerRef.current = null;
       globalThis.clearTimeout(timer);
     };
-  }, [online, organizationId, pollAttempt, pollPaused, refresh, showError, snapshot, visible]);
+  }, [
+    locked,
+    online,
+    organizationId,
+    pollAttempt,
+    pollPaused,
+    refresh,
+    showError,
+    snapshot,
+    visible,
+  ]);
 
   useEffect(() => {
     if (pollAttempt >= MAX_POLL_ATTEMPTS) setPollPaused(true);
@@ -919,7 +943,13 @@ export function OnboardingPage({
         ) {
           return;
         }
-        if (recovery.status === "applied" && snapshotResolvedTerminally(recovery.snapshot)) return;
+        if (recovery.status === "applied") {
+          if (snapshotResolvedSuccessfully(recovery.snapshot)) return;
+          if (snapshotFailedTerminally(recovery.snapshot)) {
+            showError(caught, "Tentar novamente");
+            return;
+          }
+        }
       }
       showError(caught);
     } finally {
