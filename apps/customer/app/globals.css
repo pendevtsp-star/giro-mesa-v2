@@ -1445,6 +1445,47 @@ fieldset label input {
   background: #a5aaa6;
   cursor: not-allowed;
 }
+.public-service-table-actions {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+.public-service-table-actions button {
+  background: var(--menu-accent, #136c52);
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: 750;
+  min-height: 48px;
+  padding: 0.75rem;
+}
+.public-service-table-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.public-service-partial {
+  background: #f4f7f5;
+  border: 1px solid #dce4df;
+  border-radius: 14px;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+.public-service-partial h3 { margin: 0; }
+.public-service-partial > div {
+  align-items: center;
+  border-top: 1px solid #dce4df;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 0.65rem;
+}
+@media (max-width: 560px) {
+  .public-service-table-actions { grid-template-columns: 1fr; }
+}
 .public-service-dependencies {
   margin-top: 24px;
   padding: 22px;

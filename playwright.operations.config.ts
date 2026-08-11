@@ -12,11 +12,19 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3212 --strictPort",
-    env: { VITE_DEMO_MODE: "true" },
-    url: "http://127.0.0.1:3212",
-    reuseExistingServer: false,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3212 --strictPort",
+      env: { VITE_DEMO_MODE: "true" },
+      url: "http://127.0.0.1:3212",
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: "pnpm --filter @giromesa/customer exec next dev -p 3211",
+      url: "http://localhost:3211/m/demo",
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 });

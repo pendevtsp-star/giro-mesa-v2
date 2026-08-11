@@ -85,6 +85,13 @@ export const publicMenuAssetKind = pgEnum("public_menu_asset_kind", [
   "cover",
   "product",
 ]);
+export const tableServiceCallKind = pgEnum("table_service_call_kind", ["waiter", "bill"]);
+export const tableServiceCallState = pgEnum("table_service_call_state", [
+  "received",
+  "routed",
+  "attended",
+  "canceled",
+]);
 
 export const growthCustomers = pgTable(
   "growth_customers",
@@ -1068,6 +1075,68 @@ export const publicTableSessionRateLimits = pgTable(
   ],
 );
 
+export const tableServiceCalls = pgTable(
+  "table_service_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull(),
+    tableId: uuid("table_id").notNull(),
+    kind: tableServiceCallKind("kind").notNull(),
+    state: tableServiceCallState("state").notNull().default("received"),
+    routedIdentityId: uuid("routed_identity_id").references(() => identities.id),
+    routeSource: varchar("route_source", { length: 20 }).$type<"primary" | "support" | "fallback" | "unassigned">().notNull(),
+    attendedByIdentityId: uuid("attended_by_identity_id").references(() => identities.id),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    routedAt: timestamp("routed_at", { withTimezone: true }),
+    attendedAt: timestamp("attended_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("table_service_calls_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("table_service_calls_idempotency_unique").on(table.sessionId, table.idempotencyKey),
+    index("table_service_calls_open_idx").on(table.organizationId, table.unitId, table.state, table.createdAt),
+    foreignKey({
+      name: "table_service_calls_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [publicTableSessions.organizationId, publicTableSessions.unitId, publicTableSessions.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "table_service_calls_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [tableOccupancies.organizationId, tableOccupancies.unitId, tableOccupancies.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const tableServiceCallEvents = pgTable(
+  "table_service_call_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    callId: uuid("call_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    state: tableServiceCallState("state").notNull(),
+    actorIdentityId: uuid("actor_identity_id").references(() => identities.id),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("table_service_call_events_sequence_unique").on(table.callId, table.sequence),
+    foreignKey({
+      name: "table_service_call_events_call_scope_fk",
+      columns: [table.organizationId, table.unitId, table.callId],
+      foreignColumns: [tableServiceCalls.organizationId, tableServiceCalls.unitId, tableServiceCalls.id],
+    }).onDelete("restrict"),
+  ],
+);
+
 // RLS is declared in Drizzle as well as in the hand-authored policy migration so
 // a later schema generation cannot silently remove the live tenant boundary.
 export const growthTenantTables = [
@@ -1099,6 +1168,8 @@ export const growthTenantTables = [
   publicTableSessions,
   publicTableSessionNonces,
   publicTableSessionRateLimits,
+  tableServiceCalls,
+  tableServiceCallEvents,
 ] as const;
 
 for (const table of growthTenantTables) table.enableRLS();

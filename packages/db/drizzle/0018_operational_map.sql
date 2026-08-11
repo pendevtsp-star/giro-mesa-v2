@@ -6,6 +6,10 @@ DO $$ BEGIN CREATE TYPE public.table_occupancy_state AS ENUM ('reserved', 'open'
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
 DO $$ BEGIN CREATE TYPE public.salon_exception_state AS ENUM ('open', 'acknowledged', 'resolved');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE public.table_service_call_kind AS ENUM ('waiter', 'bill');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE public.table_service_call_state AS ENUM ('received', 'routed', 'attended', 'canceled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
 
 CREATE TABLE public.service_areas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, unit_id uuid NOT NULL,
@@ -243,6 +247,41 @@ CREATE TABLE public.public_table_session_rate_limits (
     REFERENCES public.public_menus(organization_id, unit_id, id) ON DELETE CASCADE
 );--> statement-breakpoint
 
+CREATE TABLE public.table_service_calls (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, unit_id uuid NOT NULL,
+  session_id uuid NOT NULL, occupancy_id uuid NOT NULL, occupancy_epoch uuid NOT NULL, table_id uuid NOT NULL,
+  kind public.table_service_call_kind NOT NULL, state public.table_service_call_state NOT NULL DEFAULT 'received',
+  routed_identity_id uuid REFERENCES public.identities(id), route_source varchar(20) NOT NULL,
+  attended_by_identity_id uuid REFERENCES public.identities(id), idempotency_key varchar(160) NOT NULL,
+  request_hash varchar(64) NOT NULL, resource_version integer NOT NULL DEFAULT 0 CHECK (resource_version >= 0),
+  routed_at timestamptz, attended_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT table_service_calls_scope_id_unique UNIQUE (organization_id, unit_id, id),
+  CONSTRAINT table_service_calls_idempotency_unique UNIQUE (session_id, idempotency_key),
+  CONSTRAINT table_service_calls_session_scope_fk FOREIGN KEY (organization_id, unit_id, session_id)
+    REFERENCES public.public_table_sessions(organization_id, unit_id, id) ON DELETE RESTRICT,
+  CONSTRAINT table_service_calls_occupancy_scope_fk FOREIGN KEY (organization_id, unit_id, occupancy_id)
+    REFERENCES public.table_occupancies(organization_id, unit_id, id) ON DELETE RESTRICT
+);--> statement-breakpoint
+CREATE INDEX table_service_calls_open_idx ON public.table_service_calls(organization_id, unit_id, state, created_at);--> statement-breakpoint
+
+CREATE TABLE public.table_service_call_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, unit_id uuid NOT NULL,
+  call_id uuid NOT NULL, sequence integer NOT NULL, state public.table_service_call_state NOT NULL,
+  actor_identity_id uuid REFERENCES public.identities(id), metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT table_service_call_events_sequence_unique UNIQUE (call_id, sequence),
+  CONSTRAINT table_service_call_events_call_scope_fk FOREIGN KEY (organization_id, unit_id, call_id)
+    REFERENCES public.table_service_calls(organization_id, unit_id, id) ON DELETE RESTRICT
+);--> statement-breakpoint
+
+CREATE OR REPLACE FUNCTION public.giromesa_append_only_service_call_event()
+RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+  RAISE EXCEPTION 'table service call events are append-only' USING ERRCODE = '55000';
+END $$;--> statement-breakpoint
+CREATE TRIGGER table_service_call_events_append_only
+BEFORE UPDATE OR DELETE ON public.table_service_call_events FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_append_only_service_call_event();--> statement-breakpoint
+
 DO $$
 DECLARE tenant_table text;
 BEGIN
@@ -250,7 +289,7 @@ BEGIN
     'service_areas','table_layout_versions','table_layout_nodes','service_shifts','area_assignments',
     'table_groups','table_occupancies','table_group_members','table_occupancy_events','service_incidents',
     'staff_presence_leases','salon_exceptions','public_table_sessions','public_table_session_nonces',
-    'public_table_session_rate_limits'
+    'public_table_session_rate_limits','table_service_calls','table_service_call_events'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tenant_table);
     EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', tenant_table);

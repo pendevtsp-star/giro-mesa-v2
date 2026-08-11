@@ -26,6 +26,7 @@ import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
 import { TableSessionService } from "./table-session.js";
+import { TableServiceService } from "./table-service.service.js";
 
 const publicMenuDraftSchema = z.object({
   expectedVersion: z.number().int().nonnegative(),
@@ -77,6 +78,12 @@ const publicMenuDraftSchema = z.object({
 const expectedVersionSchema = z.object({ expectedVersion: z.number().int().nonnegative() });
 const publishSchema = z.object({ expectedPublishEpoch: z.number().int().nonnegative() });
 const tableSessionSchema = z.object({ qrToken: z.string().min(40).max(2_048) });
+const tableCallSchema = z.object({ kind: z.enum(["waiter", "bill"]) });
+
+function tableToken(authorization: string | undefined, explicit: string | undefined) {
+  if (authorization?.startsWith("Bearer ")) return authorization.slice(7);
+  return explicit ?? "";
+}
 
 @DatabaseContext("public-menu")
 @Controller(["api/v1/public/menus", "public/v1/menus"])
@@ -85,6 +92,7 @@ export class PublicMenuController {
     private readonly publicMenuService: PublicMenuService,
     private readonly publicOrderService: PublicOrderService,
     private readonly tableSessionService: TableSessionService,
+    private readonly tableServiceService: TableServiceService,
   ) {}
 
   @Get(":slug")
@@ -119,6 +127,33 @@ export class PublicMenuController {
     return this.tableSessionService.issue(slug, body.qrToken, request.ip ?? "unknown");
   }
 
+  @Post(":slug/table-calls")
+  tableCall(
+    @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
+    @Headers("authorization") authorization: string | undefined,
+    @Headers("x-table-session") explicitToken: string | undefined,
+    @Headers("x-request-nonce") requestNonce: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body(new ZodPipe(tableCallSchema)) body: z.infer<typeof tableCallSchema>,
+  ) {
+    return this.tableServiceService.request(
+      slug,
+      tableToken(authorization, explicitToken),
+      requestNonce ?? "",
+      idempotencyKey ?? "",
+      body.kind,
+    );
+  }
+
+  @Get(":slug/table-partial")
+  tablePartial(
+    @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
+    @Headers("authorization") authorization: string | undefined,
+    @Headers("x-table-session") explicitToken: string | undefined,
+  ) {
+    return this.tableServiceService.partial(slug, tableToken(authorization, explicitToken));
+  }
+
   @Post(":slug/orders")
   placeOrder(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
@@ -146,7 +181,10 @@ export class PublicMenuController {
   "v1/organizations/:organizationId/units/:unitId/public-menus",
 ])
 export class PublicMenuAdminController {
-  constructor(private readonly publicMenuService: PublicMenuService) {}
+  constructor(
+    private readonly publicMenuService: PublicMenuService,
+    private readonly tableServiceService: TableServiceService,
+  ) {}
 
   @Post(":menuId/tables/:tableId/qr")
   tableQr(
@@ -162,6 +200,23 @@ export class PublicMenuAdminController {
       unitId,
       menuId,
       tableId,
+    );
+  }
+
+  @Post(":menuId/calls/:callId/attend")
+  attendTableCall(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("callId", ParseUUIDPipe) callId: string,
+    @Body(new ZodPipe(expectedVersionSchema)) body: z.infer<typeof expectedVersionSchema>,
+  ) {
+    return this.tableServiceService.attend(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      callId,
+      body.expectedVersion,
     );
   }
 

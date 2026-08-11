@@ -6,6 +6,7 @@ import { PublicMenuAdminController, PublicMenuController } from "./public-menu.c
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
 import { TableSessionCodec, TableSessionService } from "./table-session.js";
+import { TableServiceService } from "./table-service.service.js";
 
 @Module({
   imports: [AuthModule, OrganizationsModule, SyncModule],
@@ -14,6 +15,7 @@ import { TableSessionCodec, TableSessionService } from "./table-session.js";
     PublicMenuService,
     PublicOrderService,
     TableSessionService,
+    TableServiceService,
     { provide: TableSessionCodec, useFactory: () => new TableSessionCodec() },
   ],
   exports: [TableSessionService],

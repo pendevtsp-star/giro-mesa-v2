@@ -101,6 +101,26 @@ export class RealtimeService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  publishTableServiceCall(event: {
+    organizationId: string;
+    unitId: string;
+    callId: string;
+    tableId: string;
+    occupancyEpoch: string;
+    state: "received" | "routed" | "attended" | "canceled";
+    routeSource: string;
+  }) {
+    this.publish({
+      organizationId: event.organizationId,
+      unitId: event.unitId,
+      topic: `table_service_call.${event.state}`,
+      aggregateType: "table_service_call",
+      aggregateId: event.callId,
+      payload: event,
+      createdAt: new Date(),
+    });
+  }
+
   private async handleMessage(client: RealtimeClient, raw: unknown) {
     if (!this.acceptMessage(client)) {
       this.disconnect(client, 1008, "Limite de mensagens excedido");

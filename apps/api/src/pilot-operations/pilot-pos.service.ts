@@ -378,6 +378,7 @@ export class PilotPosService {
             .limit(1);
           if (occupied) throw new ConflictException({ code: "TABLE_OCCUPIED", tabId: occupied.id });
         }
+        const occupancyEpoch = randomUUID();
         const [tab] = await tx
           .insert(posTabs)
           .values({
@@ -388,6 +389,7 @@ export class PilotPosService {
             label: input.label,
             guestCount: input.guestCount,
             openedByIdentityId: identityId,
+            occupancyEpoch,
           })
           .returning();
         if (!tab) throw new Error("Tab insert did not return a row");
@@ -401,7 +403,7 @@ export class PilotPosService {
                 tabId: tab.id,
                 assignedIdentityId: identityId,
                 state: "open",
-                occupancyEpoch: tab.occupancyEpoch,
+                occupancyEpoch,
                 guestCount: input.guestCount,
                 openedAt: new Date(),
               })
