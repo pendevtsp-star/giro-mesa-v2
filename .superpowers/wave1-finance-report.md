@@ -1,8 +1,8 @@
 # Relatório de execução — Onda 1C Financeiro
 
-Data: 2026-08-11  
-Base: `c899c48`  
-Branch: `codex/giromesa-wave1-platform`  
+Data: 2026-08-11
+Base: `c899c48`
+Branch: `codex/giromesa-wave1-platform`
 Worktree: `C:\gmw\w1p`
 
 ## Resultado
@@ -20,7 +20,20 @@ As Tasks 22–29 foram implementadas em ordem e com um commit funcional por task
 | 26 | Custódia e reconciliação de retornáveis | `d3d8246` |
 | 27 | Incidentes neutros, evidências e aprovação independente | `9aaf54c` |
 | 28 | DSL tipada e versionada para remuneração | `84acc96` |
-| 29 | Cálculo, aprovação, fechamento, ajustes e relatórios de remuneração | este commit |
+| 29 | Cálculo, aprovação, fechamento, ajustes e relatórios de remuneração | `f54e9ce` |
+
+## Commits da revisão cruzada
+
+| Achado | Correção | Commit |
+| --- | --- | --- |
+| 1 | DLP fiscal recursivo, normalização/Luhn e rejeição de chaves sensíveis | `f826a19` |
+| 2 | Lifecycle fiscal serializado, CAS/version e terminais monotônicos | `66e2324` |
+| 3 | Callback autenticado e aplicação atômica/idempotente | `4df1302` |
+| 4 | Consumo de ficha técnica escalado por rendimento e unidade | `17bd7c5` |
+| 5–6 | Custódia seriada com lock/CAS e reconciliação física por serial | `2e0efae` |
+| 7 | Evidência de incidente imutável e privilégios mínimos | `d6c150a` |
+| 8–9 | DSL estrita/limitada, validação antes de publicar e CSV neutro | `c673677` |
+| Contratos | DSL recursiva resolvível/discriminada no OpenAPI e clientes | `3bace5c` |
 
 ## Invariantes preservados
 
@@ -43,25 +56,29 @@ Somente as reservas autorizadas foram usadas:
 - `0022_remuneration_rules.sql`
 - `0023_fiscal_documents.sql`
 
-A cadeia completa `0001–0023` foi aplicada do zero com sucesso no banco descartável `giromesa_w1_finance_v13`.
+A cadeia financeira `0001–0016` + `0020–0023` foi aplicada do zero com sucesso no banco descartável `w1p_final` (20 registros de journal). O upgrade combinado também passou em `w1p_upgrade`: primeiro o journal operacional `0001–0019` da Onda 1B e depois este journal `0020–0023`, totalizando 23 registros e preservando tabelas das duas trilhas.
+
+As branches paralelas mantêm journals próprios após o índice 15. O merge deve unir as entradas `0017–0019` antes de `0020–0023`, conservando os timestamps crescentes já reservados; nenhum SQL adicional ou renumeração foi necessário nesta branch.
 
 ## Gates finais
 
-- PostgreSQL real, banco recém-migrado: 7/7 integrações financeiras passaram — ledger/pagamentos, fiscal, gestão/estoque, worker de consumo, retornáveis, incidentes e remuneração.
-- `pnpm typecheck`: todos os pacotes sem erros TypeScript.
-- `pnpm test`: verde em todos os pacotes; destaques: domain 51/51, Ops 56/56, API 92 pass/47 skips condicionais sem variáveis de integração, worker 15 pass/3 skips condicionais.
-- `pnpm build`: 8/8 tarefas de build passaram.
+- PostgreSQL real recém-migrado: 8/8 testes de integração API passaram — ledger/pagamentos/callback, fiscal com concorrência, gestão/estoque, retornáveis com corrida por serial, incidentes e remuneração. Worker de estoque: 1/1 integração e 5/5 regras unitárias.
+- Migrações: fresh `0001–0016` + `0020–0023` e upgrade combinado `0001–0019` + `0020–0023` passaram. O upgrade contém `public_menu_versions`, `table_occupancies`, `dispatch_effects`, `financial_ledger_entries`, `management_incidents` e `fiscal_documents`.
+- RLS/least privilege: todas as 118 tabelas RLS da trilha fresh e as 143 do upgrade combinado têm `FORCE ROW LEVEL SECURITY`; `giromesa_app` não possui `UPDATE` de tabela nem das colunas imutáveis de incidente, apenas das três colunas de transição.
+- `pnpm run typecheck`: 12/12 tarefas passaram, cobrindo nove pacotes.
+- Testes focados e completos: domain 51/51, Ops 56/56, API 99 pass/49 skips condicionais (as integrações financeiras foram executadas separadamente), worker 16 pass/3 skips condicionais.
+- `pnpm run build`: 8/8 tarefas de build passaram.
 - Biome lint sem erros nos seis pacotes alterados (API, Ops, worker, domain, DB e contracts); permanecem warnings CSS preexistentes no Ops.
-- Cliente TypeScript gerado e compilado.
+- OpenAPI regenerado sem `$ref` órfão; a AST recursiva foi promovida a componentes discriminados. Cliente TypeScript gerado e compilado.
 - Cliente C# gerado e compilado em .NET 10: 0 warnings, 0 errors.
 - Edge Hub: 73/73 testes passaram.
 - Playwright focado no relatório: 2/2, desktop e mobile.
-- `git diff --check`: passou.
+- `git diff --check`: passou após remover whitespace residual do relatório.
 - Busca de invariantes: nenhum uso de execução dinâmica; ocorrências de PAN/CVV ficam apenas na política, validação negativa e testes.
 
 ## Limites e observações
 
-- `pnpm check` não conclui a primeira etapa porque o `biome check` workspace-wide detecta normalização de fim de linha/formatting já espalhada pela base, incluindo arquivos fora desta onda. Não foi feita uma reescrita massiva e fora do escopo. O lint sem formatação, o typecheck, os testes e os builds completos passaram separadamente.
+- `pnpm check` não foi repetido como bloco monolítico porque o `biome check` workspace-wide detecta normalização de fim de linha/formatting já espalhada pela base, incluindo arquivos fora desta onda. Não foi feita uma reescrita massiva e fora do escopo. Biome focado, typecheck, testes e builds foram executados separadamente.
 - A geração OpenAPI mantém os aliases `/api/v1` e `/v1`, por isso o cliente C# contém ambas as árvores, conforme o contrato existente.
 - Providers de pagamento/fiscal, hardware, credenciais, homologação externa e comportamento de produção não foram exercitados nem alegados.
 - Nenhum merge, push ou deploy foi realizado.
