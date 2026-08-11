@@ -21,6 +21,7 @@ Escopo: Tasks 36 e 39 antecipadas, sem integração com providers ou deploy.
 | Fix 36 | `ac17f8f` | SDK antes dos entrypoints, lifecycle real e semântica HTTP 4xx |
 | Fix 36 | `b7a376a` | Recursos OTel padronizados e prova OTLP HTTP dos três sinais |
 | Fix 36 | `79c01bb` | Shutdown garantido mesmo se o force flush falhar |
+| Fix 36 | `393804b` | Dono único de sinais, cleanup de bootstrap e nomes de sinais com allowlist finita |
 
 O commit documental posterior registra este relatório e o brief recebido. Os commits de produto permanecem recuperáveis separadamente.
 
@@ -32,6 +33,8 @@ O commit documental posterior registra este relatório e o brief recebido. Os co
 - RED SDK: os probes dinâmicos encontraram `ProxyTracerProvider`, `NoopMeterProvider` e `NonRecordingSpan`; API e worker não inicializavam providers/exporters.
 - RED HTTP: `BadRequestException(400)` era emitida como `outcome=error`, `HTTP_REQUEST_FAILED` e log de erro de servidor.
 - RED recurso: `service.version` e `deployment.environment.name` eram descartados pela allowlist/Collector.
+- RED lifecycle: `enableShutdownHooks()` do Nest concorria com o dono de `SIGINT`/`SIGTERM` do runtime, podendo fechar a aplicação duas vezes e encerrar antes do flush; falhas posteriores a `createApplication()` também não fechavam a aplicação.
+- RED nomes: nomes arbitrários como `pin_1234`, `cpf_12345678901`, UUIDs e mil dimensões dinâmicas alcançavam o backend e seus caches de instrumentos.
 - GREEN: os findings foram cobertos pelos commits de fix acima e pelos gates consolidados deste relatório.
 
 ## Task 36 — observabilidade
@@ -52,9 +55,12 @@ O commit documental posterior registra este relatório e o brief recebido. Os co
 - `OTEL_EXPORTER_OTLP_ENDPOINT` ou os três endpoints por sinal são obrigatórios. Protocolo, URLs, headers, timeouts, intervalo de métricas, sampler, service name e transporte inseguro são validados antes de importar a aplicação.
 - Headers aceitam apenas nomes válidos e valores sem CR/LF/NUL; falhas citam somente o nome da variável, nunca o valor secreto.
 - API e worker inicializam a telemetria antes do bootstrap por import dinâmico. SIGINT/SIGTERM, falha de bootstrap e término do loop fecham o serviço, fazem force flush e shutdown idempotente.
+- O runtime da API é o único dono de `SIGINT`/`SIGTERM`; `app.close()` continua executando os lifecycle hooks do Nest sem registrar um segundo listener de processo. Um subprocesso com aplicação Nest real provou `close -> forceFlush -> shutdown` exatamente uma vez antes da saída, inclusive com force flush falhando.
+- Validação de porta e falha de `listen()` depois da criação da aplicação executam `app.close()`, force flush e shutdown em sequência. Cada etapa é tentada mesmo quando uma anterior falha, preservando a falha original quando o cleanup termina corretamente.
 - HTTP 4xx usa `outcome=client_rejected`, sem `HTTP_REQUEST_FAILED`, `error.type` ou log de erro de servidor; throws/5xx continuam `outcome=error`.
 - A allowlist aceita somente dimensões operacionais conhecidas; payloads, cookies, tokens, e-mail, telefone, documento, PIN, chaves, PAN/CVV/track e IDs livres são descartados ou redigidos. Prefixos sensíveis são normalizados com NFKC e detectados sem confundir nomes operacionais como `phonebook-sync`, `cookie_missing` ou `TOKEN_EXPIRED`.
 - Organização, unidade, dispositivo, rota, job e erros usam budgets por processo; excesso colapsa em `__overflow__` sem reter cardinalidade ilimitada.
+- Nomes de span, métrica e log usam uma allowlist finita dos sinais de produção. Nomes desconhecidos ou sensíveis são descartados antes de alcançar exporters ou os mapas de instrumentos do backend.
 - Logs estruturados recebem apenas atributos sanitizados. Exceções de worker registram tipo e código estático, nunca a mensagem arbitrária.
 - Ops recebeu somente interfaces de snapshot/alerta/synthetic, sem UI ou dado falso.
 - O interceptor HTTP global registra duração, status, outcome e erro sanitizado em toda rota Nest; o worker envolve o dispatch real da outbox. Ambos recebem um `TelemetryBackend` vendor-neutral explícito e testável.
@@ -94,7 +100,9 @@ Configuração ausente ou inválida impede o boot antes de criar a aplicação/w
 
 ## Gate consolidado
 
-- Testes focados: observability 4/4, API 16/16, worker 8/8, load 12/12.
+- Testes focados: observability 6/6, lifecycle da API 9/9, worker 8/8 e load 12/12.
+- Regressão ampla: API 155 total (113 aprovados, 42 skips explícitos por banco ausente) e worker 24 total (21 aprovados, 3 skips explícitos por banco ausente), sem falhas.
+- Typecheck forçado de observability, API, worker e dependências: 10/10 tasks, sem cache.
 - Turbo `typecheck` + `build`: 15/15 tasks para API, worker, Ops, observability e dependências.
 - Build Ops/Vite: `459,44 kB`, gzip `129,77 kB` no chunk principal.
 - Biome focado: pacote observability, arquivos alterados de API/worker e `infra/observability` + `load/` sem findings.
