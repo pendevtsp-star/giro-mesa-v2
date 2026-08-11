@@ -45,16 +45,21 @@ export class HttpObservabilityInterceptor implements NestInterceptor {
     return next.handle().pipe(
       catchError((error: unknown) => {
         errorStatus = error instanceof HttpException ? error.getStatus() : 500;
-        errorType = error instanceof Error ? error.name : "UnknownError";
+        if (errorStatus >= 500) {
+          errorType = error instanceof Error ? error.name : "UnknownError";
+        }
         return throwError(() => error);
       }),
       finalize(() => {
         const durationMs = performance.now() - startedAt;
-        const attributes = this.attributes(request, errorStatus ?? reply.statusCode, errorType);
+        const statusCode = errorStatus ?? reply.statusCode;
+        const attributes = this.attributes(request, statusCode, errorType);
         this.telemetry.span("http.server.request", durationMs, attributes);
         this.telemetry.counter("http.server.request.count", 1, attributes);
         this.telemetry.histogram("http.server.request.duration", durationMs, attributes);
-        if (errorType) this.telemetry.log("error", "giromesa.http.request.failed", attributes);
+        if (statusCode >= 500) {
+          this.telemetry.log("error", "giromesa.http.request.failed", attributes);
+        }
       }),
     );
   }
@@ -68,7 +73,7 @@ export class HttpObservabilityInterceptor implements NestInterceptor {
       "http.request.method": request.method,
       "http.route": request.routeOptions.url ?? "/unmatched",
       "http.response.status_code": statusCode,
-      outcome: errorType ? "error" : "success",
+      outcome: statusCode >= 500 ? "error" : statusCode >= 400 ? "client_rejected" : "success",
     };
     const organizationId = request.params?.organizationId;
     const unitId = request.params?.unitId;
@@ -79,6 +84,8 @@ export class HttpObservabilityInterceptor implements NestInterceptor {
     if (errorType) {
       attributes["error.type"] = errorType;
       attributes["error.code"] = "HTTP_REQUEST_FAILED";
+    } else if (statusCode >= 500) {
+      attributes["error.code"] = "HTTP_RESPONSE_FAILED";
     }
     return attributes;
   }

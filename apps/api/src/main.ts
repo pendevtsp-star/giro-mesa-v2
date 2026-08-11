@@ -1,9 +1,6 @@
-import { createApplication } from "./app-factory.js";
+import { startApiProcess } from "./process-runtime.js";
 
-async function bootstrap() {
-  const { app } = await createApplication();
-  const port = Number(process.env.PORT ?? 3200);
-  await app.listen(port, process.env.HOST ?? "0.0.0.0");
-}
-
-void bootstrap();
+void startApiProcess().catch(() => {
+  process.stderr.write("API startup failed\n");
+  process.exitCode = 1;
+});

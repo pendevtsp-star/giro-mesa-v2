@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, it } from "node:test";
 import type { TelemetryBackend, TelemetrySignal } from "@giromesa/observability";
-import { Controller, Get, Module } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { ObservabilityModule } from "./observability.module.js";
@@ -32,6 +32,11 @@ class ProbeController {
     const error = new Error("payload with guest@example.com");
     error.name = "PIN_1234";
     throw error;
+  }
+
+  @Get(":organizationId/:unitId/rejected")
+  rejected() {
+    throw new BadRequestException("invalid guest@example.com");
   }
 }
 
@@ -110,4 +115,30 @@ it("records a sanitized error type without its message at the HTTP boundary", as
     assert.equal(signal.attributes.outcome, "error");
   }
   assert.doesNotMatch(JSON.stringify(signals), /guest@example\.com|PIN_1234/);
+});
+
+it("classifies HTTP 4xx as client_rejected without a server error signal", async () => {
+  const start = backend.signals.length;
+  const response = await app.inject({
+    method: "GET",
+    url: `/observability-probe/${organizationId}/${unitId}/rejected`,
+  });
+
+  assert.equal(response.statusCode, 400);
+  const signals = backend.signals.slice(start);
+  assert.deepEqual(
+    signals.map((signal) => [signal.kind, signal.name]),
+    [
+      ["span", "http.server.request"],
+      ["counter", "http.server.request.count"],
+      ["histogram", "http.server.request.duration"],
+    ],
+  );
+  for (const signal of signals) {
+    assert.equal(signal.attributes["http.response.status_code"], 400);
+    assert.equal(signal.attributes.outcome, "client_rejected");
+    assert.equal(signal.attributes["error.type"], undefined);
+    assert.equal(signal.attributes["error.code"], undefined);
+  }
+  assert.doesNotMatch(JSON.stringify(signals), /guest@example\.com|HTTP_REQUEST_FAILED/);
 });
