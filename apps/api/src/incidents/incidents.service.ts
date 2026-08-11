@@ -141,34 +141,39 @@ export class IncidentsService {
           });
         return this.incidentDto(existing, true);
       }
-      const [incident] = await tx
-        .insert(managementIncidents)
-        .values({
-          organizationId,
-          unitId,
-          incidentType: normalized.incidentType,
-          neutralSummary,
-          evidence: input.evidence,
-          amountCents: input.amountCents,
-          payrollAction: false,
-          idempotencyKey: key,
-          requestHash,
-          reporterIdentityId: identityId,
-          occurredAt,
-        })
-        .returning();
+      const inserted = await tx.execute<typeof managementIncidents.$inferSelect>(sql`
+        select
+          id,
+          organization_id as "organizationId",
+          unit_id as "unitId",
+          incident_type as "incidentType",
+          status,
+          neutral_summary as "neutralSummary",
+          evidence,
+          amount_cents as "amountCents",
+          payroll_action as "payrollAction",
+          idempotency_key as "idempotencyKey",
+          request_hash as "requestHash",
+          reporter_identity_id as "reporterIdentityId",
+          approver_identity_id as "approverIdentityId",
+          occurred_at as "occurredAt",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        from public.giromesa_report_incident(
+          ${organizationId}::uuid,
+          ${unitId}::uuid,
+          ${normalized.incidentType}::varchar,
+          ${neutralSummary}::text,
+          ${JSON.stringify(input.evidence)}::jsonb,
+          ${input.amountCents ?? null}::integer,
+          ${key}::varchar,
+          ${requestHash}::varchar,
+          ${identityId}::uuid,
+          ${occurredAt.toISOString()}::timestamptz
+        )
+      `);
+      const [incident] = [...inserted];
       if (!incident) throw new Error("Incident insert returned no row.");
-      await tx.insert(managementIncidentEvents).values({
-        organizationId,
-        unitId,
-        incidentId: incident.id,
-        event: "reported",
-        toStatus: "reported",
-        neutralNote: neutralSummary,
-        idempotencyKey: key,
-        requestHash,
-        actorIdentityId: identityId,
-      });
       return this.incidentDto(incident, false);
     });
   }
@@ -304,27 +309,36 @@ export class IncidentsService {
           code: "INCIDENT_INDEPENDENT_APPROVAL_REQUIRED",
           message: "A decisão exige uma identidade diferente do relator.",
         });
-      await tx.insert(managementIncidentEvents).values({
-        organizationId,
-        unitId,
-        incidentId,
-        event: target,
-        fromStatus: incident.status,
-        toStatus: target,
-        neutralNote: note,
-        idempotencyKey: key,
-        requestHash,
-        actorIdentityId: identityId,
-      });
-      const [updated] = await tx
-        .update(managementIncidents)
-        .set({
-          status: target,
-          approverIdentityId: independentApproval ? identityId : incident.approverIdentityId,
-          updatedAt: new Date(),
-        })
-        .where(eq(managementIncidents.id, incident.id))
-        .returning();
+      const transitioned = await tx.execute<typeof managementIncidents.$inferSelect>(sql`
+        select
+          id,
+          organization_id as "organizationId",
+          unit_id as "unitId",
+          incident_type as "incidentType",
+          status,
+          neutral_summary as "neutralSummary",
+          evidence,
+          amount_cents as "amountCents",
+          payroll_action as "payrollAction",
+          idempotency_key as "idempotencyKey",
+          request_hash as "requestHash",
+          reporter_identity_id as "reporterIdentityId",
+          approver_identity_id as "approverIdentityId",
+          occurred_at as "occurredAt",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        from public.giromesa_transition_incident(
+          ${organizationId}::uuid,
+          ${unitId}::uuid,
+          ${incidentId}::uuid,
+          ${target}::varchar,
+          ${note}::text,
+          ${key}::varchar,
+          ${requestHash}::varchar,
+          ${identityId}::uuid
+        )
+      `);
+      const [updated] = [...transitioned];
       if (!updated) throw new Error("Incident update returned no row.");
       return this.incidentDto(updated, false);
     });

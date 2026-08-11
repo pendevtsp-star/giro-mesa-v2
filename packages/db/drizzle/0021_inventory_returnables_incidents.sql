@@ -187,6 +187,8 @@ RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
 AS $$
+DECLARE
+  transition_event public.management_incident_events%ROWTYPE;
 BEGIN
   IF NEW.id IS DISTINCT FROM OLD.id
     OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
@@ -205,23 +207,231 @@ BEGIN
     RAISE EXCEPTION 'incident evidence and report facts are immutable' USING ERRCODE = '55000';
   END IF;
   IF NEW.status IS DISTINCT FROM OLD.status OR NEW.approver_identity_id IS DISTINCT FROM OLD.approver_identity_id THEN
-    IF NOT EXISTS (
-      SELECT 1
+    SELECT event.* INTO transition_event
       FROM public.management_incident_events AS event
       WHERE event.organization_id = OLD.organization_id
         AND event.unit_id = OLD.unit_id
         AND event.incident_id = OLD.id
         AND event.from_status = OLD.status
         AND event.to_status = NEW.status
-        AND event.created_at >= transaction_timestamp()
-    ) THEN
+      AND event.created_at >= transaction_timestamp()
+      ORDER BY event.created_at DESC
+      LIMIT 1;
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'incident transition requires an audit event in the same transaction' USING ERRCODE = '55000';
+    END IF;
+    IF NOT (
+      (OLD.status = 'reported' AND NEW.status = 'under_review')
+      OR (OLD.status = 'under_review' AND NEW.status IN ('approved', 'rejected'))
+      OR (OLD.status IN ('approved', 'rejected') AND NEW.status = 'closed')
+    ) THEN
+      RAISE EXCEPTION 'incident transition is outside the allowed graph' USING ERRCODE = '23514';
+    END IF;
+    IF NEW.status IN ('approved', 'rejected') THEN
+      IF transition_event.actor_identity_id = OLD.reporter_identity_id
+        OR NEW.approver_identity_id IS DISTINCT FROM transition_event.actor_identity_id
+      THEN
+        RAISE EXCEPTION 'incident decision requires an independent actor' USING ERRCODE = '23514';
+      END IF;
+    ELSIF NEW.approver_identity_id IS DISTINCT FROM OLD.approver_identity_id THEN
+      RAISE EXCEPTION 'incident approver can only be set by an independent decision' USING ERRCODE = '23514';
     END IF;
   END IF;
   RETURN NEW;
 END;
 $$;
 CREATE TRIGGER "management_incidents_guard_update" BEFORE UPDATE ON "management_incidents" FOR EACH ROW EXECUTE FUNCTION public.giromesa_guard_incident_update();
+CREATE OR REPLACE FUNCTION public.giromesa_guard_incident_event_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  incident public.management_incidents%ROWTYPE;
+BEGIN
+  SELECT * INTO incident
+  FROM public.management_incidents
+  WHERE organization_id = NEW.organization_id
+    AND unit_id = NEW.unit_id
+    AND id = NEW.incident_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'incident event requires an incident in the same tenant' USING ERRCODE = '23503';
+  END IF;
+  IF NEW.event IS DISTINCT FROM NEW.to_status THEN
+    RAISE EXCEPTION 'incident event must match its target status' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.to_status = 'reported' THEN
+    IF NEW.from_status IS NOT NULL
+      OR incident.status <> 'reported'
+      OR NEW.actor_identity_id <> incident.reporter_identity_id
+      OR EXISTS (
+        SELECT 1 FROM public.management_incident_events existing
+        WHERE existing.organization_id = NEW.organization_id
+          AND existing.unit_id = NEW.unit_id
+          AND existing.incident_id = NEW.incident_id
+      )
+    THEN
+      RAISE EXCEPTION 'reported event must be the first event from the reporter' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.from_status IS DISTINCT FROM incident.status
+    OR NOT (
+      (incident.status = 'reported' AND NEW.to_status = 'under_review')
+      OR (incident.status = 'under_review' AND NEW.to_status IN ('approved', 'rejected'))
+      OR (incident.status IN ('approved', 'rejected') AND NEW.to_status = 'closed')
+    )
+  THEN
+    RAISE EXCEPTION 'incident event is outside the allowed graph' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.to_status IN ('approved', 'rejected')
+    AND NEW.actor_identity_id = incident.reporter_identity_id
+  THEN
+    RAISE EXCEPTION 'incident decision requires an independent actor' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "management_incident_events_guard_insert" BEFORE INSERT ON "management_incident_events" FOR EACH ROW EXECUTE FUNCTION public.giromesa_guard_incident_event_insert();
+CREATE OR REPLACE FUNCTION public.giromesa_report_incident(
+  p_organization_id uuid,
+  p_unit_id uuid,
+  p_incident_type varchar,
+  p_neutral_summary text,
+  p_evidence jsonb,
+  p_amount_cents integer,
+  p_idempotency_key varchar,
+  p_request_hash varchar,
+  p_reporter_identity_id uuid,
+  p_occurred_at timestamptz
+)
+RETURNS SETOF public.management_incidents
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  existing public.management_incidents%ROWTYPE;
+  created public.management_incidents%ROWTYPE;
+BEGIN
+  IF current_setting('app.current_organization_id', true) IS DISTINCT FROM p_organization_id::text
+    OR current_setting('app.current_unit_id', true) IS DISTINCT FROM p_unit_id::text
+    OR current_setting('app.current_actor_identity_id', true) IS DISTINCT FROM p_reporter_identity_id::text
+    OR current_setting('app.current_context_source', true) <> 'http'
+    OR NOT public.giromesa_tenant_context_authorized(p_organization_id, p_unit_id)
+  THEN
+    RAISE EXCEPTION 'incident report context is not authorized' USING ERRCODE = '42501';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('incident-report:' || p_organization_id::text || ':' || p_unit_id::text || ':' || p_idempotency_key));
+  SELECT * INTO existing
+  FROM public.management_incidents
+  WHERE organization_id = p_organization_id
+    AND unit_id = p_unit_id
+    AND idempotency_key = p_idempotency_key;
+  IF FOUND THEN
+    IF existing.request_hash IS DISTINCT FROM p_request_hash THEN
+      RAISE EXCEPTION 'incident idempotency payload mismatch' USING ERRCODE = '23505';
+    END IF;
+    RETURN NEXT existing;
+    RETURN;
+  END IF;
+  INSERT INTO public.management_incidents (
+    organization_id, unit_id, incident_type, neutral_summary, evidence, amount_cents,
+    payroll_action, idempotency_key, request_hash, reporter_identity_id, occurred_at
+  ) VALUES (
+    p_organization_id, p_unit_id, p_incident_type, p_neutral_summary, p_evidence, p_amount_cents,
+    false, p_idempotency_key, p_request_hash, p_reporter_identity_id, p_occurred_at
+  ) RETURNING * INTO created;
+  INSERT INTO public.management_incident_events (
+    organization_id, unit_id, incident_id, event, from_status, to_status, neutral_note,
+    idempotency_key, request_hash, actor_identity_id
+  ) VALUES (
+    p_organization_id, p_unit_id, created.id, 'reported', NULL, 'reported', p_neutral_summary,
+    p_idempotency_key, p_request_hash, p_reporter_identity_id
+  );
+  RETURN NEXT created;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.giromesa_transition_incident(
+  p_organization_id uuid,
+  p_unit_id uuid,
+  p_incident_id uuid,
+  p_target varchar,
+  p_neutral_note text,
+  p_idempotency_key varchar,
+  p_request_hash varchar,
+  p_actor_identity_id uuid
+)
+RETURNS SETOF public.management_incidents
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  incident public.management_incidents%ROWTYPE;
+  existing_event public.management_incident_events%ROWTYPE;
+BEGIN
+  IF current_setting('app.current_organization_id', true) IS DISTINCT FROM p_organization_id::text
+    OR current_setting('app.current_unit_id', true) IS DISTINCT FROM p_unit_id::text
+    OR current_setting('app.current_actor_identity_id', true) IS DISTINCT FROM p_actor_identity_id::text
+    OR current_setting('app.current_context_source', true) <> 'http'
+    OR NOT public.giromesa_tenant_context_authorized(p_organization_id, p_unit_id)
+  THEN
+    RAISE EXCEPTION 'incident transition context is not authorized' USING ERRCODE = '42501';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('incident:' || p_incident_id::text));
+  SELECT * INTO existing_event
+  FROM public.management_incident_events
+  WHERE organization_id = p_organization_id
+    AND unit_id = p_unit_id
+    AND idempotency_key = p_idempotency_key;
+  IF FOUND THEN
+    IF existing_event.incident_id IS DISTINCT FROM p_incident_id
+      OR existing_event.to_status IS DISTINCT FROM p_target
+      OR existing_event.request_hash IS DISTINCT FROM p_request_hash
+    THEN
+      RAISE EXCEPTION 'incident transition idempotency payload mismatch' USING ERRCODE = '23505';
+    END IF;
+    RETURN QUERY SELECT * FROM public.management_incidents WHERE id = p_incident_id;
+    RETURN;
+  END IF;
+  SELECT * INTO incident
+  FROM public.management_incidents
+  WHERE organization_id = p_organization_id
+    AND unit_id = p_unit_id
+    AND id = p_incident_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'incident not found' USING ERRCODE = 'P0002';
+  END IF;
+  IF NOT (
+    (incident.status = 'reported' AND p_target = 'under_review')
+    OR (incident.status = 'under_review' AND p_target IN ('approved', 'rejected'))
+    OR (incident.status IN ('approved', 'rejected') AND p_target = 'closed')
+  ) THEN
+    RAISE EXCEPTION 'incident transition is outside the allowed graph' USING ERRCODE = '23514';
+  END IF;
+  IF p_target IN ('approved', 'rejected') AND p_actor_identity_id = incident.reporter_identity_id THEN
+    RAISE EXCEPTION 'incident decision requires an independent actor' USING ERRCODE = '23514';
+  END IF;
+  INSERT INTO public.management_incident_events (
+    organization_id, unit_id, incident_id, event, from_status, to_status, neutral_note,
+    idempotency_key, request_hash, actor_identity_id
+  ) VALUES (
+    p_organization_id, p_unit_id, p_incident_id, p_target, incident.status, p_target,
+    p_neutral_note, p_idempotency_key, p_request_hash, p_actor_identity_id
+  );
+  UPDATE public.management_incidents
+  SET status = p_target,
+      approver_identity_id = CASE
+        WHEN p_target IN ('approved', 'rejected') THEN p_actor_identity_id
+        ELSE approver_identity_id
+      END,
+      updated_at = now()
+  WHERE id = incident.id
+  RETURNING * INTO incident;
+  RETURN NEXT incident;
+END;
+$$;
 --> statement-breakpoint
 ALTER TABLE "management_unit_conversions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "management_unit_conversions" FORCE ROW LEVEL SECURITY;
@@ -237,9 +447,12 @@ ALTER TABLE "management_incident_events" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "management_incident_events" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "management_unit_conversions", "management_returnable_assets", "management_returnable_serials", "management_returnable_movements", "management_incidents", "management_incident_events" FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_internal, giromesa_legacy_transition;
 GRANT SELECT, INSERT, UPDATE ON "management_unit_conversions", "management_returnable_assets", "management_returnable_serials" TO giromesa_app;
-GRANT SELECT, INSERT ON "management_incidents" TO giromesa_app;
-GRANT UPDATE ("status", "approver_identity_id", "updated_at") ON "management_incidents" TO giromesa_app;
-GRANT SELECT, INSERT ON "management_returnable_movements", "management_incident_events" TO giromesa_app;
+GRANT SELECT ON "management_incidents", "management_incident_events" TO giromesa_app;
+GRANT SELECT, INSERT ON "management_returnable_movements" TO giromesa_app;
+REVOKE ALL ON FUNCTION public.giromesa_report_incident(uuid, uuid, varchar, text, jsonb, integer, varchar, varchar, uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.giromesa_transition_incident(uuid, uuid, uuid, varchar, text, varchar, varchar, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.giromesa_report_incident(uuid, uuid, varchar, text, jsonb, integer, varchar, varchar, uuid, timestamptz) TO giromesa_app;
+GRANT EXECUTE ON FUNCTION public.giromesa_transition_incident(uuid, uuid, uuid, varchar, text, varchar, varchar, uuid) TO giromesa_app;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "management_unit_conversions" FOR ALL TO giromesa_app USING (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id)) WITH CHECK (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id));
 CREATE POLICY "giromesa_tenant_scope" ON "management_returnable_assets" FOR ALL TO giromesa_app USING (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id)) WITH CHECK (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id));
