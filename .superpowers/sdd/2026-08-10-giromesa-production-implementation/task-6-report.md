@@ -134,3 +134,36 @@ The durable resend history no longer prevents the unique creation of a local ide
 | focused Biome lint/format checks and `git diff --check` | PASS; the pre-existing mixed CRLF/LF formatter baseline in `app-factory.ts` was not bulk-rewritten |
 
 The PostgreSQL gate used only the disposable `giromesa-task6-fix2` container on host port 55441. It was stopped with `--rm`, and absence was verified. No provider call, persistent migration, push or deployment was performed.
+
+## Fix round 3
+
+Google can no longer turn an unverified local registration into a mixed-trust account. Registration and Google reconciliation now share an advisory lock keyed by the normalized e-mail. When a verified Google subject assumes an existing identity whose e-mail was still pending, one transaction deletes the untrusted password credential, revokes active e-mail-verification and password-reset tokens, revokes sessions, consumes MFA challenges, removes pending MFA factors, marks the identity verified, links Google and records `auth.google_pending_identity_recovered`. Only after that transaction commits may Google create a session. A local identity that had already verified its e-mail keeps its password credential.
+
+The in-memory IP limiter now has independent, alias-stable buckets for registration, login, e-mail verification request/confirmation, password-reset request/confirmation, MFA challenge and MFA management. Exhausting ten verification-request attempts no longer rejects the first registration from the same IP and application instance. All `/api/v1`, `/v1` and `/public/v1` verification aliases retain the same 429 body, `Retry-After` and `Cache-Control: no-store` response.
+
+Registration still has one PostgreSQL transaction and now serializes the normalized e-mail before insert. Duplicate e-mail conflicts map to 409 only when the nested PostgreSQL error is `23505` for the exact `identities_email_unique` constraint. Cause traversal is cycle-safe and bounded to eight links; `constraint` and the postgres.js `constraint_name` representation are accepted. Every other unique violation propagates as an internal failure so that it cannot be mistaken for an existing identity.
+
+### RED
+
+- The endpoint-class unit test received `{ bucket: "auth", max: 10 }` instead of the independent `auth:email-verification-request` bucket.
+- A real Fastify application returned 429 for the first registration after ten verification requests from the same IP.
+- A temporary PostgreSQL trigger raised `23505` with `task6_forced_non_identity_unique`; the broad mapper incorrectly returned 409.
+- A pending local identity linked to verified Google retained one attacker-controlled `password_credentials` row.
+
+### GREEN and regression evidence
+
+| Gate | Exact result |
+| --- | --- |
+| focused rate-limit unit suite | PASS; 3 tests, 3 pass, 0 fail |
+| complete API suite without PG variables | PASS; 103 tests, 85 pass, 18 expected skips, 0 fail |
+| complete e-mail verification integration on PostgreSQL 16 | PASS; 9 tests, 9 pass, 0 fail |
+| complete e-mail verification integration on PostgreSQL 17 | PASS; 9 tests, 9 pass, 0 fail |
+| final focused Google recovery/audit on PostgreSQL 16 and 17 | PASS; 1 test on each version, 0 fail |
+| Google auth integration on migrated PostgreSQL 16 and 17 | PASS; 1 test on each version, 0 fail; pending password removed and verified-local password preserved |
+| site browser-boundary suite | PASS; 14 tests, 14 pass, 0 fail |
+| contracts suite | PASS; 4 tests, 4 pass, 0 fail |
+| repository typecheck | PASS; 12 tasks, 12 successful |
+| repository build | PASS; 8 tasks, 8 successful |
+| focused API Biome check and `git diff --check` | PASS |
+
+The PostgreSQL checks used only `giromesa-task6-fix3-pg16` on port 55442 and `giromesa-task6-fix3-pg17` on port 55443. Both containers used `--rm`, were stopped, and their absence was verified. The rollback test used a temporary database trigger only inside its unique disposable test database; no production seam or schema change was introduced. No provider call, push, deployment or persistent migration was performed.

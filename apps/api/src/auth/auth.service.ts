@@ -63,11 +63,24 @@ const tokenHash = (token: string) => createHash("sha256").update(token).digest("
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
 const EMAIL_VERIFICATION_ACCEPTED = Object.freeze({ accepted: true as const });
 
-function databaseErrorCode(error: unknown) {
+function databaseUniqueViolation(error: unknown) {
   let candidate = error;
-  for (let depth = 0; depth < 4; depth += 1) {
+  const visited = new Set<object>();
+  for (let depth = 0; depth < 8; depth += 1) {
     if (!candidate || typeof candidate !== "object") return undefined;
-    if ("code" in candidate && typeof candidate.code === "string") return candidate.code;
+    if (visited.has(candidate)) return undefined;
+    visited.add(candidate);
+    if ("code" in candidate && candidate.code === "23505") {
+      return {
+        code: candidate.code,
+        constraint:
+          "constraint" in candidate && typeof candidate.constraint === "string"
+            ? candidate.constraint
+            : "constraint_name" in candidate && typeof candidate.constraint_name === "string"
+              ? candidate.constraint_name
+              : undefined,
+      };
+    }
     candidate = "cause" in candidate ? candidate.cause : undefined;
   }
   return undefined;
@@ -79,12 +92,16 @@ export class AuthService {
 
   async register(input: RegisterInput) {
     const encryption = this.emailVerificationEncryption();
+    const email = input.email.trim().toLowerCase();
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     try {
       return await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${email}`}::text, 0))`,
+        );
         const [identity] = await tx
           .insert(identities)
-          .values({ email: input.email, displayName: input.displayName })
+          .values({ email, displayName: input.displayName })
           .returning();
         if (!identity) throw new Error("Identity was not created");
         await tx.insert(passwordCredentials).values({ identityId: identity.id, passwordHash });
@@ -109,7 +126,8 @@ export class AuthService {
         };
       });
     } catch (error) {
-      if (databaseErrorCode(error) === "23505") {
+      const violation = databaseUniqueViolation(error);
+      if (violation?.constraint === "identities_email_unique") {
         throw new ConflictException({
           code: "IDENTITY_EXISTS",
           message: "Já existe uma conta com este e-mail.",
@@ -149,6 +167,7 @@ export class AuthService {
 
   async authenticateGoogle(profile: GoogleProfile, intent: GoogleAuthIntent) {
     const identity = await this.database.db.transaction(async (tx) => {
+      const normalizedEmail = profile.email.trim().toLowerCase();
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`google:${profile.subject}`}::text, 0))`,
       );
@@ -165,26 +184,19 @@ export class AuthService {
         .limit(1);
       if (linked) {
         if (linked.identity.disabledAt) throw new UnauthorizedException();
-        if (!linked.identity.emailVerifiedAt) {
-          await tx
-            .update(identities)
-            .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
-            .where(and(eq(identities.id, linked.identity.id), isNull(identities.emailVerifiedAt)));
-        }
-        return {
-          id: linked.identity.id,
-          email: linked.identity.email,
-          displayName: linked.identity.displayName,
-        };
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${linked.identity.email}`}::text, 0))`,
+        );
+        return this.recoverPendingIdentityForGoogle(tx, linked.identity);
       }
 
       await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${profile.email}`}::text, 0))`,
+        sql`select pg_advisory_xact_lock(hashtextextended(${`identity-email:${normalizedEmail}`}::text, 0))`,
       );
       const [existing] = await tx
         .select()
         .from(identities)
-        .where(eq(identities.email, profile.email))
+        .where(eq(identities.email, normalizedEmail))
         .limit(1);
       if (existing?.disabledAt) throw new UnauthorizedException();
       if (!existing && intent === "login") {
@@ -199,40 +211,35 @@ export class AuthService {
           await tx
             .insert(identities)
             .values({
-              email: profile.email,
+              email: normalizedEmail,
               displayName: profile.displayName,
               emailVerifiedAt: new Date(),
             })
             .returning()
         )[0];
       if (!identity) throw new Error("Google identity was not created");
+      const recoveredIdentity = await this.recoverPendingIdentityForGoogle(tx, identity);
       await tx.insert(oauthAccounts).values({
-        identityId: identity.id,
+        identityId: recoveredIdentity.id,
         provider: "google",
         providerSubject: profile.subject,
       });
-      if (!identity.emailVerifiedAt) {
-        await tx
-          .update(identities)
-          .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
-          .where(eq(identities.id, identity.id));
-      }
       await tx.insert(auditEvents).values({
-        actorIdentityId: identity.id,
+        actorIdentityId: recoveredIdentity.id,
         action: existing ? "auth.google_linked" : "identity.google_registered",
         entityType: "identity",
-        entityId: identity.id,
+        entityId: recoveredIdentity.id,
         metadata: existing ? {} : { termsVersion: process.env.LEGAL_TERMS_VERSION ?? "2026-08-09" },
       });
       if (!existing) {
         await tx.insert(outboxEvents).values({
           topic: "identity.registered",
           aggregateType: "identity",
-          aggregateId: identity.id,
-          payload: { identityId: identity.id },
+          aggregateId: recoveredIdentity.id,
+          payload: { identityId: recoveredIdentity.id },
         });
       }
-      return { id: identity.id, email: identity.email, displayName: identity.displayName };
+      return recoveredIdentity;
     });
     return this.beginIdentitySession(identity, false, "auth.google_login");
   }
@@ -790,6 +797,68 @@ export class AuthService {
     encryption: ReturnType<typeof encryptionKey>,
   ) {
     return this.enqueueEmailVerification(tx, identity, encryption, "initial");
+  }
+
+  private async recoverPendingIdentityForGoogle(
+    tx: TenantTransaction,
+    identity: {
+      id: string;
+      email: string;
+      displayName: string;
+      emailVerifiedAt?: Date | null;
+    },
+  ) {
+    if (identity.emailVerifiedAt) {
+      return { id: identity.id, email: identity.email, displayName: identity.displayName };
+    }
+
+    const recoveredAt = new Date();
+    await tx.delete(passwordCredentials).where(eq(passwordCredentials.identityId, identity.id));
+    await tx
+      .update(emailVerificationTokens)
+      .set({ revokedAt: recoveredAt })
+      .where(
+        and(
+          eq(emailVerificationTokens.identityId, identity.id),
+          isNull(emailVerificationTokens.usedAt),
+          isNull(emailVerificationTokens.revokedAt),
+        ),
+      );
+    await tx
+      .update(authSessions)
+      .set({ revokedAt: recoveredAt })
+      .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)));
+    await tx
+      .update(mfaChallenges)
+      .set({ usedAt: recoveredAt })
+      .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)));
+    await tx.delete(mfaFactors).where(eq(mfaFactors.identityId, identity.id));
+    await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: recoveredAt })
+      .where(
+        and(eq(passwordResetTokens.identityId, identity.id), isNull(passwordResetTokens.usedAt)),
+      );
+    const [verifiedIdentity] = await tx
+      .update(identities)
+      .set({ emailVerifiedAt: recoveredAt, updatedAt: recoveredAt })
+      .where(and(eq(identities.id, identity.id), isNull(identities.emailVerifiedAt)))
+      .returning({
+        id: identities.id,
+        email: identities.email,
+        displayName: identities.displayName,
+      });
+    if (!verifiedIdentity) {
+      throw new ConflictException({ code: "IDENTITY_STATE_CHANGED" });
+    }
+    await tx.insert(auditEvents).values({
+      actorIdentityId: identity.id,
+      action: "auth.google_pending_identity_recovered",
+      entityType: "identity",
+      entityId: identity.id,
+      metadata: { credentialsRevoked: true },
+    });
+    return verifiedIdentity;
   }
 
   private async enqueueEmailVerification(

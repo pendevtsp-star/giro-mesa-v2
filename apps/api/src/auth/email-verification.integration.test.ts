@@ -4,6 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  auditEvents,
   authSessions,
   createDatabase,
   emailVerificationRequests,
@@ -11,7 +12,10 @@ import {
   identities,
   mfaChallenges,
   mfaFactors,
+  oauthAccounts,
   outboxEvents,
+  passwordCredentials,
+  passwordResetTokens,
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -577,6 +581,15 @@ describe("email verification", () => {
       assert.equal(apiAlias?.statusCode, 429);
       assert.ok(Number(apiAlias?.headers["retry-after"]) > 0);
       assert.equal(apiAlias?.headers["cache-control"], "no-store");
+      const canonicalAlias = await rateLimitedApp.inject({
+        method: "POST",
+        url: "/api/v1/auth/email-verification/request",
+        payload: { email: `ip-limit-canonical-${suffix}@example.test` },
+      });
+      assert.equal(canonicalAlias.statusCode, 429);
+      assert.deepEqual(canonicalAlias.json(), apiAlias?.json());
+      assert.equal(canonicalAlias.headers["retry-after"], apiAlias?.headers["retry-after"]);
+      assert.equal(canonicalAlias.headers["cache-control"], apiAlias?.headers["cache-control"]);
       const publicAlias = await rateLimitedApp.inject({
         method: "POST",
         url: "/public/v1/auth/email-verification/request",
@@ -589,6 +602,391 @@ describe("email verification", () => {
     } finally {
       await rateLimitedApp.close();
     }
+  });
+
+  it("keeps registration independent after the verification-request IP bucket is exhausted", async (context) => {
+    if (!integrationUrl || !testOwner) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const { createApplication } = await import("../app-factory.js");
+    const { app } = await createApplication();
+    const email = `independent-register-${suffix}@example.test`;
+    try {
+      await app.init();
+      await app.getHttpAdapter().getInstance().ready();
+      const accepted = [];
+      for (let index = 0; index < 10; index += 1) {
+        accepted.push(
+          await app.inject({
+            method: "POST",
+            url: "/v1/auth/email-verification/request",
+            payload: { email: `isolated-bucket-${index}-${suffix}@example.test` },
+          }),
+        );
+      }
+      assert.equal(
+        accepted.every((response) => response.statusCode === 202),
+        true,
+      );
+
+      const exhausted = await app.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/request",
+        payload: { email: `isolated-bucket-overflow-${suffix}@example.test` },
+      });
+      assert.equal(exhausted.statusCode, 429);
+      assert.ok(Number(exhausted.headers["retry-after"]) > 0);
+      assert.equal(exhausted.headers["cache-control"], "no-store");
+
+      const registration = await app.inject({
+        method: "POST",
+        url: "/v1/auth/register",
+        payload: {
+          email,
+          name: "Independent Bucket Owner",
+          password: "a-secure-independent-bucket-password",
+          termsAccepted: true,
+        },
+      });
+      assert.equal(registration.statusCode, 201);
+      assert.deepEqual(registration.json(), {
+        accepted: true,
+        email,
+        verificationRequired: true,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("atomically arbitrates concurrent registration and rolls back non-identity unique failures", async (context) => {
+    if (!integrationUrl || !testOwner) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const { createApplication } = await import("../app-factory.js");
+    const { app } = await createApplication();
+    const email = `concurrent-register-${suffix}@example.test`;
+    try {
+      await app.init();
+      await app.getHttpAdapter().getInstance().ready();
+      const registrations = await Promise.all(
+        ["First", "Second"].map((name) =>
+          app.inject({
+            method: "POST",
+            url: "/v1/auth/register",
+            payload: {
+              email,
+              name: `${name} Concurrent Owner`,
+              password: `a-secure-${name.toLowerCase()}-concurrent-password`,
+              termsAccepted: true,
+            },
+          }),
+        ),
+      );
+      assert.deepEqual(registrations.map((response) => response.statusCode).sort(), [201, 409]);
+      const [identity] = await testOwner.db
+        .select({ id: identities.id })
+        .from(identities)
+        .where(eq(identities.email, email));
+      assert.ok(identity);
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ identityId: passwordCredentials.identityId })
+            .from(passwordCredentials)
+            .where(eq(passwordCredentials.identityId, identity.id))
+        ).length,
+        1,
+      );
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: emailVerificationTokens.id })
+            .from(emailVerificationTokens)
+            .where(eq(emailVerificationTokens.identityId, identity.id))
+        ).length,
+        1,
+      );
+      for (const topic of ["identity.registered", "auth.email_verification_requested"]) {
+        assert.equal(
+          (
+            await testOwner.db
+              .select({ id: outboxEvents.id })
+              .from(outboxEvents)
+              .where(and(eq(outboxEvents.aggregateId, identity.id), eq(outboxEvents.topic, topic)))
+          ).length,
+          1,
+        );
+      }
+
+      const rollbackEmail = `forced-rollback-${suffix}@example.test`;
+      const beforeOutbox = (await testOwner.db.select({ id: outboxEvents.id }).from(outboxEvents))
+        .length;
+      await testOwner.client.unsafe(`
+        create function task6_force_non_identity_unique() returns trigger
+        language plpgsql as $$
+        begin
+          raise exception 'forced verification insert failure'
+            using errcode = '23505', constraint = 'task6_forced_non_identity_unique';
+        end
+        $$
+      `);
+      await testOwner.client.unsafe(`
+        create trigger task6_force_non_identity_unique
+        before insert on email_verification_tokens
+        for each row execute function task6_force_non_identity_unique()
+      `);
+      try {
+        const failed = await app.inject({
+          method: "POST",
+          url: "/v1/auth/register",
+          payload: {
+            email: rollbackEmail,
+            name: "Rollback Owner",
+            password: "a-secure-rollback-password",
+            termsAccepted: true,
+          },
+        });
+        assert.equal(failed.statusCode, 500);
+      } finally {
+        await testOwner.client.unsafe(
+          "drop trigger if exists task6_force_non_identity_unique on email_verification_tokens",
+        );
+        await testOwner.client.unsafe("drop function if exists task6_force_non_identity_unique()");
+      }
+      assert.equal(
+        (
+          await testOwner.db
+            .select({ id: identities.id })
+            .from(identities)
+            .where(eq(identities.email, rollbackEmail))
+        ).length,
+        0,
+      );
+      assert.equal(
+        (await testOwner.db.select({ id: outboxEvents.id }).from(outboxEvents)).length,
+        beforeOutbox,
+      );
+      const [orphans] = await testOwner.client<{ password_count: number; token_count: number }[]>`
+        select
+          (select count(*)::int from password_credentials p
+            left join identities i on i.id = p.identity_id where i.id is null) password_count,
+          (select count(*)::int from email_verification_tokens t
+            left join identities i on i.id = t.identity_id where i.id is null) token_count
+      `;
+      assert.deepEqual(orphans, { password_count: 0, token_count: 0 });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("lets verified Google recover a pending local identity without retaining attacker credentials", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const service = auth;
+    const email = `google-recovery-${suffix}@example.test`;
+    await database.withRoleContext("identity", null, () =>
+      service.register({
+        email,
+        displayName: "Pending Local Identity",
+        password: "attacker-controlled-password",
+      }),
+    );
+    const [identity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email));
+    assert.ok(identity);
+    const legacySessionToken = randomBytes(32).toString("base64url");
+    await testOwner.db.insert(authSessions).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(legacySessionToken).digest("hex"),
+      trustedDevice: true,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    await testOwner.db.insert(mfaChallenges).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
+      trustedDevice: false,
+      expiresAt: new Date(Date.now() + 5 * 60_000),
+    });
+    await testOwner.db.insert(passwordResetTokens).values({
+      identityId: identity.id,
+      tokenHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    });
+
+    const google = await database.withRoleContext("identity", null, () =>
+      service.authenticateGoogle(
+        { subject: `recovery-subject-${suffix}`, email, displayName: "Verified Google Owner" },
+        "login",
+      ),
+    );
+    assert.equal("token" in google, true);
+    if (!("token" in google)) return;
+    assert.ok(
+      await database.withRoleContext("identity", null, () => service.authenticate(google.token)),
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(passwordCredentials)
+          .where(eq(passwordCredentials.identityId, identity.id))
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(oauthAccounts)
+          .where(eq(oauthAccounts.identityId, identity.id))
+      ).length,
+      1,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(auditEvents)
+          .where(
+            and(
+              eq(auditEvents.entityId, identity.id),
+              eq(auditEvents.action, "auth.google_pending_identity_recovered"),
+            ),
+          )
+      ).length,
+      1,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(emailVerificationTokens)
+          .where(
+            and(
+              eq(emailVerificationTokens.identityId, identity.id),
+              isNull(emailVerificationTokens.revokedAt),
+            ),
+          )
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(authSessions)
+          .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)))
+      ).length,
+      1,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(mfaChallenges)
+          .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)))
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(passwordResetTokens)
+          .where(
+            and(
+              eq(passwordResetTokens.identityId, identity.id),
+              isNull(passwordResetTokens.usedAt),
+            ),
+          )
+      ).length,
+      0,
+    );
+    await assert.rejects(
+      database.withRoleContext("identity", null, () =>
+        service.login({ email, password: "attacker-controlled-password", trustedDevice: false }),
+      ),
+      (error: unknown) => JSON.stringify(error).includes("INVALID_CREDENTIALS"),
+    );
+
+    await database.withRoleContext("identity", null, () => service.requestPasswordReset({ email }));
+    const [resetEvent] = await testOwner.db
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.aggregateId, identity.id),
+          eq(outboxEvents.topic, "auth.password_reset_requested"),
+        ),
+      )
+      .orderBy(desc(outboxEvents.createdAt))
+      .limit(1);
+    assert.ok(resetEvent);
+    const resetToken = decryptSecret(
+      resetEvent.payload.resetTokenEnvelope as SecretEnvelope,
+      encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY"),
+      `identity:${identity.id}`,
+    );
+    await database.withRoleContext("identity", null, () =>
+      service.confirmPasswordReset({ token: resetToken, password: "owner-restored-password" }),
+    );
+    const restored = await database.withRoleContext("identity", null, () =>
+      service.login({ email, password: "owner-restored-password", trustedDevice: false }),
+    );
+    assert.equal("token" in restored, true);
+
+    const concurrentEmail = `google-local-race-${suffix}@example.test`;
+    const [localRace, googleRace] = await Promise.allSettled([
+      database.withRoleContext("identity", null, () =>
+        service.register({
+          email: concurrentEmail,
+          displayName: "Concurrent Local",
+          password: "concurrent-local-password",
+        }),
+      ),
+      database.withRoleContext("identity", null, () =>
+        service.authenticateGoogle(
+          {
+            subject: `concurrent-google-${suffix}`,
+            email: concurrentEmail,
+            displayName: "Concurrent Google",
+          },
+          "signup",
+        ),
+      ),
+    ]);
+    assert.equal(googleRace.status, "fulfilled");
+    assert.equal(localRace.status === "fulfilled" || localRace.status === "rejected", true);
+    const [racedIdentity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, concurrentEmail));
+    assert.ok(racedIdentity?.emailVerifiedAt);
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(passwordCredentials)
+          .where(eq(passwordCredentials.identityId, racedIdentity.id))
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(oauthAccounts)
+          .where(eq(oauthAccounts.identityId, racedIdentity.id))
+      ).length,
+      1,
+    );
   });
 
   it("guarantees one initial verification after anonymous durable quota without bypassing resends", async (context) => {

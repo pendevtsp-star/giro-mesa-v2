@@ -78,8 +78,52 @@ it("links verified Google subjects without duplicating identities", async (conte
           .from(passwordCredentials)
           .where(eq(passwordCredentials.identityId, localIdentity.id))
       ).length,
+      0,
+    );
+    await assert.rejects(
+      auth.login({
+        email: local.email,
+        password: "a-secure-local-password",
+        trustedDevice: false,
+      }),
+      (error: unknown) => JSON.stringify(error).includes("INVALID_CREDENTIALS"),
+    );
+
+    const verifiedLocal = await auth.register({
+      email: `verified-local-${suffix}@example.test`,
+      displayName: "Verified Local Owner",
+      password: "verified-local-password",
+    });
+    const [verifiedLocalIdentity] = await database.db
+      .update(identities)
+      .set({ emailVerifiedAt: new Date() })
+      .where(eq(identities.email, verifiedLocal.email))
+      .returning();
+    assert.ok(verifiedLocalIdentity);
+    createdIdentityIds.push(verifiedLocalIdentity.id);
+    await auth.authenticateGoogle(
+      {
+        subject: `verified-local-subject-${suffix}`,
+        email: verifiedLocal.email,
+        displayName: "Verified Local Owner",
+      },
+      "login",
+    );
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(passwordCredentials)
+          .where(eq(passwordCredentials.identityId, verifiedLocalIdentity.id))
+      ).length,
       1,
     );
+    const verifiedLocalLogin = await auth.login({
+      email: verifiedLocal.email,
+      password: "verified-local-password",
+      trustedDevice: false,
+    });
+    assert.equal("token" in verifiedLocalLogin, true);
 
     await assert.rejects(
       auth.authenticateGoogle(
@@ -101,7 +145,7 @@ it("links verified Google subjects without duplicating identities", async (conte
       .select({ id: authSessions.id })
       .from(authSessions)
       .where(inArray(authSessions.identityId, createdIdentityIds));
-    assert.equal(sessions.length, 3);
+    assert.equal(sessions.length, 5);
   } finally {
     if (createdIdentityIds.length > 0) {
       await database.db.delete(identities).where(inArray(identities.id, createdIdentityIds));
