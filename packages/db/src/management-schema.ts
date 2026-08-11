@@ -318,6 +318,81 @@ export const paymentProviderEvents = pgTable(
   ],
 );
 
+export const fiscalDocuments = pgTable(
+  "fiscal_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    saleReference: varchar("sale_reference", { length: 160 }).notNull(),
+    documentType: varchar("document_type", { length: 24 }).notNull(),
+    totalCents: integer("total_cents").notNull(),
+    documentPayload: jsonb("document_payload").$type<Record<string, unknown>>().notNull(),
+    status: varchar("status", { length: 24 })
+      .$type<"pending" | "submitted" | "authorized" | "rejected" | "cancelled">()
+      .notNull()
+      .default("pending"),
+    adapter: varchar("adapter", { length: 48 }).notNull(),
+    adapterHomologated: boolean("adapter_homologated").notNull().default(false),
+    documentReference: varchar("document_reference", { length: 160 }),
+    lastErrorCode: varchar("last_error_code", { length: 80 }),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("fiscal_documents_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("fiscal_documents_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("fiscal_documents_sale_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.saleReference,
+    ),
+    foreignKey({
+      name: "fiscal_documents_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check("fiscal_documents_total_check", sql`${table.totalCents} > 0`),
+    check("fiscal_documents_attempt_check", sql`${table.attemptCount} >= 0`),
+  ],
+);
+
+export const fiscalDocumentEvents = pgTable(
+  "fiscal_document_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    documentId: uuid("document_id").notNull(),
+    fromStatus: varchar("from_status", { length: 24 }),
+    toStatus: varchar("to_status", { length: 24 }).notNull(),
+    event: varchar("event", { length: 24 }).notNull(),
+    errorCode: varchar("error_code", { length: 80 }),
+    actorIdentityId: uuid("actor_identity_id").references(() => identities.id),
+    safePayload: jsonb("safe_payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("fiscal_document_events_document_idx").on(table.documentId, table.createdAt),
+    foreignKey({
+      name: "fiscal_document_events_document_fk",
+      columns: [table.organizationId, table.unitId, table.documentId],
+      foreignColumns: [fiscalDocuments.organizationId, fiscalDocuments.unitId, fiscalDocuments.id],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const managementSuppliers = pgTable(
   "management_suppliers",
   {

@@ -5,6 +5,7 @@ import { BillingModule } from "./billing/billing.module.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { TenantContextInterceptor } from "./database/tenant-context.interceptor.js";
+import { FiscalModule } from "./fiscal/fiscal.module.js";
 import { GrowthModule } from "./growth/growth.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ManagementModule } from "./management/management.module.js";
@@ -21,6 +22,7 @@ import { SyncModule } from "./sync/sync.module.js";
 @Module({
   imports: [
     DatabaseModule,
+    FiscalModule,
     HealthModule,
     CatalogModule,
     AuthModule,
