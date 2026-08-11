@@ -131,3 +131,66 @@ describe("fronteira runtime da API de onboarding", () => {
     expect(getPwaMutationCount()).toBe(0);
   });
 });
+
+describe("fronteira HTTP do backoffice", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("encaminha cancelamento para leituras tenant-scoped da plataforma", async () => {
+    const observedSignals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        const observedSignal = init?.signal;
+        if (observedSignal) observedSignals.push(observedSignal);
+        return new Promise<Response>((_resolve, reject) => {
+          observedSignal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("The operation was aborted.", "AbortError")),
+            { once: true },
+          );
+        });
+      }),
+    );
+    const controller = new AbortController();
+    const pending = api.platform.projection(organizationId, "tenant", {
+      signal: controller.signal,
+    });
+
+    expect(observedSignals[0]?.aborted).toBe(false);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(observedSignals[0]?.aborted).toBe(true);
+  });
+
+  it("envia proposta e aprovação com escopo codificado e idempotência explícita", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: "proposal-1" }, { status: 200 }))
+      .mockResolvedValueOnce(Response.json({ id: "proposal-1", status: "executed" }, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.platform.propose(
+      "tenant/id",
+      {
+        action: "tenant.suspend",
+        targetId: organizationId,
+        justification: "Risco operacional confirmado e documentado.",
+        payload: { expectedState: "active" },
+      },
+      "proposal-key-0001",
+    );
+    await api.platform.approve("tenant/id", "proposal/id", 1, "approval-key-0001");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/platform/tenants/tenant%2Fid/actions");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      headers: { "idempotency-key": "proposal-key-0001" },
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("proposal%2Fid/approve");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: "POST",
+      headers: { "idempotency-key": "approval-key-0001" },
+      body: JSON.stringify({ expectedVersion: 1 }),
+    });
+  });
+});

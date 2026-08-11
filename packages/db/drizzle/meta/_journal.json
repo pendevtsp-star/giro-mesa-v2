@@ -162,6 +162,13 @@
       "when": 1786489200000,
       "tag": "0023_fiscal_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786490000000,
+      "tag": "0024_platform_backoffice_rls",
+      "breakpoints": true
     }
   ]
 }

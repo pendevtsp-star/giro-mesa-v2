@@ -2,6 +2,444 @@ html {
   min-width: 320px;
 }
 
+/* Platform backoffice: tenant context stays visible before any privileged action. */
+.platform-workspace {
+  --platform-ink: #163128;
+  --platform-muted: #52645d;
+  --platform-line: #dbe4df;
+  display: grid;
+  gap: 1rem;
+}
+
+.platform-commandbar {
+  align-items: center;
+  background: #123c2d;
+  border: 1px solid #255844;
+  border-radius: var(--gm-radius);
+  color: #fff;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+  position: sticky;
+  top: 76px;
+  z-index: 8;
+}
+
+.platform-commandbar h1,
+.platform-commandbar p,
+.platform-section-heading h2,
+.platform-section-heading p,
+.platform-impact p,
+.platform-error p,
+.platform-unavailable p {
+  margin: 0;
+}
+
+.platform-commandbar h1 {
+  color: #fff;
+  font-family: var(--gm-display);
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  line-height: 1.15;
+}
+
+.platform-commandbar p {
+  color: #d9eee5;
+  font-size: 0.84rem;
+  margin-top: 0.35rem;
+  max-width: 66ch;
+}
+
+.platform-commandbar__state {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.platform-commandbar__state > span:not(.gm-badge) {
+  color: #eaf6f0;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.platform-commandbar__state .gm-badge--neutral {
+  color: #405149;
+}
+
+.platform-summary {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.platform-summary > div {
+  background: var(--gm-surface);
+  border: 1px solid var(--platform-line);
+  border-radius: calc(var(--gm-radius) - 4px);
+  display: grid;
+  gap: 0.25rem;
+  min-height: 88px;
+  padding: 0.9rem 1rem;
+}
+
+.platform-summary span,
+.platform-scope span,
+.platform-record span,
+.platform-action-row > div > span {
+  color: var(--platform-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.platform-summary strong {
+  color: var(--platform-ink);
+  font-family: var(--gm-display);
+  font-size: 1.35rem;
+}
+
+.platform-context-card {
+  padding: 1rem;
+}
+
+.platform-context-form {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(240px, 1fr) auto;
+}
+
+.platform-context-form label,
+.platform-action-form label,
+.platform-scope label {
+  color: var(--platform-ink);
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.35rem;
+}
+
+.platform-workspace input,
+.platform-workspace select,
+.platform-workspace textarea {
+  background: #fff;
+  border: 1px solid #aebdb6;
+  border-radius: 8px;
+  color: var(--platform-ink);
+  font: inherit;
+  min-height: 44px;
+  padding: 0.65rem 0.75rem;
+}
+
+.platform-workspace textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.platform-workspace input:focus-visible,
+.platform-workspace select:focus-visible,
+.platform-workspace textarea:focus-visible,
+.platform-tabs button:focus-visible {
+  outline: 3px solid #f2a900;
+  outline-offset: 2px;
+}
+
+.platform-context-help {
+  color: var(--platform-muted);
+  font-size: 0.78rem;
+  margin: 0.6rem 0 0;
+}
+
+.platform-scope {
+  align-items: center;
+  background: #edf5f1;
+  border: 1px solid #bfd2c8;
+  border-radius: calc(var(--gm-radius) - 2px);
+  box-shadow: inset 0 3px 0 var(--gm-brand);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, auto) minmax(180px, 260px);
+  padding: 0.85rem 1rem;
+  position: sticky;
+  top: 174px;
+  z-index: 7;
+}
+
+.platform-scope > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.platform-scope strong,
+.platform-scope small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-scope small {
+  color: var(--platform-muted);
+}
+
+.platform-tabs {
+  border-bottom: 1px solid var(--platform-line);
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 1px;
+}
+
+.platform-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--platform-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  white-space: nowrap;
+}
+
+.platform-tabs button[aria-selected="true"] {
+  border-color: var(--gm-brand);
+  color: var(--platform-ink);
+}
+
+.platform-content-grid {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.75fr);
+}
+
+.platform-projection,
+.platform-actions-panel,
+.platform-approvals {
+  background: var(--gm-surface);
+  border: 1px solid var(--platform-line);
+  border-radius: var(--gm-radius);
+  padding: 1rem;
+}
+
+.platform-section-heading {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.platform-section-heading h2 {
+  color: var(--platform-ink);
+  font-family: var(--gm-display);
+  font-size: 1.05rem;
+}
+
+.platform-section-heading p {
+  color: var(--platform-muted);
+  font-size: 0.76rem;
+  margin-top: 0.25rem;
+}
+
+.platform-records,
+.platform-action-list,
+.platform-action-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.platform-record {
+  border-bottom: 1px solid var(--platform-line);
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  padding: 0.75rem 0;
+}
+
+.platform-record:last-child {
+  border-bottom: 0;
+}
+
+.platform-record > div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.platform-record strong {
+  color: var(--platform-ink);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.platform-impact,
+.platform-unavailable,
+.platform-empty,
+.platform-error {
+  border-radius: 8px;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem;
+}
+
+.platform-impact {
+  background: #fff7dd;
+  border: 1px solid #ead38a;
+  color: #634d08;
+}
+
+.platform-impact p,
+.platform-unavailable p,
+.platform-empty span,
+.platform-error p {
+  font-size: 0.78rem;
+}
+
+.platform-unavailable,
+.platform-empty {
+  background: #f4f7f5;
+  border: 1px dashed #aebdb6;
+  color: var(--platform-muted);
+}
+
+.platform-error {
+  align-items: center;
+  background: #fff1ee;
+  border: 1px solid #e5aaa0;
+  color: #762d24;
+  grid-template-columns: 1fr auto;
+}
+
+.platform-action-form .platform-confirmation {
+  align-items: start;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+}
+
+.platform-confirmation input {
+  min-height: 22px;
+  width: 22px;
+}
+
+.platform-blocker {
+  color: #8a372c;
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.platform-action-row {
+  align-items: center;
+  border-bottom: 1px solid var(--platform-line);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  padding: 0.85rem 0;
+}
+
+.platform-action-row:last-child {
+  border-bottom: 0;
+}
+
+.platform-action-row > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.platform-action-row small {
+  color: var(--platform-muted);
+}
+
+.platform-action-row__buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.platform-skeleton {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.platform-skeleton span {
+  animation: platform-pulse 1.2s ease-in-out infinite alternate;
+  background: #e6ede9;
+  border-radius: 6px;
+  display: block;
+  height: 34px;
+}
+
+.platform-skeleton span:nth-child(2) {
+  width: 82%;
+}
+
+.platform-skeleton span:nth-child(3) {
+  width: 64%;
+}
+
+@keyframes platform-pulse {
+  to {
+    opacity: 0.46;
+  }
+}
+
+@media (max-width: 1080px) {
+  .platform-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .platform-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-scope {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .platform-commandbar,
+  .platform-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .platform-commandbar {
+    position: static;
+  }
+
+  .platform-commandbar__state {
+    justify-content: flex-start;
+  }
+
+  .platform-context-form,
+  .platform-scope,
+  .platform-action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-action-row__buttons {
+    justify-content: stretch;
+  }
+
+  .platform-action-row__buttons .gm-button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-skeleton span {
+    animation: none;
+  }
+}
+
 /* Operational onboarding */
 .nav-icon__svg,
 .onboarding-icon-svg,
@@ -1345,7 +1783,7 @@ small {
   margin-top: auto;
 }
 .sidebar__footer small {
-  color: #667e73;
+  color: #89a99b;
   font-size: 0.62rem;
   padding-left: 0.5rem;
 }

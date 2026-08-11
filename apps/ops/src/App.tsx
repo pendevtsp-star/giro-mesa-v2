@@ -1514,7 +1514,7 @@ function PageContent({
       return session.demo ? (
         <PlatformPage />
       ) : session.platformAdmin ? (
-        <RealPlatformPage refreshToken={refreshToken} />
+        <RealPlatformPage actorIdentityId={session.identityId} refreshToken={refreshToken} />
       ) : (
         <UnavailableRealPage title="Administração da plataforma" />
       );

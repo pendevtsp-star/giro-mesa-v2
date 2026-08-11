@@ -16,6 +16,7 @@ import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from
 import { addZodRequestBodies } from "./common/openapi-zod.js";
 import { isSensitiveAuthRequest, requestRateLimit } from "./common/rate-limit.js";
 import { MetricsService } from "./health/health.module.js";
+import { closePlatformProjectionSchemas } from "./platform/platform-projection.dto.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
 export async function createApplication() {
@@ -75,6 +76,7 @@ export async function createApplication() {
       .build(),
   );
   addZodRequestBodies(app, document);
+  closePlatformProjectionSchemas(document.components?.schemas ?? {});
   fastify.get("/api/v1/openapi.json", async () => document);
   fastify.get("/openapi.json", async () => document);
 

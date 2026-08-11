@@ -3924,6 +3924,166 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[0]"];
+    put?: never;
+    post: operations["PlatformController_propose[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[1]"];
+    put?: never;
+    post: operations["PlatformController_propose[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory": {
     parameters: {
       query?: never;
@@ -6551,6 +6711,345 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
+    };
+    PlatformProjectionUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+      units: components["schemas"]["PlatformProjectionUnitResponse"][];
+    };
+    PlatformPlanProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      planId: string;
+      slug: string;
+      name: string;
+      selectionRevision: number;
+      /** Format: date-time */
+      selectedAt: string | null;
+    };
+    PlatformEntitlementProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      entitlement: string;
+      state: string;
+      /** Format: date-time */
+      activatedAt: string | null;
+      /** Format: date-time */
+      revokedAt: string | null;
+    };
+    PlatformUserRoleProjectionResponse: {
+      role: string;
+      /** Format: uuid */
+      unitId: string | null;
+    };
+    PlatformUserProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      identityId: string;
+      displayName: string;
+      email: string;
+      status: string;
+      roles: components["schemas"]["PlatformUserRoleProjectionResponse"][];
+    };
+    PlatformOnboardingChecklistProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "checklist";
+      item: string;
+      status: string;
+      source: string;
+      /** Format: date-time */
+      verifiedAt: string | null;
+    };
+    PlatformOnboardingProvisioningProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "provisioning";
+      /** Format: uuid */
+      id: string;
+      state: string;
+      checkpoint: string;
+      lastErrorCode: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformBillingProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      planId: string;
+      cycle: string;
+      state: string;
+      /** Format: date-time */
+      currentPeriodEndsAt: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformIntegrationProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string | null;
+      provider: string;
+      status: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformAuditProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      action: string;
+      entityType: string;
+      entityId: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+    };
+    PlatformUnavailableProjectionItemResponse: {
+      /** @enum {boolean} */
+      unavailable: true;
+    };
+    PlatformTenantProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "tenant";
+      items: components["schemas"]["PlatformTenantProjectionItemResponse"][];
+    };
+    PlatformPlanProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "plan";
+      items: components["schemas"]["PlatformPlanProjectionItemResponse"][];
+    };
+    PlatformEntitlementsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "entitlements";
+      items: components["schemas"]["PlatformEntitlementProjectionItemResponse"][];
+    };
+    PlatformUsersProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "users";
+      items: components["schemas"]["PlatformUserProjectionItemResponse"][];
+    };
+    PlatformOnboardingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "onboarding";
+      items: (
+        | components["schemas"]["PlatformOnboardingChecklistProjectionItemResponse"]
+        | components["schemas"]["PlatformOnboardingProvisioningProjectionItemResponse"]
+      )[];
+    };
+    PlatformBillingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "billing";
+      items: components["schemas"]["PlatformBillingProjectionItemResponse"][];
+    };
+    PlatformIntegrationsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "integrations";
+      items: components["schemas"]["PlatformIntegrationProjectionItemResponse"][];
+    };
+    PlatformAuditProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "audit";
+      items: components["schemas"]["PlatformAuditProjectionItemResponse"][];
+    };
+    PlatformLeadsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "leads";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
+    PlatformSupportProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "support";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
+    PlatformIncidentsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "incidents";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
+    PlatformCountsResponse: {
+      organizations: number;
+      active: number;
+      attention: number;
+    };
+    PlatformAccessResponse: {
+      permissions: string[];
+      stepUp: boolean;
+      /** Format: date-time */
+      stepUpExpiresAt: string | null;
+    };
+    PlatformOverviewResponse: {
+      counts: components["schemas"]["PlatformCountsResponse"];
+      access: components["schemas"]["PlatformAccessResponse"];
+    };
+    PlatformOrganizationResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantContextResponse: {
+      organization: components["schemas"]["PlatformOrganizationResponse"];
+      units: components["schemas"]["PlatformUnitResponse"][];
+      /** Format: uuid */
+      selectedUnitId: string | null;
+    };
+    PlatformActionPayloadResponse: {
+      expectedState: string;
+      restoreTo?: string;
+    };
+    PlatformActionResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** @enum {string} */
+      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      /** @enum {string} */
+      targetType: "organization" | "membership";
+      /** Format: uuid */
+      targetId: string;
+      /** Format: uuid */
+      requestedByIdentityId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+      /** @enum {string} */
+      status: "pending" | "approved" | "executed" | "rejected" | "expired" | "failed";
+      version: number;
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: uuid */
+      decidedByIdentityId?: string;
+      /** Format: date-time */
+      decidedAt?: string;
+      failureCode?: string;
+    };
+    PlatformActionPageResponse: {
+      items: components["schemas"]["PlatformActionResponse"][];
+      nextCursor: string | null;
+    };
+    PlatformProposalRequest: {
+      /** @enum {string} */
+      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      /** Format: uuid */
+      targetId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+    };
+    PlatformDecisionRequest: {
+      expectedVersion: number;
     };
     RemunerationController_createRule_0__request_recursive:
       | components["schemas"]["RemunerationController_createRule_0__request_recursive_constant"]
@@ -15133,7 +15632,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
       };
     };
   };
@@ -15150,7 +15651,343 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[0]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[1]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
       };
     };
   };

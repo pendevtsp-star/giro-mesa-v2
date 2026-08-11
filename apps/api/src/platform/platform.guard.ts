@@ -1,11 +1,12 @@
 import { CanActivate, type ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
-import { isPlatformAdminEmail } from "./platform-access.js";
+import { platformAccessFor } from "./platform-access.js";
 
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
-    if (!isPlatformAdminEmail(request.auth.email)) throw new ForbiddenException();
+    const access = platformAccessFor(request.auth.email);
+    if (!access.permissions.includes("platform.read")) throw new ForbiddenException();
     return true;
   }
 }
