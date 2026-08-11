@@ -399,6 +399,33 @@ export class SyncService {
                   );
               }
             }
+          } else if (outcome.state === "dlq") {
+            if (effect.state === "pending" || effect.state === "delivered") {
+              await tx
+                .insert(dispatchDeadLetters)
+                .values({
+                  organizationId: hub.organizationId,
+                  unitId: hub.unitId,
+                  effectId: effect.id,
+                  reason: outcome.error ?? "DISPATCH_OUTCOME_UNCERTAIN",
+                })
+                .onConflictDoNothing();
+              await tx
+                .update(dispatchEffects)
+                .set({
+                  state: "dlq",
+                  lastError: outcome.error ?? "DISPATCH_OUTCOME_UNCERTAIN",
+                  resourceVersion: effect.resourceVersion + 1,
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    eq(dispatchEffects.id, effect.id),
+                    eq(dispatchEffects.resourceVersion, effect.resourceVersion),
+                    inArray(dispatchEffects.state, ["pending", "delivered"]),
+                  ),
+                );
+            }
           } else if (outcome.state === "canceled" && effect.state !== "acked") {
             await tx
               .update(dispatchEffects)

@@ -101,6 +101,61 @@ public sealed class DispatchLedgerTests : IAsyncLifetime
             outcome => outcome.EffectId == kdsEffectId && outcome.State == "acked");
     }
 
+    [Fact]
+    public async Task RecoversInterruptedClaimToDlqWithoutRepeatingTheGatewaySideEffect()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var organizationId = Guid.NewGuid().ToString();
+        var unitId = Guid.NewGuid().ToString();
+        var effectId = Guid.NewGuid().ToString();
+        var commandId = Guid.NewGuid().ToString();
+        var deliveryKey = "dispatch-crash-claim-1";
+        var now = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var command = DispatchCommand(
+            commandId,
+            effectId,
+            organizationId,
+            unitId,
+            "printer",
+            "printer:cozinha",
+            deliveryKey,
+            now);
+        await store.SaveCloudCommandsAsync([command]);
+        await store.ScheduleDispatchAsync(new LocalDispatchEffect(
+            effectId,
+            organizationId,
+            unitId,
+            $"effect:{effectId}",
+            "printer",
+            "printer:cozinha",
+            "dispatch",
+            command.Payload.GetProperty("payload").GetRawText(),
+            now));
+        Assert.Equal("claimed", await store.ClaimDispatchAttemptAsync(effectId, deliveryKey, commandId));
+        await store.MarkCloudCommandFailedAsync(commandId, "DISPATCH_COMMAND_PROCESSING_FAILED");
+
+        Assert.Equal(1, await store.RecoverInterruptedDispatchesAsync(TimeSpan.Zero));
+        Assert.Equal(0, await store.RecoverInterruptedDispatchesAsync(TimeSpan.Zero));
+        Assert.Single(await store.GetPendingCloudAcknowledgementsAsync(10));
+        Assert.Single(await store.GetDeadLettersAsync(10));
+        var outcomes = await store.GetPendingDispatchOutcomesAsync(10);
+        Assert.Single(outcomes, outcome =>
+            outcome.EffectId == effectId &&
+            outcome.DeliveryKey == deliveryKey &&
+            outcome.State == "dlq" &&
+            outcome.Error == "DISPATCH_OUTCOME_UNCERTAIN");
+
+        var printer = new RecordingPrinterGateway();
+        var processor = new DispatchProcessor(
+            store,
+            printer,
+            new LocalKitchenDispatchGateway(store),
+            NullLogger<DispatchProcessor>.Instance);
+        await processor.ProcessPendingCommandsAsync();
+        Assert.Empty(printer.Requests);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync()

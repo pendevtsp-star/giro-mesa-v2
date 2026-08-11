@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
+  dispatchDeadLetters,
   dispatchEffects,
   deviceEnrollments,
   hubCommands,
@@ -19,6 +20,7 @@ import {
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { SyncService } from "../sync/sync.service.js";
 import { DispatchCloudWorker } from "./dispatch-cloud.worker.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 
@@ -200,6 +202,83 @@ it("creates one effect per destination and keeps attempts, ack, reprint and DLQ 
       "retry",
     );
     assert.equal(reconciled.state, "pending");
+
+    const expiredTransport = await service.reprintDispatch(
+      identity.id,
+      organization.id,
+      unit.id,
+      printer.id,
+      "dispatch-expired-transport",
+    );
+    await cloudWorker.runOnce();
+    const expiredDeliveryKey = `${expiredTransport.effectKey}:1`;
+    const [expiredCommand] = await database.db
+      .select()
+      .from(hubCommands)
+      .where(eq(hubCommands.idempotencyKey, expiredDeliveryKey))
+      .limit(1);
+    assert.ok(expiredCommand);
+    await database.db
+      .update(hubCommands)
+      .set({ expiresAt: new Date(Date.now() - 1_000) })
+      .where(eq(hubCommands.id, expiredCommand.id));
+    await database.db
+      .update(hubHeartbeats)
+      .set({ lastSeenAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(hubHeartbeats.hubId, hub.id));
+
+    const recoveredTransport = await cloudWorker.runOnce();
+    assert.equal(recoveredTransport.recovered, 1);
+    const [expiredEffectAfterRecovery] = await database.db
+      .select()
+      .from(dispatchEffects)
+      .where(eq(dispatchEffects.id, expiredTransport.id))
+      .limit(1);
+    assert.equal(expiredEffectAfterRecovery?.state, "dlq");
+    const expiredDeadLetters = await database.db
+      .select()
+      .from(dispatchDeadLetters)
+      .where(eq(dispatchDeadLetters.effectId, expiredTransport.id));
+    assert.equal(expiredDeadLetters.length, 1);
+    assert.equal(expiredDeadLetters[0]?.reason, "DISPATCH_TRANSPORT_EXPIRED_UNCERTAIN");
+    assert.equal((await cloudWorker.runOnce()).recovered, 0);
+
+    const edgeDlqEffect = await service.reprintDispatch(
+      identity.id,
+      organization.id,
+      unit.id,
+      printer.id,
+      "dispatch-edge-uncertain",
+    );
+    const edgeDlqDeliveryKey = `${edgeDlqEffect.effectKey}:1`;
+    const sync = new SyncService(database, undefined as never, undefined as never);
+    const edgeDlqOutcomeId = randomUUID();
+    const outcomeResult = await sync.applyDispatchOutcomes(syncKey, [
+      {
+        id: edgeDlqOutcomeId,
+        effectId: edgeDlqEffect.id,
+        deliveryKey: edgeDlqDeliveryKey,
+        state: "dlq",
+        error: "DISPATCH_OUTCOME_UNCERTAIN",
+        occurredAt: new Date().toISOString(),
+      },
+    ]);
+    assert.deepEqual(outcomeResult.acceptedOutcomeIds, [edgeDlqOutcomeId]);
+    const [edgeDlqEffectAfterOutcome] = await database.db
+      .select()
+      .from(dispatchEffects)
+      .where(eq(dispatchEffects.id, edgeDlqEffect.id))
+      .limit(1);
+    assert.equal(edgeDlqEffectAfterOutcome?.state, "dlq");
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(dispatchDeadLetters)
+          .where(eq(dispatchDeadLetters.effectId, edgeDlqEffect.id))
+      ).length,
+      1,
+    );
   } finally {
     await database.onModuleDestroy();
   }

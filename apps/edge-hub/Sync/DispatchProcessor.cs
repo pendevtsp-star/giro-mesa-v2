@@ -14,6 +14,7 @@ public sealed class DispatchProcessor(
 
     public async Task ProcessPendingCommandsAsync(CancellationToken cancellationToken = default)
     {
+        await store.RecoverInterruptedDispatchesAsync(TimeSpan.FromMinutes(2));
         foreach (var command in await store.GetPendingCloudCommandsAsync(50))
         {
             if (command.Type != "dispatch.effect.execute")
@@ -39,7 +40,10 @@ public sealed class DispatchProcessor(
                     effectPayload,
                     command.CreatedAt));
 
-                var claim = await store.ClaimDispatchAttemptAsync(payload.EffectId, payload.DeliveryKey);
+                var claim = await store.ClaimDispatchAttemptAsync(
+                    payload.EffectId,
+                    payload.DeliveryKey,
+                    command.Id);
                 if (claim == "executing")
                 {
                     await store.MarkCloudCommandFailedAsync(command.Id, "DISPATCH_OUTCOME_UNCERTAIN");

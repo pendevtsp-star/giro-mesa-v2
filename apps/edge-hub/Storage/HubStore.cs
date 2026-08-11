@@ -129,6 +129,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 effect_id TEXT NOT NULL REFERENCES local_dispatch_effects(id),
                 delivery_key TEXT NOT NULL UNIQUE,
+                cloud_command_id TEXT NULL,
                 attempt_number INTEGER NOT NULL,
                 state TEXT NOT NULL,
                 attempted_at TEXT NOT NULL,
@@ -204,6 +205,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         await EnsureColumnAsync(connection, "operational_events", "price_references", "TEXT NULL");
         await EnsureColumnAsync(connection, "operational_events", "primary_resource_id", "TEXT NULL");
         await EnsureColumnAsync(connection, "local_dispatch_dead_letters", "resolved_at", "TEXT NULL");
+        await EnsureColumnAsync(connection, "local_dispatch_attempts", "cloud_command_id", "TEXT NULL");
         await EnsureColumnAsync(connection, "inbound_cloud_commands", "processed_at", "TEXT NULL");
         await EnsureColumnAsync(connection, "inbound_cloud_commands", "processing_error", "TEXT NULL");
         var backfill = connection.CreateCommand();
@@ -801,7 +803,10 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         return results;
     }
 
-    public async Task<string> ClaimDispatchAttemptAsync(string effectId, string deliveryKey)
+    public async Task<string> ClaimDispatchAttemptAsync(
+        string effectId,
+        string deliveryKey,
+        string? cloudCommandId = null)
     {
         await _gate.WaitAsync();
         try
@@ -813,13 +818,14 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             insert.Transaction = transaction;
             insert.CommandText = """
                 INSERT OR IGNORE INTO local_dispatch_attempts
-                    (effect_id, delivery_key, attempt_number, state, attempted_at)
-                SELECT id, $deliveryKey, attempt_count + 1, 'executing', $attemptedAt
+                    (effect_id, delivery_key, cloud_command_id, attempt_number, state, attempted_at)
+                SELECT id, $deliveryKey, $cloudCommandId, attempt_count + 1, 'executing', $attemptedAt
                 FROM local_dispatch_effects
                 WHERE id = $effectId AND state NOT IN ('acked', 'dlq', 'canceled');
                 """;
             insert.Parameters.AddWithValue("$effectId", effectId);
             insert.Parameters.AddWithValue("$deliveryKey", deliveryKey);
+            insert.Parameters.AddWithValue("$cloudCommandId", (object?)cloudCommandId ?? DBNull.Value);
             insert.Parameters.AddWithValue("$attemptedAt", DateTimeOffset.UtcNow.ToString("O"));
             var inserted = await insert.ExecuteNonQueryAsync() == 1;
             if (inserted)
@@ -843,6 +849,110 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                 ?? throw new InvalidOperationException("DISPATCH_ATTEMPT_NOT_CLAIMED");
             await transaction.CommitAsync();
             return inserted ? "claimed" : state;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<int> RecoverInterruptedDispatchesAsync(TimeSpan minimumAge)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var select = connection.CreateCommand();
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT a.effect_id, a.delivery_key,
+                       COALESCE(a.cloud_command_id, (
+                           SELECT c.id FROM inbound_cloud_commands c
+                           WHERE json_extract(c.payload, '$.deliveryKey') = a.delivery_key
+                           ORDER BY c.received_at DESC LIMIT 1
+                       )) AS cloud_command_id
+                FROM local_dispatch_attempts a
+                JOIN local_dispatch_effects e ON e.id = a.effect_id
+                WHERE a.state = 'executing'
+                  AND a.attempted_at <= $cutoff
+                  AND e.state NOT IN ('acked', 'dlq', 'canceled')
+                ORDER BY a.attempted_at, a.id;
+                """;
+            select.Parameters.AddWithValue(
+                "$cutoff",
+                DateTimeOffset.UtcNow.Subtract(minimumAge).ToString("O"));
+            var interrupted = new List<(string EffectId, string DeliveryKey, string? CommandId)>();
+            await using (var reader = await select.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                    interrupted.Add((
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+
+            var recovered = 0;
+            foreach (var item in interrupted)
+            {
+                var updateAttempt = connection.CreateCommand();
+                updateAttempt.Transaction = transaction;
+                updateAttempt.CommandText = """
+                    UPDATE local_dispatch_attempts SET state = 'failed'
+                    WHERE effect_id = $effectId AND delivery_key = $deliveryKey AND state = 'executing';
+                    """;
+                updateAttempt.Parameters.AddWithValue("$effectId", item.EffectId);
+                updateAttempt.Parameters.AddWithValue("$deliveryKey", item.DeliveryKey);
+                if (await updateAttempt.ExecuteNonQueryAsync() != 1) continue;
+
+                var now = DateTimeOffset.UtcNow;
+                var deadLetter = connection.CreateCommand();
+                deadLetter.Transaction = transaction;
+                deadLetter.CommandText = """
+                    INSERT OR IGNORE INTO local_dispatch_dead_letters (effect_id, reason, created_at)
+                    VALUES ($effectId, 'DISPATCH_OUTCOME_UNCERTAIN', $now);
+                    """;
+                deadLetter.Parameters.AddWithValue("$effectId", item.EffectId);
+                deadLetter.Parameters.AddWithValue("$now", now.ToString("O"));
+                await deadLetter.ExecuteNonQueryAsync();
+
+                var updateEffect = connection.CreateCommand();
+                updateEffect.Transaction = transaction;
+                updateEffect.CommandText = """
+                    UPDATE local_dispatch_effects SET state = 'dlq', updated_at = $now
+                    WHERE id = $effectId AND state NOT IN ('acked', 'dlq', 'canceled');
+                    """;
+                updateEffect.Parameters.AddWithValue("$effectId", item.EffectId);
+                updateEffect.Parameters.AddWithValue("$now", now.ToString("O"));
+                await updateEffect.ExecuteNonQueryAsync();
+
+                await InsertDispatchOutcomeAsync(
+                    connection,
+                    transaction,
+                    item.EffectId,
+                    item.DeliveryKey,
+                    "dlq",
+                    "DISPATCH_OUTCOME_UNCERTAIN",
+                    now);
+
+                if (item.CommandId is not null)
+                {
+                    var finishCommand = connection.CreateCommand();
+                    finishCommand.Transaction = transaction;
+                    finishCommand.CommandText = """
+                        UPDATE inbound_cloud_commands
+                        SET processed_at = $now, processing_error = NULL
+                        WHERE id = $commandId AND processed_at IS NULL;
+                        """;
+                    finishCommand.Parameters.AddWithValue("$commandId", item.CommandId);
+                    finishCommand.Parameters.AddWithValue("$now", now.ToString("O"));
+                    await finishCommand.ExecuteNonQueryAsync();
+                }
+                recovered += 1;
+            }
+            await transaction.CommitAsync();
+            return recovered;
         }
         finally
         {

@@ -1,4 +1,4 @@
-import { dispatchEffects, hubCommands } from "@giromesa/db";
+import { dispatchDeadLetters, dispatchEffects, hubCommands } from "@giromesa/db";
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
@@ -16,6 +16,13 @@ type DispatchCandidate = {
   delivery_key: string;
   attempt_number: number;
   hub_id: string;
+};
+
+type ExpiredDispatchCandidate = {
+  effect_id: string;
+  organization_id: string;
+  unit_id: string;
+  resource_version: number;
 };
 
 @Injectable()
@@ -36,10 +43,52 @@ export class DispatchCloudWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   async runOnce(limit = 50) {
-    if (this.running) return { scheduled: 0 };
+    if (this.running) return { scheduled: 0, recovered: 0 };
     this.running = true;
     try {
       return await this.database.db.transaction(async (tx) => {
+        const expired = await tx.execute<ExpiredDispatchCandidate>(sql`
+          select e.id as effect_id, e.organization_id, e.unit_id, e.resource_version
+          from ${dispatchEffects} e
+          join public.dispatch_attempts a
+            on a.organization_id = e.organization_id
+           and a.unit_id = e.unit_id
+           and a.effect_id = e.id
+           and a.state = 'scheduled'
+           and a.attempt_number = e.attempt_count
+          join public.hub_commands c
+            on c.unit_id = e.unit_id
+           and c.idempotency_key = a.delivery_key
+           and c.acknowledged_at is null
+           and c.expires_at <= now()
+          where e.state = 'pending'
+          order by c.expires_at, e.id
+          for update of e skip locked
+          limit ${Math.max(1, Math.min(limit, 100))}
+        `);
+        let recovered = 0;
+        for (const row of expired) {
+          await tx
+            .insert(dispatchDeadLetters)
+            .values({
+              organizationId: row.organization_id,
+              unitId: row.unit_id,
+              effectId: row.effect_id,
+              reason: "DISPATCH_TRANSPORT_EXPIRED_UNCERTAIN",
+            })
+            .onConflictDoNothing();
+          const [updated] = await tx
+            .update(dispatchEffects)
+            .set({
+              state: "dlq",
+              lastError: "DISPATCH_TRANSPORT_EXPIRED_UNCERTAIN",
+              resourceVersion: row.resource_version + 1,
+              updatedAt: new Date(),
+            })
+            .where(sql`${dispatchEffects.id} = ${row.effect_id} and ${dispatchEffects.state} = 'pending'`)
+            .returning({ id: dispatchEffects.id });
+          if (updated) recovered += 1;
+        }
         const rows = await tx.execute<DispatchCandidate>(sql`
           select e.id as effect_id, e.organization_id, e.unit_id, e.order_id, e.station_id,
                  e.effect_key, e.destination, e.target_ref, e.operation,
@@ -111,11 +160,11 @@ export class DispatchCloudWorker implements OnModuleInit, OnModuleDestroy {
             .returning({ id: hubCommands.id });
           if (created) scheduled += 1;
         }
-        return { scheduled };
+        return { scheduled, recovered };
       });
     } catch (error) {
       this.logger.warn("Dispatch cloud scheduling failed; effects remain durable", error);
-      return { scheduled: 0 };
+      return { scheduled: 0, recovered: 0 };
     } finally {
       this.running = false;
     }
