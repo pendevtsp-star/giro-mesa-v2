@@ -50,6 +50,274 @@ export const managementCashShiftStatus = pgEnum("management_cash_shift_status", 
   "reviewed",
 ]);
 
+export const financialLedgerTransactions = pgTable(
+  "financial_ledger_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: varchar("kind", { length: 24 })
+      .$type<"sale" | "payment" | "refund" | "chargeback" | "adjustment" | "reversal">()
+      .notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("BRL"),
+    referenceType: varchar("reference_type", { length: 48 }).notNull(),
+    referenceId: varchar("reference_id", { length: 160 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    reversalOf: uuid("reversal_of"),
+    debitCents: integer("debit_cents").notNull(),
+    creditCents: integer("credit_cents").notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("financial_ledger_transactions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("financial_ledger_transactions_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("financial_ledger_transactions_reversal_unique")
+      .on(table.organizationId, table.unitId, table.reversalOf)
+      .where(sql`${table.reversalOf} is not null`),
+    index("financial_ledger_transactions_reference_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.referenceType,
+      table.referenceId,
+      table.postedAt,
+    ),
+    foreignKey({
+      name: "financial_ledger_transactions_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "financial_ledger_transactions_reversal_fk",
+      columns: [table.organizationId, table.unitId, table.reversalOf],
+      foreignColumns: [table.organizationId, table.unitId, table.id],
+    }).onDelete("restrict"),
+    check(
+      "financial_ledger_transactions_balanced_check",
+      sql`${table.debitCents} > 0 and ${table.debitCents} = ${table.creditCents}`,
+    ),
+    check("financial_ledger_transactions_currency_check", sql`${table.currency} = 'BRL'`),
+    check(
+      "financial_ledger_transactions_reversal_check",
+      sql`(${table.kind} = 'reversal') = (${table.reversalOf} is not null)`,
+    ),
+  ],
+);
+
+export const financialLedgerEntries = pgTable(
+  "financial_ledger_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    transactionId: uuid("transaction_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    account: varchar("account", { length: 80 }).notNull(),
+    component: varchar("component", { length: 24 }),
+    debitCents: integer("debit_cents").notNull().default(0),
+    creditCents: integer("credit_cents").notNull().default(0),
+    memo: varchar("memo", { length: 240 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("financial_ledger_entries_sequence_unique").on(table.transactionId, table.sequence),
+    foreignKey({
+      name: "financial_ledger_entries_transaction_fk",
+      columns: [table.organizationId, table.unitId, table.transactionId],
+      foreignColumns: [
+        financialLedgerTransactions.organizationId,
+        financialLedgerTransactions.unitId,
+        financialLedgerTransactions.id,
+      ],
+    }).onDelete("restrict"),
+    check("financial_ledger_entries_sequence_check", sql`${table.sequence} >= 0`),
+    check(
+      "financial_ledger_entries_one_side_check",
+      sql`(${table.debitCents} > 0 and ${table.creditCents} = 0) or (${table.creditCents} > 0 and ${table.debitCents} = 0)`,
+    ),
+  ],
+);
+
+export const paymentTerminals = pgTable(
+  "payment_terminals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    adapter: varchar("adapter", { length: 48 }).notNull(),
+    externalReference: varchar("external_reference", { length: 160 }),
+    status: varchar("status", { length: 24 })
+      .$type<"active" | "offline" | "revoked">()
+      .notNull()
+      .default("active"),
+    capabilities: jsonb("capabilities").$type<string[]>().notNull().default([]),
+    pairedAt: timestamp("paired_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("payment_terminals_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("payment_terminals_external_unique")
+      .on(table.organizationId, table.unitId, table.adapter, table.externalReference)
+      .where(sql`${table.externalReference} is not null`),
+    foreignKey({
+      name: "payment_terminals_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const paymentIntents = pgTable(
+  "payment_intents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sourceType: varchar("source_type", { length: 48 }).notNull(),
+    sourceId: varchar("source_id", { length: 160 }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    capturedCents: integer("captured_cents").notNull().default(0),
+    currency: varchar("currency", { length: 3 }).notNull().default("BRL"),
+    status: varchar("status", { length: 24 })
+      .$type<"pending" | "partially_paid" | "paid" | "cancelled">()
+      .notNull()
+      .default("pending"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    version: integer("version").notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [
+    unique("payment_intents_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("payment_intents_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "payment_intents_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check(
+      "payment_intents_amount_check",
+      sql`${table.amountCents} > 0 and ${table.capturedCents} >= 0 and ${table.capturedCents} <= ${table.amountCents}`,
+    ),
+    check("payment_intents_currency_check", sql`${table.currency} = 'BRL'`),
+    check("payment_intents_version_check", sql`${table.version} > 0`),
+  ],
+);
+
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    intentId: uuid("intent_id").notNull(),
+    terminalId: uuid("terminal_id"),
+    adapter: varchar("adapter", { length: 48 }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    status: varchar("status", { length: 24 })
+      .$type<
+        | "created"
+        | "processing"
+        | "authorized"
+        | "declined"
+        | "unknown"
+        | "reconciled"
+        | "cancelled"
+      >()
+      .notNull()
+      .default("created"),
+    providerReference: varchar("provider_reference", { length: 160 }),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    reviewRequired: boolean("review_required").notNull().default(false),
+    reviewReason: varchar("review_reason", { length: 240 }),
+    lastLookupAt: timestamp("last_lookup_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [
+    unique("payment_attempts_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("payment_attempts_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("payment_attempts_review_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.reviewRequired,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "payment_attempts_intent_fk",
+      columns: [table.organizationId, table.unitId, table.intentId],
+      foreignColumns: [paymentIntents.organizationId, paymentIntents.unitId, paymentIntents.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "payment_attempts_terminal_fk",
+      columns: [table.organizationId, table.unitId, table.terminalId],
+      foreignColumns: [
+        paymentTerminals.organizationId,
+        paymentTerminals.unitId,
+        paymentTerminals.id,
+      ],
+    }).onDelete("restrict"),
+    check("payment_attempts_amount_check", sql`${table.amountCents} > 0`),
+    check("payment_attempts_version_check", sql`${table.version} > 0`),
+    check(
+      "payment_attempts_review_check",
+      sql`${table.status} <> 'unknown' or (${table.reviewRequired} and ${table.reviewReason} is not null)`,
+    ),
+  ],
+);
+
+export const paymentProviderEvents = pgTable(
+  "payment_provider_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    attemptId: uuid("attempt_id").notNull(),
+    adapter: varchar("adapter", { length: 48 }).notNull(),
+    providerEventId: varchar("provider_event_id", { length: 160 }).notNull(),
+    outcome: varchar("outcome", { length: 24 }).notNull(),
+    safePayload: jsonb("safe_payload").$type<Record<string, unknown>>().notNull().default({}),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("payment_provider_events_provider_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.adapter,
+      table.providerEventId,
+    ),
+    foreignKey({
+      name: "payment_provider_events_attempt_fk",
+      columns: [table.organizationId, table.unitId, table.attemptId],
+      foreignColumns: [paymentAttempts.organizationId, paymentAttempts.unitId, paymentAttempts.id],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const managementSuppliers = pgTable(
   "management_suppliers",
   {
