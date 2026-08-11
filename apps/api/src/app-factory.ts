@@ -5,6 +5,7 @@ import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
+import { MAX_SYNC_HTTP_BODY_BYTES } from "@giromesa/domain";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
@@ -20,7 +21,7 @@ import { RealtimeService } from "./realtime/realtime.service.js";
 export async function createApplication() {
   const adapter = new FastifyAdapter({
     trustProxy: configuredTrustProxy(),
-    bodyLimit: 1_048_576,
+    bodyLimit: MAX_SYNC_HTTP_BODY_BYTES,
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     genReqId: (request: IncomingMessage) => {
       const supplied = request.headers["x-request-id"];

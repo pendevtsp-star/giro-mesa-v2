@@ -1,17 +1,92 @@
 using System.Text.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace GiroMesa.EdgeHub;
 
 public static class SyncEnvelopeLimits
 {
-    public const int MaximumResourcePreconditions = 128;
-    public const int MaximumPriceReferences = 2_048;
-    public const int MaximumPayloadBytes = 65_536;
-    public const int MaximumEventBytes = 950_000;
-    public const int MaximumBatchBytes = 1_000_000;
-    public const int MaximumBatchEvents = 100;
-    public const int MaximumOfflineCommandAgeDays = 30;
+    private static readonly EnvelopeContract Contract = Load();
+
+    public static int MaximumResourcePreconditions => Contract.ResourcePreconditionsMax;
+    public static int MaximumPriceReferences => Contract.PriceReferencesMax;
+    public static int MaximumPayloadBytes => Contract.PayloadBytesMax;
+    public static int MaximumEventBytes => Contract.EventBytesMax;
+    public static int MaximumBatchBytes => Contract.BatchBytesMax;
+    public static int MaximumBatchEvents => Contract.BatchEventsMax;
+    public static int MaximumAcknowledgements => Contract.AcknowledgementsMax;
+    public static int MinimumCommandVersion => Contract.CommandVersionMin;
+    public static int MaximumCommandVersion => Contract.CommandVersionMax;
+    public static int MinimumResourceVersion => Contract.ResourceVersionMin;
+    public static int MaximumResourceVersion => Contract.ResourceVersionMax;
+    public static int MinimumAggregateSequence => Contract.AggregateSequenceMin;
+    public static int MaximumAggregateSequence => Contract.AggregateSequenceMax;
+    public static int MinimumIdempotencyKeyLength => Contract.IdempotencyKeyMin;
+    public static int MaximumIdempotencyKeyLength => Contract.IdempotencyKeyMax;
+    public static int MinimumEventTypeLength => Contract.EventTypeMin;
+    public static int MaximumEventTypeLength => Contract.EventTypeMax;
+    public static int MinimumAggregateTypeLength => Contract.AggregateTypeMin;
+    public static int MaximumAggregateTypeLength => Contract.AggregateTypeMax;
+    public static int MinimumPriceRevisionLength => Contract.PriceRevisionMin;
+    public static int MaximumPriceRevisionLength => Contract.PriceRevisionMax;
+    public static int MinimumPriceTokenLength => Contract.PriceTokenMin;
+    public static int MaximumPriceTokenLength => Contract.PriceTokenMax;
+    public static int MaximumOfflineCommandAgeDays => Contract.OfflineCommandAgeDays;
+    public static int MaximumFutureClockSkewSeconds => Contract.FutureClockSkewSeconds;
+    public static IReadOnlyList<int> ProtocolVersions => Contract.ProtocolVersions;
+    public static IReadOnlyList<string> PriceReferenceKinds => Contract.PriceReferenceKinds;
+    public static bool IsCanonicalUuid(string? value) =>
+        value is not null && CanonicalUuid.IsMatch(value);
+
+    private static EnvelopeContract Load()
+    {
+        using var stream = typeof(SyncEnvelopeLimits).Assembly
+            .GetManifestResourceStream("GiroMesa.SyncEnvelopeContract.json")
+            ?? throw new InvalidOperationException("SYNC_ENVELOPE_CONTRACT_MISSING");
+        return JsonSerializer.Deserialize<EnvelopeContract>(
+            stream,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("SYNC_ENVELOPE_CONTRACT_INVALID");
+    }
+
+    private static readonly Regex CanonicalUuid = new(
+        Contract.UuidPattern,
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private sealed record EnvelopeContract(
+        string UuidPattern,
+        IReadOnlyList<int> ProtocolVersions,
+        IReadOnlyList<string> PriceReferenceKinds,
+        bool TimestampRequiresOffset,
+        int ResourcePreconditionsMax,
+        int PriceReferencesMax,
+        int PayloadBytesMax,
+        int EventBytesMax,
+        int BatchBytesMax,
+        int HttpBodyBytesMax,
+        int BatchEventsMax,
+        int AcknowledgementsMax,
+        int CommandVersionMin,
+        int CommandVersionMax,
+        int ResourceVersionMin,
+        int ResourceVersionMax,
+        int AggregateSequenceMin,
+        int AggregateSequenceMax,
+        int IdempotencyKeyMin,
+        int IdempotencyKeyMax,
+        int EventTypeMin,
+        int EventTypeMax,
+        int AggregateTypeMin,
+        int AggregateTypeMax,
+        int PriceRevisionMin,
+        int PriceRevisionMax,
+        int PriceTokenMin,
+        int PriceTokenMax,
+        int OfflineCommandAgeDays,
+        int FutureClockSkewSeconds,
+        int PriceOccurredAtSkewSeconds,
+        int PriceReferenceValidityDays,
+        int PriceReferenceDeliveryGraceDays);
 }
 
 public sealed record OperationalCommand(
@@ -49,12 +124,13 @@ public sealed record OperationalCommand(
         ValidId(errors, nameof(ActorId), ActorId);
         ValidId(errors, nameof(DeviceId), DeviceId);
 
-        if (Version < 1)
+        if (Version < SyncEnvelopeLimits.MinimumCommandVersion ||
+            Version > SyncEnvelopeLimits.MaximumCommandVersion)
         {
-            errors[nameof(Version)] = ["Version must be greater than zero."];
+            errors[nameof(Version)] = ["Version must be between 1 and 100."];
         }
 
-        if (OccurredAt > DateTimeOffset.UtcNow.AddMinutes(5))
+        if (OccurredAt > DateTimeOffset.UtcNow.AddSeconds(SyncEnvelopeLimits.MaximumFutureClockSkewSeconds))
         {
             errors[nameof(OccurredAt)] = ["OccurredAt cannot be in the future."];
         }
@@ -73,9 +149,17 @@ public sealed record OperationalCommand(
             errors[nameof(Payload)] = ["Payload exceeds 64 KiB."];
         }
 
-        if (IdempotencyKey is not null && (IdempotencyKey.Trim().Length < 8 || IdempotencyKey.Length > 160))
+        if (IdempotencyKey is not null &&
+            (IdempotencyKey.Trim().Length < SyncEnvelopeLimits.MinimumIdempotencyKeyLength ||
+             IdempotencyKey.Trim().Length > SyncEnvelopeLimits.MaximumIdempotencyKeyLength))
         {
             errors[nameof(IdempotencyKey)] = ["IdempotencyKey must contain between 8 and 160 characters."];
+        }
+
+        if (Type.Trim().Length < SyncEnvelopeLimits.MinimumEventTypeLength ||
+            Type.Trim().Length > SyncEnvelopeLimits.MaximumEventTypeLength)
+        {
+            errors[nameof(Type)] = ["Type is outside the supported length."];
         }
 
         return errors;
@@ -91,11 +175,12 @@ public sealed record OperationalCommand(
 
     private static void ValidId(Dictionary<string, string[]> errors, string field, string value)
     {
-        if (!string.IsNullOrWhiteSpace(value) && !Guid.TryParse(value, out _))
+        if (!string.IsNullOrWhiteSpace(value) && !SyncEnvelopeLimits.IsCanonicalUuid(value))
         {
-            errors[field] = ["Must be a UUID."];
+            errors[field] = ["Must be a canonical lowercase RFC 4122 UUID in D format."];
         }
     }
+
 }
 
 public sealed record AcceptedCommand(

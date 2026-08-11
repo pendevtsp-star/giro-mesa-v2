@@ -109,3 +109,45 @@ test("price references reject commands outside validity and tampered revision or
     /PRICE_REFERENCE_INVALID/,
   );
 });
+
+test("price references allow bounded occurredAt skew without extending expiry", () => {
+  const now = new Date("2026-08-03T12:00:00.000Z");
+  assert.equal(
+    verifyPriceReference(
+      token(),
+      { ...expected, occurredAt: "2026-08-01T11:59:59.000Z" },
+      originalKeyring,
+      now,
+    ),
+    2_500,
+  );
+  assert.equal(
+    verifyPriceReference(
+      token(),
+      { ...expected, occurredAt: "2026-08-01T11:55:01.000Z" },
+      originalKeyring,
+      now,
+    ),
+    2_500,
+  );
+  assert.throws(
+    () =>
+      verifyPriceReference(
+        token(),
+        { ...expected, occurredAt: "2026-08-01T11:54:59.000Z" },
+        originalKeyring,
+        now,
+      ),
+    /PRICE_REFERENCE_COMMAND_OUTSIDE_VALIDITY/,
+  );
+  assert.throws(
+    () =>
+      verifyPriceReference(
+        token(),
+        { ...expected, occurredAt: "2026-09-05T12:00:00.000Z" },
+        originalKeyring,
+        new Date("2026-09-05T12:00:01.000Z"),
+      ),
+    /PRICE_REFERENCE_EXPIRED/,
+  );
+});

@@ -1,18 +1,29 @@
-export const MAX_RESOURCE_VERSION = 2_147_483_647;
-export const MAX_AGGREGATE_SEQUENCE = 2_147_483_647;
-export const MAX_SYNC_RESOURCE_PRECONDITIONS = 128;
-export const MAX_SYNC_PRICE_REFERENCES = 2_048;
-export const MAX_SYNC_PAYLOAD_BYTES = 65_536;
-export const MAX_SYNC_EVENT_BYTES = 950_000;
-export const MAX_SYNC_BATCH_BYTES = 1_000_000;
-export const MAX_SYNC_BATCH_EVENTS = 100;
-export const MAX_OFFLINE_COMMAND_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
-export const PRICE_REFERENCE_VALIDITY_MS = 35 * 24 * 60 * 60 * 1_000;
-export const PRICE_REFERENCE_DELIVERY_GRACE_MS = 5 * 24 * 60 * 60 * 1_000;
+import envelopeContract from "./fixtures/sync-envelope-contract.json" with { type: "json" };
+
+export const SYNC_ENVELOPE_CONTRACT = Object.freeze(envelopeContract);
+export const MAX_RESOURCE_VERSION = envelopeContract.resourceVersionMax;
+export const MAX_AGGREGATE_SEQUENCE = envelopeContract.aggregateSequenceMax;
+export const MAX_SYNC_RESOURCE_PRECONDITIONS = envelopeContract.resourcePreconditionsMax;
+export const MAX_SYNC_PRICE_REFERENCES = envelopeContract.priceReferencesMax;
+export const MAX_SYNC_PAYLOAD_BYTES = envelopeContract.payloadBytesMax;
+export const MAX_SYNC_EVENT_BYTES = envelopeContract.eventBytesMax;
+export const MAX_SYNC_BATCH_BYTES = envelopeContract.batchBytesMax;
+export const MAX_SYNC_HTTP_BODY_BYTES = envelopeContract.httpBodyBytesMax;
+export const MAX_SYNC_BATCH_EVENTS = envelopeContract.batchEventsMax;
+export const MAX_SYNC_ACKNOWLEDGEMENTS = envelopeContract.acknowledgementsMax;
+export const MAX_OFFLINE_COMMAND_AGE_MS =
+  envelopeContract.offlineCommandAgeDays * 24 * 60 * 60 * 1_000;
+export const MAX_FUTURE_CLOCK_SKEW_MS = envelopeContract.futureClockSkewSeconds * 1_000;
+export const PRICE_REFERENCE_OCCURRED_AT_SKEW_MS =
+  envelopeContract.priceOccurredAtSkewSeconds * 1_000;
+export const PRICE_REFERENCE_VALIDITY_MS =
+  envelopeContract.priceReferenceValidityDays * 24 * 60 * 60 * 1_000;
+export const PRICE_REFERENCE_DELIVERY_GRACE_MS =
+  envelopeContract.priceReferenceDeliveryGraceDays * 24 * 60 * 60 * 1_000;
 export const PRICE_REFERENCE_KEY_RETENTION_MS =
   PRICE_REFERENCE_VALIDITY_MS + PRICE_REFERENCE_DELIVERY_GRACE_MS;
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern = new RegExp(envelopeContract.uuidPattern);
 const isoTimestampPattern =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -93,13 +104,23 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
   context: TrustedCommandContext,
 ): Readonly<CommandEnvelope<TPayload>> {
   const aggregate = Object.freeze({
-    type: boundedText(input.aggregate.type, "aggregate.type", 1, 80),
+    type: boundedText(
+      input.aggregate.type,
+      "aggregate.type",
+      envelopeContract.aggregateTypeMin,
+      envelopeContract.aggregateTypeMax,
+    ),
     id: requiredUuid(input.aggregate.id, "aggregate.id"),
   });
   const resourcePreconditions = Object.freeze(
     (input.resourcePreconditions ?? []).map((resource) =>
       Object.freeze({
-        type: boundedText(resource.type, "resourcePreconditions.type", 1, 80),
+        type: boundedText(
+          resource.type,
+          "resourcePreconditions.type",
+          envelopeContract.aggregateTypeMin,
+          envelopeContract.aggregateTypeMax,
+        ),
         id: requiredUuid(resource.id, "resourcePreconditions.id"),
         occupancyEpoch: requiredUuid(
           resource.occupancyEpoch,
@@ -127,27 +148,44 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
         priceRevision: boundedText(
           reference.priceRevision,
           "priceReferences.priceRevision",
-          1,
-          100,
+          envelopeContract.priceRevisionMin,
+          envelopeContract.priceRevisionMax,
         ),
-        token: boundedText(reference.token, "priceReferences.token", 32, 2_048),
+        token: boundedText(
+          reference.token,
+          "priceReferences.token",
+          envelopeContract.priceTokenMin,
+          envelopeContract.priceTokenMax,
+        ),
       }),
     ),
   );
   if (priceReferences.length > MAX_SYNC_PRICE_REFERENCES) {
-    throw new TypeError(`priceReferences must contain at most ${MAX_SYNC_PRICE_REFERENCES} entries`);
+    throw new TypeError(
+      `priceReferences must contain at most ${MAX_SYNC_PRICE_REFERENCES} entries`,
+    );
   }
   if (Buffer.byteLength(JSON.stringify(input.payload), "utf8") > MAX_SYNC_PAYLOAD_BYTES) {
     throw new TypeError(`payload must not exceed ${MAX_SYNC_PAYLOAD_BYTES} bytes`);
   }
   const envelope = {
     commandId: requiredUuid(input.commandId, "commandId"),
-    idempotencyKey: boundedText(input.idempotencyKey, "idempotencyKey", 8, 160),
+    idempotencyKey: boundedText(
+      input.idempotencyKey,
+      "idempotencyKey",
+      envelopeContract.idempotencyKeyMin,
+      envelopeContract.idempotencyKeyMax,
+    ),
     organizationId: requiredUuid(context.organizationId, "organizationId"),
     unitId: requiredUuid(context.unitId, "unitId"),
     actorId: requiredUuid(input.actorId, "actorId"),
     deviceId: requiredUuid(input.deviceId, "deviceId"),
-    type: boundedText(input.type, "type", 3, 100),
+    type: boundedText(
+      input.type,
+      "type",
+      envelopeContract.eventTypeMin,
+      envelopeContract.eventTypeMax,
+    ),
     aggregate,
     occupancyEpoch: requiredUuid(input.occupancyEpoch, "occupancyEpoch"),
     resourceVersion: boundedInteger(

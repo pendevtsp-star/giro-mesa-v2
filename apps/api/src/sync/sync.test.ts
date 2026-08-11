@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import {
+  MAX_SYNC_BATCH_BYTES,
+  MAX_SYNC_EVENT_BYTES,
+  MAX_SYNC_PAYLOAD_BYTES,
+  SYNC_ENVELOPE_CONTRACT,
+} from "@giromesa/domain";
+import { orderSchema } from "../pilot-operations/pilot-schemas.js";
+import { createPriceReference } from "./price-reference.js";
 import { stableOperationalId } from "./stable-operational-id.js";
 import { hubSyncKey } from "./sync.controller.js";
 import { normalizeSyncBatch, syncBatchSchema } from "./sync.schemas.js";
@@ -7,6 +15,13 @@ import { canonicalJson, pilotConflictResult, redactOperationalSecrets } from "./
 import { PilotConflictException } from "./sync-pilot.service.js";
 
 describe("edge sync boundaries", () => {
+  it("consumes the shared envelope format fixture", () => {
+    assert.deepEqual(SYNC_ENVELOPE_CONTRACT.protocolVersions, [1, 2]);
+    assert.deepEqual(SYNC_ENVELOPE_CONTRACT.priceReferenceKinds, ["product", "modifier-option"]);
+    assert.equal(SYNC_ENVELOPE_CONTRACT.aggregateSequenceMin, 1);
+    assert.equal(SYNC_ENVELOPE_CONTRACT.aggregateSequenceMax, 2_147_483_647);
+  });
+
   it("canonicalizes JSON for idempotency without depending on property order", () => {
     assert.equal(
       canonicalJson({ b: 2, a: { d: 4, c: 3 } }),
@@ -85,6 +100,66 @@ describe("edge sync boundaries", () => {
     });
     assert.equal(current.events[0]?.commandId, id);
     assert.equal(current.events[0]?.aggregate.type, "tab");
+    assert.equal(
+      syncBatchSchema.safeParse({
+        protocolVersion: 1,
+        hubVersion: "1.9.0",
+        events: [
+          {
+            id: `{${id}}`,
+            actorId,
+            deviceId,
+            idempotencyKey: "legacy-command-1",
+            type: "order.created",
+            payload: {},
+            version: 1,
+            occurredAt,
+          },
+        ],
+      }).success,
+      false,
+    );
+    assert.equal(
+      syncBatchSchema.safeParse({
+        protocolVersion: 1,
+        hubVersion: "1.9.0",
+        events: [
+          {
+            id,
+            actorId,
+            deviceId,
+            idempotencyKey: "legacy-command-1",
+            type: "order.created",
+            payload: {},
+            version: 101,
+            occurredAt,
+          },
+        ],
+      }).success,
+      false,
+    );
+    assert.equal(
+      syncBatchSchema.safeParse({
+        protocolVersion: 2,
+        hubVersion: "2.0.0",
+        events: [
+          {
+            commandId: id,
+            actorId,
+            deviceId,
+            idempotencyKey: "ordered-command-1",
+            type: "order.item_added",
+            payload: {},
+            aggregate: current.events[0]?.aggregate,
+            occupancyEpoch: current.events[0]?.occupancyEpoch,
+            resourceVersion: 0,
+            aggregateSequence: 0,
+            occurredAt,
+          },
+        ],
+      }).success,
+      false,
+    );
     assert.equal(
       syncBatchSchema.safeParse({
         protocolVersion: 2,
@@ -232,7 +307,7 @@ describe("edge sync boundaries", () => {
         events: [
           {
             ...event,
-            priceReferences: Array.from({ length: 470 }, (_, index) => ({
+            priceReferences: Array.from({ length: 900 }, (_, index) => ({
               kind: "product" as const,
               entityId: crypto.randomUUID(),
               priceRevision: `revision-${index}`,
@@ -243,6 +318,109 @@ describe("edge sync boundaries", () => {
       }).success,
       false,
     );
+  });
+
+  it("uploads the reviewer 16x100 order and generated near-worst valid event", () => {
+    const keyring = {
+      activeVersion: "k".repeat(32),
+      keys: new Map([["k".repeat(32), Buffer.alloc(32, 9)]]),
+    };
+    const makeItem = () => ({
+      productId: crypto.randomUUID(),
+      quantity: 1,
+      modifierOptionIds: Array.from({ length: 100 }, () => crypto.randomUUID()),
+    });
+    const reviewerItems = Array.from({ length: 16 }, makeItem);
+    const payloadFor = (items: typeof reviewerItems) => ({
+      kind: "pilot.mutation",
+      action: "create-order",
+      data: { tabId: crypto.randomUUID(), body: { items } },
+    });
+    const reviewerPayload = payloadFor(reviewerItems);
+    assert.equal(orderSchema.safeParse(reviewerPayload.data.body).success, true);
+    assert.ok(Buffer.byteLength(JSON.stringify(reviewerPayload), "utf8") <= MAX_SYNC_PAYLOAD_BYTES);
+
+    const generatedItems: typeof reviewerItems = [];
+    while (generatedItems.length < 500) {
+      const next = makeItem();
+      const candidate = [...generatedItems, next];
+      if (Buffer.byteLength(JSON.stringify(payloadFor(candidate)), "utf8") > MAX_SYNC_PAYLOAD_BYTES)
+        break;
+      generatedItems.push(next);
+    }
+    assert.equal(generatedItems.length, 16);
+    const generatedPayload = payloadFor(generatedItems);
+    assert.equal(orderSchema.safeParse(generatedPayload.data.body).success, true);
+    const tabId = generatedPayload.data.tabId;
+    const occupancyEpoch = crypto.randomUUID();
+    const revision = "2026-08-10T12:00:00.000Z";
+    const issuedAt = new Date("2026-08-10T12:00:00.000Z");
+    const references = generatedItems.flatMap((item) => [
+      {
+        kind: "product" as const,
+        entityId: item.productId,
+        priceRevision: revision,
+        token: createPriceReference(
+          {
+            kind: "product",
+            entityId: item.productId,
+            organizationId: crypto.randomUUID(),
+            unitId: crypto.randomUUID(),
+            priceCents: 2_500,
+            priceRevision: revision,
+          },
+          keyring,
+          issuedAt,
+        ),
+      },
+      ...item.modifierOptionIds.map((entityId) => ({
+        kind: "modifier-option" as const,
+        entityId,
+        priceRevision: revision,
+        token: createPriceReference(
+          {
+            kind: "modifier-option",
+            entityId,
+            organizationId: crypto.randomUUID(),
+            unitId: crypto.randomUUID(),
+            priceCents: 100,
+            priceRevision: revision,
+          },
+          keyring,
+          issuedAt,
+        ),
+      })),
+    ]);
+    assert.equal(references.length, 1_616);
+    const event = {
+      commandId: crypto.randomUUID(),
+      actorId: crypto.randomUUID(),
+      deviceId: crypto.randomUUID(),
+      idempotencyKey: "near-worst-valid-order",
+      type: "pos.order.create_requested",
+      payload: generatedPayload,
+      aggregate: { type: "tab", id: tabId },
+      occupancyEpoch,
+      resourceVersion: 1,
+      aggregateSequence: 1,
+      resourcePreconditions: [
+        {
+          type: "tab",
+          id: tabId,
+          occupancyEpoch,
+          resourceVersion: 1,
+        },
+      ],
+      priceReferences: references,
+      occurredAt: new Date().toISOString(),
+    };
+    const eventBytes = Buffer.byteLength(JSON.stringify(event), "utf8");
+    const batch = { protocolVersion: 2 as const, hubVersion: "2.1.0", events: [event] };
+    assert.ok(eventBytes < MAX_SYNC_EVENT_BYTES);
+    assert.ok(eventBytes <= MAX_SYNC_EVENT_BYTES - 250_000);
+    assert.ok(Buffer.byteLength(JSON.stringify(batch), "utf8") < MAX_SYNC_BATCH_BYTES);
+    assert.equal(syncBatchSchema.safeParse(batch).success, true);
+    assert.equal(SYNC_ENVELOPE_CONTRACT.eventBytesMax, MAX_SYNC_EVENT_BYTES);
   });
 
   it("accepts only the dedicated authorization scheme", () => {

@@ -1,15 +1,19 @@
 import {
+  MAX_FUTURE_CLOCK_SKEW_MS,
   MAX_OFFLINE_COMMAND_AGE_MS,
+  MAX_SYNC_ACKNOWLEDGEMENTS,
   MAX_SYNC_BATCH_BYTES,
   MAX_SYNC_BATCH_EVENTS,
   MAX_SYNC_EVENT_BYTES,
   MAX_SYNC_PAYLOAD_BYTES,
   MAX_SYNC_PRICE_REFERENCES,
   MAX_SYNC_RESOURCE_PRECONDITIONS,
+  SYNC_ENVELOPE_CONTRACT,
 } from "@giromesa/domain";
 import { z } from "zod";
 
-const maximumInteger = 2_147_483_647;
+const contract = SYNC_ENVELOPE_CONTRACT;
+const canonicalUuid = z.string().regex(new RegExp(contract.uuidPattern));
 
 const boundedJson = z
   .record(z.string(), z.unknown())
@@ -21,41 +25,51 @@ const boundedJson = z
 const edgeTimestamp = z.iso.datetime({ offset: true }).refine((value) => {
   const timestamp = new Date(value).getTime();
   const now = Date.now();
-  return timestamp >= now - MAX_OFFLINE_COMMAND_AGE_MS && timestamp <= now + 5 * 60 * 1000;
+  return (
+    timestamp >= now - MAX_OFFLINE_COMMAND_AGE_MS && timestamp <= now + MAX_FUTURE_CLOCK_SKEW_MS
+  );
 }, "Timestamp is outside the accepted clock window.");
 
 const eventBase = {
-  actorId: z.uuid(),
-  deviceId: z.uuid(),
-  idempotencyKey: z.string().trim().min(8).max(160),
-  type: z.string().trim().min(3).max(100),
+  actorId: canonicalUuid,
+  deviceId: canonicalUuid,
+  idempotencyKey: z.string().trim().min(contract.idempotencyKeyMin).max(contract.idempotencyKeyMax),
+  type: z.string().trim().min(contract.eventTypeMin).max(contract.eventTypeMax),
   payload: boundedJson,
   occurredAt: edgeTimestamp,
 };
 
 const resourcePreconditionSchema = z
   .object({
-    type: z.string().trim().min(1).max(80),
-    id: z.uuid(),
-    occupancyEpoch: z.uuid(),
-    resourceVersion: z.number().int().nonnegative().max(maximumInteger),
+    type: z.string().trim().min(contract.aggregateTypeMin).max(contract.aggregateTypeMax),
+    id: canonicalUuid,
+    occupancyEpoch: canonicalUuid,
+    resourceVersion: z
+      .number()
+      .int()
+      .min(contract.resourceVersionMin)
+      .max(contract.resourceVersionMax),
   })
   .strict();
 
 const priceReferenceSchema = z
   .object({
-    kind: z.enum(["product", "modifier-option"]),
-    entityId: z.uuid(),
-    priceRevision: z.string().trim().min(1).max(100),
-    token: z.string().trim().min(32).max(2_048),
+    kind: z
+      .string()
+      .refine((value): value is "product" | "modifier-option" =>
+        contract.priceReferenceKinds.includes(value),
+      ),
+    entityId: canonicalUuid,
+    priceRevision: z.string().trim().min(contract.priceRevisionMin).max(contract.priceRevisionMax),
+    token: z.string().trim().min(contract.priceTokenMin).max(contract.priceTokenMax),
   })
   .strict();
 
 export const legacySyncEventSchema = z
   .object({
-    id: z.uuid(),
+    id: canonicalUuid,
     ...eventBase,
-    version: z.number().int().positive().max(100),
+    version: z.number().int().min(contract.commandVersionMin).max(contract.commandVersionMax),
   })
   .strict()
   .refine(
@@ -65,12 +79,25 @@ export const legacySyncEventSchema = z
 
 export const syncEventSchema = z
   .object({
-    commandId: z.uuid(),
+    commandId: canonicalUuid,
     ...eventBase,
-    aggregate: z.object({ type: z.string().trim().min(1).max(80), id: z.uuid() }).strict(),
-    occupancyEpoch: z.uuid(),
-    resourceVersion: z.number().int().nonnegative().max(maximumInteger),
-    aggregateSequence: z.number().int().positive().max(maximumInteger),
+    aggregate: z
+      .object({
+        type: z.string().trim().min(contract.aggregateTypeMin).max(contract.aggregateTypeMax),
+        id: canonicalUuid,
+      })
+      .strict(),
+    occupancyEpoch: canonicalUuid,
+    resourceVersion: z
+      .number()
+      .int()
+      .min(contract.resourceVersionMin)
+      .max(contract.resourceVersionMax),
+    aggregateSequence: z
+      .number()
+      .int()
+      .min(contract.aggregateSequenceMin)
+      .max(contract.aggregateSequenceMax),
     resourcePreconditions: z
       .array(resourcePreconditionSchema)
       .max(MAX_SYNC_RESOURCE_PRECONDITIONS)
@@ -134,7 +161,7 @@ const syncBatchBase = {
     .record(z.string().max(64), z.unknown())
     .refine((value) => Buffer.byteLength(JSON.stringify(value), "utf8") <= 4_096)
     .default({}),
-  acknowledgedCommandIds: z.array(z.uuid()).max(100).default([]),
+  acknowledgedCommandIds: z.array(canonicalUuid).max(MAX_SYNC_ACKNOWLEDGEMENTS).default([]),
 };
 
 const legacySyncBatchSchema = z

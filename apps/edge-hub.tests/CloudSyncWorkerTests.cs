@@ -150,6 +150,68 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                     new ResourcePrecondition("table", Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), 1))).ToArray(),
                 primaryId,
                 [])));
+        Assert.Equal(1_750_000, SyncEnvelopeLimits.MaximumEventBytes);
+        Assert.Equal(2_000_000, SyncEnvelopeLimits.MaximumBatchBytes);
+        Assert.Equal(2_048, SyncEnvelopeLimits.MaximumPriceReferences);
+        Assert.Equal([1, 2], SyncEnvelopeLimits.ProtocolVersions);
+        Assert.Equal(["product", "modifier-option"], SyncEnvelopeLimits.PriceReferenceKinds);
+    }
+
+    [Fact]
+    public void RejectsBraceGuidVersion101AndSequenceZeroBeforeUpload()
+    {
+        var primaryId = Guid.NewGuid().ToString();
+        var resources = new[]
+        {
+            new ResourcePrecondition("tab", primaryId, Guid.NewGuid().ToString(), 1),
+        };
+        var valid = OrderedPending(resources, primaryId, []);
+        Assert.Throws<LocalEnvelopeException>(() => CloudSyncWorker.CreateOutboundEvent(
+            valid with { Id = $"{{{valid.Id}}}" }));
+        Assert.Throws<LocalEnvelopeException>(() => CloudSyncWorker.CreateOutboundEvent(
+            valid with { Version = 101 }));
+        Assert.Throws<LocalEnvelopeException>(() => CloudSyncWorker.CreateOutboundEvent(
+            valid with { AggregateSequence = 0 }));
+    }
+
+    [Fact]
+    public async Task UploadsReviewer16x100AndGeneratedNearWorstEventsInSeparateBoundedBatches()
+    {
+        var options = Options.Create(new HubOptions
+        {
+            DataDirectory = _directory,
+            DatabaseKey = "test-database-key-32-characters-long",
+            CloudApiBaseUrl = "https://cloud.example",
+            CloudSyncKey = "cloud-sync-secret",
+        });
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var reviewer = ValidCommand();
+        var generated = ValidCommand();
+        await store.AcceptCommandAsync(reviewer);
+        await store.AcceptCommandAsync(generated);
+        var reviewerOrder = BuildLargeOrder(16);
+        var generatedOrder = BuildNearWorstOrder();
+        Assert.Equal(16, reviewerOrder.ItemCount);
+        Assert.Equal(16, generatedOrder.ItemCount);
+        Assert.Equal(1_616, reviewerOrder.References.Count);
+        Assert.True(Encoding.UTF8.GetByteCount(reviewerOrder.Payload) <= SyncEnvelopeLimits.MaximumPayloadBytes);
+        await PromoteToLargeV2Async(options.Value, reviewer.Id, reviewerOrder, 1);
+        await PromoteToLargeV2Async(options.Value, generated.Id, generatedOrder, 2);
+        var handler = new AcceptEveryEventHandler();
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(new[] { reviewer.Id, generated.Id }.Order().ToArray(), handler.UploadedIds.Order().ToArray());
+        Assert.Equal("idle", worker.Status);
+        Assert.Empty(await store.GetPendingAsync(10));
+        Assert.Empty(await store.GetReconciliationAsync(10));
     }
 
     [Fact]
@@ -206,6 +268,72 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.Contains(reconciliation, item =>
             item.Id == oversized.Id && item.Reason == "LOCAL_ENVELOPE_LIMIT_EXCEEDED");
         Assert.Empty(await store.GetPendingAsync(10));
+    }
+
+    [Fact]
+    public async Task BisectsHiddenCloudSchema400AndUploadsValidSibling()
+    {
+        var options = Options.Create(new HubOptions
+        {
+            DataDirectory = _directory,
+            DatabaseKey = "test-database-key-32-characters-long",
+            CloudApiBaseUrl = "https://cloud.example",
+            CloudSyncKey = "cloud-sync-secret",
+        });
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var hiddenInvalid = ValidCommand();
+        var valid = ValidCommand();
+        await store.AcceptCommandAsync(hiddenInvalid);
+        await store.AcceptCommandAsync(valid);
+        await PromoteToLargeV2Async(options.Value, hiddenInvalid.Id, BuildLargeOrder(1), 1);
+        await PromoteToLargeV2Async(options.Value, valid.Id, BuildLargeOrder(1), 1);
+        var handler = new HiddenSchemaHandler(hiddenInvalid.Id);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(3, handler.CallCount);
+        Assert.Equal([valid.Id], handler.UploadedIds);
+        Assert.Equal("reconciling", worker.Status);
+        Assert.Contains(await store.GetReconciliationAsync(10), item =>
+            item.Id == hiddenInvalid.Id && item.Reason == "CLOUD_ENVELOPE_REJECTED");
+        Assert.Empty(await store.GetPendingAsync(10));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task DoesNotBisectNonSchemaFailures(HttpStatusCode statusCode)
+    {
+        var options = Options.Create(new HubOptions
+        {
+            DataDirectory = _directory,
+            DatabaseKey = "test-database-key-32-characters-long",
+            CloudApiBaseUrl = "https://cloud.example",
+            CloudSyncKey = "cloud-sync-secret",
+        });
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        await store.AcceptCommandAsync(ValidCommand());
+        await store.AcceptCommandAsync(ValidCommand());
+        var handler = new FixedFailureHandler(statusCode);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal("offline", worker.Status);
+        Assert.Equal(2, (await store.GetPendingAsync(10)).Count);
     }
 
     [Fact]
@@ -279,6 +407,106 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             references,
             primaryId);
 
+    private static LargeOrder BuildLargeOrder(int itemCount)
+    {
+        var items = Enumerable.Range(0, itemCount).Select(_ => NewLargeItem()).ToArray();
+        return CompleteLargeOrder(items);
+    }
+
+    private static LargeOrder BuildNearWorstOrder()
+    {
+        var items = new List<LargeItem>();
+        while (items.Count < 500)
+        {
+            var next = NewLargeItem();
+            var candidate = items.Append(next).ToArray();
+            var payload = SerializeOrderPayload(Guid.NewGuid().ToString(), candidate);
+            if (Encoding.UTF8.GetByteCount(payload) > SyncEnvelopeLimits.MaximumPayloadBytes) break;
+            items.Add(next);
+        }
+        return CompleteLargeOrder(items);
+    }
+
+    private static LargeItem NewLargeItem() => new(
+        Guid.NewGuid().ToString(),
+        1,
+        Enumerable.Range(0, 100).Select(_ => Guid.NewGuid().ToString()).ToArray());
+
+    private static LargeOrder CompleteLargeOrder(IReadOnlyList<LargeItem> items)
+    {
+        var tabId = Guid.NewGuid().ToString();
+        var payload = SerializeOrderPayload(tabId, items);
+        var references = items.SelectMany(item =>
+            new[] { PriceReferenceFor("product", item.ProductId) }
+                .Concat(item.ModifierOptionIds.Select(id => PriceReferenceFor("modifier-option", id))))
+            .ToArray();
+        return new(tabId, payload, references, items.Count);
+    }
+
+    private static string SerializeOrderPayload(string tabId, IReadOnlyList<LargeItem> items) =>
+        JsonSerializer.Serialize(
+            new
+            {
+                kind = "pilot.mutation",
+                action = "create-order",
+                data = new { tabId, body = new { items } },
+            },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    private static PriceReference PriceReferenceFor(string kind, string entityId)
+    {
+        const string revision = "2026-08-10T12:00:00.000Z";
+        var material = JsonSerializer.Serialize(
+            new
+            {
+                kind,
+                entityId,
+                organizationId = ValidOrganizationId,
+                unitId = ValidUnitId,
+                priceCents = 2_500,
+                priceRevision = revision,
+                issuedAt = "2026-08-10T12:00:00.000Z",
+                expiresAt = "2026-09-14T12:00:00.000Z",
+                keyVersion = new string('k', 32),
+            },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(material))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        return new(kind, entityId, revision, $"{encoded}.{new string('s', 43)}");
+    }
+
+    private static async Task PromoteToLargeV2Async(
+        HubOptions options,
+        string eventId,
+        LargeOrder order,
+        int sequence)
+    {
+        var epoch = Guid.NewGuid().ToString();
+        var resources = JsonSerializer.Serialize(new[]
+        {
+            new ResourcePrecondition("tab", order.TabId, epoch, 1),
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var references = JsonSerializer.Serialize(
+            order.References,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        await using var connection = OpenConnection(options);
+        await connection.OpenAsync();
+        var update = connection.CreateCommand();
+        update.CommandText = """
+            UPDATE operational_events SET protocol_version = 2, type = 'pos.order.create_requested',
+              resource_preconditions = $resources, aggregate_sequence = $sequence,
+              primary_resource_id = $primary, price_references = $references, payload = $payload
+            WHERE id = $id;
+            """;
+        update.Parameters.AddWithValue("$resources", resources);
+        update.Parameters.AddWithValue("$sequence", sequence);
+        update.Parameters.AddWithValue("$primary", order.TabId);
+        update.Parameters.AddWithValue("$references", references);
+        update.Parameters.AddWithValue("$payload", order.Payload);
+        update.Parameters.AddWithValue("$id", eventId);
+        await update.ExecuteNonQueryAsync();
+    }
+
     private static SqliteConnection OpenConnection(HubOptions options)
     {
         var path = Path.Combine(Path.GetFullPath(options.DataDirectory), "giromesa-edge.db").Replace('\\', '/');
@@ -290,6 +518,17 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             Pooling = false,
         }.ToString());
     }
+
+    private sealed record LargeItem(
+        string ProductId,
+        int Quantity,
+        IReadOnlyList<string> ModifierOptionIds);
+
+    private sealed record LargeOrder(
+        string TabId,
+        string Payload,
+        IReadOnlyList<PriceReference> References,
+        int ItemCount);
 
     private sealed class SyncHandler(HubStore store, string eventId, string cloudCommandId)
         : HttpMessageHandler
@@ -464,4 +703,82 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             };
         }
     }
+
+    private sealed class AcceptEveryEventHandler : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+        public List<string> UploadedIds { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var ids = body.RootElement.GetProperty("events").EnumerateArray()
+                .Select(item => item.GetProperty("commandId").GetString()!)
+                .ToArray();
+            Assert.Single(ids);
+            UploadedIds.AddRange(ids);
+            return JsonResponse(HttpStatusCode.OK, new
+            {
+                acceptedEventIds = ids,
+                rejectedEvents = Array.Empty<object>(),
+                commands = Array.Empty<object>(),
+                serverTime = DateTimeOffset.UtcNow,
+            });
+        }
+    }
+
+    private sealed class HiddenSchemaHandler(string hiddenId) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+        public List<string> UploadedIds { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var ids = body.RootElement.GetProperty("events").EnumerateArray()
+                .Select(item => item.TryGetProperty("commandId", out var commandId)
+                    ? commandId.GetString()!
+                    : item.GetProperty("id").GetString()!)
+                .ToArray();
+            if (ids.Contains(hiddenId))
+                return JsonResponse(ids.Length == 1
+                    ? HttpStatusCode.UnprocessableEntity
+                    : HttpStatusCode.BadRequest, new { code = "HIDDEN_SCHEMA_RULE" });
+            UploadedIds.AddRange(ids);
+            return JsonResponse(HttpStatusCode.OK, new
+            {
+                acceptedEventIds = ids,
+                rejectedEvents = Array.Empty<object>(),
+                commands = Array.Empty<object>(),
+                serverTime = DateTimeOffset.UtcNow,
+            });
+        }
+    }
+
+    private sealed class FixedFailureHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            return Task.FromResult(JsonResponse(statusCode, new { code = "FAILURE" }));
+        }
+    }
+
+    private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, object value) => new(statusCode)
+    {
+        Content = new StringContent(
+            JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json"),
+    };
 }

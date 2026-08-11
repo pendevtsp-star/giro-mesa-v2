@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { PRICE_REFERENCE_VALIDITY_MS } from "@giromesa/domain";
+import { PRICE_REFERENCE_OCCURRED_AT_SKEW_MS, PRICE_REFERENCE_VALIDITY_MS } from "@giromesa/domain";
 import { canonicalJson } from "./canonical-json.js";
 import {
   type CommandFingerprintKeyring,
@@ -97,7 +97,7 @@ export function verifyPriceReference(
     throw new Error("PRICE_REFERENCE_INVALID");
   if (now.getTime() < issuedAt) throw new Error("PRICE_REFERENCE_NOT_YET_VALID");
   if (now.getTime() > expiresAt) throw new Error("PRICE_REFERENCE_EXPIRED");
-  if (occurredAt < issuedAt || occurredAt > expiresAt)
+  if (occurredAt < issuedAt - PRICE_REFERENCE_OCCURRED_AT_SKEW_MS || occurredAt > expiresAt)
     throw new Error("PRICE_REFERENCE_COMMAND_OUTSIDE_VALIDITY");
   return material.priceCents;
 }
