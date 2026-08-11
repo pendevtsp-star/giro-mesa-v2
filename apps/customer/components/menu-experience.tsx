@@ -22,6 +22,7 @@ import {
   readPublicOrderOptions,
   readPublicOrderReceipt,
 } from "../lib/public-order";
+import { withCustomerPwaMutation } from "./pwa-client";
 
 type HubState = "checking" | "online" | "offline";
 type Notice = { tone: "success" | "warning"; text: string } | null;
@@ -238,24 +239,31 @@ export function MenuExperience({
     if (!apiUrl || !apiEnabled) return false;
     setPendingCommand(type);
     try {
-      const response = await fetch(
-        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-          body: JSON.stringify({ type, payload }),
-        },
-      );
-      const result: unknown = await response.json();
-      if (!response.ok || !isCommandAccepted(result)) throw new Error("Sem confirmação do hub");
-      setNotice({
-        tone: "success",
-        text:
-          type === "call_waiter"
-            ? "A equipe recebeu o chamado da mesa."
-            : "A operação recebeu o pedido da conta.",
+      return await withCustomerPwaMutation(async () => {
+        const response = await fetch(
+          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": crypto.randomUUID(),
+            },
+            body: JSON.stringify({ type, payload }),
+          },
+        );
+        const result: unknown = await response.json();
+        if (!response.ok || !isCommandAccepted(result)) {
+          throw new Error("Sem confirmação do hub");
+        }
+        setNotice({
+          tone: "success",
+          text:
+            type === "call_waiter"
+              ? "A equipe recebeu o chamado da mesa."
+              : "A operação recebeu o pedido da conta.",
+        });
+        return true;
       });
-      return true;
     } catch {
       setHub("offline");
       setNotice({
@@ -310,22 +318,24 @@ export function MenuExperience({
     setOrderAttempt(attempt);
     setPendingCommand("public_order");
     try {
-      const response = await fetch(
-        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/orders`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
-          body: serialized,
-        },
-      );
-      const payload: unknown = await response.json();
-      const receipt = readPublicOrderReceipt(payload);
-      if (!response.ok || !receipt) throw new Error("Pedido sem confirmação persistida");
-      setOrderReceipt(receipt);
-      setCart([]);
-      setNotice({
-        tone: "success",
-        text: `Pedido ${receipt.protocol} registrado. Pagamento aguardando retirada ou entrega.`,
+      await withCustomerPwaMutation(async () => {
+        const response = await fetch(
+          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/orders`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
+            body: serialized,
+          },
+        );
+        const payload: unknown = await response.json();
+        const receipt = readPublicOrderReceipt(payload);
+        if (!response.ok || !receipt) throw new Error("Pedido sem confirmação persistida");
+        setOrderReceipt(receipt);
+        setCart([]);
+        setNotice({
+          tone: "success",
+          text: `Pedido ${receipt.protocol} registrado. Pagamento aguardando retirada ou entrega.`,
+        });
       });
     } catch {
       setNotice({

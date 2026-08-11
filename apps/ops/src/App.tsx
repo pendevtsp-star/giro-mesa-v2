@@ -65,6 +65,7 @@ import {
 } from "./operational-dispatch";
 import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./operations";
 import { RealPlatformPage } from "./platform";
+import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { parseRoute, routeHref } from "./router";
 import {
@@ -208,6 +209,7 @@ export function App() {
       () => {
         setSession(null);
         setScopeSource(null);
+        void clearPwaRuntimeState();
       },
       session?.demo ? undefined : () => api.logout(),
     );
@@ -966,13 +968,15 @@ function OperationalApp({
       if (replaying) return;
       replaying = true;
       setSyncState("syncing");
-      const remaining = await replayOperationalQueue(
-        {
-          organizationId: session.organizationId,
-          unitId: session.unitId,
-          actorId: session.identityId,
-        },
-        runtime,
+      const remaining = await withPwaMutation(() =>
+        replayOperationalQueue(
+          {
+            organizationId: session.organizationId,
+            unitId: session.unitId,
+            actorId: session.identityId,
+          },
+          runtime,
+        ),
       );
       replaying = false;
       if (cancelled) return;
@@ -1002,17 +1006,19 @@ function OperationalApp({
   const dispatchPilot = useCallback<PilotDispatcher>(
     async (type, payload, execute) => {
       try {
-        const result = await dispatchOperationalMutation({
-          scope: {
-            organizationId: session.organizationId,
-            unitId: session.unitId,
-            actorId: session.identityId,
-          },
-          runtime,
-          type,
-          payload,
-          execute,
-        });
+        const result = await withPwaMutation(() =>
+          dispatchOperationalMutation({
+            scope: {
+              organizationId: session.organizationId,
+              unitId: session.unitId,
+              actorId: session.identityId,
+            },
+            runtime,
+            type,
+            payload,
+            execute,
+          }),
+        );
         setRuntimeError(null);
         return result;
       } catch (error) {
@@ -1047,11 +1053,8 @@ function OperationalApp({
         return;
       }
       if (runtime.embedded) {
-        const result = await sendShellCommand(
-          session.organizationId,
-          session.unitId,
-          session.identityId,
-          command,
+        const result = await withPwaMutation(() =>
+          sendShellCommand(session.organizationId, session.unitId, session.identityId, command),
         );
         if (!result?.success) {
           setQueuedCommands(enqueueCommand(command));

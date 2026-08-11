@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="GiroMesa">
+  <rect width="192" height="192" rx="44" fill="#163f35"/>
+  <path d="M143 57c-12-15-29-23-49-23-36 0-64 27-64 63 0 35 27 62 63 62 20 0 38-7 52-21v-45H92v25h25v8c-6 4-14 6-23 6-20 0-36-15-36-36s16-36 37-36c12 0 22 4 31 13l17-16Z" fill="#c6f34d"/>
+  <path d="M67 82h55" stroke="#fffdf7" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+</svg>
+

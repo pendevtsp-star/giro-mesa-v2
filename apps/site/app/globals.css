@@ -48,6 +48,56 @@ summary:focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 3px;
 }
+.pwa-connectivity,
+.pwa-update {
+  position: fixed;
+  z-index: 180;
+  left: 50%;
+  bottom: 18px;
+  width: min(720px, calc(100% - 28px));
+  transform: translateX(-50%);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(13, 48, 40, 0.2);
+}
+.pwa-connectivity {
+  padding: 13px 16px;
+  background: #fff0dc;
+  color: #713712;
+}
+.pwa-update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--forest-2);
+  color: #fff;
+}
+.pwa-update > div {
+  display: grid;
+}
+.pwa-update span {
+  color: #d8e7e0;
+  font-size: 12px;
+}
+.pwa-update button {
+  min-height: 44px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lime);
+  color: var(--forest-2);
+  font-weight: 800;
+  cursor: pointer;
+}
+.pwa-update button:last-child {
+  background: transparent;
+  color: #fff;
+}
+.pwa-update button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
 .container {
   width: min(1180px, calc(100% - 40px));
   margin-inline: auto;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Footer } from "../components/footer";
 import { Header } from "../components/header";
+import { PwaClient } from "../components/pwa-client";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Header />
         {children}
         <Footer />
+        <PwaClient />
         <a
           className="whatsapp"
           href={whatsappHref}
