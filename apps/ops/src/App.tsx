@@ -71,6 +71,7 @@ import {
   loadOperationalResource,
   type PilotDispatcher,
   type PilotLoader,
+  pendingKdsAcknowledgementCount,
   replayOperationalQueue,
 } from "./operational-dispatch";
 import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./operations";
@@ -913,7 +914,7 @@ function OperationalApp({
 
   useEffect(() => {
     try {
-      setQueuedCommands(queuedCommandCount());
+      setQueuedCommands(queuedCommandCount() + pendingKdsAcknowledgementCount());
       return connectShell(setRuntime);
     } catch {
       setRuntimeError(
@@ -960,11 +961,14 @@ function OperationalApp({
   }, [session.demo, session.organizationId, session.platformAdmin, session.unitId]);
 
   useEffect(() => {
-    if (session.demo || session.platformAdmin || queuedCommands === 0) return undefined;
+    if (session.demo || session.platformAdmin || (!runtime.embedded && queuedCommands === 0))
+      return undefined;
     let cancelled = false;
     let replaying = false;
     const replay = async () => {
       if (replaying) return;
+      const pending = queuedCommandCount() + pendingKdsAcknowledgementCount();
+      if (pending === 0) return;
       replaying = true;
       setSyncState("syncing");
       const replay = () =>
@@ -1021,7 +1025,7 @@ function OperationalApp({
         setRuntimeError(null);
         return result;
       } catch (error) {
-        const count = queuedCommandCount();
+        const count = queuedCommandCount() + pendingKdsAcknowledgementCount();
         setQueuedCommands(count);
         if (count > 0) {
           setSyncState("offline");
@@ -1281,6 +1285,7 @@ function OperationalApp({
             profile={session.profile}
             route={route}
             refreshToken={scopeRevision}
+            runtime={runtime}
             session={session}
             setTables={setTables}
             setTickets={setTickets}
@@ -1393,6 +1398,7 @@ function PageContent({
   loadPilot,
   route,
   refreshToken,
+  runtime,
   session,
   profile,
   tables,
@@ -1407,6 +1413,7 @@ function PageContent({
   loadPilot: PilotLoader;
   route: RouteId;
   refreshToken: number;
+  runtime: DeviceContext;
   session: Session;
   profile: Profile;
   tables: DiningTable[];
@@ -1426,6 +1433,7 @@ function PageContent({
   const pilotScope = {
     ...managementScope,
     membershipId: session.membershipId,
+    runtime,
     dispatch: dispatchPilot,
     load: loadPilot,
   };

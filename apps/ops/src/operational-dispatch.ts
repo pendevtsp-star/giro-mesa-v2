@@ -1,6 +1,11 @@
 import type { OperationalCommandInput } from "@giromesa/contracts";
 import { ApiClientError, api } from "./api";
-import { type DeviceContext, loadShellOperationalState, sendShellCommand } from "./bridge";
+import {
+  acknowledgeShellKdsDispatch,
+  type DeviceContext,
+  loadShellOperationalState,
+  sendShellCommand,
+} from "./bridge";
 import { createCommand, enqueueCommand, queuedCommands, removeQueuedCommand } from "./commands";
 
 export interface OperationalScope {
@@ -59,6 +64,88 @@ export class RejectedOperationalMutationError extends Error {
     this.name = "RejectedOperationalMutationError";
     this.code = code;
   }
+}
+
+export class QueuedKdsAcknowledgementError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super(`O ACK do KDS ficou preservado para replay (${code}).`);
+    this.name = "QueuedKdsAcknowledgementError";
+    this.code = code;
+  }
+}
+
+interface PendingKdsAcknowledgement {
+  effectId: string;
+  deliveryKey: string;
+}
+
+const kdsAcknowledgementQueueKey = "giromesa.ops.kds-acknowledgements";
+
+function pendingKdsAcknowledgements(): PendingKdsAcknowledgement[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(kdsAcknowledgementQueueKey) ?? "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (item): item is PendingKdsAcknowledgement =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.effectId === "string" &&
+        item.effectId.length > 0 &&
+        typeof item.deliveryKey === "string" &&
+        item.deliveryKey.length > 0,
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveKdsAcknowledgements(entries: PendingKdsAcknowledgement[]) {
+  localStorage.setItem(kdsAcknowledgementQueueKey, JSON.stringify(entries));
+}
+
+function queueKdsAcknowledgement(entry: PendingKdsAcknowledgement) {
+  const entries = pendingKdsAcknowledgements();
+  if (
+    !entries.some(
+      (item) => item.effectId === entry.effectId && item.deliveryKey === entry.deliveryKey,
+    )
+  ) {
+    entries.push(entry);
+    saveKdsAcknowledgements(entries);
+  }
+}
+
+function removeKdsAcknowledgement(entry: PendingKdsAcknowledgement) {
+  saveKdsAcknowledgements(
+    pendingKdsAcknowledgements().filter(
+      (item) => item.effectId !== entry.effectId || item.deliveryKey !== entry.deliveryKey,
+    ),
+  );
+}
+
+export function pendingKdsAcknowledgementCount(): number {
+  return pendingKdsAcknowledgements().length;
+}
+
+export async function acknowledgeKdsDelivery(
+  runtime: DeviceContext,
+  effectId: string,
+  deliveryKey: string,
+): Promise<void> {
+  const entry = { effectId, deliveryKey };
+  if (!runtime.embedded) {
+    queueKdsAcknowledgement(entry);
+    throw new QueuedKdsAcknowledgementError("KDS_EDGE_REQUIRED");
+  }
+  const acknowledgement = await acknowledgeShellKdsDispatch(effectId, deliveryKey);
+  if (!acknowledgement?.success) {
+    const code = acknowledgement?.errorCode ?? "SHELL_BRIDGE_UNAVAILABLE";
+    queueKdsAcknowledgement(entry);
+    throw new QueuedKdsAcknowledgementError(code);
+  }
+  removeKdsAcknowledgement(entry);
 }
 
 export function pilotMutation(
@@ -142,7 +229,20 @@ export async function replayOperationalQueue(
       // Mantém o comando durável até que a API confirme a mesma chave idempotente.
     }
   }
-  return queuedCommands().length;
+  if (runtime.embedded) {
+    for (const acknowledgement of pendingKdsAcknowledgements()) {
+      try {
+        await acknowledgeKdsDelivery(
+          runtime,
+          acknowledgement.effectId,
+          acknowledgement.deliveryKey,
+        );
+      } catch {
+        // MantÃ©m o ACK durÃ¡vel atÃ© o mesmo efeito ser confirmado pelo Hub.
+      }
+    }
+  }
+  return queuedCommands().length + pendingKdsAcknowledgementCount();
 }
 
 export async function loadOperationalResource<T>(
@@ -151,9 +251,15 @@ export async function loadOperationalResource<T>(
   resourceId: string | undefined,
   cloudLoader: () => Promise<T>,
 ): Promise<T> {
+  if (resource === "kds" && !runtime.embedded) {
+    throw new RejectedOperationalMutationError("KDS_EDGE_REQUIRED");
+  }
   if (runtime.embedded) {
     const state = await loadShellOperationalState(resource, resourceId);
     if (state?.success && state.payload !== undefined) return state.payload as T;
+    if (resource === "kds") {
+      throw new RejectedOperationalMutationError(state?.errorCode ?? "KDS_EDGE_UNAVAILABLE");
+    }
   }
   return cloudLoader();
 }

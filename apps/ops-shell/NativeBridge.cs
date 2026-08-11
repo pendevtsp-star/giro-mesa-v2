@@ -169,13 +169,14 @@ public sealed class NativeBridge
         string resource,
         string? resourceId = null)
     {
+        if (resource == "kds") return await GetKdsDispatchStateAsync();
+
         var path = resource switch
         {
             "catalog" => "/v1/operational-state/catalog",
             "floor" => "/v1/operational-state/floor",
             "tabs" => "/v1/operational-state/tabs",
             "tab" when Guid.TryParse(resourceId, out _) => $"/v1/operational-state/tabs/{resourceId}",
-            "kds" => "/v1/operational-state/kds",
             "reconciliation" => "/v1/operational-state/reconciliation",
             _ => null,
         };
@@ -204,6 +205,90 @@ public sealed class NativeBridge
         {
             return new(false, null, "HUB_STATE_UNREACHABLE");
         }
+    }
+
+    public async Task<KdsAcknowledgementResult> AcknowledgeKdsDispatchAsync(
+        string effectId,
+        string deliveryKey)
+    {
+        if (!Guid.TryParse(effectId, out _) || string.IsNullOrWhiteSpace(deliveryKey))
+        {
+            return new(false, "INVALID_KDS_ACKNOWLEDGEMENT");
+        }
+
+        var endpoint = NormalizeHubUrl(Preferences.Default.Get(HubUrlPreference, string.Empty));
+        var token = await SecureStorage.Default.GetAsync(DeviceTokenKey);
+        var deviceId = Preferences.Default.Get("device_id", string.Empty);
+        if (endpoint is null || string.IsNullOrWhiteSpace(token) || !Guid.TryParse(deviceId, out _))
+        {
+            return new(false, "HUB_NOT_PAIRED");
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                new Uri(endpoint, $"/v1/dispatch/{Uri.EscapeDataString(effectId)}/ack"))
+            {
+                Content = JsonContent.Create(new
+                {
+                    acknowledgementKey = $"ops-kds:{deviceId}:{deliveryKey}",
+                }),
+            };
+            request.Headers.Add("X-GiroMesa-Device-Token", token);
+            using var response = await _httpClient.SendAsync(request);
+            return response.IsSuccessStatusCode
+                ? new(true, null)
+                : new(false, await ReadErrorCodeAsync(response));
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return new(false, "HUB_ACK_UNREACHABLE");
+        }
+    }
+
+    private async Task<OperationalStateResult> GetKdsDispatchStateAsync()
+    {
+        var endpoint = NormalizeHubUrl(Preferences.Default.Get(HubUrlPreference, string.Empty));
+        var token = await SecureStorage.Default.GetAsync(DeviceTokenKey);
+        if (endpoint is null || string.IsNullOrWhiteSpace(token))
+        {
+            return new(false, null, "HUB_NOT_PAIRED");
+        }
+
+        try
+        {
+            var snapshot = await GetAuthenticatedJsonAsync(endpoint, token, "/v1/operational-state/kds");
+            if (!snapshot.Success) return new(false, null, snapshot.ErrorCode);
+            var deliveries = await GetAuthenticatedJsonAsync(endpoint, token, "/v1/dispatch/kds");
+            if (!deliveries.Success) return new(false, null, deliveries.ErrorCode);
+            var payload = JsonSerializer.SerializeToElement(new
+            {
+                snapshot = snapshot.Payload,
+                deliveries = deliveries.Payload,
+            });
+            return new(true, payload, null);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return new(false, null, "KDS_EDGE_UNREACHABLE");
+        }
+    }
+
+    private async Task<OperationalStateResult> GetAuthenticatedJsonAsync(
+        Uri endpoint,
+        string token,
+        string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, path));
+        request.Headers.Add("X-GiroMesa-Device-Token", token);
+        using var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new(false, null, await ReadErrorCodeAsync(response));
+        }
+        using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        return new(true, payload.RootElement.Clone(), null);
     }
 
     private static async Task<string> ReadErrorCodeAsync(HttpResponseMessage response)
@@ -236,6 +321,7 @@ public sealed class NativeBridge
     public sealed record PairingResult(bool Success, string? ErrorCode);
     public sealed record CommandResult(bool Success, bool Duplicate, string? ErrorCode, JsonElement? Result);
     public sealed record OperationalStateResult(bool Success, JsonElement? Payload, string? ErrorCode);
+    public sealed record KdsAcknowledgementResult(bool Success, string? ErrorCode);
     private sealed record PairingPayload(string DeviceToken);
     private sealed record HubCommandResponse(bool Duplicate, JsonElement? Result);
     private sealed record HubError(string Code);

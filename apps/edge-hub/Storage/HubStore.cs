@@ -1091,6 +1091,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             insert.Parameters.AddWithValue("$acknowledgementKey", acknowledgementKey);
             insert.Parameters.AddWithValue("$acknowledgedAt", now);
             var inserted = await insert.ExecuteNonQueryAsync() == 1;
+            var duplicate = false;
             if (inserted)
             {
                 var update = connection.CreateCommand();
@@ -1122,8 +1123,20 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
                     null,
                     DateTimeOffset.Parse(now));
             }
+            else
+            {
+                var existing = connection.CreateCommand();
+                existing.Transaction = transaction;
+                existing.CommandText = """
+                    SELECT COUNT(1) FROM local_dispatch_acknowledgements
+                    WHERE effect_id = $effectId AND acknowledgement_key = $acknowledgementKey;
+                    """;
+                existing.Parameters.AddWithValue("$effectId", effectId);
+                existing.Parameters.AddWithValue("$acknowledgementKey", acknowledgementKey);
+                duplicate = Convert.ToInt32(await existing.ExecuteScalarAsync()) == 1;
+            }
             await transaction.CommitAsync();
-            return inserted;
+            return inserted || duplicate;
         }
         finally
         {

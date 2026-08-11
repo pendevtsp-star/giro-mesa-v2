@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiClientError } from "./api";
 import { queuedCommandCount } from "./commands";
 import {
+  acknowledgeKdsDelivery,
   dispatchOperationalMutation,
   loadOperationalResource,
+  pendingKdsAcknowledgementCount,
   pilotMutation,
   QueuedOperationalMutationError,
   RejectedOperationalMutationError,
@@ -175,5 +177,57 @@ describe("fila idempotente das mutações POS", () => {
 
     expect(result).toEqual([{ id: "tab-local" }]);
     expect(cloudLoader).not.toHaveBeenCalled();
+  });
+
+  it("falha fechado no KDS quando a inbox durável do Edge não responde", async () => {
+    window.HybridWebView = {
+      SendRawMessage: vi.fn(),
+      InvokeDotNet: vi.fn().mockResolvedValue({
+        Success: false,
+        ErrorCode: "KDS_EDGE_UNREACHABLE",
+      }),
+    };
+    const cloudLoader = vi.fn().mockResolvedValue({ tickets: [{ id: "cloud-only" }], items: [] });
+
+    await expect(
+      loadOperationalResource(
+        { embedded: true, deviceId: "device-1", deviceName: "Terminal", platform: "win" },
+        "kds",
+        undefined,
+        cloudLoader,
+      ),
+    ).rejects.toMatchObject({ code: "KDS_EDGE_UNREACHABLE" });
+    expect(cloudLoader).not.toHaveBeenCalled();
+  });
+
+  it("preserva ACK do KDS offline e o reproduz com a mesma identidade", async () => {
+    const invoke = vi
+      .fn()
+      .mockResolvedValueOnce({ Success: false, ErrorCode: "HUB_ACK_UNREACHABLE" })
+      .mockResolvedValueOnce({ Success: true });
+    window.HybridWebView = { SendRawMessage: vi.fn(), InvokeDotNet: invoke };
+    const runtime = {
+      embedded: true,
+      deviceId: "device-1",
+      deviceName: "Terminal",
+      platform: "win",
+    };
+
+    await expect(acknowledgeKdsDelivery(runtime, "effect-1", "delivery-1")).rejects.toMatchObject({
+      code: "HUB_ACK_UNREACHABLE",
+    });
+    expect(pendingKdsAcknowledgementCount()).toBe(1);
+
+    const remaining = await replayOperationalQueue(
+      { organizationId: "org-1", unitId: "unit-1", actorId: "actor-1" },
+      runtime,
+    );
+    expect(remaining).toBe(0);
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      "AcknowledgeKdsDispatchAsync",
+      "AcknowledgeKdsDispatchAsync",
+    ]);
+    expect(invoke.mock.calls[0]?.[1]).toEqual(["effect-1", "delivery-1"]);
+    expect(invoke.mock.calls[1]?.[1]).toEqual(["effect-1", "delivery-1"]);
   });
 });

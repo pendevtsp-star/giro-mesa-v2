@@ -32,8 +32,11 @@ public sealed class DispatchLedgerTests : IAsyncLifetime
         Assert.True(await store.RecordDispatchAttemptAsync(effect.Id, "delivery-1", true));
         Assert.False(await store.RecordDispatchAttemptAsync(effect.Id, "delivery-1", true));
         Assert.True(await store.AcknowledgeDispatchAsync(effect.Id, "ack-1"));
-        Assert.False(await store.AcknowledgeDispatchAsync(effect.Id, "ack-1"));
+        Assert.True(await store.AcknowledgeDispatchAsync(effect.Id, "ack-1"));
         Assert.Empty(await store.GetPendingDispatchAsync(10));
+        Assert.Single(
+            await store.GetPendingDispatchOutcomesAsync(10),
+            outcome => outcome.EffectId == effect.Id && outcome.State == "acked");
     }
 
     [Fact]

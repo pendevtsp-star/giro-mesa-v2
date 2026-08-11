@@ -1,9 +1,15 @@
 import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import type { DeviceContext } from "./bridge";
 import type { ProfileId } from "./domain";
 import { KdsBoard, type KdsBoardTicket } from "./kds-board";
-import { type PilotDispatcher, type PilotLoader, pilotMutation } from "./operational-dispatch";
+import {
+  acknowledgeKdsDelivery,
+  type PilotDispatcher,
+  type PilotLoader,
+  pilotMutation,
+} from "./operational-dispatch";
 import { formatMoney } from "./rules";
 import { SalonMap, type SalonMapTable, type SalonTableStatus } from "./salon-map";
 
@@ -13,6 +19,7 @@ export interface PilotScope {
   membershipId: string;
   profileId: ProfileId;
   refreshToken: number;
+  runtime: DeviceContext;
   dispatch: PilotDispatcher;
   load: PilotLoader;
 }
@@ -132,11 +139,23 @@ interface KdsTicket {
   stationId: string;
   status: "pending" | "preparing" | "ready" | "done" | "canceled";
   createdAt: string | null;
+  deliveries: KdsDeliveryIdentity[];
+}
+
+interface KdsDeliveryIdentity {
+  effectId: string;
+  deliveryKey: string;
+}
+
+interface KdsDelivery extends KdsDeliveryIdentity {
+  orderId: string;
+  stationId: string;
 }
 
 export interface KdsData {
   tickets: KdsTicket[];
   items: Array<{ ticketId: string; item: PosItem }>;
+  deliveries: KdsDelivery[];
 }
 
 export class InvalidPilotPayloadError extends Error {
@@ -342,13 +361,52 @@ export function parseKds(value: unknown): KdsData {
         stationId: text(row.stationId),
         status: status as KdsTicket["status"],
         createdAt: optionalText(row.createdAt),
+        deliveries: [],
       };
     }),
     items: records(payload.items).map((row) => ({
       ticketId: text(row.ticketId),
       item: parseItem(record(row.item)),
     })),
+    deliveries: [],
   };
+}
+
+export function parseDurableKds(value: unknown): KdsData {
+  const payload = record(value);
+  const snapshot = parseKds(payload.snapshot);
+  const deliveries = records(payload.deliveries).map((row): KdsDelivery => {
+    const effectId = text(row.effectId);
+    const deliveryKey = text(row.deliveryKey);
+    text(row.targetRef);
+    text(row.operation);
+    text(row.deliveredAt);
+    let dispatchPayload: Row;
+    try {
+      dispatchPayload = record(JSON.parse(text(row.payload)));
+    } catch {
+      throw new InvalidPilotPayloadError();
+    }
+    return {
+      effectId,
+      deliveryKey,
+      orderId: text(dispatchPayload.orderId),
+      stationId: text(dispatchPayload.stationId),
+    };
+  });
+
+  for (const delivery of deliveries) {
+    const ticket = snapshot.tickets.find(
+      (candidate) =>
+        candidate.orderId === delivery.orderId && candidate.stationId === delivery.stationId,
+    );
+    if (!ticket) throw new InvalidPilotPayloadError();
+    ticket.deliveries.push({
+      effectId: delivery.effectId,
+      deliveryKey: delivery.deliveryKey,
+    });
+  }
+  return { ...snapshot, deliveries };
 }
 
 function useRemote<T>(
@@ -1460,10 +1518,27 @@ export function RealKdsPage({ scope }: { scope: PilotScope }) {
   const remote = useRemote(
     scope,
     () => scope.load("kds", undefined, () => api.pilot.kds(scope.organizationId, scope.unitId)),
-    parseKds,
+    parseDurableKds,
   );
   const [busyId, setBusyId] = useState("");
   const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    if (remote.state.status !== "ready" || remote.state.data.deliveries.length === 0) return;
+    let active = true;
+    void Promise.allSettled(
+      remote.state.data.deliveries.map((delivery) =>
+        acknowledgeKdsDelivery(scope.runtime, delivery.effectId, delivery.deliveryKey),
+      ),
+    ).then((results) => {
+      if (!active) return;
+      if (results.some((result) => result.status === "rejected")) {
+        setFeedback("O ticket estÃ¡ visÃ­vel, mas o ACK ficou preservado para replay no Edge.");
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [remote.state, scope.runtime]);
   return (
     <RemoteGate remote={remote}>
       {(data) => {

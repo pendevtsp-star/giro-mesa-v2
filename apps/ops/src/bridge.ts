@@ -21,6 +21,11 @@ export interface ShellOperationalStateResult {
   errorCode?: string;
 }
 
+export interface ShellKdsAcknowledgementResult {
+  success: boolean;
+  errorCode?: string;
+}
+
 interface HybridWebViewApi {
   SendRawMessage(message: string): void;
   InvokeDotNet?<T>(method: string, args?: unknown[]): Promise<T>;
@@ -183,6 +188,27 @@ export async function loadShellOperationalState(
     return {
       success: readBoolean(result, "Success", "success"),
       payload: readUnknown(result, "Payload", "payload"),
+      errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
+    };
+  } catch {
+    return { success: false, errorCode: "SHELL_BRIDGE_UNAVAILABLE" };
+  }
+}
+
+export async function acknowledgeShellKdsDispatch(
+  effectId: string,
+  deliveryKey: string,
+): Promise<ShellKdsAcknowledgementResult | null> {
+  const invoke = window.HybridWebView?.InvokeDotNet;
+  if (!invoke) return null;
+
+  try {
+    const result = await invoke<Record<string, unknown>>("AcknowledgeKdsDispatchAsync", [
+      effectId,
+      deliveryKey,
+    ]);
+    return {
+      success: readBoolean(result, "Success", "success"),
       errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
     };
   } catch {
