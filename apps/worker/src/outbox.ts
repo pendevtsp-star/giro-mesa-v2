@@ -25,6 +25,7 @@ import {
   emailProviderConfiguration,
 } from "./email.js";
 import { consumeOrderSentInventory, InventoryConsumptionError } from "./inventory.js";
+import { WorkerObservability } from "./observability.js";
 import { deliverWebhook, parseWebhookDeliveryRequest, WebhookDeliveryError } from "./webhook.js";
 
 export interface ClaimedOutboxEvent extends Record<string, unknown> {
@@ -36,6 +37,17 @@ export interface ClaimedOutboxEvent extends Record<string, unknown> {
   unit_id: string | null;
   payload: Record<string, unknown>;
   attempts: number;
+}
+
+export function observeOutboxDispatch<T>(
+  observability: WorkerObservability,
+  event: Pick<ClaimedOutboxEvent, "organization_id" | "topic" | "unit_id">,
+  operation: () => Promise<T>,
+) {
+  const attributes: Record<string, unknown> = { "job.type": event.topic };
+  if (event.organization_id) attributes["organization.id"] = event.organization_id;
+  if (event.unit_id) attributes["unit.id"] = event.unit_id;
+  return observability.runJob("outbox.dispatch", attributes, operation);
 }
 
 export function retryDelaySeconds(attempts: number) {
@@ -90,7 +102,10 @@ function activeExpiry(payload: Record<string, unknown>) {
 export class OutboxWorker {
   private readonly connection: DatabaseConnection;
 
-  constructor(connection: DatabaseConnection = createDatabase()) {
+  constructor(
+    connection: DatabaseConnection = createDatabase(),
+    private readonly observability = new WorkerObservability(),
+  ) {
     this.connection = connection;
   }
 
@@ -193,10 +208,12 @@ export class OutboxWorker {
             organizationId: event.organization_id,
             unitId: event.unit_id,
           },
-          () => this.dispatch(event),
+          () => observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
         );
       } else {
-        await withWorkerContext(this.connection, () => this.dispatch(event));
+        await withWorkerContext(this.connection, () =>
+          observeOutboxDispatch(this.observability, event, () => this.dispatch(event)),
+        );
       }
       await withWorkerContext(this.connection, (tx) =>
         tx.execute(
