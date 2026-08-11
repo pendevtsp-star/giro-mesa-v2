@@ -58,6 +58,7 @@ export interface AuthContext {
   displayName: string;
   sessionId: string;
   expiresAt: Date;
+  mfaVerifiedAt?: Date | null;
 }
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -476,6 +477,7 @@ export class AuthService {
           identityId: challenge.identity.id,
           tokenHash: tokenHash(token),
           trustedDevice: challenge.challenge.trustedDevice,
+          mfaVerifiedAt: new Date(),
           expiresAt,
         })
         .returning({ id: authSessions.id });
@@ -677,6 +679,7 @@ export class AuthService {
         email: identities.email,
         displayName: identities.displayName,
         expiresAt: authSessions.expiresAt,
+        mfaVerifiedAt: authSessions.mfaVerifiedAt,
       })
       .from(authSessions)
       .innerJoin(identities, eq(identities.id, authSessions.identityId))

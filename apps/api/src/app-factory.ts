@@ -33,7 +33,9 @@ export async function createApplication() {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
   const fastify = app.getHttpAdapter().getInstance();
   fastify.addHook("onRequest", async (request, reply) => {
-    if (isSensitiveAuthRequest(request.url)) reply.header("Cache-Control", "no-store");
+    if (isSensitiveAuthRequest(request.url) || request.url.includes("/privacy")) {
+      reply.header("Cache-Control", "no-store");
+    }
   });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });

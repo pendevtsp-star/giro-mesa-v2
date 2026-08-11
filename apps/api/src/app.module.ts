@@ -13,6 +13,7 @@ import { OperationsModule } from "./operations/operations.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
 import { PilotOperationsModule } from "./pilot-operations/pilot-operations.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
+import { PrivacyModule } from "./privacy/privacy.module.js";
 import { PublicMenuModule } from "./public-menu/public-menu.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { SyncModule } from "./sync/sync.module.js";
@@ -31,6 +32,7 @@ import { SyncModule } from "./sync/sync.module.js";
     RealtimeModule,
     PilotOperationsModule,
     PlatformModule,
+    PrivacyModule,
     ManagementModule,
     GrowthModule,
     SyncModule,

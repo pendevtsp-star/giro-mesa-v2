@@ -4,4 +4,5 @@ export * from "./commercial.js";
 export * from "./conflict-matrix.js";
 export * from "./onboarding.js";
 export * from "./permissions.js";
+export * from "./privacy.js";
 export * from "./secret-envelope.js";
