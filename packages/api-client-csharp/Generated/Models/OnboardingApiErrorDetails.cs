@@ -33,10 +33,10 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The missingItems property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public List<string>? MissingItems { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_missingItems?>? MissingItems { get; set; }
 #nullable restore
 #else
-        public List<string> MissingItems { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_missingItems?> MissingItems { get; set; }
 #endif
         /// <summary>The provisioningRunId property</summary>
         public Guid? ProvisioningRunId { get; set; }
@@ -67,7 +67,7 @@ namespace GiroMesa.ApiClient.Models
             {
                 { "fieldErrors", n => { FieldErrors = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_fieldErrors>(global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_fieldErrors.CreateFromDiscriminatorValue); } },
                 { "formErrors", n => { FormErrors = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
-                { "missingItems", n => { MissingItems = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
+                { "missingItems", n => { MissingItems = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_missingItems>()?.AsList(); } },
                 { "provisioningRunId", n => { ProvisioningRunId = n.GetGuidValue(); } },
             };
         }
@@ -80,7 +80,7 @@ namespace GiroMesa.ApiClient.Models
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_fieldErrors>("fieldErrors", FieldErrors);
             writer.WriteCollectionOfPrimitiveValues<string>("formErrors", FormErrors);
-            writer.WriteCollectionOfPrimitiveValues<string>("missingItems", MissingItems);
+            writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails_missingItems>("missingItems", MissingItems);
             writer.WriteGuidValue("provisioningRunId", ProvisioningRunId);
             writer.WriteAdditionalData(AdditionalData);
         }

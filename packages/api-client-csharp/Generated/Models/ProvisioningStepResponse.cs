@@ -17,47 +17,17 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The attempts property</summary>
         public double? Attempts { get; set; }
         /// <summary>The compensatedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_compensatedAt? CompensatedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_compensatedAt CompensatedAt { get; set; }
-#endif
+        public DateTimeOffset? CompensatedAt { get; set; }
         /// <summary>The completedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_completedAt? CompletedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_completedAt CompletedAt { get; set; }
-#endif
+        public DateTimeOffset? CompletedAt { get; set; }
         /// <summary>The createdAt property</summary>
         public DateTimeOffset? CreatedAt { get; set; }
         /// <summary>The startedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_startedAt? StartedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_startedAt StartedAt { get; set; }
-#endif
+        public DateTimeOffset? StartedAt { get; set; }
         /// <summary>The status property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Status { get; set; }
-#nullable restore
-#else
-        public string Status { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_status? Status { get; set; }
         /// <summary>The step property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Step { get; set; }
-#nullable restore
-#else
-        public string Step { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_step? Step { get; set; }
         /// <summary>The updatedAt property</summary>
         public DateTimeOffset? UpdatedAt { get; set; }
         /// <summary>
@@ -86,12 +56,12 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "attempts", n => { Attempts = n.GetDoubleValue(); } },
-                { "compensatedAt", n => { CompensatedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_compensatedAt>(global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_compensatedAt.CreateFromDiscriminatorValue); } },
-                { "completedAt", n => { CompletedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_completedAt>(global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_completedAt.CreateFromDiscriminatorValue); } },
+                { "compensatedAt", n => { CompensatedAt = n.GetDateTimeOffsetValue(); } },
+                { "completedAt", n => { CompletedAt = n.GetDateTimeOffsetValue(); } },
                 { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
-                { "startedAt", n => { StartedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_startedAt>(global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_startedAt.CreateFromDiscriminatorValue); } },
-                { "status", n => { Status = n.GetStringValue(); } },
-                { "step", n => { Step = n.GetStringValue(); } },
+                { "startedAt", n => { StartedAt = n.GetDateTimeOffsetValue(); } },
+                { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_status>(); } },
+                { "step", n => { Step = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_step>(); } },
                 { "updatedAt", n => { UpdatedAt = n.GetDateTimeOffsetValue(); } },
             };
         }
@@ -103,12 +73,12 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteDoubleValue("attempts", Attempts);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_compensatedAt>("compensatedAt", CompensatedAt);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_completedAt>("completedAt", CompletedAt);
+            writer.WriteDateTimeOffsetValue("compensatedAt", CompensatedAt);
+            writer.WriteDateTimeOffsetValue("completedAt", CompletedAt);
             writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_startedAt>("startedAt", StartedAt);
-            writer.WriteStringValue("status", Status);
-            writer.WriteStringValue("step", Step);
+            writer.WriteDateTimeOffsetValue("startedAt", StartedAt);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_status>("status", Status);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningStepResponse_step>("step", Step);
             writer.WriteDateTimeOffsetValue("updatedAt", UpdatedAt);
             writer.WriteAdditionalData(AdditionalData);
         }

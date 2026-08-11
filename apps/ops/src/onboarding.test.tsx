@@ -85,7 +85,7 @@ function snapshot(overrides: Partial<OnboardingResponse> = {}): OnboardingRespon
             status === "not_applicable" ? "Operacao piloto sem QR nesta unidade." : null,
         },
       ]),
-    ),
+    ) as OnboardingResponse["items"],
     ready: false,
     missingItems: ["catalog", "tables", "team", "cashier", "training", "rehearsal"],
     selection: {
@@ -256,6 +256,12 @@ describe("onboarding operacional", () => {
     expect(values.get(activationStorageKey(organizationId))).toBe(first);
     releaseActivationKey(organizationId, "completed", storage);
     expect(values.has(activationStorageKey(organizationId))).toBe(false);
+    storage.setItem(activationStorageKey(organizationId), first);
+    releaseActivationKey(organizationId, "terminal_failed", storage);
+    expect(values.has(activationStorageKey(organizationId))).toBe(false);
+    storage.setItem(activationStorageKey(organizationId), first);
+    releaseActivationKey(organizationId, "compensated", storage);
+    expect(values.has(activationStorageKey(organizationId))).toBe(false);
   });
 
   it("limita polling, pausa offline ou fora de foco e reconhece terminais", () => {
@@ -274,7 +280,7 @@ describe("onboarding operacional", () => {
     expect(isTerminalProvisioningState("retryable_failed")).toBe(false);
   });
 
-  it("oferece recuperacao segura para erros publicos sem refletir details", () => {
+  it("oferece recuperacao segura e preserva somente validação allowlisted", () => {
     expect(
       errorGuidance({ status: 401, code: "UNAUTHORIZED", message: "Sessao encerrada" }),
     ).toMatchObject({ action: "Entrar novamente", sessionEnded: true });
@@ -290,5 +296,19 @@ describe("onboarding operacional", () => {
     expect(errorGuidance({ status: 500, code: "INTERNAL", message: "x" }).message).not.toContain(
       "details",
     );
+    expect(
+      errorGuidance({
+        status: 400,
+        code: "VALIDATION_ERROR",
+        message: "Revise",
+        details: {
+          fieldErrors: { "items.qr.waiverReason": ["Justificativa inválida"] },
+          formErrors: ["Revise a dispensa"],
+        },
+      }),
+    ).toMatchObject({
+      fieldErrors: { "items.qr.waiverReason": ["Justificativa inválida"] },
+      formErrors: ["Revise a dispensa"],
+    });
   });
 });

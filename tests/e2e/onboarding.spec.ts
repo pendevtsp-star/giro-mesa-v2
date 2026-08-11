@@ -26,24 +26,102 @@ type Item = (typeof checklistItems)[number];
 type ItemStatus = "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
 type ItemEvidence = {
   status: ItemStatus;
-  source: "system" | "actor_attestation" | "authorized_waiver";
-  evidenceReference?: string | null;
-  evidence?: Record<string, unknown>;
-  actorIdentityId?: string | null;
-  verifiedAt?: string | null;
-  waiverReason?: string | null;
+  source: "system" | "actor_attestation" | "authorized_waiver" | "legacy_import";
+  evidenceReference: string | null;
+  evidence: Record<string, unknown>;
+  actorIdentityId: string | null;
+  verifiedAt: string | null;
+  waiverReason: string | null;
 };
+
+function itemEvidence(
+  status: ItemStatus,
+  source: ItemEvidence["source"] = "system",
+  overrides: Partial<ItemEvidence> = {},
+): ItemEvidence {
+  return {
+    status,
+    source,
+    evidenceReference: null,
+    evidence: {},
+    actorIdentityId: null,
+    verifiedAt: null,
+    waiverReason: null,
+    ...overrides,
+  };
+}
 
 function pendingItems(): Record<Item, ItemEvidence> {
   return Object.fromEntries(
-    checklistItems.map((item) => [item, { status: "pending", source: "system" }]),
+    checklistItems.map((item) => [item, itemEvidence("pending")]),
   ) as Record<Item, ItemEvidence>;
 }
 
-async function enterDemo(page: Page, profile?: "owner" | "waiter") {
+function verifiedItems(): Record<Item, ItemEvidence> {
+  return Object.fromEntries(
+    checklistItems.map((item) => [
+      item,
+      itemEvidence("verified", "system", {
+        evidenceReference: `server:${item}`,
+        verifiedAt: "2026-08-11T10:00:00.000Z",
+      }),
+    ]),
+  ) as Record<Item, ItemEvidence>;
+}
+
+function selectedPlan(revision = 1, selectedUnitId = unitId) {
+  return {
+    selectedUnitId,
+    plan: {
+      id: planId,
+      slug: "operacao",
+      catalogVersion: 1,
+      monthlyPriceCents: 0,
+      annualPriceCents: 0,
+      includedUnits: 1,
+      entitlements: [],
+    },
+    revision,
+    selectedAt: "2026-08-11T10:00:00.000Z",
+    updatedAt: "2026-08-11T10:00:00.000Z",
+  } as const;
+}
+
+function onboardingSnapshot({
+  items = pendingItems(),
+  selection = null,
+  provisioning = null,
+  activatedAt = null,
+}: {
+  items?: Record<Item, ItemEvidence>;
+  selection?: ReturnType<typeof selectedPlan> | null;
+  provisioning?: Record<string, unknown> | null;
+  activatedAt?: string | null;
+} = {}) {
+  const missingItems = checklistItems.filter(
+    (item) => !["verified", "not_applicable"].includes(items[item].status),
+  );
+  return {
+    organizationId,
+    activatedAt,
+    items,
+    ready: missingItems.length === 0,
+    missingItems,
+    selection,
+    provisioning,
+  };
+}
+
+async function enterDemo(
+  page: Page,
+  profile?: "owner" | "manager" | "waiter",
+  selectedUnitId?: string,
+) {
   await page.goto("http://127.0.0.1:3112");
   if (profile) await page.getByLabel("Perfil demonstrativo").selectOption(profile);
   await page.getByRole("button", { name: /entrar no giromesa/i }).click();
+  if (selectedUnitId)
+    await page.getByLabel("Unidade", { exact: true }).selectOption(selectedUnitId);
   await page.getByRole("button", { name: /abrir operação/i }).click();
 }
 
@@ -110,23 +188,17 @@ test("onboarding vazio chega a ativação única somente com readiness do servid
         if (selection) {
           getAfterSelection += 1;
           for (const item of ["business", "unit", "plan"] as const) {
-            items[item] = {
-              status: "verified",
-              source: "system",
+            items[item] = itemEvidence("verified", "system", {
               evidenceReference: `server:${item}`,
-              evidence: {},
               verifiedAt: "2026-08-11T10:00:00.000Z",
-            };
+            });
           }
           if (getAfterSelection >= 2) {
             for (const item of ["catalog", "tables", "team", "cashier"] as const) {
-              items[item] = {
-                status: "verified",
-                source: "system",
+              items[item] = itemEvidence("verified", "system", {
                 evidenceReference: `server:${item}`,
-                evidence: {},
                 verifiedAt: "2026-08-11T10:00:00.000Z",
-              };
+              });
             }
           }
         }
@@ -160,16 +232,18 @@ test("onboarding vazio chega a ativação única somente com readiness do servid
       if (request.method() === "PATCH" && url.pathname.endsWith("/onboarding")) {
         const body = request.postDataJSON() as { items: Partial<Record<Item, ItemEvidence>> };
         for (const [item, evidence] of Object.entries(body.items) as Array<[Item, ItemEvidence]>) {
-          items[item] = {
-            ...evidence,
-            source:
-              evidence.status === "not_applicable" ? "authorized_waiver" : "actor_attestation",
-            actorIdentityId: organizationId,
-            verifiedAt:
-              evidence.status === "verified" || evidence.status === "not_applicable"
-                ? "2026-08-11T10:05:00.000Z"
-                : null,
-          };
+          items[item] = itemEvidence(
+            evidence.status,
+            evidence.status === "not_applicable" ? "authorized_waiver" : "actor_attestation",
+            {
+              ...evidence,
+              actorIdentityId: organizationId,
+              verifiedAt:
+                evidence.status === "verified" || evidence.status === "not_applicable"
+                  ? "2026-08-11T10:05:00.000Z"
+                  : null,
+            },
+          );
         }
         await route.fulfill({ json: response() });
         return;
@@ -265,21 +339,375 @@ test("onboarding vazio chega a ativação única somente com readiness do servid
   );
 });
 
-test("retoma polling cancelável após reload e conclui a saga existente", async ({ page }) => {
+test("recarrega de verdade, repete a mesma chave e a remove somente no snapshot terminal", async ({
+  page,
+}) => {
   const items = pendingItems();
   for (const item of checklistItems) {
-    items[item] = {
-      status: "verified",
-      source: "system",
+    items[item] = itemEvidence("verified", "system", {
       evidenceReference: `server:${item}`,
-      evidence: {},
       verifiedAt: "2026-08-11T10:00:00.000Z",
-    };
+    });
   }
   let completed = false;
-  let statusCalls = 0;
-  const provisioning = (state: "publishing" | "completed") => ({
-    id: runId,
+  const activationKeys: string[] = [];
+  const selection = {
+    selectedUnitId: unitId,
+    plan: {
+      id: planId,
+      slug: "operacao",
+      catalogVersion: 1,
+      monthlyPriceCents: 0,
+      annualPriceCents: 0,
+      includedUnits: 1,
+      entitlements: [],
+    },
+    revision: 1,
+    selectedAt: "2026-08-11T10:00:00.000Z",
+    updatedAt: "2026-08-11T10:00:00.000Z",
+  };
+
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const url = new URL(route.request().url());
+      if (route.request().method() === "POST" && url.pathname.endsWith("/activate")) {
+        activationKeys.push(route.request().headers()["idempotency-key"] ?? "");
+        if (activationKeys.length === 1) {
+          await route.fulfill({
+            status: 500,
+            json: {
+              statusCode: 500,
+              code: "PROVISIONING_TRANSIENT_FAILURE",
+              message: "A tentativa foi preservada e pode ser retomada.",
+            },
+          });
+          return;
+        }
+        completed = true;
+        await route.fulfill({
+          status: 201,
+          json: {
+            id: "a2222222-2222-4222-8222-222222222222",
+            organizationId,
+            commercialPlanId: planId,
+            provisioningRunId: runId,
+            subscriptionId,
+            startsAt: "2026-08-11T10:10:00.000Z",
+            endsAt: "2026-08-25T10:10:00.000Z",
+            state: "completed",
+            entitlements: [],
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        json: {
+          organizationId,
+          activatedAt: completed ? "2026-08-11T10:10:00.000Z" : null,
+          items,
+          ready: true,
+          missingItems: [],
+          selection,
+          provisioning: completed
+            ? {
+                id: runId,
+                state: "completed",
+                checkpoint: "published",
+                attempts: 2,
+                lastErrorCode: null,
+                nextRetryAt: null,
+                completedAt: "2026-08-11T10:10:00.000Z",
+                failedAt: null,
+                createdAt: "2026-08-11T10:00:00.000Z",
+                updatedAt: "2026-08-11T10:10:00.000Z",
+              }
+            : null,
+        },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const activation = page.locator(".onboarding-activation");
+  await activation.getByRole("checkbox").check();
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "A tentativa pode ser retomada com segurança",
+  );
+  const storedKey = await page.evaluate(
+    (key) => sessionStorage.getItem(key),
+    `giromesa:onboarding:activation:${organizationId}`,
+  );
+  expect(storedKey?.length).toBeGreaterThanOrEqual(8);
+
+  await page.reload();
+  await enterDemo(page);
+  await openOnboarding(page);
+  await activation.getByRole("checkbox").check();
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
+    timeout: 10_000,
+  });
+  expect(activationKeys).toEqual([storedKey, storedKey]);
+  expect(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      `giromesa:onboarding:activation:${organizationId}`,
+    ),
+  ).toBeNull();
+
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), {
+    key: `giromesa:onboarding:activation:${organizationId}`,
+    value: "stale-terminal-replay-key",
+  });
+  await page.reload();
+  await enterDemo(page);
+  await openOnboarding(page);
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  expect(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      `giromesa:onboarding:activation:${organizationId}`,
+    ),
+  ).toBeNull();
+});
+
+test("manager da unidade A não recebe o onboarding pinado na unidade B", async ({ page }) => {
+  const methods: string[] = [];
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      methods.push(route.request().method());
+      await route.fulfill({
+        status: 403,
+        json: {
+          statusCode: 403,
+          code: "ONBOARDING_UNIT_SCOPE_DENIED",
+          message: "O onboarding selecionado pertence a outra unidade.",
+        },
+      });
+    },
+  );
+
+  await enterDemo(page, "manager");
+  await openOnboarding(page);
+  await expect(
+    page.getByRole("heading", { name: "O onboarding ainda não pôde ser carregado" }),
+  ).toBeVisible();
+  await expect(page.getByText("O onboarding selecionado pertence a outra unidade.")).toBeVisible();
+  await expectActiveUnit(page, "Aurora Centro");
+  expect(methods.length).toBeGreaterThanOrEqual(1);
+  expect(methods.every((method) => method === "GET")).toBe(true);
+});
+
+test("PATCH 400 associa somente erros seguros ao campo e foca o primeiro inválido", async ({
+  page,
+}) => {
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: onboardingSnapshot() });
+        return;
+      }
+      await route.fulfill({
+        status: 400,
+        json: {
+          statusCode: 400,
+          code: "INVALID_ONBOARDING_EVIDENCE",
+          message: "Revise os campos indicados.",
+          details: {
+            fieldErrors: {
+              "items.fiscalChoice.evidence.choice": ["Escolha fiscal inválida."],
+            },
+            formErrors: ["A evidência precisa corresponder à operação real."],
+          },
+        },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await page.getByRole("button", { name: "Confirmar escolha fiscal" }).click();
+  const fiscal = page.getByLabel("Modo fiscal real");
+  await expect(fiscal).toHaveAttribute("aria-invalid", "true");
+  await expect(fiscal).toHaveAttribute("aria-describedby", "onboarding-fiscal-error");
+  await expect(page.getByText("Escolha fiscal inválida.")).toBeVisible();
+  await expect(page.getByText("A evidência precisa corresponder à operação real.")).toBeVisible();
+  await expect(fiscal).toBeFocused();
+});
+
+test("matriz 404, 409 e 429 permanece pública e recuperável", async ({ page }) => {
+  let mode: "not-found" | "conflict" | "rate-limit" = "not-found";
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      if (request.method() === "GET") {
+        if (mode === "not-found") {
+          await route.fulfill({
+            status: 404,
+            json: {
+              statusCode: 404,
+              code: "ONBOARDING_NOT_FOUND",
+              message: "Onboarding não encontrado.",
+            },
+          });
+        } else {
+          await route.fulfill({ json: onboardingSnapshot() });
+        }
+        return;
+      }
+      if (mode === "conflict") {
+        await route.fulfill({
+          status: 409,
+          json: {
+            statusCode: 409,
+            code: "ONBOARDING_RESELECT_REQUIRED",
+            message: "Confirme explicitamente a troca.",
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 429,
+        json: {
+          statusCode: 429,
+          code: "RATE_LIMITED",
+          message: "Muitas tentativas.",
+        },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await expect(page.getByText("Onboarding não encontrado.")).toBeVisible();
+
+  mode = "conflict";
+  await page.getByRole("button", { name: "Tentar novamente" }).click();
+  await expect(page.getByText("0 de 12 requisitos prontos")).toBeVisible();
+  await page.getByRole("button", { name: "Salvar seleção" }).click();
+  await expect(page.getByRole("alert")).toContainText("Confirme explicitamente a troca.");
+
+  mode = "rate-limit";
+  await page.getByRole("button", { name: "Confirmar escolha fiscal" }).click();
+  await expect(page.getByRole("alert")).toContainText("Aguarde antes de repetir esta ação");
+});
+
+test("401 limpa a sessão visual no mesmo turno", async ({ page }) => {
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: onboardingSnapshot() });
+        return;
+      }
+      await route.fulfill({
+        status: 401,
+        json: { statusCode: 401, code: "SESSION_EXPIRED", message: "Sessão expirada." },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  await page.getByRole("button", { name: "Confirmar escolha fiscal" }).click();
+  await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
+});
+
+test("aborta GET obsoleto e preserva a revisão mais nova", async ({ page }) => {
+  let getCalls = 0;
+  const newerItems = pendingItems();
+  newerItems.business = itemEvidence("verified", "system", {
+    evidenceReference: "server:business:new",
+    verifiedAt: "2026-08-11T10:00:00.000Z",
+  });
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fulfill({
+          status: 404,
+          json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+        });
+        return;
+      }
+      getCalls += 1;
+      if (getCalls === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        await route.fulfill({ json: onboardingSnapshot() }).catch(() => undefined);
+        return;
+      }
+      await route.fulfill({
+        json: onboardingSnapshot({ items: getCalls >= 3 ? newerItems : pendingItems() }),
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const refreshButtons = page.getByRole("button", { name: "Atualizar status" });
+  await refreshButtons.first().click();
+  await refreshButtons.nth(1).click();
+  await expect(page.getByText("1 de 12 requisitos prontos")).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.getByText("1 de 12 requisitos prontos")).toBeVisible();
+});
+
+test("invalida confirmações quando readiness, revisão ou motivo mudam", async ({ page }) => {
+  let revision = 1;
+  let items = verifiedItems();
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      await route.fulfill({
+        json: onboardingSnapshot({ items, selection: selectedPlan(revision) }),
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const activation = page.locator(".onboarding-activation");
+  await activation.getByRole("checkbox").check();
+  await expect(activation.getByRole("checkbox")).toBeChecked();
+
+  items = verifiedItems();
+  items.qr = itemEvidence("blocked", "system", {
+    evidenceReference: "unit:qr-readiness",
+  });
+  revision = 2;
+  await page.getByRole("button", { name: "Atualizar status" }).first().click();
+  await expect(activation.getByRole("checkbox")).not.toBeChecked();
+
+  const qr = page.locator("article").filter({ hasText: "QR da mesa" });
+  await qr.getByText("Solicitar dispensa de QR").click();
+  await qr.getByLabel("Justificativa auditável").fill("Piloto controlado sem QR na nova revisão.");
+  await qr.getByLabel(/Entendo que esta unidade/).check();
+  await qr.getByLabel("Motivo").selectOption("external_qr");
+  await expect(qr.getByLabel(/Entendo que esta unidade/)).not.toBeChecked();
+  await qr.getByLabel(/Entendo que esta unidade/).check();
+
+  revision = 3;
+  await page.getByRole("button", { name: "Atualizar prova do servidor" }).click();
+  await qr.getByText("Solicitar dispensa de QR").click();
+  await expect(qr.getByLabel("Justificativa auditável")).toHaveValue("");
+  await expect(qr.getByLabel(/Entendo que esta unidade/)).not.toBeChecked();
+});
+
+test("cancela polling antigo ao desmontar e não mistura runs", async ({ page }) => {
+  const runB = "e2222222-2222-4222-8222-222222222222";
+  let reopened = false;
+  let markStatusStarted: (() => void) | undefined;
+  const statusStarted = new Promise<void>((resolve) => {
+    markStatusStarted = resolve;
+  });
+  const summary = (id: string, state: "publishing" | "completed") => ({
+    id,
     state,
     checkpoint: state === "completed" ? "published" : "activation_committed",
     attempts: 1,
@@ -290,63 +718,50 @@ test("retoma polling cancelável após reload e conclui a saga existente", async
     createdAt: "2026-08-11T10:00:00.000Z",
     updatedAt: "2026-08-11T10:10:00.000Z",
   });
-
   await page.route(
     `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
     async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith(`/provisioning/${runId}`)) {
-        statusCalls += 1;
-        if (statusCalls === 1) {
-          await route.fulfill({
-            status: 503,
+        markStatusStarted?.();
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        await route
+          .fulfill({
             json: {
-              statusCode: 503,
-              code: "PROVISIONING_TEMPORARILY_UNAVAILABLE",
-              message: "Acompanhamento temporariamente indisponível.",
+              ...summary(runId, "completed"),
+              state: "terminal_failed",
+              checkpoint: "activation_committed",
+              completedAt: null,
+              failedAt: "2026-08-11T10:10:00.000Z",
+              steps: [],
             },
-          });
-          return;
-        }
-        completed = true;
-        await route.fulfill({ json: { ...provisioning("completed"), steps: [] } });
+          })
+          .catch(() => undefined);
         return;
       }
       await route.fulfill({
-        json: {
-          organizationId,
-          activatedAt: completed ? "2026-08-11T10:10:00.000Z" : null,
-          items,
-          ready: true,
-          missingItems: [],
-          selection: {
-            selectedUnitId: unitId,
-            plan: {
-              id: planId,
-              slug: "operacao",
-              catalogVersion: 1,
-              monthlyPriceCents: 0,
-              annualPriceCents: 0,
-              includedUnits: 1,
-              entitlements: [],
-            },
-            revision: 1,
-            selectedAt: "2026-08-11T10:00:00.000Z",
-            updatedAt: "2026-08-11T10:00:00.000Z",
-          },
-          provisioning: provisioning(completed ? "completed" : "publishing"),
-        },
+        json: onboardingSnapshot({
+          items: verifiedItems(),
+          selection: selectedPlan(reopened ? 2 : 1),
+          provisioning: summary(reopened ? runB : runId, reopened ? "completed" : "publishing"),
+          activatedAt: reopened ? "2026-08-11T10:10:00.000Z" : null,
+        }),
       });
     },
   );
 
   await enterDemo(page);
   await openOnboarding(page);
-  await expect(page.getByText("Publicando conclusão")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
-    timeout: 10_000,
+  await statusStarted;
+  await page.evaluate(() => {
+    window.location.hash = "#/dashboard";
   });
-  expect(statusCalls).toBe(2);
+  reopened = true;
+  await openOnboarding(page);
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  await expect(page.getByText("Ativação concluída")).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.getByText("Ativação concluída")).toBeVisible();
 });
 
 test("perfil não autorizado vê bloqueio sem request e erro de autorização recebe foco", async ({

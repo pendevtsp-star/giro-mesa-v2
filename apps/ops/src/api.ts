@@ -1,97 +1,40 @@
 import type {
-  ApiComponents,
   ApiError,
   ApiOperations,
   LoginInput,
+  OnboardingResponsePayload,
+  OnboardingSelectionResponsePayload,
   OperationalCommandInput,
+  ProvisioningStatusResponsePayload,
+  TrialActivationResponsePayload,
+} from "../../../packages/contracts/src/index";
+import {
+  onboardingResponseSchema,
+  onboardingSelectionResponseSchema,
+  provisioningStatusResponseSchema,
+  trialActivationResponseSchema,
 } from "../../../packages/contracts/src/index";
 
-export type CreateOrganizationInput = ApiOperations["OrganizationsController_create[1]"]["requestBody"]["content"]["application/json"];
-export type OnboardingUpdateInput = ApiOperations["OnboardingController_update[1]"]["requestBody"]["content"]["application/json"];
-export type OnboardingSelectionInput = ApiOperations["OnboardingController_select[1]"]["requestBody"]["content"]["application/json"];
-export type TrialActivationInput = ApiOperations["OnboardingController_activate[1]"]["requestBody"]["content"]["application/json"];
-export type OnboardingSelectionResponse = ApiComponents["schemas"]["OnboardingSelectionResponse"];
-export type TrialActivationResponse = ApiComponents["schemas"]["TrialActivationResponse"];
-export type ProvisioningState =
-  | "requested"
-  | "validating"
-  | "provisioning"
-  | "activating"
-  | "publishing"
-  | "retryable_failed"
-  | "compensating"
-  | "compensated"
-  | "terminal_failed"
-  | "completed";
-export type ChecklistStatus =
-  | "pending"
-  | "in_progress"
-  | "verified"
-  | "blocked"
-  | "not_applicable";
-export type ChecklistSource =
-  | "system"
-  | "actor_attestation"
-  | "authorized_waiver"
-  | "legacy_import";
-export type ChecklistItem =
-  | "business"
-  | "unit"
-  | "plan"
-  | "fiscalChoice"
-  | "catalog"
-  | "tables"
-  | "team"
-  | "qr"
-  | "production"
-  | "cashier"
-  | "training"
-  | "rehearsal";
-
-export interface OnboardingChecklistEvidence {
-  status: ChecklistStatus;
-  source: ChecklistSource;
-  evidenceReference?: string | null;
-  evidence?: Record<string, string | number | boolean | string[] | null>;
-  actorIdentityId?: string | null;
-  verifiedAt?: string | null;
-  waiverReason?: string | null;
-}
-
-export interface ProvisioningSummary {
-  id: string;
-  state: ProvisioningState;
-  checkpoint: string;
-  attempts: number;
-  lastErrorCode?: string | null;
-  nextRetryAt?: string | null;
-  completedAt?: string | null;
-  failedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProvisioningStatus extends ProvisioningSummary {
-  steps: Array<{
-    step: string;
-    status: string;
-    attempts: number;
-    startedAt?: string | null;
-    completedAt?: string | null;
-    compensatedAt?: string | null;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-}
-
-export type OnboardingResponse = Omit<
-  ApiComponents["schemas"]["OnboardingResponse"],
-  "activatedAt" | "items" | "provisioning"
-> & {
-  activatedAt: string | null;
-  items: Partial<Record<ChecklistItem, OnboardingChecklistEvidence>>;
-  provisioning: ProvisioningSummary | null;
-};
+export type CreateOrganizationInput =
+  ApiOperations["OrganizationsController_create[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingUpdateInput =
+  ApiOperations["OnboardingController_update[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionInput =
+  ApiOperations["OnboardingController_select[1]"]["requestBody"]["content"]["application/json"];
+export type TrialActivationInput =
+  ApiOperations["OnboardingController_activate[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionResponse = OnboardingSelectionResponsePayload;
+export type TrialActivationResponse = TrialActivationResponsePayload;
+export type ProvisioningStatus = ProvisioningStatusResponsePayload;
+export type ProvisioningSummary = OnboardingResponsePayload["provisioning"] extends infer Summary
+  ? Exclude<Summary, null>
+  : never;
+export type ProvisioningState = ProvisioningSummary["state"];
+export type OnboardingResponse = OnboardingResponsePayload;
+export type ChecklistItem = keyof OnboardingResponse["items"];
+export type OnboardingChecklistEvidence = OnboardingResponse["items"][ChecklistItem];
+export type ChecklistStatus = OnboardingChecklistEvidence["status"];
+export type ChecklistSource = OnboardingChecklistEvidence["source"];
 
 export interface CreatedOrganizationResponse {
   organization: {
@@ -231,25 +174,51 @@ function safeErrorDetails(value: unknown): OnboardingErrorDetails | undefined {
     details.provisioningRunId = candidate.provisioningRunId;
   }
   if (Array.isArray(candidate.missingItems)) {
-    details.missingItems = candidate.missingItems.filter(
-      (item): item is string => typeof item === "string",
-    );
+    details.missingItems = candidate.missingItems
+      .filter((item): item is string => typeof item === "string" && item.length <= 80)
+      .slice(0, 12);
   }
   if (candidate.fieldErrors && typeof candidate.fieldErrors === "object") {
     details.fieldErrors = Object.fromEntries(
-      Object.entries(candidate.fieldErrors as Record<string, unknown>).flatMap(([key, messages]) =>
-        Array.isArray(messages)
-          ? [[key, messages.filter((message): message is string => typeof message === "string")]]
-          : [],
-      ),
+      Object.entries(candidate.fieldErrors as Record<string, unknown>)
+        .slice(0, 20)
+        .flatMap(([key, messages]) =>
+          key.length <= 120 && Array.isArray(messages)
+            ? [
+                [
+                  key,
+                  messages
+                    .filter((message): message is string => typeof message === "string")
+                    .slice(0, 5)
+                    .map((message) => message.slice(0, 240)),
+                ],
+              ]
+            : [],
+        ),
     );
   }
   if (Array.isArray(candidate.formErrors)) {
-    details.formErrors = candidate.formErrors.filter(
-      (message): message is string => typeof message === "string",
-    );
+    details.formErrors = candidate.formErrors
+      .filter((message): message is string => typeof message === "string")
+      .slice(0, 10)
+      .map((message) => message.slice(0, 240));
   }
   return Object.keys(details).length > 0 ? details : undefined;
+}
+
+function parseApiPayload<T>(
+  schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } },
+  value: unknown,
+  label: string,
+): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  throw new ApiClientError(
+    `A API retornou ${label} em formato inválido.`,
+    502,
+    "INVALID_API_RESPONSE",
+    false,
+  );
 }
 
 async function safeJson<T>(response: Response): Promise<T | null> {
@@ -349,32 +318,46 @@ export const api = {
       body: JSON.stringify(body),
     }),
   onboarding: {
-    get: (organizationId: string) =>
-      request<OnboardingResponse>(onboardingPath(organizationId)),
-    update: (organizationId: string, body: OnboardingUpdateInput) =>
-      request<OnboardingResponse>(onboardingPath(organizationId), {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
-    select: (organizationId: string, body: OnboardingSelectionInput) =>
-      request<OnboardingSelectionResponse>(onboardingPath(organizationId, "selection"), {
-        method: "PUT",
-        body: JSON.stringify(body),
-      }),
-    activate: (
-      organizationId: string,
-      body: TrialActivationInput,
-      idempotencyKey: string,
-    ) =>
-      request<TrialActivationResponse>(onboardingPath(organizationId, "activate"), {
+    get: async (organizationId: string, signal?: AbortSignal) =>
+      parseApiPayload(
+        onboardingResponseSchema,
+        await request<unknown>(onboardingPath(organizationId), { signal }),
+        "o onboarding",
+      ),
+    update: async (organizationId: string, body: OnboardingUpdateInput) =>
+      parseApiPayload(
+        onboardingResponseSchema,
+        await request<unknown>(onboardingPath(organizationId), {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }),
+        "o onboarding atualizado",
+      ),
+    select: async (organizationId: string, body: OnboardingSelectionInput) =>
+      parseApiPayload(
+        onboardingSelectionResponseSchema,
+        await request<unknown>(onboardingPath(organizationId, "selection"), {
+          method: "PUT",
+          body: JSON.stringify(body),
+        }),
+        "a seleção do onboarding",
+      ),
+    activate: (organizationId: string, body: TrialActivationInput, idempotencyKey: string) =>
+      request<unknown>(onboardingPath(organizationId, "activate"), {
         method: "POST",
         headers: { "idempotency-key": idempotencyKey },
         body: JSON.stringify(body),
-      }),
-    provisioning: (organizationId: string, runId: string, signal?: AbortSignal) =>
-      request<ProvisioningStatus>(
-        onboardingPath(organizationId, `provisioning/${encodeURIComponent(runId)}`),
-        { signal },
+      }).then((value) =>
+        parseApiPayload(trialActivationResponseSchema, value, "a ativação do trial"),
+      ),
+    provisioning: async (organizationId: string, runId: string, signal?: AbortSignal) =>
+      parseApiPayload(
+        provisioningStatusResponseSchema,
+        await request<unknown>(
+          onboardingPath(organizationId, `provisioning/${encodeURIComponent(runId)}`),
+          { signal },
+        ),
+        "o status do provisionamento",
       ),
   },
   platform: {

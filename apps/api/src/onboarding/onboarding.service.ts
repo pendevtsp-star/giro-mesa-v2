@@ -176,9 +176,7 @@ function sanitizedSystemEvidence(item: ChecklistItem, evidence: Record<string, u
       const requestedMode = evidence.requestedMode ?? evidence.mode;
       const boundedIds = (value: unknown) =>
         Array.isArray(value)
-          ? value
-              .filter((entry): entry is string => typeof entry === "string")
-              .slice(0, 24)
+          ? value.filter((entry): entry is string => typeof entry === "string").slice(0, 24)
           : [];
       return {
         configured: evidence.configured === true,
@@ -386,6 +384,7 @@ export class OnboardingService {
     evidenceReference: string,
     evidence: Record<string, unknown> = {},
     reason = "system_readiness_refresh",
+    selectedUnitId: string | null = null,
   ) {
     const [existing] = await tx
       .select()
@@ -440,6 +439,7 @@ export class OnboardingService {
     const after = checklistAuditState(item, next);
     await tx.insert(auditEvents).values({
       organizationId,
+      unitId: selectedUnitId,
       actorIdentityId: null,
       action: "onboarding.system_evidence_changed",
       entityType: "onboarding_checklist_item",
@@ -568,6 +568,7 @@ export class OnboardingService {
       `organization:${organizationId}`,
       {},
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -580,6 +581,7 @@ export class OnboardingService {
         selectedUnitActive: selectedUnits.length === 1,
       },
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -589,6 +591,7 @@ export class OnboardingService {
       selectedUnitId ? `unit:${selectedUnitId}:catalog` : `organization:${organizationId}:catalog`,
       {},
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -598,6 +601,7 @@ export class OnboardingService {
       selectedUnitId ? `unit:${selectedUnitId}:tables` : `organization:${organizationId}:tables`,
       {},
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -609,6 +613,7 @@ export class OnboardingService {
         activeMembersObserved: team.length,
       },
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -623,6 +628,7 @@ export class OnboardingService {
         serverTestPassed: false,
       },
       reason,
+      selectedUnitId,
     );
     await this.setSystemEvidence(
       tx,
@@ -632,6 +638,7 @@ export class OnboardingService {
       selectedUnitId ? `unit:${selectedUnitId}:cashier` : `organization:${organizationId}:cashier`,
       {},
       reason,
+      selectedUnitId,
     );
     const [production] = await tx
       .select({
@@ -665,6 +672,7 @@ export class OnboardingService {
           requestedMode: production.evidence.mode ?? null,
         },
         reason,
+        selectedUnitId,
       );
     }
     if (pinnedPlan) {
@@ -679,6 +687,7 @@ export class OnboardingService {
           slug: pinnedPlan.slug,
         },
         reason,
+        selectedUnitId,
       );
     } else {
       await this.setSystemEvidence(
@@ -689,6 +698,7 @@ export class OnboardingService {
         `organization:${organizationId}:plan-selection`,
         {},
         reason,
+        selectedUnitId,
       );
     }
   }
@@ -764,10 +774,11 @@ export class OnboardingService {
     tx: TenantTransaction,
     identityId: string,
     organizationId: string,
+    selectedUnitId: string | null,
     allowed: readonly ("owner" | "manager")[],
   ) {
     const bindings = await tx
-      .select({ role: roleBindings.role })
+      .select({ role: roleBindings.role, unitId: roleBindings.unitId })
       .from(memberships)
       .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
       .where(
@@ -784,17 +795,23 @@ export class OnboardingService {
         message: "A autorização para alterar o onboarding não está mais ativa.",
       });
     }
-    return bindings;
+    const scopedBindings = bindings.filter(
+      (binding) =>
+        binding.unitId === null || (selectedUnitId !== null && binding.unitId === selectedUnitId),
+    );
+    if (scopedBindings.length === 0) {
+      throw new ForbiddenException({
+        code: "ONBOARDING_UNIT_SCOPE_DENIED",
+        message: "O onboarding selecionado pertence a outra unidade.",
+      });
+    }
+    return scopedBindings;
   }
 
   async get(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
-      await this.requireMutationRoleInTransaction(tx, identityId, organizationId, [
-        "owner",
-        "manager",
-      ]);
       const [record] = await tx
         .select()
         .from(onboardingRecords)
@@ -806,6 +823,13 @@ export class OnboardingService {
           message: "Onboarding não encontrado.",
         });
       }
+      await this.requireMutationRoleInTransaction(
+        tx,
+        identityId,
+        organizationId,
+        record.selectedUnitId,
+        ["owner", "manager"],
+      );
       const selectedPlan = record.activatedAt
         ? frozenSelectedPlan(record)
         : await this.exactSelectedPlan(tx, record);
@@ -964,10 +988,6 @@ export class OnboardingService {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
-      const roles = await this.requireMutationRoleInTransaction(tx, identityId, organizationId, [
-        "owner",
-        "manager",
-      ]);
       const [record] = await tx
         .select()
         .from(onboardingRecords)
@@ -979,6 +999,13 @@ export class OnboardingService {
           message: "Onboarding não encontrado.",
         });
       }
+      const roles = await this.requireMutationRoleInTransaction(
+        tx,
+        identityId,
+        organizationId,
+        record.selectedUnitId,
+        ["owner", "manager"],
+      );
       if (record.activatedAt) {
         throw new ConflictException({
           code: "ONBOARDING_ALREADY_ACTIVATED",
@@ -1126,8 +1153,7 @@ export class OnboardingService {
               ),
             );
         } else if (!SYSTEM_ITEMS.has(item)) {
-          const progressEvidence =
-            "evidence" in requested ? (requested.evidence ?? {}) : {};
+          const progressEvidence = "evidence" in requested ? (requested.evidence ?? {}) : {};
           const progressReference =
             "evidenceReference" in requested ? (requested.evidenceReference ?? null) : null;
           await tx
@@ -1178,6 +1204,7 @@ export class OnboardingService {
       const checklist = await this.checklist(tx, organizationId);
       await tx.insert(auditEvents).values({
         organizationId,
+        unitId: updatedRecord.selectedUnitId,
         actorIdentityId: identityId,
         action: "onboarding.updated",
         entityType: "onboarding",
@@ -2170,32 +2197,58 @@ export class OnboardingService {
 
   async provisioningStatus(identityId: string, organizationId: string, runId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
-    const [run] = await this.database.db
-      .select()
-      .from(provisioningRuns)
-      .where(
-        and(eq(provisioningRuns.id, runId), eq(provisioningRuns.organizationId, organizationId)),
-      )
-      .limit(1);
-    if (!run) throw new NotFoundException();
-    const steps = await this.database.db
-      .select({
-        step: provisioningSteps.step,
-        status: provisioningSteps.status,
-        attempts: provisioningSteps.attempts,
-        startedAt: provisioningSteps.startedAt,
-        completedAt: provisioningSteps.completedAt,
-        compensatedAt: provisioningSteps.compensatedAt,
-        createdAt: provisioningSteps.createdAt,
-        updatedAt: provisioningSteps.updatedAt,
-      })
-      .from(provisioningSteps)
-      .where(
-        and(
-          eq(provisioningSteps.organizationId, organizationId),
-          eq(provisioningSteps.provisioningRunId, runId),
-        ),
+    return this.durable(identityId, organizationId, async (tx) => {
+      await this.organizationLock(tx, organizationId);
+      const [record] = await tx
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, organizationId))
+        .limit(1);
+      if (!record) {
+        throw new NotFoundException({
+          code: "ONBOARDING_NOT_FOUND",
+          message: "Onboarding não encontrado.",
+        });
+      }
+      await this.requireMutationRoleInTransaction(
+        tx,
+        identityId,
+        organizationId,
+        record.selectedUnitId,
+        ["owner", "manager"],
       );
-    return { ...this.provisioningProjection(run), steps };
+      if (record.selectedUnitId) {
+        await tx.execute(
+          sql`select set_config('app.current_unit_id', ${record.selectedUnitId}, true)`,
+        );
+      }
+      const [run] = await tx
+        .select()
+        .from(provisioningRuns)
+        .where(
+          and(eq(provisioningRuns.id, runId), eq(provisioningRuns.organizationId, organizationId)),
+        )
+        .limit(1);
+      if (!run) throw new NotFoundException();
+      const steps = await tx
+        .select({
+          step: provisioningSteps.step,
+          status: provisioningSteps.status,
+          attempts: provisioningSteps.attempts,
+          startedAt: provisioningSteps.startedAt,
+          completedAt: provisioningSteps.completedAt,
+          compensatedAt: provisioningSteps.compensatedAt,
+          createdAt: provisioningSteps.createdAt,
+          updatedAt: provisioningSteps.updatedAt,
+        })
+        .from(provisioningSteps)
+        .where(
+          and(
+            eq(provisioningSteps.organizationId, organizationId),
+            eq(provisioningSteps.provisioningRunId, runId),
+          ),
+        );
+      return { ...this.provisioningProjection(run), steps };
+    });
   }
 }

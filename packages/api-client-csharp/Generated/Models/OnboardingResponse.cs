@@ -13,30 +13,24 @@ namespace GiroMesa.ApiClient.Models
     #pragma warning restore CS1591
     {
         /// <summary>The activatedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.OnboardingResponse_activatedAt? ActivatedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.OnboardingResponse_activatedAt ActivatedAt { get; set; }
-#endif
+        public DateTimeOffset? ActivatedAt { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.Models.OnboardingResponse_items? Items { get; set; }
+        public global::GiroMesa.ApiClient.Models.OnboardingChecklistItemsResponse? Items { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.Models.OnboardingResponse_items Items { get; set; }
+        public global::GiroMesa.ApiClient.Models.OnboardingChecklistItemsResponse Items { get; set; }
 #endif
         /// <summary>The missingItems property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public List<string>? MissingItems { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.OnboardingResponse_missingItems?>? MissingItems { get; set; }
 #nullable restore
 #else
-        public List<string> MissingItems { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.OnboardingResponse_missingItems?> MissingItems { get; set; }
 #endif
         /// <summary>The organizationId property</summary>
         public Guid? OrganizationId { get; set; }
@@ -83,9 +77,9 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "activatedAt", n => { ActivatedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_activatedAt>(global::GiroMesa.ApiClient.Models.OnboardingResponse_activatedAt.CreateFromDiscriminatorValue); } },
-                { "items", n => { Items = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_items>(global::GiroMesa.ApiClient.Models.OnboardingResponse_items.CreateFromDiscriminatorValue); } },
-                { "missingItems", n => { MissingItems = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
+                { "activatedAt", n => { ActivatedAt = n.GetDateTimeOffsetValue(); } },
+                { "items", n => { Items = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingChecklistItemsResponse>(global::GiroMesa.ApiClient.Models.OnboardingChecklistItemsResponse.CreateFromDiscriminatorValue); } },
+                { "missingItems", n => { MissingItems = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.Models.OnboardingResponse_missingItems>()?.AsList(); } },
                 { "organizationId", n => { OrganizationId = n.GetGuidValue(); } },
                 { "provisioning", n => { Provisioning = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_provisioning>(global::GiroMesa.ApiClient.Models.OnboardingResponse_provisioning.CreateFromDiscriminatorValue); } },
                 { "ready", n => { Ready = n.GetBoolValue(); } },
@@ -99,9 +93,9 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_activatedAt>("activatedAt", ActivatedAt);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_items>("items", Items);
-            writer.WriteCollectionOfPrimitiveValues<string>("missingItems", MissingItems);
+            writer.WriteDateTimeOffsetValue("activatedAt", ActivatedAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingChecklistItemsResponse>("items", Items);
+            writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.Models.OnboardingResponse_missingItems>("missingItems", MissingItems);
             writer.WriteGuidValue("organizationId", OrganizationId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingResponse_provisioning>("provisioning", Provisioning);
             writer.WriteBoolValue("ready", Ready);

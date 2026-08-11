@@ -25,13 +25,26 @@ const crashingRunId = crypto.randomUUID();
 const maliciousInternalRunId = crypto.randomUUID();
 const maliciousUnavailableRunId = crypto.randomUUID();
 const nestedCauseRunId = crypto.randomUUID();
+const unitScopedRunId = crypto.randomUUID();
 let updateCalls = 0;
 const fakeService = {
-  get() {
+  get(actorIdentityId: string) {
+    if (actorIdentityId === managerIdentityId) {
+      throw new ForbiddenException({
+        code: "ONBOARDING_UNIT_SCOPE_DENIED",
+        message: "O onboarding selecionado pertence a outra unidade.",
+      });
+    }
     throw new NotFoundException();
   },
-  update() {
+  update(actorIdentityId: string) {
     updateCalls += 1;
+    if (actorIdentityId === managerIdentityId) {
+      throw new ForbiddenException({
+        code: "ONBOARDING_UNIT_SCOPE_DENIED",
+        message: "O onboarding selecionado pertence a outra unidade.",
+      });
+    }
     throw new ConflictException({
       code: "ONBOARDING_ALREADY_ACTIVATED",
       message: "O onboarding já foi ativado.",
@@ -72,6 +85,12 @@ const fakeService = {
     });
   },
   provisioningStatus(_identityId: string, _organizationId: string, runId: string) {
+    if (_identityId === managerIdentityId && runId === unitScopedRunId) {
+      throw new ForbiddenException({
+        code: "ONBOARDING_UNIT_SCOPE_DENIED",
+        message: "O onboarding selecionado pertence a outra unidade.",
+      });
+    }
     if (runId === crashingRunId) {
       throw new Error("database password and internal stack must stay private");
     }
@@ -178,6 +197,22 @@ describe("onboarding real HTTP error contract", () => {
         payload: { planSlug: "operacao", selectedUnitId: crypto.randomUUID() },
       });
       exactError(forbidden.json(), 403, "INSUFFICIENT_ROLE");
+
+      for (const request of [
+        { method: "GET" as const, url: base },
+        {
+          method: "PATCH" as const,
+          url: base,
+          payload: { items: { training: { status: "pending" } } },
+        },
+        { method: "GET" as const, url: `${base}/provisioning/${unitScopedRunId}` },
+      ]) {
+        const crossUnit = await app.inject({
+          ...request,
+          headers: { authorization: "Bearer manager" },
+        });
+        exactError(crossUnit.json(), 403, "ONBOARDING_UNIT_SCOPE_DENIED");
+      }
 
       const internal = await app.inject({
         method: "GET",

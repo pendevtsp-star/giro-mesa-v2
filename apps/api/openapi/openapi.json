@@ -3083,6 +3083,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -3162,6 +3172,16 @@
             }
           },
           "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "",
             "content": {
               "application/json": {
@@ -4069,6 +4089,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -4148,6 +4178,16 @@
             }
           },
           "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "",
             "content": {
               "application/json": {
@@ -5065,6 +5105,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -5180,6 +5230,16 @@
             }
           },
           "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "",
             "content": {
               "application/json": {
@@ -5322,6 +5382,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -5442,6 +5512,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -5551,6 +5631,16 @@
               }
             }
           },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -5630,6 +5720,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "",
             "content": {
               "application/json": {
@@ -21101,6 +21201,228 @@
           "status"
         ]
       },
+      "OnboardingEvidenceResponse": {
+        "type": "object",
+        "properties": {
+          "selectedUnitId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "selectedUnitActive": {
+            "type": "boolean"
+          },
+          "activeMembersObserved": {
+            "type": "number",
+            "minimum": 0
+          },
+          "menuPublished": {
+            "type": "boolean"
+          },
+          "tablesConfigured": {
+            "type": "boolean"
+          },
+          "capabilitiesConfigured": {
+            "type": "boolean"
+          },
+          "serverTestPassed": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "requestedMode": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "off",
+              "kds",
+              "print",
+              "both"
+            ]
+          },
+          "kdsStationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "printerProfileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "configurationReference": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "catalogVersion": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "operacao",
+              "crescimento",
+              "rede"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "focus",
+              "external"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "pilot_without_qr",
+              "external_qr",
+              "not_required",
+              "external_fiscal"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "kds",
+              "print",
+              "both"
+            ]
+          },
+          "legacyValue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OnboardingChecklistEvidenceResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "verified",
+              "blocked",
+              "not_applicable"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "system",
+              "actor_attestation",
+              "authorized_waiver",
+              "legacy_import"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 240
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/OnboardingEvidenceResponse"
+          },
+          "actorIdentityId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "waiverReason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "status",
+          "source",
+          "evidenceReference",
+          "evidence",
+          "actorIdentityId",
+          "verifiedAt",
+          "waiverReason"
+        ]
+      },
+      "OnboardingChecklistItemsResponse": {
+        "type": "object",
+        "properties": {
+          "business": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "fiscalChoice": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "tables": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "team": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "qr": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "production": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "cashier": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "training": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          },
+          "rehearsal": {
+            "$ref": "#/components/schemas/OnboardingChecklistEvidenceResponse"
+          }
+        },
+        "required": [
+          "business",
+          "unit",
+          "plan",
+          "fiscalChoice",
+          "catalog",
+          "tables",
+          "team",
+          "qr",
+          "production",
+          "cashier",
+          "training",
+          "rehearsal"
+        ]
+      },
       "OnboardingPlanResponse": {
         "type": "object",
         "properties": {
@@ -21183,30 +21505,51 @@
             "format": "uuid"
           },
           "state": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "requested",
+              "validating",
+              "provisioning",
+              "activating",
+              "publishing",
+              "retryable_failed",
+              "compensating",
+              "compensated",
+              "terminal_failed",
+              "completed"
+            ]
           },
           "checkpoint": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "requested",
+              "validated",
+              "internal_provisioned",
+              "activation_committed",
+              "published",
+              "compensated"
+            ]
           },
           "attempts": {
             "type": "number"
           },
           "lastErrorCode": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
           },
           "nextRetryAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "completedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "failedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
@@ -21236,13 +21579,12 @@
             "format": "uuid"
           },
           "activatedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "items": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/OnboardingChecklistItemsResponse"
           },
           "ready": {
             "type": "boolean"
@@ -21250,7 +21592,21 @@
           "missingItems": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "business",
+                "unit",
+                "plan",
+                "fiscalChoice",
+                "catalog",
+                "tables",
+                "team",
+                "qr",
+                "production",
+                "cashier",
+                "training",
+                "rehearsal"
+              ]
             }
           },
           "selection": {
@@ -21289,7 +21645,21 @@
           "missingItems": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "business",
+                "unit",
+                "plan",
+                "fiscalChoice",
+                "catalog",
+                "tables",
+                "team",
+                "qr",
+                "production",
+                "cashier",
+                "training",
+                "rehearsal"
+              ]
             }
           },
           "fieldErrors": {
@@ -21391,26 +21761,40 @@
         "type": "object",
         "properties": {
           "step": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "validation",
+              "internal_provisioning",
+              "activation",
+              "publication",
+              "compensation"
+            ]
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "compensated"
+            ]
           },
           "attempts": {
             "type": "number"
           },
           "startedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "completedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "compensatedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
@@ -21439,30 +21823,51 @@
             "format": "uuid"
           },
           "state": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "requested",
+              "validating",
+              "provisioning",
+              "activating",
+              "publishing",
+              "retryable_failed",
+              "compensating",
+              "compensated",
+              "terminal_failed",
+              "completed"
+            ]
           },
           "checkpoint": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "requested",
+              "validated",
+              "internal_provisioned",
+              "activation_committed",
+              "published",
+              "compensated"
+            ]
           },
           "attempts": {
             "type": "number"
           },
           "lastErrorCode": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
           },
           "nextRetryAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "completedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },
           "failedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           },

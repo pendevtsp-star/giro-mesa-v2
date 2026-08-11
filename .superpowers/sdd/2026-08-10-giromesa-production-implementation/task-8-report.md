@@ -64,8 +64,45 @@ Artefatos temporários, fora do bundle e ignorados pelo Git:
 - `git diff --check`: **verde**.
 - `pnpm run lint` integral: vermelho somente pelo baseline CRLF/formatação preexistente em `packages/db`, `packages/domain` e `apps/site`; nenhum desses arquivos foi alterado ou reformatado.
 
+## Fix round 1 â€” autorizaÃ§Ã£o, concorrÃªncia e contrato
+
+O round de revisÃ£o corrigiu o achado crÃ­tico e os sete achados importantes sem reduzir requisitos nem antecipar Task 9+.
+
+### RED adicional capturado
+
+- PostgreSQL 17 reproduziu o acesso cruzado: um manager vinculado Ã  unidade B alcanÃ§ava o `GET` do onboarding pinado na unidade A e sÃ³ falhava depois ao tentar gravar audit sob RLS, em vez de receber 403 no boundary. O teste focal ficou verde apÃ³s a autorizaÃ§Ã£o unit-scoped sob o advisory lock.
+- O novo teste OpenAPI falhou com `items: { type: object, additionalProperties: true }`, provando que checklist/evidence e provisioning ainda nÃ£o eram tipados. ApÃ³s fortalecer os DTOs e regenerar clientes, ficou 3/3.
+- A primeira matriz Playwright ampliada ficou 12/20. As falhas revelaram uma atualizaÃ§Ã£o redundante apÃ³s trocar unidade e expectativas antigas de copy/labels; o fluxo eliminou o refresh do escopo antigo e a matriz final ficou 20/20.
+
+### CorreÃ§Ãµes
+
+- `GET`, `PATCH` e status de provisioning agora carregam o `onboarding_record` sob o lock da organizaÃ§Ã£o e revalidam, dentro da mesma transaÃ§Ã£o, binding global ou binding exatamente igual a `selectedUnitId`. Registro sem seleÃ§Ã£o exige binding global. Owner global, manager da unidade selecionada e manager global foram cobertos; manager de outra unidade recebe `ONBOARDING_UNIT_SCOPE_DENIED` antes de refresh, mutation ou leitura da saga.
+- Audit events disparados por revalidaÃ§Ã£o/PATCH carregam a unidade pinada, preservando a polÃ­tica RLS do manager unit-scoped. O status de provisioning tambÃ©m passou a usar contexto tenant, advisory lock e a mesma revalidaÃ§Ã£o.
+- Todo snapshot terminal recebido no `GET`/refresh remove a chave da tentativa (`completed`, `terminal_failed` ou `compensated`). O E2E faz reload real, repete exatamente a mesma chave depois de um 500 e prova limpeza no resultado e em novo reload terminal.
+- Fetches de snapshot compÃµem `AbortController`, sequÃªncia monotÃ´nica, generation e identidade de escopo. Mutations e polling conferem organizaÃ§Ã£o/unidade/revisÃ£o/run antes de aplicar resposta. Troca de contexto aborta requests, zera snapshot, busy e polling; troca de revisÃ£o/run zera backoff/pausa. E2E determinÃ­stico cobre GET fora de ordem e polling abortado ao desmontar sem misturar runs.
+- ConfirmaÃ§Ãµes de ativaÃ§Ã£o e waiver sÃ£o vinculadas a organizaÃ§Ã£o, unidade, revisÃ£o, plano, readiness, missing items e run; mudanÃ§a do motivo do waiver tambÃ©m desmarca a confirmaÃ§Ã£o. O E2E prova resets por readiness, revisÃ£o e motivo.
+- Checklist items/evidence, selection, provisioning states/checkpoints/steps/statuses e datas agora sÃ£o schemas OpenAPI explÃ­citos. O cliente valida respostas com Zod em runtime e converte violaÃ§Ã£o de boundary em `INVALID_API_RESPONSE`, sem cast cego. TS e C# foram regenerados; warnings Kiota anteriores de datas nullable do onboarding foram eliminados.
+- Em 401, a sessÃ£o local Ã© limpa sincronicamente; logout remoto Ã© best effort e nÃ£o bloqueia a tela. O unit test mantÃ©m o logout remoto pendente e verifica a limpeza imediata.
+- A matriz E2E usa somente status documentados pelo OpenAPI: 400/401/403/404/409/429/500. Ela cobre componente/boundary real, PATCH 400, owner/manager/waiter, unidade A/B, same-key replay, reload, terminal cleanup, cancellation e races.
+- `fieldErrors` e `formErrors` allowlisted sÃ£o limitados por quantidade/tamanho, propagados ao formulÃ¡rio e associados por `aria-invalid`/`aria-describedby`. O primeiro campo invÃ¡lido recebe foco; o PATCH 400 de escolha fiscal comprova mensagem, associaÃ§Ã£o e foco.
+
+### Gates do fix round 1
+
+- PostgreSQL 17: **21/21** integraÃ§Ãµes reais; inclui escopo A/B, manager matching/global, owner global sem seleÃ§Ã£o e regressÃµes completas da Task 7.
+- PostgreSQL 16: **21/21** no mesmo conjunto. Containers descartÃ¡veis `giromesa-task8-fix-pg16` e `giromesa-task8-fix-pg17` foram verificados pelo nome/imagem e removidos ao fim.
+- API completa sem env de integraÃ§Ã£o: **91 passed, 42 skipped declarados, 0 failures**; HTTP onboarding cobre GET/PATCH/status unit-scoped nos aliases `/api/v1` e `/v1`.
+- Ops unit/component/runtime boundary: **13 arquivos, 49/49 testes**.
+- Contracts: **8/8 testes**; OpenAPI onboarding: **3/3**.
+- Playwright onboarding: **20/20**, desktop + mobile. A matriz inclui 10 cenÃ¡rios por viewport, axe WCAG, overflow, reload real, idempotÃªncia, confirmaÃ§Ãµes, erros, cancelamento e races.
+- C# gerado: `dotnet build --no-restore` **verde, 0 warnings, 0 errors** (`net10.0`).
+- Workspace typecheck: **12/12 tasks**. Workspace build: **8/8 tasks**.
+- Workspace test: **12/12 tasks**; baseline/supply-chain permaneceram verdes. As integrações PostgreSQL declaradamente puladas nesse comando foram executadas separadamente em PG16 e PG17, como registrado acima.
+- Biome focado: **14 arquivos sem diagnósticos**. `git diff --check`: **verde**.
+- QA visual em lote: as quatro capturas desktop/mobile de topo/ativaÃ§Ã£o foram inspecionadas em resoluÃ§Ã£o original; hierarquia, wrapping, foco visual e ausÃªncia de overflow permaneceram corretos.
+- O detector Impeccable nÃ£o foi executado novamente neste round: a Task 8 exigia uma Ãºnica execuÃ§Ã£o final, jÃ¡ registrada acima. As correÃ§Ãµes preservam esse gate sem fabricar uma segunda passagem.
+
 ## Limites conhecidos
 
-- O E2E interceptado prova comportamento e renderização do cliente, não substitui integração autenticada com PostgreSQL. A Task 7 registra os gates reais PG16/PG17; nesta task nenhum banco/provider foi iniciado.
+- O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.
 - KDS/impressão/both não podem concluir enquanto a API não projetar estações, perfis e teste reais. O estado seguro é `in_progress`, com ação de recuperação, nunca sucesso local.
 - A substituição global dos pseudo-ícones legados e os advisories de CSS detectados permanecem para a Task 11; nenhuma tarefa 9+ foi iniciada.

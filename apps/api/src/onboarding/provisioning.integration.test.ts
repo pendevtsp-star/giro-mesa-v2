@@ -755,6 +755,231 @@ describe("durable onboarding provisioning", () => {
     }
   });
 
+  it("enforces the pinned unit for manager reads, updates and provisioning status under the organization lock", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Manager Unit Scope");
+    const otherUnitId = randomUUID();
+    const matchingManagerIdentityId = randomUUID();
+    const otherManagerIdentityId = randomUUID();
+    const globalManagerIdentityId = randomUUID();
+    const matchingManagerMembershipId = randomUUID();
+    const otherManagerMembershipId = randomUUID();
+    const globalManagerMembershipId = randomUUID();
+
+    await owner.db.insert(units).values({
+      id: otherUnitId,
+      organizationId: subject.organizationId,
+      name: "Manager Unit Scope Filial",
+    });
+    await owner.db.insert(identities).values([
+      {
+        id: matchingManagerIdentityId,
+        email: `manager-a-${suffix}@example.test`,
+        displayName: "Manager A",
+        emailVerifiedAt: new Date(),
+      },
+      {
+        id: otherManagerIdentityId,
+        email: `manager-b-${suffix}@example.test`,
+        displayName: "Manager B",
+        emailVerifiedAt: new Date(),
+      },
+      {
+        id: globalManagerIdentityId,
+        email: `manager-global-${suffix}@example.test`,
+        displayName: "Manager Global",
+        emailVerifiedAt: new Date(),
+      },
+    ]);
+    await owner.db.insert(memberships).values([
+      {
+        id: matchingManagerMembershipId,
+        identityId: matchingManagerIdentityId,
+        organizationId: subject.organizationId,
+        status: "active",
+      },
+      {
+        id: otherManagerMembershipId,
+        identityId: otherManagerIdentityId,
+        organizationId: subject.organizationId,
+        status: "active",
+      },
+      {
+        id: globalManagerMembershipId,
+        identityId: globalManagerIdentityId,
+        organizationId: subject.organizationId,
+        status: "active",
+      },
+    ]);
+    await owner.db.insert(roleBindings).values([
+      { membershipId: matchingManagerMembershipId, unitId: subject.unitId, role: "manager" },
+      { membershipId: otherManagerMembershipId, unitId: otherUnitId, role: "manager" },
+      { membershipId: globalManagerMembershipId, unitId: null, role: "manager" },
+    ]);
+
+    for (const operation of [
+      () => service?.get(otherManagerIdentityId, subject.organizationId),
+      () =>
+        service?.update(otherManagerIdentityId, subject.organizationId, {
+          items: {
+            training: {
+              status: "verified",
+              evidenceReference: "cross-unit-training",
+              evidence: { completed: true },
+            },
+          },
+        }),
+    ]) {
+      await assert.rejects(
+        invoke(
+          otherManagerIdentityId,
+          subject.organizationId,
+          () => operation() ?? Promise.reject(new Error("service unavailable")),
+        ),
+        errorContains("ONBOARDING_UNIT_SCOPE_DENIED"),
+      );
+    }
+
+    const matchingSnapshot = await invoke(
+      matchingManagerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(matchingManagerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(matchingSnapshot.selection?.selectedUnitId, subject.unitId);
+    const globalSnapshot = await invoke(
+      globalManagerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(globalManagerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(globalSnapshot.selection?.selectedUnitId, subject.unitId);
+
+    await invoke(
+      matchingManagerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.update(matchingManagerIdentityId, subject.organizationId, {
+          items: {
+            training: {
+              status: "verified",
+              evidenceReference: "matching-unit-training",
+              evidence: { completed: true },
+            },
+          },
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const activation = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.activate(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          "manager-unit-scope-activation",
+          { planSlug: "operacao" },
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(typeof activation.provisioningRunId, "string");
+    const provisioningRunId = String(activation.provisioningRunId);
+    await assert.rejects(
+      invoke(
+        otherManagerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.provisioningStatus(
+            otherManagerIdentityId,
+            subject.organizationId,
+            provisioningRunId,
+          ) ?? Promise.reject(new Error("service unavailable")),
+      ),
+      errorContains("ONBOARDING_UNIT_SCOPE_DENIED"),
+    );
+    for (const identityId of [matchingManagerIdentityId, globalManagerIdentityId]) {
+      const status = await invoke(
+        identityId,
+        subject.organizationId,
+        () =>
+          service?.provisioningStatus(identityId, subject.organizationId, provisioningRunId) ??
+          Promise.reject(new Error("service unavailable")),
+      );
+      assert.equal(status.id, provisioningRunId);
+    }
+
+    documentCounter += 1;
+    const unselectedOrganizationId = randomUUID();
+    const unselectedUnitId = randomUUID();
+    const unselectedOwnerIdentityId = randomUUID();
+    const unselectedManagerIdentityId = randomUUID();
+    const unselectedOwnerMembershipId = randomUUID();
+    const unselectedManagerMembershipId = randomUUID();
+    await owner.db.insert(organizations).values({
+      id: unselectedOrganizationId,
+      legalName: "Unselected Scope Ltda",
+      tradeName: "Unselected Scope",
+      document: String(documentCounter).padStart(14, "0"),
+      billingState: "onboarding",
+    });
+    await owner.db.insert(units).values({
+      id: unselectedUnitId,
+      organizationId: unselectedOrganizationId,
+      name: "Unselected Scope Matriz",
+    });
+    await owner.db.insert(identities).values([
+      {
+        id: unselectedOwnerIdentityId,
+        email: `unselected-owner-${suffix}@example.test`,
+        displayName: "Unselected Owner",
+        emailVerifiedAt: new Date(),
+      },
+      {
+        id: unselectedManagerIdentityId,
+        email: `unselected-manager-${suffix}@example.test`,
+        displayName: "Unselected Manager",
+        emailVerifiedAt: new Date(),
+      },
+    ]);
+    await owner.db.insert(memberships).values([
+      {
+        id: unselectedOwnerMembershipId,
+        identityId: unselectedOwnerIdentityId,
+        organizationId: unselectedOrganizationId,
+        status: "active",
+      },
+      {
+        id: unselectedManagerMembershipId,
+        identityId: unselectedManagerIdentityId,
+        organizationId: unselectedOrganizationId,
+        status: "active",
+      },
+    ]);
+    await owner.db.insert(roleBindings).values([
+      { membershipId: unselectedOwnerMembershipId, unitId: null, role: "owner" },
+      { membershipId: unselectedManagerMembershipId, unitId: unselectedUnitId, role: "manager" },
+    ]);
+    await owner.db.insert(onboardingRecords).values({ organizationId: unselectedOrganizationId });
+    const ownerWithoutSelection = await invoke(
+      unselectedOwnerIdentityId,
+      unselectedOrganizationId,
+      () =>
+        service?.get(unselectedOwnerIdentityId, unselectedOrganizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(ownerWithoutSelection.selection, null);
+    await assert.rejects(
+      invoke(
+        unselectedManagerIdentityId,
+        unselectedOrganizationId,
+        () =>
+          service?.get(unselectedManagerIdentityId, unselectedOrganizationId) ??
+          Promise.reject(new Error("service unavailable")),
+      ),
+      errorContains("ONBOARDING_UNIT_SCOPE_DENIED"),
+    );
+  });
+
   it("ignores adulterated legacy booleans and never starts a trial before verified evidence", async (context) => {
     if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
     const subject = await fixture("Incomplete", false);

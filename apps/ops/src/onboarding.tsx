@@ -16,13 +16,23 @@ import { routeHref } from "./router";
 export type { OnboardingResponse } from "./api";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-type PublicError = { status: number; code: string; message: string };
+type PublicError = {
+  status: number;
+  code: string;
+  message: string;
+  details?: {
+    fieldErrors?: Record<string, string[]>;
+    formErrors?: string[];
+  };
+};
 type ErrorGuidance = {
   title: string;
   message: string;
   action: string;
   sessionEnded?: boolean;
   permissionLocked?: boolean;
+  fieldErrors?: Record<string, string[]>;
+  formErrors?: string[];
 };
 
 type ChecklistDefinition = {
@@ -358,12 +368,17 @@ export function createQrWaiverUpdate(
 }
 
 export function errorGuidance(error: PublicError): ErrorGuidance {
+  const validation = {
+    fieldErrors: error.details?.fieldErrors,
+    formErrors: error.details?.formErrors,
+  };
   if (error.status === 401) {
     return {
       title: "Sua sessão terminou",
       message: error.message || "Entre novamente para continuar o onboarding.",
       action: "Entrar novamente",
       sessionEnded: true,
+      ...validation,
     };
   }
   if (error.status === 403) {
@@ -372,6 +387,7 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       message: error.message || "Seu perfil não pode alterar este onboarding.",
       action: "Manter em modo de consulta",
       permissionLocked: true,
+      ...validation,
     };
   }
   if (error.status === 404) {
@@ -379,6 +395,7 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       title: "Onboarding não encontrado",
       message: error.message || "Confirme a organização selecionada e tente novamente.",
       action: "Atualizar contexto",
+      ...validation,
     };
   }
   if (error.status === 409) {
@@ -386,6 +403,7 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       title: "O estado mudou no servidor",
       message: error.message || "Revise a seleção e atualize os requisitos antes de continuar.",
       action: error.code === "ONBOARDING_RESELECT_REQUIRED" ? "Revisar seleção" : "Atualizar",
+      ...validation,
     };
   }
   if (error.status === 429) {
@@ -393,6 +411,7 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       title: "Muitas tentativas",
       message: "Aguarde antes de repetir esta ação. A tentativa atual continua preservada.",
       action: "Tentar mais tarde",
+      ...validation,
     };
   }
   if (error.status === 0) {
@@ -400,6 +419,7 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       title: "Sem conexão com o servidor",
       message: error.message || "Reconecte para atualizar ou alterar o onboarding.",
       action: "Tentar novamente",
+      ...validation,
     };
   }
   if (error.status >= 500) {
@@ -408,13 +428,45 @@ export function errorGuidance(error: PublicError): ErrorGuidance {
       message:
         "O servidor não concluiu a solicitação. A tentativa pode ser retomada com segurança.",
       action: "Tentar novamente",
+      ...validation,
     };
   }
   return {
     title: "Revise as informações",
     message: error.message || "Corrija os campos indicados e tente novamente.",
     action: "Revisar",
+    ...validation,
   };
+}
+
+function fieldError(
+  fieldErrors: Record<string, string[]> | undefined,
+  ...names: string[]
+): string | undefined {
+  if (!fieldErrors) return undefined;
+  for (const name of names) {
+    const direct = fieldErrors[name]?.find(Boolean);
+    if (direct) return direct;
+    const nested = Object.entries(fieldErrors).find(
+      ([key, messages]) => key.endsWith(`.${name}`) && messages.some(Boolean),
+    );
+    if (nested) return nested[1].find(Boolean);
+  }
+  return undefined;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function snapshotIdentity(snapshot: OnboardingResponse | null, scopeKey: string) {
+  if (!snapshot) return `${scopeKey}:empty`;
+  return [
+    scopeKey,
+    snapshot.selection?.revision ?? "unselected",
+    snapshot.selection?.plan.slug ?? "no-plan",
+    snapshot.provisioning?.id ?? "no-run",
+  ].join(":");
 }
 
 export function OnboardingPage({
@@ -445,12 +497,25 @@ export function OnboardingPage({
   const [pollPaused, setPollPaused] = useState(false);
   const [error, setError] = useState<ErrorGuidance | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+  const scopeKey = `${organizationId}:${unitId}`;
+  const scopeKeyRef = useRef(scopeKey);
+  const generationRef = useRef(0);
+  const refreshSequenceRef = useRef(0);
+  const mutationSequenceRef = useRef(0);
+  const snapshotRef = useRef<OnboardingResponse | null>(null);
+  const refreshControllerRef = useRef<AbortController | null>(null);
+  const pollControllerRef = useRef<AbortController | null>(null);
 
   const showError = useCallback(
     (caught: unknown) => {
       const source =
         caught instanceof ApiClientError
-          ? { status: caught.status, code: caught.code, message: caught.message }
+          ? {
+              status: caught.status,
+              code: caught.code,
+              message: caught.message,
+              details: caught.details,
+            }
           : { status: 0, code: "UNEXPECTED_CLIENT_ERROR", message: "Não foi possível continuar." };
       const guidance = errorGuidance(source);
       setError(guidance);
@@ -462,26 +527,96 @@ export function OnboardingPage({
 
   useEffect(() => {
     if (!error || loading) return undefined;
-    const timer = globalThis.setTimeout(() => errorRef.current?.focus(), 60);
+    const timer = globalThis.setTimeout(() => {
+      const invalidField = document.querySelector<HTMLElement>(
+        '[data-onboarding-root] [aria-invalid="true"]',
+      );
+      (invalidField ?? errorRef.current)?.focus();
+    }, 60);
     return () => globalThis.clearTimeout(timer);
   }, [error, loading]);
 
-  const refresh = useCallback(async () => {
-    if (!authorized || !organizationId) return;
-    setError(null);
-    try {
-      const next = await api.onboarding.get(organizationId);
+  const applySnapshot = useCallback(
+    (next: OnboardingResponse, expectedGeneration: number, expectedScope: string) => {
+      if (generationRef.current !== expectedGeneration || scopeKeyRef.current !== expectedScope) {
+        return false;
+      }
+      const previousIdentity = snapshotIdentity(snapshotRef.current, expectedScope);
+      const nextIdentity = snapshotIdentity(next, expectedScope);
+      if (previousIdentity !== nextIdentity) {
+        pollControllerRef.current?.abort();
+        setPollAttempt(0);
+        setPollPaused(false);
+      }
+      snapshotRef.current = next;
       setSnapshot(next);
-    } catch (caught) {
-      showError(caught);
-    } finally {
-      setLoading(false);
-    }
-  }, [authorized, organizationId, showError]);
+      if (next.provisioning && isTerminalProvisioningState(next.provisioning.state)) {
+        const storage = browserSessionStorage();
+        if (storage) releaseActivationKey(organizationId, next.provisioning.state, storage);
+      }
+      return true;
+    },
+    [organizationId],
+  );
+
+  const refresh = useCallback(
+    async (expectedGeneration = generationRef.current, expectedScope = scopeKeyRef.current) => {
+      if (!authorized || !organizationId) return;
+      const sequence = ++refreshSequenceRef.current;
+      refreshControllerRef.current?.abort();
+      const controller = new AbortController();
+      refreshControllerRef.current = controller;
+      if (generationRef.current === expectedGeneration && scopeKeyRef.current === expectedScope) {
+        setError(null);
+      }
+      try {
+        const next = await api.onboarding.get(organizationId, controller.signal);
+        if (sequence !== refreshSequenceRef.current) return;
+        applySnapshot(next, expectedGeneration, expectedScope);
+      } catch (caught) {
+        if (
+          !isAbortError(caught) &&
+          sequence === refreshSequenceRef.current &&
+          generationRef.current === expectedGeneration &&
+          scopeKeyRef.current === expectedScope
+        ) {
+          showError(caught);
+        }
+      } finally {
+        if (
+          sequence === refreshSequenceRef.current &&
+          generationRef.current === expectedGeneration &&
+          scopeKeyRef.current === expectedScope
+        ) {
+          setLoading(false);
+        }
+      }
+    },
+    [applySnapshot, authorized, organizationId, showError],
+  );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    scopeKeyRef.current = scopeKey;
+    refreshSequenceRef.current += 1;
+    mutationSequenceRef.current += 1;
+    refreshControllerRef.current?.abort();
+    pollControllerRef.current?.abort();
+    snapshotRef.current = null;
+    setSnapshot(null);
+    setLoading(authorized);
+    setBusy(false);
+    setLocked(false);
+    setPollAttempt(0);
+    setPollPaused(false);
+    setError(null);
+    if (authorized && organizationId) void refresh(generation, scopeKey);
+    return () => {
+      refreshControllerRef.current?.abort();
+      pollControllerRef.current?.abort();
+    };
+  }, [authorized, organizationId, refresh, scopeKey]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return undefined;
@@ -503,18 +638,40 @@ export function OnboardingPage({
     if (!run || pollPaused || pollAttempt >= MAX_POLL_ATTEMPTS) return undefined;
     if (!shouldPollProvisioning({ online, visible, state: run.state })) return undefined;
     const controller = new AbortController();
+    pollControllerRef.current?.abort();
+    pollControllerRef.current = controller;
+    const expectedGeneration = generationRef.current;
+    const expectedScope = scopeKeyRef.current;
+    const expectedRunId = run.id;
+    const expectedRevision = snapshot.selection?.revision ?? null;
     const timer = globalThis.setTimeout(async () => {
       try {
         const status = await api.onboarding.provisioning(organizationId, run.id, controller.signal);
-        setSnapshot((current) => (current ? { ...current, provisioning: status } : current));
+        const current = snapshotRef.current;
+        if (
+          controller.signal.aborted ||
+          generationRef.current !== expectedGeneration ||
+          scopeKeyRef.current !== expectedScope ||
+          current?.provisioning?.id !== expectedRunId ||
+          (current.selection?.revision ?? null) !== expectedRevision
+        ) {
+          return;
+        }
+        const next = { ...current, provisioning: status };
+        snapshotRef.current = next;
+        setSnapshot(next);
         setPollAttempt((attempt) => attempt + 1);
         if (isTerminalProvisioningState(status.state)) {
           const storage = browserSessionStorage();
           if (storage) releaseActivationKey(organizationId, status.state, storage);
-          await refresh();
+          await refresh(expectedGeneration, expectedScope);
         }
       } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
+        if (
+          !isAbortError(caught) &&
+          generationRef.current === expectedGeneration &&
+          scopeKeyRef.current === expectedScope
+        ) {
           showError(caught);
           setPollAttempt((attempt) => attempt + 1);
         }
@@ -522,6 +679,7 @@ export function OnboardingPage({
     }, pollingDelay(pollAttempt));
     return () => {
       controller.abort();
+      if (pollControllerRef.current === controller) pollControllerRef.current = null;
       globalThis.clearTimeout(timer);
     };
   }, [online, organizationId, pollAttempt, pollPaused, refresh, showError, snapshot, visible]);
@@ -557,14 +715,32 @@ export function OnboardingPage({
 
   async function mutate(request: () => Promise<OnboardingResponse>) {
     if (!online || locked || busy) return;
+    const expectedGeneration = generationRef.current;
+    const expectedScope = scopeKeyRef.current;
+    const sequence = ++mutationSequenceRef.current;
     setBusy(true);
     setError(null);
     try {
-      setSnapshot(await request());
+      const next = await request();
+      if (sequence === mutationSequenceRef.current) {
+        applySnapshot(next, expectedGeneration, expectedScope);
+      }
     } catch (caught) {
-      showError(caught);
+      if (
+        sequence === mutationSequenceRef.current &&
+        generationRef.current === expectedGeneration &&
+        scopeKeyRef.current === expectedScope
+      ) {
+        showError(caught);
+      }
     } finally {
-      setBusy(false);
+      if (
+        sequence === mutationSequenceRef.current &&
+        generationRef.current === expectedGeneration &&
+        scopeKeyRef.current === expectedScope
+      ) {
+        setBusy(false);
+      }
     }
   }
 
@@ -574,16 +750,40 @@ export function OnboardingPage({
 
   async function select(input: OnboardingSelectionInput) {
     if (profileId !== "owner") return;
+    const expectedGeneration = generationRef.current;
+    const expectedScope = scopeKeyRef.current;
+    const sequence = ++mutationSequenceRef.current;
     setBusy(true);
     setError(null);
     try {
       await api.onboarding.select(organizationId, input);
+      if (
+        sequence !== mutationSequenceRef.current ||
+        generationRef.current !== expectedGeneration ||
+        scopeKeyRef.current !== expectedScope
+      ) {
+        return;
+      }
       onUnitSelected?.(input.selectedUnitId);
-      await refresh();
+      if (input.selectedUnitId === unitId) {
+        await refresh(expectedGeneration, expectedScope);
+      }
     } catch (caught) {
-      showError(caught);
+      if (
+        sequence === mutationSequenceRef.current &&
+        generationRef.current === expectedGeneration &&
+        scopeKeyRef.current === expectedScope
+      ) {
+        showError(caught);
+      }
     } finally {
-      setBusy(false);
+      if (
+        sequence === mutationSequenceRef.current &&
+        generationRef.current === expectedGeneration &&
+        scopeKeyRef.current === expectedScope
+      ) {
+        setBusy(false);
+      }
     }
   }
 
@@ -602,6 +802,9 @@ export function OnboardingPage({
       );
       return;
     }
+    const expectedGeneration = generationRef.current;
+    const expectedScope = scopeKeyRef.current;
+    const sequence = ++mutationSequenceRef.current;
     setBusy(true);
     setError(null);
     try {
@@ -611,15 +814,35 @@ export function OnboardingPage({
         currentSnapshot.selection ? { planSlug: currentSnapshot.selection.plan.slug } : {},
         idempotencyKey,
       );
+      if (
+        sequence !== mutationSequenceRef.current ||
+        generationRef.current !== expectedGeneration ||
+        scopeKeyRef.current !== expectedScope
+      ) {
+        return;
+      }
       releaseActivationKey(organizationId, result.state, storage);
-      await refresh();
+      await refresh(expectedGeneration, expectedScope);
     } catch (caught) {
+      if (
+        sequence !== mutationSequenceRef.current ||
+        generationRef.current !== expectedGeneration ||
+        scopeKeyRef.current !== expectedScope
+      ) {
+        return;
+      }
       if (caught instanceof ApiClientError && caught.details?.provisioningRunId) {
-        await refresh();
+        await refresh(expectedGeneration, expectedScope);
       }
       showError(caught);
     } finally {
-      setBusy(false);
+      if (
+        sequence === mutationSequenceRef.current &&
+        generationRef.current === expectedGeneration &&
+        scopeKeyRef.current === expectedScope
+      ) {
+        setBusy(false);
+      }
     }
   }
 
@@ -639,6 +862,13 @@ export function OnboardingPage({
           <div>
             <strong>{error.title}</strong>
             <p>{error.message}</p>
+            {error.formErrors && error.formErrors.length > 0 && (
+              <ul>
+                {error.formErrors.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
           </div>
           {!error.sessionEnded && (
             <Button onClick={() => void refresh()} size="sm" variant="secondary">
@@ -671,6 +901,7 @@ export function OnboardingPage({
         )}
       <OnboardingJourney
         busy={busy || locked}
+        fieldErrors={error?.fieldErrors}
         online={online}
         profileId={profileId}
         snapshot={snapshot}
@@ -695,6 +926,7 @@ export function OnboardingJourney({
   onRefresh,
   onPatch,
   onSelect,
+  fieldErrors,
   onActivate,
 }: {
   snapshot: OnboardingResponse;
@@ -706,6 +938,7 @@ export function OnboardingJourney({
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
   onSelect: (input: OnboardingSelectionInput) => void;
+  fieldErrors?: Record<string, string[]>;
   onActivate: () => void;
 }) {
   const readyCount = CHECKLIST_GROUPS.flatMap((group) => group.items).filter((definition) => {
@@ -715,9 +948,19 @@ export function OnboardingJourney({
   const progress = Math.round((readyCount / 12) * 100);
   const provisioning = snapshot.provisioning;
   const activeProvisioning = provisioning && !isTerminalProvisioningState(provisioning.state);
+  const confirmationIdentity = [
+    snapshot.organizationId,
+    unitId,
+    snapshot.selection?.revision ?? "unselected",
+    snapshot.selection?.plan.slug ?? "no-plan",
+    snapshot.ready,
+    [...snapshot.missingItems].sort().join(","),
+    snapshot.provisioning?.id ?? "no-run",
+    snapshot.provisioning?.state ?? "no-state",
+  ].join(":");
 
   return (
-    <div className="onboarding-layout">
+    <div className="onboarding-layout" data-onboarding-root>
       <aside className="onboarding-map" aria-label="Mapa do onboarding">
         <div className="onboarding-map__summary">
           <div>
@@ -789,7 +1032,8 @@ export function OnboardingJourney({
                   busy={busy || Boolean(activeProvisioning) || Boolean(snapshot.activatedAt)}
                   definition={definition}
                   evidence={snapshot.items[definition.item]}
-                  key={definition.item}
+                  fieldErrors={fieldErrors}
+                  key={`${confirmationIdentity}:${definition.item}`}
                   online={online}
                   profileId={profileId}
                   selection={snapshot.selection}
@@ -806,6 +1050,7 @@ export function OnboardingJourney({
 
         <ActivationPanel
           busy={busy}
+          key={confirmationIdentity}
           online={online}
           profileId={profileId}
           snapshot={snapshot}
@@ -828,6 +1073,7 @@ function ChecklistRow({
   onRefresh,
   onPatch,
   onSelect,
+  fieldErrors,
 }: {
   definition: ChecklistDefinition;
   evidence: OnboardingResponse["items"][ChecklistItem];
@@ -840,6 +1086,7 @@ function ChecklistRow({
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
   onSelect: (input: OnboardingSelectionInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const status = evidence?.status ?? "pending";
   return (
@@ -866,6 +1113,7 @@ function ChecklistRow({
         <ItemAction
           busy={busy}
           evidence={evidence}
+          fieldErrors={fieldErrors}
           item={definition.item}
           online={online}
           profileId={profileId}
@@ -893,6 +1141,7 @@ function ItemAction({
   onRefresh,
   onPatch,
   onSelect,
+  fieldErrors,
 }: {
   item: ChecklistItem;
   evidence: OnboardingResponse["items"][ChecklistItem];
@@ -905,6 +1154,7 @@ function ItemAction({
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
   onSelect: (input: OnboardingSelectionInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const disabled = busy || !online;
   if (item === "plan") {
@@ -912,6 +1162,7 @@ function ItemAction({
       <SelectionControl
         busy={disabled}
         current={selection}
+        fieldErrors={fieldErrors}
         profileId={profileId}
         unitId={unitId}
         units={units}
@@ -920,13 +1171,21 @@ function ItemAction({
     );
   }
   if (item === "fiscalChoice") {
-    return <FiscalControl disabled={disabled} evidence={evidence} onPatch={onPatch} />;
+    return (
+      <FiscalControl
+        disabled={disabled}
+        evidence={evidence}
+        fieldErrors={fieldErrors}
+        onPatch={onPatch}
+      />
+    );
   }
   if (item === "qr") {
     return (
       <QrControl
         disabled={disabled}
         evidence={evidence}
+        fieldErrors={fieldErrors}
         profileId={profileId}
         onPatch={onPatch}
         onRefresh={onRefresh}
@@ -938,6 +1197,7 @@ function ItemAction({
       <ProductionControl
         disabled={disabled}
         evidence={evidence}
+        fieldErrors={fieldErrors}
         onPatch={onPatch}
         onRefresh={onRefresh}
       />
@@ -945,7 +1205,13 @@ function ItemAction({
   }
   if (item === "training" || item === "rehearsal") {
     return (
-      <AttestationControl disabled={disabled} evidence={evidence} item={item} onPatch={onPatch} />
+      <AttestationControl
+        disabled={disabled}
+        evidence={evidence}
+        fieldErrors={fieldErrors}
+        item={item}
+        onPatch={onPatch}
+      />
     );
   }
 
@@ -978,6 +1244,7 @@ function SelectionControl({
   profileId,
   busy,
   onSelect,
+  fieldErrors,
 }: {
   current: OnboardingResponse["selection"];
   units: Unit[];
@@ -985,6 +1252,7 @@ function SelectionControl({
   profileId: ProfileId;
   busy: boolean;
   onSelect: (input: OnboardingSelectionInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const [planSlug, setPlanSlug] = useState<OnboardingSelectionInput["planSlug"]>(
     current?.plan.slug ?? "operacao",
@@ -995,6 +1263,8 @@ function SelectionControl({
     current && (current.plan.slug !== planSlug || current.selectedUnitId !== selectedUnitId),
   );
   const owner = profileId === "owner";
+  const planError = fieldError(fieldErrors, "planSlug");
+  const unitError = fieldError(fieldErrors, "selectedUnitId");
 
   return (
     <form
@@ -1009,6 +1279,8 @@ function SelectionControl({
       <label>
         Plano publicado
         <select
+          aria-describedby={planError ? "onboarding-plan-error" : undefined}
+          aria-invalid={planError ? true : undefined}
           disabled={!owner || busy}
           onChange={(event) => {
             setPlanSlug(event.target.value as OnboardingSelectionInput["planSlug"]);
@@ -1022,10 +1294,13 @@ function SelectionControl({
             </option>
           ))}
         </select>
+        {planError && <small id="onboarding-plan-error">{planError}</small>}
       </label>
       <label>
         Unidade da ativação
         <select
+          aria-describedby={unitError ? "onboarding-unit-error" : undefined}
+          aria-invalid={unitError ? true : undefined}
           disabled={!owner || busy}
           onChange={(event) => {
             setSelectedUnitId(event.target.value);
@@ -1039,6 +1314,7 @@ function SelectionControl({
             </option>
           ))}
         </select>
+        {unitError && <small id="onboarding-unit-error">{unitError}</small>}
       </label>
       {changed && (
         <label className="onboarding-confirmation">
@@ -1065,10 +1341,12 @@ function FiscalControl({
   disabled,
   evidence,
   onPatch,
+  fieldErrors,
 }: {
   disabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   onPatch: (input: OnboardingUpdateInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const savedChoice = evidence?.evidence?.choice;
   const initialChoice =
@@ -1076,6 +1354,7 @@ function FiscalControl({
       ? savedChoice
       : "disabled";
   const [choice, setChoice] = useState<"disabled" | "focus" | "external">(initialChoice);
+  const choiceError = fieldError(fieldErrors, "items.fiscalChoice.evidence.choice", "fiscalChoice");
   if (evidence?.status === "verified") {
     return (
       <p className="onboarding-confirmed">
@@ -1094,6 +1373,8 @@ function FiscalControl({
       <label>
         Modo fiscal real
         <select
+          aria-describedby={choiceError ? "onboarding-fiscal-error" : undefined}
+          aria-invalid={choiceError ? true : undefined}
           disabled={disabled}
           onChange={(event) => setChoice(event.target.value as "disabled" | "focus" | "external")}
           value={choice}
@@ -1102,6 +1383,7 @@ function FiscalControl({
           <option value="focus">focus — integração ainda depende de credenciais</option>
           <option value="external">external — emissão fora do GiroMesa</option>
         </select>
+        {choiceError && <small id="onboarding-fiscal-error">{choiceError}</small>}
       </label>
       <p>Escolher Focus ou externo registra a decisão; não simula conexão nem homologação.</p>
       <Button disabled={disabled} size="sm" type="submit">
@@ -1117,12 +1399,14 @@ function QrControl({
   profileId,
   onRefresh,
   onPatch,
+  fieldErrors,
 }: {
   disabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   profileId: ProfileId;
   onRefresh: () => void;
   onPatch: (input: OnboardingUpdateInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const [reason, setReason] = useState<"pilot_without_qr" | "external_qr" | "not_required">(
     "pilot_without_qr",
@@ -1130,6 +1414,8 @@ function QrControl({
   const [waiverReason, setWaiverReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const resolved = evidence?.status === "verified" || evidence?.status === "not_applicable";
+  const reasonError = fieldError(fieldErrors, "items.qr.evidence.reason", "qr.evidence.reason");
+  const waiverError = fieldError(fieldErrors, "items.qr.waiverReason", "qr.waiverReason");
   return (
     <div className="onboarding-item__actions onboarding-item__actions--stacked">
       <a className="onboarding-action-link" href={routeHref("catalog")}>
@@ -1153,23 +1439,28 @@ function QrControl({
             <label>
               Motivo
               <select
+                aria-describedby={reasonError ? "qr-reason-error" : undefined}
+                aria-invalid={reasonError ? true : undefined}
                 disabled={disabled}
-                onChange={(event) =>
+                onChange={(event) => {
                   setReason(
                     event.target.value as "pilot_without_qr" | "external_qr" | "not_required",
-                  )
-                }
+                  );
+                  setConfirmed(false);
+                }}
                 value={reason}
               >
                 <option value="pilot_without_qr">Piloto sem QR</option>
                 <option value="external_qr">QR externo</option>
                 <option value="not_required">Não necessário</option>
               </select>
+              {reasonError && <small id="qr-reason-error">{reasonError}</small>}
             </label>
             <label>
               Justificativa auditável
               <textarea
-                aria-describedby="qr-waiver-help"
+                aria-describedby={waiverError ? "qr-waiver-help qr-waiver-error" : "qr-waiver-help"}
+                aria-invalid={waiverError ? true : undefined}
                 disabled={disabled}
                 minLength={10}
                 onChange={(event) => {
@@ -1181,6 +1472,7 @@ function QrControl({
               />
             </label>
             <small id="qr-waiver-help">Mínimo de 10 caracteres. Não informe segredos.</small>
+            {waiverError && <small id="qr-waiver-error">{waiverError}</small>}
             <label className="onboarding-confirmation">
               <input
                 checked={confirmed}
@@ -1212,11 +1504,13 @@ function ProductionControl({
   evidence,
   onPatch,
   onRefresh,
+  fieldErrors,
 }: {
   disabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   onPatch: (input: OnboardingUpdateInput) => void;
   onRefresh: () => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const requestedMode = evidence?.evidence?.requestedMode ?? evidence?.evidence?.mode;
   const initialMode =
@@ -1233,6 +1527,7 @@ function ProductionControl({
     (mode === "kds" && kdsStationIds.length > 0) ||
     (mode === "print" && printerProfileIds.length > 0) ||
     (mode === "both" && kdsStationIds.length > 0 && printerProfileIds.length > 0);
+  const modeError = fieldError(fieldErrors, "items.production.evidence.mode", "production");
 
   if (evidence?.status === "verified") {
     return (
@@ -1261,6 +1556,8 @@ function ProductionControl({
       <label>
         Destino dos pedidos
         <select
+          aria-describedby={modeError ? "onboarding-production-error" : undefined}
+          aria-invalid={modeError ? true : undefined}
           disabled={disabled}
           onChange={(event) => setMode(event.target.value as "off" | "kds" | "print" | "both")}
           value={mode}
@@ -1270,6 +1567,7 @@ function ProductionControl({
           <option value="print">print — impressão</option>
           <option value="both">both — KDS e impressão</option>
         </select>
+        {modeError && <small id="onboarding-production-error">{modeError}</small>}
       </label>
       {mode !== "off" && (
         <p>
@@ -1304,17 +1602,20 @@ function AttestationControl({
   disabled,
   evidence,
   onPatch,
+  fieldErrors,
 }: {
   item: "training" | "rehearsal";
   disabled: boolean;
   evidence: OnboardingResponse["items"][ChecklistItem];
   onPatch: (input: OnboardingUpdateInput) => void;
+  fieldErrors?: Record<string, string[]>;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const label =
     item === "training"
       ? "Confirmo que a equipe praticou acesso, atendimento, produção e caixa."
       : "Confirmo que um pedido percorreu atendimento, produção e conferência do caixa.";
+  const attestationError = fieldError(fieldErrors, `items.${item}.evidence.completed`, item);
   if (evidence?.status === "verified") {
     return <p className="onboarding-confirmed">Confirmação registrada pelo servidor.</p>;
   }
@@ -1328,6 +1629,8 @@ function AttestationControl({
     >
       <label className="onboarding-confirmation">
         <input
+          aria-describedby={attestationError ? `onboarding-${item}-error` : undefined}
+          aria-invalid={attestationError ? true : undefined}
           checked={confirmed}
           disabled={disabled}
           onChange={(event) => setConfirmed(event.target.checked)}
@@ -1335,6 +1638,7 @@ function AttestationControl({
         />
         <span>{label}</span>
       </label>
+      {attestationError && <small id={`onboarding-${item}-error`}>{attestationError}</small>}
       <Button disabled={disabled || !confirmed} size="sm" type="submit">
         {item === "training" ? "Confirmar treinamento" : "Confirmar ensaio"}
       </Button>

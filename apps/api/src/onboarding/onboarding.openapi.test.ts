@@ -101,11 +101,11 @@ describe("onboarding generated contract", () => {
         { $ref: "#/components/schemas/ProvisioningStatusResponse" },
       );
       const errorResponses = [
-        [base, "get", ["400", "401", "403", "404", "500"]],
-        [base, "patch", ["400", "401", "403", "404", "409", "500"]],
-        [`${base}/selection`, "put", ["400", "401", "403", "404", "409", "500"]],
-        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "500"]],
-        [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404", "500"]],
+        [base, "get", ["400", "401", "403", "404", "429", "500"]],
+        [base, "patch", ["400", "401", "403", "404", "409", "429", "500"]],
+        [`${base}/selection`, "put", ["400", "401", "403", "404", "409", "429", "500"]],
+        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "429", "500"]],
+        [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404", "429", "500"]],
       ] as const;
       for (const [path, method, statuses] of errorResponses) {
         for (const status of statuses) {
@@ -165,7 +165,7 @@ describe("onboarding generated contract", () => {
       new URL("Activate/ActivateRequestBuilder.cs", csharpRoot),
       "utf8",
     );
-    for (const status of ["400", "401", "403", "404", "409", "500"]) {
+    for (const status of ["400", "401", "403", "404", "409", "429", "500"]) {
       assert.match(
         activate,
         new RegExp(
@@ -195,6 +195,96 @@ describe("onboarding generated contract", () => {
           /\{ "500", global::GiroMesa\.ApiClient\.Models\.OnboardingApiErrorResponse\.CreateFromDiscriminatorValue \}/,
         );
       }
+    }
+  });
+
+  it("describes checklist evidence and provisioning with closed enums and date-times", async () => {
+    const document = object(JSON.parse(await readFile(openApiUrl, "utf8")));
+    const schemas = object(property(document, "components", "schemas"));
+    assert.deepEqual(property(schemas.OnboardingResponse, "properties", "items"), {
+      $ref: "#/components/schemas/OnboardingChecklistItemsResponse",
+    });
+    assert.deepEqual(property(schemas.OnboardingChecklistItemsResponse, "required"), [
+      "business",
+      "unit",
+      "plan",
+      "fiscalChoice",
+      "catalog",
+      "tables",
+      "team",
+      "qr",
+      "production",
+      "cashier",
+      "training",
+      "rehearsal",
+    ]);
+    for (const item of [
+      "business",
+      "unit",
+      "plan",
+      "fiscalChoice",
+      "catalog",
+      "tables",
+      "team",
+      "qr",
+      "production",
+      "cashier",
+      "training",
+      "rehearsal",
+    ]) {
+      assert.deepEqual(property(schemas.OnboardingChecklistItemsResponse, "properties", item), {
+        $ref: "#/components/schemas/OnboardingChecklistEvidenceResponse",
+      });
+    }
+    assert.deepEqual(
+      property(schemas.OnboardingChecklistEvidenceResponse, "properties", "evidence"),
+      { $ref: "#/components/schemas/OnboardingEvidenceResponse" },
+    );
+    assert.deepEqual(property(schemas.ProvisioningSummaryResponse, "properties", "state", "enum"), [
+      "requested",
+      "validating",
+      "provisioning",
+      "activating",
+      "publishing",
+      "retryable_failed",
+      "compensating",
+      "compensated",
+      "terminal_failed",
+      "completed",
+    ]);
+    assert.deepEqual(
+      property(schemas.ProvisioningSummaryResponse, "properties", "checkpoint", "enum"),
+      [
+        "requested",
+        "validated",
+        "internal_provisioned",
+        "activation_committed",
+        "published",
+        "compensated",
+      ],
+    );
+    assert.deepEqual(property(schemas.ProvisioningStepResponse, "properties", "status", "enum"), [
+      "pending",
+      "in_progress",
+      "completed",
+      "failed",
+      "compensated",
+    ]);
+    for (const dateProperty of [
+      "nextRetryAt",
+      "completedAt",
+      "failedAt",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      assert.equal(
+        property(schemas.ProvisioningSummaryResponse, "properties", dateProperty, "format"),
+        "date-time",
+      );
+      assert.equal(
+        property(schemas.ProvisioningSummaryResponse, "properties", dateProperty, "type"),
+        "string",
+      );
     }
   });
 });

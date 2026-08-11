@@ -31,6 +31,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiProperty,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
@@ -42,7 +43,24 @@ class OnboardingApiErrorDetails {
   @ApiProperty({ required: false, format: "uuid" })
   declare provisioningRunId?: string;
 
-  @ApiProperty({ required: false, type: [String] })
+  @ApiProperty({
+    required: false,
+    isArray: true,
+    enum: [
+      "business",
+      "unit",
+      "plan",
+      "fiscalChoice",
+      "catalog",
+      "tables",
+      "team",
+      "qr",
+      "production",
+      "cashier",
+      "training",
+      "rehearsal",
+    ],
+  })
   declare missingItems?: string[];
 
   @ApiProperty({
@@ -88,17 +106,132 @@ class OnboardingSelectionResponse {
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;
 }
 
+class OnboardingEvidenceResponse {
+  @ApiProperty({ required: false, nullable: true, type: String, format: "uuid" })
+  declare selectedUnitId?: string | null;
+  @ApiProperty({ required: false }) declare selectedUnitActive?: boolean;
+  @ApiProperty({ required: false, minimum: 0 }) declare activeMembersObserved?: number;
+  @ApiProperty({ required: false }) declare menuPublished?: boolean;
+  @ApiProperty({ required: false }) declare tablesConfigured?: boolean;
+  @ApiProperty({ required: false }) declare capabilitiesConfigured?: boolean;
+  @ApiProperty({ required: false }) declare serverTestPassed?: boolean;
+  @ApiProperty({ required: false }) declare configured?: boolean;
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    enum: ["off", "kds", "print", "both"],
+  })
+  declare requestedMode?: string | null;
+  @ApiProperty({ required: false, type: [String], format: "uuid" })
+  declare kdsStationIds?: string[];
+  @ApiProperty({ required: false, type: [String], format: "uuid" })
+  declare printerProfileIds?: string[];
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 120 })
+  declare configurationReference?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: Number, minimum: 0 })
+  declare catalogVersion?: number | null;
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    enum: ["operacao", "crescimento", "rede"],
+  })
+  declare slug?: string | null;
+  @ApiProperty({ required: false, maxLength: 240 }) declare note?: string;
+  @ApiProperty({ required: false, enum: ["disabled", "focus", "external"] })
+  declare choice?: string;
+  @ApiProperty({ required: false }) declare completed?: boolean;
+  @ApiProperty({
+    required: false,
+    enum: ["pilot_without_qr", "external_qr", "not_required", "external_fiscal"],
+  })
+  declare reason?: string;
+  @ApiProperty({ required: false, enum: ["off", "kds", "print", "both"] })
+  declare mode?: string;
+  @ApiProperty({ required: false }) declare legacyValue?: boolean;
+}
+
+class OnboardingChecklistEvidenceResponse {
+  @ApiProperty({ enum: ["pending", "in_progress", "verified", "blocked", "not_applicable"] })
+  declare status: string;
+  @ApiProperty({ enum: ["system", "actor_attestation", "authorized_waiver", "legacy_import"] })
+  declare source: string;
+  @ApiProperty({ nullable: true, type: String, maxLength: 240 })
+  declare evidenceReference: string | null;
+  @ApiProperty({ type: () => OnboardingEvidenceResponse })
+  declare evidence: OnboardingEvidenceResponse;
+  @ApiProperty({ nullable: true, type: String, format: "uuid" })
+  declare actorIdentityId: string | null;
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
+  declare verifiedAt: string | null;
+  @ApiProperty({ nullable: true, type: String, maxLength: 500 })
+  declare waiverReason: string | null;
+}
+
+class OnboardingChecklistItemsResponse {
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare business: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare unit: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare plan: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare fiscalChoice: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare catalog: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare tables: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare team: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare qr: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare production: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare cashier: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare training: OnboardingChecklistEvidenceResponse;
+  @ApiProperty({ type: () => OnboardingChecklistEvidenceResponse })
+  declare rehearsal: OnboardingChecklistEvidenceResponse;
+}
+
 class ProvisioningSummaryResponse {
   @ApiProperty({ format: "uuid" }) declare id: string;
-  @ApiProperty() declare state: string;
-  @ApiProperty() declare checkpoint: string;
+  @ApiProperty({
+    enum: [
+      "requested",
+      "validating",
+      "provisioning",
+      "activating",
+      "publishing",
+      "retryable_failed",
+      "compensating",
+      "compensated",
+      "terminal_failed",
+      "completed",
+    ],
+  })
+  declare state: string;
+  @ApiProperty({
+    enum: [
+      "requested",
+      "validated",
+      "internal_provisioned",
+      "activation_committed",
+      "published",
+      "compensated",
+    ],
+  })
+  declare checkpoint: string;
   @ApiProperty() declare attempts: number;
-  @ApiProperty({ required: false, nullable: true }) declare lastErrorCode: string | null;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 120 })
+  declare lastErrorCode: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare nextRetryAt: string | null;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare completedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare failedAt: string | null;
   @ApiProperty({ format: "date-time" }) declare createdAt: string;
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;
@@ -106,12 +239,29 @@ class ProvisioningSummaryResponse {
 
 class OnboardingResponse {
   @ApiProperty({ format: "uuid" }) declare organizationId: string;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare activatedAt: string | null;
-  @ApiProperty({ type: Object, additionalProperties: true })
-  declare items: Record<string, unknown>;
+  @ApiProperty({ type: () => OnboardingChecklistItemsResponse })
+  declare items: OnboardingChecklistItemsResponse;
   @ApiProperty() declare ready: boolean;
-  @ApiProperty({ type: [String] }) declare missingItems: string[];
+  @ApiProperty({
+    isArray: true,
+    enum: [
+      "business",
+      "unit",
+      "plan",
+      "fiscalChoice",
+      "catalog",
+      "tables",
+      "team",
+      "qr",
+      "production",
+      "cashier",
+      "training",
+      "rehearsal",
+    ],
+  })
+  declare missingItems: string[];
   @ApiProperty({ required: false, nullable: true, type: () => OnboardingSelectionResponse })
   declare selection: OnboardingSelectionResponse | null;
   @ApiProperty({ required: false, nullable: true, type: () => ProvisioningSummaryResponse })
@@ -119,14 +269,18 @@ class OnboardingResponse {
 }
 
 class ProvisioningStepResponse {
-  @ApiProperty() declare step: string;
-  @ApiProperty() declare status: string;
+  @ApiProperty({
+    enum: ["validation", "internal_provisioning", "activation", "publication", "compensation"],
+  })
+  declare step: string;
+  @ApiProperty({ enum: ["pending", "in_progress", "completed", "failed", "compensated"] })
+  declare status: string;
   @ApiProperty() declare attempts: number;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare startedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare completedAt: string | null;
-  @ApiProperty({ required: false, nullable: true, format: "date-time" })
+  @ApiProperty({ required: false, nullable: true, type: String, format: "date-time" })
   declare compensatedAt: string | null;
   @ApiProperty({ format: "date-time" }) declare createdAt: string;
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;
@@ -164,6 +318,7 @@ export class OnboardingController {
   @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
+  @ApiTooManyRequestsResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   get(
     @Req() request: AuthenticatedRequest,
@@ -179,6 +334,7 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
+  @ApiTooManyRequestsResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   update(
     @Req() request: AuthenticatedRequest,
@@ -195,6 +351,7 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
+  @ApiTooManyRequestsResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   select(
     @Req() request: AuthenticatedRequest,
@@ -211,6 +368,7 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
+  @ApiTooManyRequestsResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   @ApiHeader({
     name: "Idempotency-Key",
@@ -238,6 +396,7 @@ export class OnboardingController {
   @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
+  @ApiTooManyRequestsResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   provisioningStatus(
     @Req() request: AuthenticatedRequest,

@@ -245,6 +245,192 @@ export const activateTrialSchema = z
   })
   .strict();
 
+export const onboardingChecklistItemSchema = z.enum([
+  "business",
+  "unit",
+  "plan",
+  "fiscalChoice",
+  "catalog",
+  "tables",
+  "team",
+  "qr",
+  "production",
+  "cashier",
+  "training",
+  "rehearsal",
+]);
+
+export const onboardingChecklistSourceSchema = z.enum([
+  "system",
+  "actor_attestation",
+  "authorized_waiver",
+  "legacy_import",
+]);
+
+export const onboardingEvidenceResponseSchema = z
+  .object({
+    selectedUnitId: idSchema.nullable().optional(),
+    selectedUnitActive: z.boolean().optional(),
+    activeMembersObserved: z.number().int().min(0).max(10_000).optional(),
+    menuPublished: z.boolean().optional(),
+    tablesConfigured: z.boolean().optional(),
+    capabilitiesConfigured: z.boolean().optional(),
+    serverTestPassed: z.boolean().optional(),
+    configured: z.boolean().optional(),
+    requestedMode: z.enum(["off", "kds", "print", "both"]).nullable().optional(),
+    kdsStationIds: z.array(idSchema).max(24).optional(),
+    printerProfileIds: z.array(idSchema).max(24).optional(),
+    configurationReference: z.string().max(120).nullable().optional(),
+    catalogVersion: z.number().int().nonnegative().nullable().optional(),
+    slug: z.enum(["operacao", "crescimento", "rede"]).nullable().optional(),
+    note: z.string().max(240).optional(),
+    choice: z.enum(["disabled", "focus", "external"]).optional(),
+    completed: z.boolean().optional(),
+    reason: z
+      .enum(["pilot_without_qr", "external_qr", "not_required", "external_fiscal"])
+      .optional(),
+    mode: z.enum(["off", "kds", "print", "both"]).optional(),
+    legacyValue: z.boolean().optional(),
+  })
+  .strict();
+
+export const onboardingChecklistEvidenceResponseSchema = z
+  .object({
+    status: onboardingChecklistStatusSchema,
+    source: onboardingChecklistSourceSchema,
+    evidenceReference: z.string().max(240).nullable(),
+    evidence: onboardingEvidenceResponseSchema,
+    actorIdentityId: idSchema.nullable(),
+    verifiedAt: z.iso.datetime({ offset: true }).nullable(),
+    waiverReason: z.string().max(500).nullable(),
+  })
+  .strict();
+
+export const onboardingChecklistItemsResponseSchema = z
+  .object({
+    business: onboardingChecklistEvidenceResponseSchema,
+    unit: onboardingChecklistEvidenceResponseSchema,
+    plan: onboardingChecklistEvidenceResponseSchema,
+    fiscalChoice: onboardingChecklistEvidenceResponseSchema,
+    catalog: onboardingChecklistEvidenceResponseSchema,
+    tables: onboardingChecklistEvidenceResponseSchema,
+    team: onboardingChecklistEvidenceResponseSchema,
+    qr: onboardingChecklistEvidenceResponseSchema,
+    production: onboardingChecklistEvidenceResponseSchema,
+    cashier: onboardingChecklistEvidenceResponseSchema,
+    training: onboardingChecklistEvidenceResponseSchema,
+    rehearsal: onboardingChecklistEvidenceResponseSchema,
+  })
+  .strict();
+
+export const onboardingPlanResponseSchema = z
+  .object({
+    id: idSchema,
+    slug: z.enum(["operacao", "crescimento", "rede"]),
+    catalogVersion: z.number().int().nonnegative(),
+    monthlyPriceCents: moneyCentsSchema,
+    annualPriceCents: moneyCentsSchema,
+    includedUnits: z.number().int().positive(),
+    entitlements: z.array(z.string().min(1).max(120)).max(100),
+  })
+  .strict();
+
+export const onboardingSelectionResponseSchema = z
+  .object({
+    selectedUnitId: idSchema,
+    plan: onboardingPlanResponseSchema,
+    revision: z.number().int().positive(),
+    selectedAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const provisioningStateSchema = z.enum([
+  "requested",
+  "validating",
+  "provisioning",
+  "activating",
+  "publishing",
+  "retryable_failed",
+  "compensating",
+  "compensated",
+  "terminal_failed",
+  "completed",
+]);
+
+export const provisioningCheckpointSchema = z.enum([
+  "requested",
+  "validated",
+  "internal_provisioned",
+  "activation_committed",
+  "published",
+  "compensated",
+]);
+
+export const provisioningSummaryResponseSchema = z
+  .object({
+    id: idSchema,
+    state: provisioningStateSchema,
+    checkpoint: provisioningCheckpointSchema,
+    attempts: z.number().int().nonnegative(),
+    lastErrorCode: z.string().max(120).nullable(),
+    nextRetryAt: z.iso.datetime({ offset: true }).nullable(),
+    completedAt: z.iso.datetime({ offset: true }).nullable(),
+    failedAt: z.iso.datetime({ offset: true }).nullable(),
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const onboardingResponseSchema = z
+  .object({
+    organizationId: idSchema,
+    activatedAt: z.iso.datetime({ offset: true }).nullable(),
+    items: onboardingChecklistItemsResponseSchema,
+    ready: z.boolean(),
+    missingItems: z.array(onboardingChecklistItemSchema).max(12),
+    selection: onboardingSelectionResponseSchema.nullable(),
+    provisioning: provisioningSummaryResponseSchema.nullable(),
+  })
+  .strict();
+
+export const provisioningStepResponseSchema = z
+  .object({
+    step: z.enum([
+      "validation",
+      "internal_provisioning",
+      "activation",
+      "publication",
+      "compensation",
+    ]),
+    status: z.enum(["pending", "in_progress", "completed", "failed", "compensated"]),
+    attempts: z.number().int().nonnegative(),
+    startedAt: z.iso.datetime({ offset: true }).nullable(),
+    completedAt: z.iso.datetime({ offset: true }).nullable(),
+    compensatedAt: z.iso.datetime({ offset: true }).nullable(),
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const provisioningStatusResponseSchema = provisioningSummaryResponseSchema.extend({
+  steps: z.array(provisioningStepResponseSchema).max(5),
+});
+
+export const trialActivationResponseSchema = z
+  .object({
+    id: idSchema,
+    organizationId: idSchema,
+    commercialPlanId: idSchema,
+    provisioningRunId: idSchema,
+    subscriptionId: idSchema,
+    startsAt: z.iso.datetime({ offset: true }),
+    endsAt: z.iso.datetime({ offset: true }),
+    state: z.literal("completed"),
+    entitlements: z.array(z.string().min(1).max(120)).max(100),
+  })
+  .strict();
+
 export const operationalCommandSchema = z.object({
   id: idSchema,
   deviceId: idSchema,
@@ -410,6 +596,10 @@ export type AcceptMembershipInviteInput = z.infer<typeof acceptMembershipInviteS
 export type UpdateOnboardingInput = z.infer<typeof updateOnboardingSchema>;
 export type OnboardingSelectionInput = z.infer<typeof onboardingSelectionSchema>;
 export type ActivateTrialInput = z.infer<typeof activateTrialSchema>;
+export type OnboardingResponsePayload = z.infer<typeof onboardingResponseSchema>;
+export type OnboardingSelectionResponsePayload = z.infer<typeof onboardingSelectionResponseSchema>;
+export type ProvisioningStatusResponsePayload = z.infer<typeof provisioningStatusResponseSchema>;
+export type TrialActivationResponsePayload = z.infer<typeof trialActivationResponseSchema>;
 export type OperationalCommandInput = z.infer<typeof operationalCommandSchema>;
 export type BillingEventInput = z.infer<typeof billingEventSchema>;
 export type TrialApplicationInput = z.infer<typeof trialApplicationSchema>;

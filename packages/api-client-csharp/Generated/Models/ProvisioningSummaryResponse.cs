@@ -17,57 +17,27 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The attempts property</summary>
         public double? Attempts { get; set; }
         /// <summary>The checkpoint property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Checkpoint { get; set; }
-#nullable restore
-#else
-        public string Checkpoint { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint? Checkpoint { get; set; }
         /// <summary>The completedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_completedAt? CompletedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_completedAt CompletedAt { get; set; }
-#endif
+        public DateTimeOffset? CompletedAt { get; set; }
         /// <summary>The createdAt property</summary>
         public DateTimeOffset? CreatedAt { get; set; }
         /// <summary>The failedAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_failedAt? FailedAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_failedAt FailedAt { get; set; }
-#endif
+        public DateTimeOffset? FailedAt { get; set; }
         /// <summary>The id property</summary>
         public Guid? Id { get; set; }
         /// <summary>The lastErrorCode property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_lastErrorCode? LastErrorCode { get; set; }
+        public string? LastErrorCode { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_lastErrorCode LastErrorCode { get; set; }
+        public string LastErrorCode { get; set; }
 #endif
         /// <summary>The nextRetryAt property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_nextRetryAt? NextRetryAt { get; set; }
-#nullable restore
-#else
-        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_nextRetryAt NextRetryAt { get; set; }
-#endif
+        public DateTimeOffset? NextRetryAt { get; set; }
         /// <summary>The state property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? State { get; set; }
-#nullable restore
-#else
-        public string State { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_state? State { get; set; }
         /// <summary>The updatedAt property</summary>
         public DateTimeOffset? UpdatedAt { get; set; }
         /// <summary>
@@ -96,14 +66,14 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "attempts", n => { Attempts = n.GetDoubleValue(); } },
-                { "checkpoint", n => { Checkpoint = n.GetStringValue(); } },
-                { "completedAt", n => { CompletedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_completedAt>(global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_completedAt.CreateFromDiscriminatorValue); } },
+                { "checkpoint", n => { Checkpoint = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint>(); } },
+                { "completedAt", n => { CompletedAt = n.GetDateTimeOffsetValue(); } },
                 { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
-                { "failedAt", n => { FailedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_failedAt>(global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_failedAt.CreateFromDiscriminatorValue); } },
+                { "failedAt", n => { FailedAt = n.GetDateTimeOffsetValue(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
-                { "lastErrorCode", n => { LastErrorCode = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_lastErrorCode>(global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_lastErrorCode.CreateFromDiscriminatorValue); } },
-                { "nextRetryAt", n => { NextRetryAt = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_nextRetryAt>(global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_nextRetryAt.CreateFromDiscriminatorValue); } },
-                { "state", n => { State = n.GetStringValue(); } },
+                { "lastErrorCode", n => { LastErrorCode = n.GetStringValue(); } },
+                { "nextRetryAt", n => { NextRetryAt = n.GetDateTimeOffsetValue(); } },
+                { "state", n => { State = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_state>(); } },
                 { "updatedAt", n => { UpdatedAt = n.GetDateTimeOffsetValue(); } },
             };
         }
@@ -115,14 +85,14 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteDoubleValue("attempts", Attempts);
-            writer.WriteStringValue("checkpoint", Checkpoint);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_completedAt>("completedAt", CompletedAt);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_checkpoint>("checkpoint", Checkpoint);
+            writer.WriteDateTimeOffsetValue("completedAt", CompletedAt);
             writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_failedAt>("failedAt", FailedAt);
+            writer.WriteDateTimeOffsetValue("failedAt", FailedAt);
             writer.WriteGuidValue("id", Id);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_lastErrorCode>("lastErrorCode", LastErrorCode);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_nextRetryAt>("nextRetryAt", NextRetryAt);
-            writer.WriteStringValue("state", State);
+            writer.WriteStringValue("lastErrorCode", LastErrorCode);
+            writer.WriteDateTimeOffsetValue("nextRetryAt", NextRetryAt);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ProvisioningSummaryResponse_state>("state", State);
             writer.WriteDateTimeOffsetValue("updatedAt", UpdatedAt);
             writer.WriteAdditionalData(AdditionalData);
         }

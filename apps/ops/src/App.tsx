@@ -140,6 +140,14 @@ function rejectedEventCount(payload: unknown): number {
   return Array.isArray(events) ? events.length : 0;
 }
 
+export function clearSessionBeforeRemoteLogout(
+  clearLocalSession: () => void,
+  remoteLogout?: () => Promise<unknown>,
+) {
+  clearLocalSession();
+  if (remoteLogout) void remoteLogout().catch(() => undefined);
+}
+
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [scopeSource, setScopeSource] = useState<ScopeSource | null>(null);
@@ -195,13 +203,14 @@ export function App() {
     else setScopeSource(toScopeSource(access));
   }
 
-  async function logout() {
-    try {
-      if (!session?.demo) await api.logout();
-    } finally {
-      setSession(null);
-      setScopeSource(null);
-    }
+  function logout() {
+    clearSessionBeforeRemoteLogout(
+      () => {
+        setSession(null);
+        setScopeSource(null);
+      },
+      session?.demo ? undefined : () => api.logout(),
+    );
   }
 
   if (booting) return <LoadingScreen />;

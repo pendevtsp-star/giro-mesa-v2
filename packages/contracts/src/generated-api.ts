@@ -4544,6 +4544,61 @@ export interface components {
        */
       status: "already_verified";
     };
+    OnboardingEvidenceResponse: {
+      /** Format: uuid */
+      selectedUnitId?: string | null;
+      selectedUnitActive?: boolean;
+      activeMembersObserved?: number;
+      menuPublished?: boolean;
+      tablesConfigured?: boolean;
+      capabilitiesConfigured?: boolean;
+      serverTestPassed?: boolean;
+      configured?: boolean;
+      /** @enum {string|null} */
+      requestedMode?: "off" | "kds" | "print" | "both" | null;
+      kdsStationIds?: string[];
+      printerProfileIds?: string[];
+      configurationReference?: string | null;
+      catalogVersion?: number | null;
+      /** @enum {string|null} */
+      slug?: "operacao" | "crescimento" | "rede" | null;
+      note?: string;
+      /** @enum {string} */
+      choice?: "disabled" | "focus" | "external";
+      completed?: boolean;
+      /** @enum {string} */
+      reason?: "pilot_without_qr" | "external_qr" | "not_required" | "external_fiscal";
+      /** @enum {string} */
+      mode?: "off" | "kds" | "print" | "both";
+      legacyValue?: boolean;
+    };
+    OnboardingChecklistEvidenceResponse: {
+      /** @enum {string} */
+      status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+      /** @enum {string} */
+      source: "system" | "actor_attestation" | "authorized_waiver" | "legacy_import";
+      evidenceReference: string | null;
+      evidence: components["schemas"]["OnboardingEvidenceResponse"];
+      /** Format: uuid */
+      actorIdentityId: string | null;
+      /** Format: date-time */
+      verifiedAt: string | null;
+      waiverReason: string | null;
+    };
+    OnboardingChecklistItemsResponse: {
+      business: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      unit: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      plan: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      fiscalChoice: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      catalog: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      tables: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      team: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      qr: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      production: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      cashier: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      training: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      rehearsal: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+    };
     OnboardingPlanResponse: {
       /** Format: uuid */
       id: string;
@@ -4568,16 +4623,34 @@ export interface components {
     ProvisioningSummaryResponse: {
       /** Format: uuid */
       id: string;
-      state: string;
-      checkpoint: string;
+      /** @enum {string} */
+      state:
+        | "requested"
+        | "validating"
+        | "provisioning"
+        | "activating"
+        | "publishing"
+        | "retryable_failed"
+        | "compensating"
+        | "compensated"
+        | "terminal_failed"
+        | "completed";
+      /** @enum {string} */
+      checkpoint:
+        | "requested"
+        | "validated"
+        | "internal_provisioned"
+        | "activation_committed"
+        | "published"
+        | "compensated";
       attempts: number;
-      lastErrorCode?: Record<string, never> | null;
+      lastErrorCode?: string | null;
       /** Format: date-time */
-      nextRetryAt?: Record<string, never> | null;
+      nextRetryAt?: string | null;
       /** Format: date-time */
-      completedAt?: Record<string, never> | null;
+      completedAt?: string | null;
       /** Format: date-time */
-      failedAt?: Record<string, never> | null;
+      failedAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4587,19 +4660,43 @@ export interface components {
       /** Format: uuid */
       organizationId: string;
       /** Format: date-time */
-      activatedAt?: Record<string, never> | null;
-      items: {
-        [key: string]: unknown;
-      };
+      activatedAt?: string | null;
+      items: components["schemas"]["OnboardingChecklistItemsResponse"];
       ready: boolean;
-      missingItems: string[];
+      missingItems: (
+        | "business"
+        | "unit"
+        | "plan"
+        | "fiscalChoice"
+        | "catalog"
+        | "tables"
+        | "team"
+        | "qr"
+        | "production"
+        | "cashier"
+        | "training"
+        | "rehearsal"
+      )[];
       selection?: components["schemas"]["OnboardingSelectionResponse"] | null;
       provisioning?: components["schemas"]["ProvisioningSummaryResponse"] | null;
     };
     OnboardingApiErrorDetails: {
       /** Format: uuid */
       provisioningRunId?: string;
-      missingItems?: string[];
+      missingItems?: (
+        | "business"
+        | "unit"
+        | "plan"
+        | "fiscalChoice"
+        | "catalog"
+        | "tables"
+        | "team"
+        | "qr"
+        | "production"
+        | "cashier"
+        | "training"
+        | "rehearsal"
+      )[];
       fieldErrors?: {
         [key: string]: string[];
       };
@@ -4631,15 +4728,17 @@ export interface components {
       entitlements: string[];
     };
     ProvisioningStepResponse: {
-      step: string;
-      status: string;
+      /** @enum {string} */
+      step: "validation" | "internal_provisioning" | "activation" | "publication" | "compensation";
+      /** @enum {string} */
+      status: "pending" | "in_progress" | "completed" | "failed" | "compensated";
       attempts: number;
       /** Format: date-time */
-      startedAt?: Record<string, never> | null;
+      startedAt?: string | null;
       /** Format: date-time */
-      completedAt?: Record<string, never> | null;
+      completedAt?: string | null;
       /** Format: date-time */
-      compensatedAt?: Record<string, never> | null;
+      compensatedAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4648,16 +4747,34 @@ export interface components {
     ProvisioningStatusResponse: {
       /** Format: uuid */
       id: string;
-      state: string;
-      checkpoint: string;
+      /** @enum {string} */
+      state:
+        | "requested"
+        | "validating"
+        | "provisioning"
+        | "activating"
+        | "publishing"
+        | "retryable_failed"
+        | "compensating"
+        | "compensated"
+        | "terminal_failed"
+        | "completed";
+      /** @enum {string} */
+      checkpoint:
+        | "requested"
+        | "validated"
+        | "internal_provisioned"
+        | "activation_committed"
+        | "published"
+        | "compensated";
       attempts: number;
-      lastErrorCode?: Record<string, never> | null;
+      lastErrorCode?: string | null;
       /** Format: date-time */
-      nextRetryAt?: Record<string, never> | null;
+      nextRetryAt?: string | null;
       /** Format: date-time */
-      completedAt?: Record<string, never> | null;
+      completedAt?: string | null;
       /** Format: date-time */
-      failedAt?: Record<string, never> | null;
+      failedAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -6553,6 +6670,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -6820,6 +6945,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -6874,6 +7007,14 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -7148,6 +7289,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -7221,6 +7370,14 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -7308,6 +7465,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -7380,6 +7545,14 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -7466,6 +7639,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -7528,6 +7709,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       500: {
         headers: {
           [name: string]: unknown;
@@ -7583,6 +7772,14 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
         headers: {
           [name: string]: unknown;
         };
