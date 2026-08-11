@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using GiroMesa.EdgeHub.Storage;
 using Microsoft.Extensions.Options;
@@ -8,11 +9,11 @@ namespace GiroMesa.EdgeHub.Security;
 public sealed record PairDeviceRequest(string DeviceId, string DeviceName, string EnrollmentCode);
 public sealed record PairResult(bool IsSuccess, string? Token, string? Error, int StatusCode);
 
-public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore store)
+public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore store, HubIdentity? hubIdentity = null)
 {
     private readonly HubOptions _options = options.Value;
 
-    public async Task<PairResult> PairAsync(PairDeviceRequest request)
+    public async Task<PairResult> PairAsync(PairDeviceRequest request, X509Certificate2? certificate = null)
     {
         if (string.IsNullOrWhiteSpace(_options.EnrollmentCode))
         {
@@ -22,6 +23,11 @@ public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore s
         if (string.IsNullOrWhiteSpace(request.DeviceId) || string.IsNullOrWhiteSpace(request.DeviceName))
         {
             return new(false, null, "INVALID_DEVICE", StatusCodes.Status400BadRequest);
+        }
+
+        if (_options.RequireMutualTls && (hubIdentity is null || !hubIdentity.IsCertificateAuthorized(certificate)))
+        {
+            return new(false, null, "HUB_MTLS_REQUIRED", StatusCodes.Status401Unauthorized);
         }
 
         var expected = Encoding.UTF8.GetBytes(_options.EnrollmentCode);
@@ -36,8 +42,10 @@ public sealed class DeviceAuthenticator(IOptions<HubOptions> options, HubStore s
         return new(true, token, null, StatusCodes.Status200OK);
     }
 
-    public async Task<bool> IsAuthorizedAsync(string? token) =>
-        !string.IsNullOrWhiteSpace(token) && await store.HasActiveTokenAsync(Hash(token));
+    public async Task<bool> IsAuthorizedAsync(string? token, X509Certificate2? certificate = null) =>
+        (!_options.RequireMutualTls || (hubIdentity is not null && hubIdentity.IsCertificateAuthorized(certificate))) &&
+        !string.IsNullOrWhiteSpace(token) &&
+        await store.HasActiveTokenAsync(Hash(token));
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }

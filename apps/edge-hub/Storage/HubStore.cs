@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using GiroMesa.EdgeHub.Security;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
@@ -146,6 +147,25 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             );
             CREATE UNIQUE INDEX IF NOT EXISTS ux_local_dispatch_dead_letters_open
                 ON local_dispatch_dead_letters(effect_id) WHERE resolved_at IS NULL;
+            CREATE TABLE IF NOT EXISTS hub_installation_identity (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                installation_id TEXT NOT NULL UNIQUE,
+                unit_id TEXT NOT NULL,
+                certificate_thumbprint TEXT NOT NULL,
+                state_generation INTEGER NOT NULL,
+                revoked_at TEXT NULL,
+                revoke_reason TEXT NULL,
+                last_observed_utc TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS hub_security_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                state_generation INTEGER NOT NULL,
+                detail TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             """;
         await command.ExecuteNonQueryAsync();
         await EnsureColumnAsync(connection, "operational_events", "idempotency_key", "TEXT");
@@ -864,6 +884,217 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         while (await reader.ReadAsync())
             results.Add(new LocalDispatchDeadLetter(reader.GetString(0), reader.GetString(1), DateTimeOffset.Parse(reader.GetString(2))));
         return results;
+    }
+
+    public async Task<HubIdentityRegistration> EnsureHubIdentityAsync(
+        string installationId,
+        string unitId,
+        string certificateThumbprint)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var existing = await ReadHubIdentityAsync(connection, transaction);
+            if (existing is not null)
+            {
+                await transaction.CommitAsync();
+                return new HubIdentityRegistration(existing, false);
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO hub_installation_identity
+                    (singleton, installation_id, unit_id, certificate_thumbprint, state_generation,
+                     created_at, updated_at)
+                VALUES (1, $installationId, $unitId, $certificateThumbprint, 1, $now, $now);
+                """;
+            insert.Parameters.AddWithValue("$installationId", installationId);
+            insert.Parameters.AddWithValue("$unitId", unitId);
+            insert.Parameters.AddWithValue("$certificateThumbprint", certificateThumbprint);
+            insert.Parameters.AddWithValue("$now", now.ToString("O"));
+            await insert.ExecuteNonQueryAsync();
+            await AppendHubSecurityEventAsync(connection, transaction, "identity.created", 1, "installation identity initialized", now);
+            await transaction.CommitAsync();
+            return new HubIdentityRegistration(
+                new StoredHubIdentity(installationId, unitId, certificateThumbprint, 1, false, null),
+                true);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<StoredHubIdentity?> GetHubIdentityAsync()
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        return await ReadHubIdentityAsync(connection, null);
+    }
+
+    public async Task<StoredHubIdentity> RevokeHubIdentityAsync(string reason)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var current = await ReadHubIdentityAsync(connection, transaction)
+                ?? throw new InvalidOperationException("HUB_IDENTITY_MISSING");
+            if (current.Revoked)
+            {
+                await transaction.CommitAsync();
+                return current;
+            }
+            var now = DateTimeOffset.UtcNow;
+            var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE hub_installation_identity SET
+                    state_generation = state_generation + 1,
+                    revoked_at = $revokedAt,
+                    revoke_reason = $reason,
+                    updated_at = $revokedAt
+                WHERE singleton = 1 AND state_generation = $expectedGeneration;
+                """;
+            update.Parameters.AddWithValue("$revokedAt", now.ToString("O"));
+            update.Parameters.AddWithValue("$reason", reason);
+            update.Parameters.AddWithValue("$expectedGeneration", current.StateGeneration);
+            if (await update.ExecuteNonQueryAsync() != 1)
+                throw new InvalidOperationException("HUB_IDENTITY_VERSION_CONFLICT");
+            await AppendHubSecurityEventAsync(
+                connection,
+                transaction,
+                "identity.revoked",
+                current.StateGeneration + 1,
+                reason,
+                now);
+            await transaction.CommitAsync();
+            return current with { StateGeneration = current.StateGeneration + 1, Revoked = true };
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> ObserveHubClockAsync(DateTimeOffset observedUtc, int maximumRollbackSeconds)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var current = await ReadHubIdentityAsync(connection, transaction)
+                ?? throw new InvalidOperationException("HUB_IDENTITY_MISSING");
+            if (current.LastObservedUtc is { } last &&
+                observedUtc < last.AddSeconds(-maximumRollbackSeconds))
+            {
+                await AppendHubSecurityEventAsync(
+                    connection,
+                    transaction,
+                    "clock.rollback_detected",
+                    current.StateGeneration,
+                    "local clock moved backwards beyond tolerance",
+                    DateTimeOffset.UtcNow);
+                await transaction.CommitAsync();
+                return false;
+            }
+            if (current.LastObservedUtc is null || observedUtc > current.LastObservedUtc)
+            {
+                var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE hub_installation_identity
+                    SET last_observed_utc = $observedUtc, updated_at = $observedUtc
+                    WHERE singleton = 1;
+                    """;
+                update.Parameters.AddWithValue("$observedUtc", observedUtc.ToString("O"));
+                await update.ExecuteNonQueryAsync();
+            }
+            await transaction.CommitAsync();
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task CreateEncryptedBackupAsync(string destinationPath)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            var fullPath = Path.GetFullPath(destinationPath);
+            var directory = Path.GetDirectoryName(fullPath)
+                ?? throw new InvalidOperationException("HUB_BACKUP_PATH_INVALID");
+            Directory.CreateDirectory(directory);
+            if (File.Exists(fullPath)) throw new InvalidOperationException("HUB_BACKUP_ALREADY_EXISTS");
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            var checkpoint = connection.CreateCommand();
+            checkpoint.CommandText = "PRAGMA wal_checkpoint(FULL);";
+            await checkpoint.ExecuteNonQueryAsync();
+            var backup = connection.CreateCommand();
+            backup.CommandText = "VACUUM INTO $path";
+            backup.Parameters.AddWithValue("$path", fullPath.Replace('\\', '/'));
+            await backup.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static async Task<StoredHubIdentity?> ReadHubIdentityAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT installation_id, unit_id, certificate_thumbprint, state_generation,
+                   revoked_at, last_observed_utc
+            FROM hub_installation_identity WHERE singleton = 1 LIMIT 1;
+            """;
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return null;
+        return new StoredHubIdentity(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt64(3),
+            !reader.IsDBNull(4),
+            reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5)));
+    }
+
+    private static async Task AppendHubSecurityEventAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string type,
+        long stateGeneration,
+        string detail,
+        DateTimeOffset createdAt)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO hub_security_events (type, state_generation, detail, created_at)
+            VALUES ($type, $stateGeneration, $detail, $createdAt);
+            """;
+        command.Parameters.AddWithValue("$type", type);
+        command.Parameters.AddWithValue("$stateGeneration", stateGeneration);
+        command.Parameters.AddWithValue("$detail", detail);
+        command.Parameters.AddWithValue("$createdAt", createdAt.ToString("O"));
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task EnsureColumnAsync(

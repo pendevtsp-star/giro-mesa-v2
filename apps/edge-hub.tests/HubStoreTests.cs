@@ -43,7 +43,7 @@ public sealed class HubStoreTests : IAsyncLifetime
         var store = CreateStore();
         await store.InitializeAsync();
         var authenticator = new DeviceAuthenticator(
-            Options.Create(new HubOptions { DataDirectory = _directory, DatabaseKey = TestKey, EnrollmentCode = "654321" }),
+            Options.Create(new HubOptions { DataDirectory = _directory, DatabaseKey = TestKey, EnrollmentCode = "654321", RequireMutualTls = false }),
             store);
 
         var pairing = await authenticator.PairAsync(new PairDeviceRequest("terminal-1", "Caixa 01", "654321"));
