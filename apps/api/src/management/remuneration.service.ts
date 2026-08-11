@@ -23,6 +23,7 @@ import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { managementRequestHash } from "./management.rules.js";
+import { remunerationExpressionSchema } from "./remuneration.schemas.js";
 
 const REMUNERATION_ROLES = ["owner", "manager", "finance"] as const;
 
@@ -63,7 +64,8 @@ function ruleFromRows(
 }
 
 function escapeCsv(value: string | number | null) {
-  const text = value === null ? "" : String(value);
+  const raw = value === null ? "" : String(value);
+  const text = /^[\t ]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -121,6 +123,26 @@ function safeSimulation(rule: RemunerationRuleVersion, metrics: RemunerationMetr
   }
 }
 
+const ZERO_METRICS: RemunerationMetrics = {
+  grossSalesCents: 0,
+  netSalesCents: 0,
+  serviceChargeCents: 0,
+  eligibleSalesCents: 0,
+  profitCents: 0,
+  hoursMinutes: 0,
+  unitsSold: 0,
+};
+
+function validatedExpression(value: unknown) {
+  const parsed = remunerationExpressionSchema.safeParse(value);
+  if (!parsed.success)
+    throw new BadRequestException({
+      code: "REMUNERATION_RULE_INVALID",
+      message: "A expressão deve usar apenas a DSL de remuneração suportada.",
+    });
+  return parsed.data;
+}
+
 @Injectable()
 export class RemunerationService {
   constructor(
@@ -161,6 +183,7 @@ export class RemunerationService {
     },
   ) {
     await this.requireRole(identityId, organizationId, unitId);
+    const expression = validatedExpression(input.expression);
     const idempotencyKey = key(keyValue);
     const effectiveFrom = new Date(input.effectiveFrom);
     if (
@@ -210,17 +233,9 @@ export class RemunerationService {
         kind: input.kind,
         effectiveFrom: effectiveFrom.toISOString(),
         effectiveUntil: null,
-        expression: input.expression,
+        expression,
       };
-      safeSimulation(candidate, {
-        grossSalesCents: 0,
-        netSalesCents: 0,
-        serviceChargeCents: 0,
-        eligibleSalesCents: 0,
-        profitCents: 0,
-        hoursMinutes: 0,
-        unitsSold: 0,
-      });
+      safeSimulation(candidate, ZERO_METRICS);
       const [set] = await tx
         .insert(remunerationRuleSets)
         .values({
@@ -241,7 +256,7 @@ export class RemunerationService {
           unitId,
           ruleSetId: set.id,
           version: 1,
-          expression: input.expression as unknown as Record<string, unknown>,
+          expression: expression as unknown as Record<string, unknown>,
           effectiveFrom,
           createdByIdentityId: identityId,
         })
@@ -260,6 +275,7 @@ export class RemunerationService {
     effectiveFromValue: string,
   ) {
     await this.requireRole(identityId, organizationId, unitId);
+    const parsedExpression = validatedExpression(expression);
     const effectiveFrom = new Date(effectiveFromValue);
     if (Number.isNaN(effectiveFrom.valueOf()))
       throw new BadRequestException({ code: "REMUNERATION_RULE_INVALID" });
@@ -287,6 +303,17 @@ export class RemunerationService {
       const current = versions.at(-1);
       if (!current || current.effectiveFrom >= effectiveFrom)
         throw new ConflictException({ code: "REMUNERATION_RULE_EFFECTIVE_ORDER_INVALID" });
+      safeSimulation(
+        {
+          ruleSetId: set.id,
+          version: current.version + 1,
+          kind: set.kind,
+          effectiveFrom: effectiveFrom.toISOString(),
+          effectiveUntil: null,
+          expression: parsedExpression,
+        },
+        ZERO_METRICS,
+      );
       await tx
         .update(remunerationRuleVersions)
         .set({ effectiveUntil: effectiveFrom })
@@ -298,7 +325,7 @@ export class RemunerationService {
           unitId,
           ruleSetId: set.id,
           version: current.version + 1,
-          expression: expression as unknown as Record<string, unknown>,
+          expression: parsedExpression as unknown as Record<string, unknown>,
           effectiveFrom,
           createdByIdentityId: identityId,
         })

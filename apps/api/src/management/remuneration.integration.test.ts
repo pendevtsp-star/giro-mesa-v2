@@ -6,6 +6,7 @@ import {
   memberships,
   organizations,
   remunerationCalculationRuns,
+  remunerationRuleVersions,
   roleBindings,
   units,
 } from "@giromesa/db";
@@ -74,6 +75,7 @@ it("separates service, commission and profit sharing through estimated, approved
       { kind: "profit_sharing" as const, metric: "profitCents" as const, basisPoints: 1_000 },
     ];
     const runIds: string[] = [];
+    const ruleSetIds: string[] = [];
     for (const [index, definition] of definitions.entries()) {
       const rule = await service.createRule(
         creator.id,
@@ -92,6 +94,7 @@ it("separates service, commission and profit sharing through estimated, approved
           effectiveFrom: "2026-01-01T00:00:00.000Z",
         },
       );
+      ruleSetIds.push(rule.ruleSetId);
       const metrics = { ...zeroMetrics, [definition.metric]: 100_000 };
       const simulation = await service.simulate(
         creator.id,
@@ -114,7 +117,11 @@ it("separates service, commission and profit sharing through estimated, approved
           metrics,
           sourceReferences: [`ledger:${definition.kind}:2026-07`],
           recipients: [
-            { reference: "person-a", label: "Pessoa A", basisPoints: 6_000 },
+            {
+              reference: "person-a",
+              label: '=HYPERLINK("https://example.test")',
+              basisPoints: 6_000,
+            },
             { reference: "person-b", label: "Pessoa B", basisPoints: 4_000 },
           ],
         },
@@ -122,6 +129,30 @@ it("separates service, commission and profit sharing through estimated, approved
       assert.equal(run.status, "estimated");
       runIds.push(run.runId);
     }
+
+    const firstRuleVersion = await database.db
+      .select()
+      .from(remunerationRuleVersions)
+      .where(eq(remunerationRuleVersions.ruleSetId, ruleSetIds[0] as string))
+      .limit(1);
+    const originalVersion = firstRuleVersion[0];
+    assert.ok(originalVersion);
+    await assert.rejects(() =>
+      service.publishVersion(
+        creator.id,
+        organization.id,
+        unit.id,
+        originalVersion.ruleSetId,
+        { type: "eval", code: "return 999999" } as never,
+        "2026-09-01T00:00:00.000Z",
+      ),
+    );
+    const versionsAfterRejectedPublish = await database.db
+      .select()
+      .from(remunerationRuleVersions)
+      .where(eq(remunerationRuleVersions.ruleSetId, originalVersion.ruleSetId));
+    assert.equal(versionsAfterRejectedPublish.length, 1);
+    assert.equal(versionsAfterRejectedPublish[0]?.effectiveUntil, null);
 
     await assert.rejects(() =>
       service.approve(creator.id, organization.id, unit.id, runIds[0] as string),
@@ -182,6 +213,7 @@ it("separates service, commission and profit sharing through estimated, approved
     assert.ok("bodyBase64" in pdf && typeof pdf.bodyBase64 === "string");
     assert.ok("body" in print && typeof print.body === "string");
     assert.match(csv.body, /categoria,status,referencia,beneficiario,valor_centavos/);
+    assert.match(csv.body, /'=HYPERLINK/);
     assert.ok(Buffer.from(pdf.bodyBase64, "base64").subarray(0, 5).equals(Buffer.from("%PDF-")));
     assert.match(print.body, /Relatório de remuneração/);
   } finally {
