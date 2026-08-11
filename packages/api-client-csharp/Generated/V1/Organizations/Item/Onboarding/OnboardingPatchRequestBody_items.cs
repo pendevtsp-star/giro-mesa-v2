@@ -55,10 +55,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         /// <summary>The production property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production? Production { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production? Production { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production Production { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production Production { get; set; }
 #endif
         /// <summary>The qr property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -131,7 +131,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
                 { "catalog", n => { Catalog = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_catalog>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_catalog.CreateFromDiscriminatorValue); } },
                 { "fiscalChoice", n => { FiscalChoice = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_fiscalChoice>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_fiscalChoice.CreateFromDiscriminatorValue); } },
                 { "plan", n => { Plan = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_plan>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_plan.CreateFromDiscriminatorValue); } },
-                { "production", n => { Production = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production.CreateFromDiscriminatorValue); } },
+                { "production", n => { Production = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production.CreateFromDiscriminatorValue); } },
                 { "qr", n => { Qr = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_qr>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_qr.CreateFromDiscriminatorValue); } },
                 { "rehearsal", n => { Rehearsal = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_rehearsal>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_rehearsal.CreateFromDiscriminatorValue); } },
                 { "tables", n => { Tables = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_tables>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_tables.CreateFromDiscriminatorValue); } },
@@ -152,7 +152,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_catalog>("catalog", Catalog);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_fiscalChoice>("fiscalChoice", FiscalChoice);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_plan>("plan", Plan);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production>("production", Production);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production>("production", Production);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_qr>("qr", Qr);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_rehearsal>("rehearsal", Rehearsal);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_tables>("tables", Tables);
@@ -224,63 +224,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
             {
                 if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
                 writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_fiscalChoiceMember1>(null, OnboardingPatchRequestBodyItemsFiscalChoiceMember1, OnboardingPatchRequestBodyItemsFiscalChoiceMember2, OnboardingPatchRequestBodyItemsFiscalChoiceMember3);
-            }
-        }
-        /// <summary>
-        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember2"/>
-        /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class OnboardingPatchRequestBody_items_production : IComposedTypeWrapper, IParsable
-        {
-            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1"/></summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-            public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1? OnboardingPatchRequestBodyItemsProductionMember1 { get; set; }
-#nullable restore
-#else
-            public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1 OnboardingPatchRequestBodyItemsProductionMember1 { get; set; }
-#endif
-            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember2"/></summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-            public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember2? OnboardingPatchRequestBodyItemsProductionMember2 { get; set; }
-#nullable restore
-#else
-            public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember2 OnboardingPatchRequestBodyItemsProductionMember2 { get; set; }
-#endif
-            /// <summary>
-            /// Creates a new instance of the appropriate class based on discriminator value
-            /// </summary>
-            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production"/></returns>
-            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production CreateFromDiscriminatorValue(IParseNode parseNode)
-            {
-                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.OnboardingPatchRequestBody_items_production();
-                result.OnboardingPatchRequestBodyItemsProductionMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1();
-                result.OnboardingPatchRequestBodyItemsProductionMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember2();
-                return result;
-            }
-            /// <summary>
-            /// The deserialization information for the current model
-            /// </summary>
-            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
-            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
-            {
-                if(OnboardingPatchRequestBodyItemsProductionMember1 != null || OnboardingPatchRequestBodyItemsProductionMember2 != null)
-                {
-                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(OnboardingPatchRequestBodyItemsProductionMember1, OnboardingPatchRequestBodyItemsProductionMember2);
-                }
-                return new Dictionary<string, Action<IParseNode>>();
-            }
-            /// <summary>
-            /// Serializes information the current object
-            /// </summary>
-            /// <param name="writer">Serialization writer to use to serialize this model</param>
-            public virtual void Serialize(ISerializationWriter writer)
-            {
-                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1>(null, OnboardingPatchRequestBodyItemsProductionMember1, OnboardingPatchRequestBodyItemsProductionMember2);
             }
         }
         /// <summary>

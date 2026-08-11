@@ -6553,6 +6553,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
     };
   };
   "OnboardingController_update[0]": {
@@ -6675,14 +6683,37 @@ export interface operations {
                   waiverReason: string;
                 };
             production?:
-              | {
-                  /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
-                  evidenceReference?: string;
-                  evidence?: {
-                    note?: string;
-                  };
-                }
+              | (
+                  | {
+                      /** @enum {string} */
+                      status: "pending";
+                    }
+                  | {
+                      /** @enum {string} */
+                      status: "in_progress" | "blocked";
+                      evidenceReference?: string;
+                      evidence:
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "kds";
+                            kdsStationIds: string[];
+                          }
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "print";
+                            printerProfileIds: string[];
+                          }
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "both";
+                            kdsStationIds: string[];
+                            printerProfileIds: string[];
+                          };
+                    }
+                )
               | {
                   /** @enum {string} */
                   status: "verified";
@@ -6789,6 +6820,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
     };
   };
   "OnboardingController_get[1]": {
@@ -6835,6 +6874,14 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -6964,14 +7011,37 @@ export interface operations {
                   waiverReason: string;
                 };
             production?:
-              | {
-                  /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
-                  evidenceReference?: string;
-                  evidence?: {
-                    note?: string;
-                  };
-                }
+              | (
+                  | {
+                      /** @enum {string} */
+                      status: "pending";
+                    }
+                  | {
+                      /** @enum {string} */
+                      status: "in_progress" | "blocked";
+                      evidenceReference?: string;
+                      evidence:
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "kds";
+                            kdsStationIds: string[];
+                          }
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "print";
+                            printerProfileIds: string[];
+                          }
+                        | {
+                            configurationReference?: string;
+                            /** @enum {string} */
+                            mode: "both";
+                            kdsStationIds: string[];
+                            printerProfileIds: string[];
+                          };
+                    }
+                )
               | {
                   /** @enum {string} */
                   status: "verified";
@@ -7078,6 +7148,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
     };
   };
   "OnboardingController_select[0]": {
@@ -7143,6 +7221,14 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -7222,6 +7308,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
     };
   };
   "OnboardingController_activate[0]": {
@@ -7286,6 +7380,14 @@ export interface operations {
         };
       };
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -7372,6 +7474,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
       503: {
         headers: {
           [name: string]: unknown;
@@ -7434,6 +7544,14 @@ export interface operations {
           "application/json": components["schemas"]["OnboardingApiErrorResponse"];
         };
       };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
     };
   };
   "OnboardingController_provisioningStatus[1]": {
@@ -7481,6 +7599,14 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
         headers: {
           [name: string]: unknown;
         };

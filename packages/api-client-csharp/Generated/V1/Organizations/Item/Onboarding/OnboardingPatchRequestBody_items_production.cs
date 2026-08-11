@@ -9,16 +9,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class OnboardingPatchRequestBody_items_productionMember1 : IParsable
+    public partial class OnboardingPatchRequestBody_items_production : IParsable
     #pragma warning restore CS1591
     {
         /// <summary>The evidence property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_evidence? Evidence { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_evidence? Evidence { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_evidence Evidence { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_evidence Evidence { get; set; }
 #endif
         /// <summary>The evidenceReference property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -29,16 +29,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         public string EvidenceReference { get; set; }
 #endif
         /// <summary>The status property</summary>
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_status? Status { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_status? Status { get; set; }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production"/></returns>
         /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-        public static global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1 CreateFromDiscriminatorValue(IParseNode parseNode)
+        public static global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production CreateFromDiscriminatorValue(IParseNode parseNode)
         {
             if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-            return new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1();
+            return new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production();
         }
         /// <summary>
         /// The deserialization information for the current model
@@ -48,9 +48,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "evidence", n => { Evidence = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_evidence>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_evidence.CreateFromDiscriminatorValue); } },
+                { "evidence", n => { Evidence = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_evidence>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_evidence.CreateFromDiscriminatorValue); } },
                 { "evidenceReference", n => { EvidenceReference = n.GetStringValue(); } },
-                { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_status>(); } },
+                { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_status>(); } },
             };
         }
         /// <summary>
@@ -60,9 +60,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_evidence>("evidence", Evidence);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_evidence>("evidence", Evidence);
             writer.WriteStringValue("evidenceReference", EvidenceReference);
-            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_productionMember1_status>("status", Status);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items_production_status>("status", Status);
         }
     }
 }

@@ -3,6 +3,7 @@ import { after, before, describe, it } from "node:test";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Module,
   NotFoundException,
   ServiceUnavailableException,
@@ -17,6 +18,8 @@ import { OnboardingService } from "./onboarding.service.js";
 
 const organizationId = crypto.randomUUID();
 const identityId = crypto.randomUUID();
+const managerIdentityId = crypto.randomUUID();
+const crashingRunId = crypto.randomUUID();
 let updateCalls = 0;
 const fakeService = {
   get() {
@@ -29,7 +32,10 @@ const fakeService = {
       message: "O onboarding já foi ativado.",
     });
   },
-  select() {
+  select(actorIdentityId: string) {
+    if (actorIdentityId === managerIdentityId) {
+      throw new ForbiddenException({ code: "INSUFFICIENT_ROLE", message: "Acesso não autorizado." });
+    }
     throw new BadRequestException({
       code: "INVALID_ONBOARDING_UNIT",
       message: "Selecione uma unidade ativa desta organização.",
@@ -56,15 +62,18 @@ const fakeService = {
       },
     });
   },
-  provisioningStatus() {
+  provisioningStatus(_identityId: string, _organizationId: string, runId: string) {
+    if (runId === crashingRunId) {
+      throw new Error("database password and internal stack must stay private");
+    }
     throw new NotFoundException();
   },
 };
 
 const fakeAuth = {
-  authenticate() {
+  authenticate(token: string) {
     return {
-      identityId,
+      identityId: token === "manager" ? managerIdentityId : identityId,
       email: "owner@example.test",
       displayName: "Owner",
       sessionId: crypto.randomUUID(),
@@ -120,6 +129,25 @@ describe("onboarding real HTTP error contract", () => {
   for (const prefix of ["/api/v1", "/v1"]) {
     it(`normalizes validation, not-found and conflict responses on ${prefix}`, async () => {
       const base = `${prefix}/organizations/${organizationId}/onboarding`;
+      const unauthenticated = await app.inject({ method: "GET", url: base });
+      exactError(unauthenticated.json(), 401, "UNAUTHORIZED");
+
+      const forbidden = await app.inject({
+        method: "PUT",
+        url: `${base}/selection`,
+        headers: { authorization: "Bearer manager" },
+        payload: { planSlug: "operacao", selectedUnitId: crypto.randomUUID() },
+      });
+      exactError(forbidden.json(), 403, "INSUFFICIENT_ROLE");
+
+      const internal = await app.inject({
+        method: "GET",
+        url: `${base}/provisioning/${crashingRunId}`,
+        headers: { authorization: "Bearer test" },
+      });
+      exactError(internal.json(), 500, "INTERNAL_ERROR");
+      assert.doesNotMatch(internal.body, /password|stack|private|database/i);
+
       const invalidHeader = await app.inject({
         method: "POST",
         url: `${base}/activate`,

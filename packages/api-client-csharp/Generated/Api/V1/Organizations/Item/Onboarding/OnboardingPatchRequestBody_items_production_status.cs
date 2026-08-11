@@ -5,12 +5,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public enum OnboardingPatchRequestBody_items_productionMember2_evidence_mode
+    public enum OnboardingPatchRequestBody_items_production_status
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "off")]
+        [EnumMember(Value = "verified")]
         #pragma warning disable CS1591
-        Off,
+        Verified,
         #pragma warning restore CS1591
     }
 }

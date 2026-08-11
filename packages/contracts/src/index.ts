@@ -118,6 +118,40 @@ const checklistProgressSchema = z
     evidence: checklistProgressEvidenceSchema.optional(),
   })
   .strict();
+const productionRouteEvidenceBaseSchema = z.object({
+  configurationReference: z.string().trim().min(3).max(120).optional(),
+});
+const productionInProgressSchema = z.discriminatedUnion("mode", [
+  productionRouteEvidenceBaseSchema
+    .extend({
+      mode: z.literal("kds"),
+      kdsStationIds: z.array(idSchema).min(1).max(24),
+    })
+    .strict(),
+  productionRouteEvidenceBaseSchema
+    .extend({
+      mode: z.literal("print"),
+      printerProfileIds: z.array(idSchema).min(1).max(24),
+    })
+    .strict(),
+  productionRouteEvidenceBaseSchema
+    .extend({
+      mode: z.literal("both"),
+      kdsStationIds: z.array(idSchema).min(1).max(24),
+      printerProfileIds: z.array(idSchema).min(1).max(24),
+    })
+    .strict(),
+]);
+const productionProgressSchema = z.union([
+  z.object({ status: z.literal("pending") }).strict(),
+  z
+    .object({
+      status: z.enum(["in_progress", "blocked"]),
+      evidenceReference: checklistEvidenceReferenceSchema.optional(),
+      evidence: productionInProgressSchema,
+    })
+    .strict(),
+]);
 const verifiedChecklistItem = <T extends z.ZodType>(evidence: T) =>
   z
     .object({
@@ -171,7 +205,10 @@ const onboardingChecklistItemsInputSchema = z
     tables: checklistProgressSchema,
     team: checklistProgressSchema,
     qr: z.union([checklistProgressSchema, waivedChecklistItem(qrWaiverEvidenceSchema)]),
-    production: z.union([checklistProgressSchema, verifiedChecklistItem(productionEvidenceSchema)]),
+    production: z.union([
+      productionProgressSchema,
+      verifiedChecklistItem(productionEvidenceSchema),
+    ]),
     cashier: checklistProgressSchema,
     training: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),
     rehearsal: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),

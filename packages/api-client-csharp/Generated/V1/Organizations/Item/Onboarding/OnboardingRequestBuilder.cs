@@ -58,6 +58,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 401 status code</exception>
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 403 status code</exception>
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 404 status code</exception>
+        /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 500 status code</exception>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
         public async Task<global::GiroMesa.ApiClient.Models.OnboardingResponse?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
@@ -74,6 +75,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
                 { "401", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
                 { "403", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
                 { "404", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
+                { "500", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
             };
             return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Models.OnboardingResponse>(requestInfo, global::GiroMesa.ApiClient.Models.OnboardingResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }
@@ -86,6 +88,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 403 status code</exception>
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 404 status code</exception>
         /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 409 status code</exception>
+        /// <exception cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse">When receiving a 500 status code</exception>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
         public async Task<global::GiroMesa.ApiClient.Models.OnboardingResponse?> PatchAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
@@ -104,6 +107,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
                 { "403", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
                 { "404", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
                 { "409", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
+                { "500", global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse.CreateFromDiscriminatorValue },
             };
             return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Models.OnboardingResponse>(requestInfo, global::GiroMesa.ApiClient.Models.OnboardingResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }

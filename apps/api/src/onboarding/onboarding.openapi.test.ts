@@ -20,6 +20,10 @@ const csharpRoot = new URL(
   "../../../../packages/api-client-csharp/Generated/Api/V1/Organizations/Item/Onboarding/",
   import.meta.url,
 );
+const csharpAliasRoot = new URL(
+  "../../../../packages/api-client-csharp/Generated/V1/Organizations/Item/Onboarding/",
+  import.meta.url,
+);
 
 describe("onboarding generated contract", () => {
   it("keeps aliases, success/error responses and Idempotency-Key explicit", async () => {
@@ -94,11 +98,11 @@ describe("onboarding generated contract", () => {
         { $ref: "#/components/schemas/ProvisioningStatusResponse" },
       );
       const errorResponses = [
-        [base, "get", ["400", "401", "403", "404"]],
-        [base, "patch", ["400", "401", "403", "404", "409"]],
-        [`${base}/selection`, "put", ["400", "401", "403", "404", "409"]],
-        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "503"]],
-        [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404"]],
+        [base, "get", ["400", "401", "403", "404", "500"]],
+        [base, "patch", ["400", "401", "403", "404", "409", "500"]],
+        [`${base}/selection`, "put", ["400", "401", "403", "404", "409", "500"]],
+        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "500", "503"]],
+        [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404", "500"]],
       ] as const;
       for (const [path, method, statuses] of errorResponses) {
         for (const status of statuses) {
@@ -158,13 +162,35 @@ describe("onboarding generated contract", () => {
       new URL("Activate/ActivateRequestBuilder.cs", csharpRoot),
       "utf8",
     );
-    for (const status of ["400", "401", "403", "404", "409", "503"]) {
+    for (const status of ["400", "401", "403", "404", "409", "500", "503"]) {
       assert.match(
         activate,
         new RegExp(
           `\\{ "${status}", global::GiroMesa\\.ApiClient\\.Models\\.OnboardingApiErrorResponse\\.CreateFromDiscriminatorValue \\}`,
         ),
       );
+    }
+    for (const root of [csharpRoot, csharpAliasRoot]) {
+      for (const path of [
+        "OnboardingRequestBuilder.cs",
+        "Selection/SelectionRequestBuilder.cs",
+        "Activate/ActivateRequestBuilder.cs",
+        "Provisioning/Item/WithRunItemRequestBuilder.cs",
+      ]) {
+        const source = await readFile(new URL(path, root), "utf8");
+        assert.match(
+          source,
+          /\{ "401", global::GiroMesa\.ApiClient\.Models\.OnboardingApiErrorResponse\.CreateFromDiscriminatorValue \}/,
+        );
+        assert.match(
+          source,
+          /\{ "403", global::GiroMesa\.ApiClient\.Models\.OnboardingApiErrorResponse\.CreateFromDiscriminatorValue \}/,
+        );
+        assert.match(
+          source,
+          /\{ "500", global::GiroMesa\.ApiClient\.Models\.OnboardingApiErrorResponse\.CreateFromDiscriminatorValue \}/,
+        );
+      }
     }
   });
 });

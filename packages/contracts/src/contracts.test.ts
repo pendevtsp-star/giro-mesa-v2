@@ -202,6 +202,52 @@ describe("public contracts", () => {
     );
   });
 
+  it("captures bounded production routing intent without verifying it", () => {
+    const kdsStationId = crypto.randomUUID();
+    const printerProfileId = crypto.randomUUID();
+    for (const evidence of [
+      { mode: "kds", kdsStationIds: [kdsStationId] },
+      { mode: "print", printerProfileIds: [printerProfileId] },
+      {
+        mode: "both",
+        kdsStationIds: [kdsStationId],
+        printerProfileIds: [printerProfileId],
+        configurationReference: "production-route-draft",
+      },
+    ]) {
+      const parsed = updateOnboardingSchema.parse({
+        items: { production: { status: "in_progress", evidence } },
+      });
+      assert.equal(parsed.items?.production?.status, "in_progress");
+    }
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: {
+          production: {
+            status: "in_progress",
+            evidence: { mode: "kds", kdsStationIds: [kdsStationId], token: "secret" },
+          },
+        },
+      }).success,
+      false,
+    );
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: {
+          production: {
+            status: "in_progress",
+            evidence: { mode: "both", kdsStationIds: [kdsStationId] },
+          },
+        },
+      }).success,
+      false,
+    );
+    assert.deepEqual(
+      updateOnboardingSchema.parse({ items: { production: { status: "pending" } } }),
+      { items: { production: { status: "pending" } } },
+    );
+  });
+
   it("requires an explicit plan and unit selection before the activation contract", () => {
     const unitId = crypto.randomUUID();
     assert.deepEqual(

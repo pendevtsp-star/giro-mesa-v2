@@ -102,3 +102,37 @@ O onboarding agora usa evidencias normalizadas e uma saga persistida por organiz
 - As escritas de readiness nao escapam do lock comum e as auditorias pertencem a mesma transacao da evidencia; refresh no-op e idempotente.
 - Respostas e auditorias usam allowlists: nenhuma evidencia arbitraria, segredo, lease, fingerprint bruto ou payload interno e refletido.
 - Nao houve push, deploy, provider real ou alteracao de containers compartilhados.
+
+## Fix round 3
+
+### RED capturado
+
+- Os contratos aceitavam apenas `production: off` verificado ou progresso generico; os novos testes falharam para a intencao estrita `kds`, `print` e `both` e para o round-trip exato de `pending`.
+- A primeira tentativa de `SELECT ... FOR UPDATE` pelo papel da aplicacao falhou com `permission denied` nas tabelas de autorizacao. O boundary foi movido para uma funcao minima `SECURITY DEFINER`, sem conceder `UPDATE` em memberships/role bindings. Um RED adicional com nomes de GUC incorretos retornou `false` e confirmou o fail-closed.
+- Os testes de corrida PostgreSQL pausaram a selecao e o commit final nos dois lados da fronteira de autorizacao. Antes dos locks de linha, a revogacao podia ficar fora da ordem linearizavel esperada.
+- O GET pos-ativacao reavaliava recursos operacionais e podia rebaixar checklist/auditoria historicos; o teste removeu produto, mesa e equipe depois da ativacao e capturou essa mutacao indevida.
+
+### Correcoes aplicadas
+
+- A migration aditiva `0016_onboarding_owner_lock` cria uma funcao `public` com `search_path` fixo, tabelas qualificadas, `PUBLIC` revogado e `EXECUTE` exclusivo para `giromesa_app`. Ela valida organizacao/ator contra os GUCs da transacao, bloqueia memberships e depois role bindings em ordem UUID fixa, revalida owner e mantem os locks ate o commit. Selecao, criacao do run e commits de ativacao usam esse mesmo boundary depois do advisory lock.
+- Os testes deterministas cobrem selecao e ativacao nos dois sentidos: quando onboarding obtem o lock primeiro, a democao aguarda; quando a democao vence, onboarding aguarda e falha sem selecionar/ativar. Nenhum trial nasce sem owner linearizavel.
+- Um onboarding ativado agora projeta o snapshot final persistido com `ready: true`, sem refresh, rebaixamento ou nova auditoria por drift operacional posterior. Saude operacional futura permanece fora desse dominio historico.
+- PATCH `pending` persiste exatamente `pending` e limpa referencia/evidencia/ator/verificacao/waiver. `blocked` e `in_progress` continuam distintos no contrato, banco e DTO.
+- Producao aceita intencao estrita `kds`, `print` e `both` em progresso, com UUIDs limitados das estacoes/perfis e referencia de configuracao limitada. Chaves extras e modos incompletos sao rejeitados; a intencao nunca promove readiness. `off` explicito continua verificavel.
+- Todos os cinco endpoints nos aliases `/api/v1` e `/v1` publicam respostas reais 401, 403 e 500. O filtro converte excecao nao HTTP em corpo allowlisted `INTERNAL_ERROR`, sem stack/segredo. OpenAPI e clientes TypeScript/C# foram regenerados; testes exercitam HTTP real e mappings C#.
+
+### Gates do fix
+
+- PostgreSQL 17.10: integracao Task 7 **20/20**, incluindo fresh migration, upgrade ate `0016`, corridas nos dois commit orders, freeze, pending, modos de producao, RLS e least privilege.
+- PostgreSQL 16 descartavel: o mesmo gate **20/20**; o container temporario criado para o gate foi removido.
+- `pnpm test`: **12/12 tasks** e gates de baseline/supply-chain **25/25**. API: **131 total, 90 pass, 41 skips declarados sem env, 0 fail**; contratos: **8/8**.
+- `pnpm typecheck`: **12/12 tasks**; `pnpm build`: **8/8 tasks**.
+- Cliente C# compilou com **0 warnings e 0 errors**. OpenAPI, TypeScript e C# foram regenerados; os testes de contrato HTTP/OpenAPI passaram nos dois aliases.
+- `git diff --check`: **verde**.
+- `pnpm lint` integral continua vermelho pelo baseline CRLF/formatacao preexistente e fora deste patch em `packages/domain`, `apps/site` e outros arquivos. Nenhum bulk rewrite fora de escopo foi realizado.
+
+### Self-review de seguranca e consistencia
+
+- O `SECURITY DEFINER` nao aceita SQL dinamico, fixa `pg_catalog, public`, qualifica todas as relacoes e a propria chamada, nao devolve dados de autorizacao alem do booleano e nao concede escrita ao app. `PUBLIC` nao possui execute; chamadas sem GUC ou com ator divergente falham fechado. Os GUCs continuam parte do boundary transacional confiavel ja usado pelo RLS; uma credencial de banco comprometida permanece fora do modelo de usuario HTTP e nao ganha nova mutacao por essa funcao.
+- O freeze usa apenas snapshot cujo ID, versao e fingerprint ainda conferem internamente. Evidencias e erros continuam saindo por allowlists.
+- Nao houve push, deploy, provider real ou remocao de containers compartilhados.

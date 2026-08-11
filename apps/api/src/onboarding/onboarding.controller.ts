@@ -27,6 +27,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiProperty,
@@ -164,6 +165,7 @@ export class OnboardingController {
   @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
+  @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   get(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -178,6 +180,7 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
+  @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   update(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -193,6 +196,7 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
+  @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   select(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -209,6 +213,7 @@ export class OnboardingController {
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
   @ApiServiceUnavailableResponse({ type: OnboardingApiErrorResponse })
+  @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   @ApiHeader({
     name: "Idempotency-Key",
     required: true,
@@ -235,6 +240,7 @@ export class OnboardingController {
   @ApiUnauthorizedResponse({ type: OnboardingApiErrorResponse })
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
+  @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   provisioningStatus(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,

@@ -174,12 +174,24 @@ function sanitizedSystemEvidence(item: ChecklistItem, evidence: Record<string, u
       };
     case "production": {
       const requestedMode = evidence.requestedMode ?? evidence.mode;
+      const boundedIds = (value: unknown) =>
+        Array.isArray(value)
+          ? value
+              .filter((entry): entry is string => typeof entry === "string")
+              .slice(0, 24)
+          : [];
       return {
         configured: evidence.configured === true,
         serverTestPassed: evidence.serverTestPassed === true,
         requestedMode: ["off", "kds", "print", "both"].includes(String(requestedMode))
           ? String(requestedMode)
           : null,
+        kdsStationIds: boundedIds(evidence.kdsStationIds),
+        printerProfileIds: boundedIds(evidence.printerProfileIds),
+        configurationReference:
+          typeof evidence.configurationReference === "string"
+            ? evidence.configurationReference.slice(0, 120)
+            : null,
       };
     }
     case "plan":
@@ -256,7 +268,7 @@ function sanitizedChecklistRequest(input: UpdateOnboardingInput) {
   const items = Object.fromEntries(
     Object.entries(input.items ?? {}).flatMap(([item, value]) => {
       if (!value) return [];
-      const evidence = value.evidence ?? {};
+      const evidence = ("evidence" in value ? value.evidence : undefined) ?? {};
       const safeEvidence =
         item === "fiscalChoice"
           ? { choice: "choice" in evidence ? evidence.choice : undefined }
@@ -274,7 +286,8 @@ function sanitizedChecklistRequest(input: UpdateOnboardingInput) {
           item,
           {
             status: value.status,
-            evidenceReference: value.evidenceReference ?? null,
+            evidenceReference:
+              "evidenceReference" in value ? (value.evidenceReference ?? null) : null,
             evidence: safeEvidence,
             waiverReason: "waiverReason" in value ? value.waiverReason : null,
           },
@@ -304,6 +317,29 @@ function sanitizedFailure(error: unknown) {
     "O provisionamento foi preservado e pode ser retomado.",
     "transient",
   );
+}
+
+function frozenSelectedPlan(record: OnboardingRecord): PlanSnapshot | null {
+  const snapshot = record.selectedPlanSnapshot;
+  if (
+    !record.selectedPlanId ||
+    record.selectedCatalogVersion === null ||
+    !record.selectedPlanFingerprint ||
+    !snapshot ||
+    snapshot.id !== record.selectedPlanId ||
+    snapshot.catalogVersion !== record.selectedCatalogVersion ||
+    typeof snapshot.slug !== "string" ||
+    typeof snapshot.catalogVersionId !== "string" ||
+    typeof snapshot.monthlyPriceCents !== "number" ||
+    typeof snapshot.annualPriceCents !== "number" ||
+    typeof snapshot.includedUnits !== "number" ||
+    !Array.isArray(snapshot.entitlements) ||
+    !snapshot.entitlements.every((entry) => typeof entry === "string") ||
+    fingerprint(snapshot) !== record.selectedPlanFingerprint
+  ) {
+    return null;
+  }
+  return snapshot as PlanSnapshot;
 }
 
 @Injectable()
@@ -711,11 +747,14 @@ export class OnboardingService {
     plan: PlanSnapshot | null,
     provisioning?: ProvisioningRun,
   ) {
+    const readiness = record.activatedAt
+      ? { ready: true, missingItems: [] as ChecklistItem[] }
+      : activationReadiness(checklist);
     return {
       organizationId: record.organizationId,
       activatedAt: record.activatedAt,
       items: checklist,
-      ...activationReadiness(checklist),
+      ...readiness,
       selection: this.selectionProjection(record, plan),
       provisioning: this.provisioningProjection(provisioning),
     };
@@ -767,14 +806,18 @@ export class OnboardingService {
           message: "Onboarding não encontrado.",
         });
       }
-      const selectedPlan = await this.exactSelectedPlan(tx, record);
-      await this.revalidateSystemChecklist(
-        tx,
-        organizationId,
-        record.selectedUnitId,
-        selectedPlan ?? undefined,
-        "onboarding_get_refresh",
-      );
+      const selectedPlan = record.activatedAt
+        ? frozenSelectedPlan(record)
+        : await this.exactSelectedPlan(tx, record);
+      if (!record.activatedAt) {
+        await this.revalidateSystemChecklist(
+          tx,
+          organizationId,
+          record.selectedUnitId,
+          selectedPlan ?? undefined,
+          "onboarding_get_refresh",
+        );
+      }
       const checklist = await this.checklist(tx, organizationId);
       const [provisioning] = await tx
         .select()
@@ -790,7 +833,12 @@ export class OnboardingService {
     await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
-      await this.requireMutationRoleInTransaction(tx, identityId, organizationId, ["owner"]);
+      if (!(await this.lockOwnerAuthorization(tx, identityId, organizationId))) {
+        throw new ForbiddenException({
+          code: "ONBOARDING_ROLE_CHANGED",
+          message: "A autorização para alterar o onboarding não está mais ativa.",
+        });
+      }
       const [record] = await tx
         .select()
         .from(onboardingRecords)
@@ -990,6 +1038,27 @@ export class OnboardingService {
       for (const [rawItem, requested] of Object.entries(input.items ?? {})) {
         const item = rawItem as ChecklistItem;
         if (!requested) continue;
+        if (requested.status === "pending" && !SYSTEM_ITEMS.has(item)) {
+          await tx
+            .update(onboardingChecklistItems)
+            .set({
+              status: "pending",
+              source: "actor_attestation",
+              evidenceReference: null,
+              evidence: {},
+              actorIdentityId: null,
+              verifiedAt: null,
+              waiverReason: null,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(onboardingChecklistItems.organizationId, organizationId),
+                eq(onboardingChecklistItems.item, item),
+              ),
+            );
+          continue;
+        }
         if (requested.status === "not_applicable") {
           if (!isOwner || !WAIVABLE_ITEMS.has(item) || !requested.waiverReason) {
             throw new BadRequestException({
@@ -1057,13 +1126,17 @@ export class OnboardingService {
               ),
             );
         } else if (!SYSTEM_ITEMS.has(item)) {
+          const progressEvidence =
+            "evidence" in requested ? (requested.evidence ?? {}) : {};
+          const progressReference =
+            "evidenceReference" in requested ? (requested.evidenceReference ?? null) : null;
           await tx
             .update(onboardingChecklistItems)
             .set({
               status: requested.status === "blocked" ? "blocked" : "in_progress",
               source: "actor_attestation",
-              evidenceReference: requested.evidenceReference ?? null,
-              evidence: requested.evidence ?? {},
+              evidenceReference: progressReference,
+              evidence: progressEvidence,
               actorIdentityId: identityId,
               verifiedAt: null,
               waiverReason: null,
@@ -1212,26 +1285,31 @@ export class OnboardingService {
     identityId: string,
     organizationId: string,
   ) {
-    const [owner] = await tx
-      .select({ id: memberships.id })
-      .from(memberships)
-      .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-      .where(
-        and(
-          eq(memberships.identityId, identityId),
-          eq(memberships.organizationId, organizationId),
-          eq(memberships.status, "active"),
-          eq(roleBindings.role, "owner"),
-        ),
-      )
-      .limit(1);
-    if (!owner) {
+    if (!(await this.lockOwnerAuthorization(tx, identityId, organizationId))) {
       throw new ProvisioningError(
         "PROVISIONING_OWNER_CHANGED",
         "O proprietário que iniciou a ativação não possui mais autorização.",
         "terminal",
       );
     }
+  }
+
+  private async lockOwnerAuthorization(
+    tx: TenantTransaction,
+    identityId: string,
+    organizationId: string,
+  ) {
+    // The SECURITY DEFINER boundary holds UPDATE row locks without granting
+    // the application role mutation rights on identity authorization tables.
+    // It validates both tenant and actor session settings, locks memberships
+    // then role bindings in UUID order, and revalidates owner after waiting.
+    const [result] = await tx.execute<{ authorized: boolean }>(sql`
+      select public.giromesa_lock_onboarding_owner(
+        ${organizationId}::uuid,
+        ${identityId}::uuid
+      ) as authorized
+    `);
+    return result?.authorized === true;
   }
 
   private async initializeRun(
@@ -1243,6 +1321,7 @@ export class OnboardingService {
     const requestFingerprint = fingerprint({ planSlug: input.planSlug ?? null });
     return this.durable(identityId, organizationId, async (tx) => {
       await this.organizationLock(tx, organizationId);
+      await this.requireOwnerInTransaction(tx, identityId, organizationId);
       const [sameKey] = await tx
         .select()
         .from(provisioningRuns)

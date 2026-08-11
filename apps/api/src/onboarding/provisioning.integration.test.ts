@@ -30,7 +30,7 @@ import {
   trials,
   units,
 } from "@giromesa/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { OnboardingService } from "./onboarding.service.js";
@@ -323,7 +323,7 @@ describe("durable onboarding provisioning", () => {
   }
 
   async function installAdvisoryGateTrigger(
-    table: "trials" | "onboarding_checklist_items",
+    table: "trials" | "subscriptions" | "onboarding_records" | "onboarding_checklist_items",
     organizationId: string,
     name: string,
     salt: number,
@@ -386,6 +386,48 @@ describe("durable onboarding provisioning", () => {
     );
   }
 
+  async function assertRowLockWaits(minimum: number, timeoutMilliseconds = 4_000) {
+    if (!owner) throw new Error("owner unavailable");
+    const ownerConnection = owner;
+    await waitUntil(
+      async () => {
+        const [activity] = await ownerConnection.client<{ waits: number }[]>`
+          select count(*)::int waits
+          from pg_stat_activity
+          where datname = current_database()
+            and pid <> pg_backend_pid()
+            and wait_event_type = 'Lock'
+            and lower(coalesce(wait_event, '')) <> 'advisory'
+        `;
+        return (activity?.waits ?? 0) >= minimum;
+      },
+      timeoutMilliseconds,
+      `${minimum} row-lock waiter(s)`,
+    );
+  }
+
+  async function holdOwnerDemotion(membershipId: string) {
+    if (!owner) throw new Error("owner unavailable");
+    const changed = deferred<void>();
+    const release = deferred<void>();
+    const completed = owner.client.begin(async (transaction) => {
+      await transaction.unsafe(`
+        update role_bindings
+        set role = 'manager'
+        where membership_id = '${membershipId}'::uuid and role = 'owner'
+      `);
+      changed.resolve();
+      await release.promise;
+    });
+    await changed.promise;
+    return {
+      async release() {
+        release.resolve();
+        await completed;
+      },
+    };
+  }
+
   async function assertForcedOverlap(timeoutMilliseconds = 4_000) {
     if (!owner) throw new Error("owner unavailable");
     const ownerConnection = owner;
@@ -418,6 +460,8 @@ describe("durable onboarding provisioning", () => {
     assert.equal(provisioningMigration, "0014_onboarding_provisioning.sql");
     const selectionMigration = migrations.find((file) => file.startsWith("0015_"));
     assert.equal(selectionMigration, "0015_onboarding_selection.sql");
+    const ownerLockMigration = migrations.find((file) => file.startsWith("0016_"));
+    assert.equal(ownerLockMigration, "0016_onboarding_owner_lock.sql");
 
     const freshUrl = new URL(integrationUrl);
     freshUrl.pathname = `/${freshDatabaseName}`;
@@ -447,7 +491,10 @@ describe("durable onboarding provisioning", () => {
     const migrator = createDatabase(databaseUrl.toString(), { max: 1 });
     try {
       for (const file of migrations.filter(
-        (file) => file !== provisioningMigration && file !== selectionMigration,
+        (file) =>
+          file !== provisioningMigration &&
+          file !== selectionMigration &&
+          file !== ownerLockMigration,
       )) {
         await applyMigration(migrator.client, file);
       }
@@ -462,6 +509,7 @@ describe("durable onboarding provisioning", () => {
       `;
       await applyMigration(migrator.client, provisioningMigration);
       await applyMigration(migrator.client, selectionMigration);
+      await applyMigration(migrator.client, ownerLockMigration);
       const backfill = await migrator.client<{ item: string; status: string; source: string }[]>`
         select item, status::text, source::text
         from onboarding_checklist_items
@@ -657,6 +705,178 @@ describe("durable onboarding provisioning", () => {
       capabilitiesConfigured: false,
       serverTestPassed: false,
     });
+  });
+
+  it("round-trips pending exactly and keeps blocked and in-progress distinct", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Pending Roundtrip");
+    const patch = (status: "pending" | "blocked" | "in_progress") =>
+      invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.update(subject.ownerIdentityId, subject.organizationId, {
+            items: {
+              training:
+                status === "pending"
+                  ? { status }
+                  : { status, evidenceReference: `training-${status}`, evidence: { note: status } },
+            },
+          }) ?? Promise.reject(new Error("service unavailable")),
+      );
+    const pending = await patch("pending");
+    assert.equal(pending.items.training?.status, "pending");
+    assert.deepEqual(pending.items.training?.evidence, {});
+    const [pendingRow] = await owner.db
+      .select()
+      .from(onboardingChecklistItems)
+      .where(
+        and(
+          eq(onboardingChecklistItems.organizationId, subject.organizationId),
+          eq(onboardingChecklistItems.item, "training"),
+        ),
+      );
+    assert.deepEqual(
+      {
+        status: pendingRow?.status,
+        evidenceReference: pendingRow?.evidenceReference,
+        evidence: pendingRow?.evidence,
+        actorIdentityId: pendingRow?.actorIdentityId,
+        verifiedAt: pendingRow?.verifiedAt,
+        waiverReason: pendingRow?.waiverReason,
+      },
+      {
+        status: "pending",
+        evidenceReference: null,
+        evidence: {},
+        actorIdentityId: null,
+        verifiedAt: null,
+        waiverReason: null,
+      },
+    );
+    assert.equal((await patch("blocked")).items.training?.status, "blocked");
+    assert.equal((await patch("in_progress")).items.training?.status, "in_progress");
+  });
+
+  it("persists strict KDS and print intent without treating it as readiness", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Production Intent");
+    const kdsStationId = randomUUID();
+    const printerProfileId = randomUUID();
+    const routes = [
+      { mode: "kds" as const, kdsStationIds: [kdsStationId] },
+      { mode: "print" as const, printerProfileIds: [printerProfileId] },
+      {
+        mode: "both" as const,
+        kdsStationIds: [kdsStationId],
+        printerProfileIds: [printerProfileId],
+        configurationReference: "pilot-production-route",
+      },
+    ];
+    for (const evidence of routes) {
+      const onboarding = await invoke(
+        subject.ownerIdentityId,
+        subject.organizationId,
+        () =>
+          service?.update(subject.ownerIdentityId, subject.organizationId, {
+            items: {
+              production: {
+                status: "in_progress",
+                evidenceReference: `production-${evidence.mode}`,
+                evidence,
+              },
+            },
+          }) ?? Promise.reject(new Error("service unavailable")),
+      );
+      assert.equal(onboarding.items.production?.status, "in_progress");
+      assert.equal(onboarding.items.production?.verifiedAt, null);
+      assert.equal(onboarding.ready, false);
+      assert.ok(onboarding.missingItems.includes("production"));
+      assert.deepEqual(onboarding.items.production?.evidence, evidence);
+    }
+    const off = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.update(subject.ownerIdentityId, subject.organizationId, {
+          items: {
+            production: {
+              status: "verified",
+              evidenceReference: "production-off",
+              evidence: { mode: "off" },
+            },
+          },
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(off.items.production?.status, "verified");
+    assert.equal(off.ready, true);
+  });
+
+  it("freezes the activated checklist and audit when operational resources later drift", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+    const subject = await fixture("Activated Freeze");
+    await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.activate(
+          subject.ownerIdentityId,
+          subject.organizationId,
+          "activated-freeze-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    const before = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(subject.ownerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    const checklistBefore = await owner.db
+      .select()
+      .from(onboardingChecklistItems)
+      .where(eq(onboardingChecklistItems.organizationId, subject.organizationId));
+    const auditBefore = await owner.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.organizationId, subject.organizationId));
+    await owner.db
+      .delete(posProductPrices)
+      .where(eq(posProductPrices.organizationId, subject.organizationId));
+    await owner.db
+      .update(posDiningTables)
+      .set({ active: false })
+      .where(eq(posDiningTables.organizationId, subject.organizationId));
+    await owner.db
+      .update(memberships)
+      .set({ status: "disabled" })
+      .where(eq(memberships.id, subject.cashierMembershipId));
+    const after = await invoke(
+      subject.ownerIdentityId,
+      subject.organizationId,
+      () =>
+        service?.get(subject.ownerIdentityId, subject.organizationId) ??
+        Promise.reject(new Error("service unavailable")),
+    );
+    assert.equal(after.ready, true);
+    assert.deepEqual(after.missingItems, []);
+    assert.deepEqual(after.items, before.items);
+    assert.deepEqual(after.selection, before.selection);
+    assert.deepEqual(
+      await owner.db
+        .select()
+        .from(onboardingChecklistItems)
+        .where(eq(onboardingChecklistItems.organizationId, subject.organizationId)),
+      checklistBefore,
+    );
+    assert.deepEqual(
+      await owner.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.organizationId, subject.organizationId)),
+      auditBefore,
+    );
   });
 
   it("pins plan/unit before the saga, exposes all 12 items and returns only allowlisted DTOs", async (context) => {
@@ -947,6 +1167,173 @@ describe("durable onboarding provisioning", () => {
       .where(eq(onboardingRecords.organizationId, subject.organizationId));
     assert.equal(after[0]?.selectedPlanId, before[0]?.selectedPlanId);
     assert.equal(after[0]?.selectionRevision, before[0]?.selectionRevision);
+  });
+
+  it("linearizes selection against owner revocation in both commit orders", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+
+    const selectionWins = await fixture("Selection Lock Wins");
+    const trigger = `task7_selection_owner_${suffix.slice(0, 7)}`;
+    const salt = 7131;
+    await installAdvisoryGateTrigger(
+      "onboarding_records",
+      selectionWins.organizationId,
+      trigger,
+      salt,
+      "update",
+    );
+    const gate = await holdAdvisoryGate(selectionWins.organizationId, salt);
+    const selection = invoke(
+      selectionWins.ownerIdentityId,
+      selectionWins.organizationId,
+      () =>
+        service?.select(selectionWins.ownerIdentityId, selectionWins.organizationId, {
+          planSlug: "crescimento",
+          selectedUnitId: selectionWins.unitId,
+          reselect: true,
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    selection.catch(() => undefined);
+    let lateDemotion: Promise<unknown> | undefined;
+    try {
+      await assertAdvisoryWaits(1);
+      lateDemotion = owner.db
+        .update(roleBindings)
+        .set({ role: "manager" })
+        .where(eq(roleBindings.membershipId, selectionWins.ownerMembershipId));
+      lateDemotion.catch(() => undefined);
+      await assertRowLockWaits(1);
+    } finally {
+      await gate.release();
+    }
+    try {
+      assert.equal((await selection)?.plan.slug, "crescimento");
+      await lateDemotion;
+    } finally {
+      await removeFailureTrigger("onboarding_records", trigger);
+    }
+    await owner.db
+      .update(roleBindings)
+      .set({ role: "owner" })
+      .where(eq(roleBindings.membershipId, selectionWins.ownerMembershipId));
+
+    const revocationWins = await fixture("Selection Revocation Wins");
+    const heldDemotion = await holdOwnerDemotion(revocationWins.ownerMembershipId);
+    const rejectedSelection = invoke(
+      revocationWins.ownerIdentityId,
+      revocationWins.organizationId,
+      () =>
+        service?.select(revocationWins.ownerIdentityId, revocationWins.organizationId, {
+          planSlug: "crescimento",
+          selectedUnitId: revocationWins.unitId,
+          reselect: true,
+        }) ?? Promise.reject(new Error("service unavailable")),
+    );
+    rejectedSelection.catch(() => undefined);
+    await assertRowLockWaits(1);
+    await heldDemotion.release();
+    await assert.rejects(rejectedSelection, errorContains("ONBOARDING_ROLE_CHANGED"));
+    const [preserved] = await owner.db
+      .select()
+      .from(onboardingRecords)
+      .where(eq(onboardingRecords.organizationId, revocationWins.organizationId));
+    assert.equal(preserved?.selectedPlanId, planId);
+  });
+
+  it("linearizes final activation against owner revocation in both commit orders", async (context) => {
+    if (!owner || !service) return context.skip("PROVISIONING_DATABASE_URL not configured");
+
+    const activationWins = await fixture("Activation Owner Lock Wins");
+    const trialTrigger = `task7_activation_owner_${suffix.slice(0, 7)}`;
+    const trialSalt = 7132;
+    await installAdvisoryGateTrigger(
+      "trials",
+      activationWins.organizationId,
+      trialTrigger,
+      trialSalt,
+      "insert",
+    );
+    const trialGate = await holdAdvisoryGate(activationWins.organizationId, trialSalt);
+    const activation = invoke(
+      activationWins.ownerIdentityId,
+      activationWins.organizationId,
+      () =>
+        service?.activate(
+          activationWins.ownerIdentityId,
+          activationWins.organizationId,
+          "activation-owner-lock-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    activation.catch(() => undefined);
+    let lateDemotion: Promise<unknown> | undefined;
+    try {
+      await assertAdvisoryWaits(1);
+      lateDemotion = owner.db
+        .update(roleBindings)
+        .set({ role: "manager" })
+        .where(eq(roleBindings.membershipId, activationWins.ownerMembershipId));
+      lateDemotion.catch(() => undefined);
+      await assertRowLockWaits(1);
+    } finally {
+      await trialGate.release();
+    }
+    try {
+      assert.equal((await activation).state, "completed");
+      await lateDemotion;
+    } finally {
+      await removeFailureTrigger("trials", trialTrigger);
+    }
+
+    const revocationWins = await fixture("Activation Revocation Wins");
+    const subscriptionTrigger = `task7_pre_final_owner_${suffix.slice(0, 7)}`;
+    const subscriptionSalt = 7133;
+    await installAdvisoryGateTrigger(
+      "subscriptions",
+      revocationWins.organizationId,
+      subscriptionTrigger,
+      subscriptionSalt,
+      "insert",
+    );
+    const subscriptionGate = await holdAdvisoryGate(
+      revocationWins.organizationId,
+      subscriptionSalt,
+    );
+    const rejectedActivation = invoke(
+      revocationWins.ownerIdentityId,
+      revocationWins.organizationId,
+      () =>
+        service?.activate(
+          revocationWins.ownerIdentityId,
+          revocationWins.organizationId,
+          "activation-revocation-key-0001",
+          {},
+        ) ?? Promise.reject(new Error("service unavailable")),
+    );
+    rejectedActivation.catch(() => undefined);
+    try {
+      await assertAdvisoryWaits(1);
+      await owner.db
+        .update(roleBindings)
+        .set({ role: "manager" })
+        .where(eq(roleBindings.membershipId, revocationWins.ownerMembershipId));
+    } finally {
+      await subscriptionGate.release();
+    }
+    try {
+      await assert.rejects(rejectedActivation, errorContains("PROVISIONING_OWNER_CHANGED"));
+    } finally {
+      await removeFailureTrigger("subscriptions", subscriptionTrigger);
+    }
+    assert.equal(
+      (
+        await owner.db
+          .select()
+          .from(trials)
+          .where(eq(trials.organizationId, revocationWins.organizationId))
+      ).length,
+      0,
+    );
   });
 
   it("serializes final activation before PATCH and rejects the late mutation without changing evidence", async (context) => {
@@ -1561,6 +1948,18 @@ describe("durable onboarding provisioning", () => {
           }) ?? Promise.reject(new Error("database unavailable")),
       ),
     );
+    const [spoofedLock] = await invoke(
+      tenantB.ownerIdentityId,
+      tenantB.organizationId,
+      () =>
+        database?.db.execute<{ authorized: boolean }>(sql`
+          select giromesa_lock_onboarding_owner(
+            ${tenantB.organizationId}::uuid,
+            ${tenantA.ownerIdentityId}::uuid
+          ) as authorized
+        `) ?? Promise.reject(new Error("database unavailable")),
+    );
+    assert.equal(spoofedLock?.authorized, false);
     await owner.db
       .update(onboardingChecklistItems)
       .set({ status: "in_progress", source: "legacy_import" })
@@ -1596,6 +1995,9 @@ describe("durable onboarding provisioning", () => {
         app_selection_update: boolean;
         worker_selection_update: boolean;
         app_audit_update: boolean;
+        app_membership_update: boolean;
+        app_role_binding_update: boolean;
+        app_owner_lock_execute: boolean;
       }[]
     >`
       select
@@ -1609,7 +2011,10 @@ describe("durable onboarding provisioning", () => {
         has_column_privilege('giromesa_app', 'subscriptions', 'provisioning_run_id', 'insert') app_subscription_run_column_insert,
         has_column_privilege('giromesa_app', 'onboarding_records', 'selected_plan_snapshot', 'update') app_selection_update,
         has_column_privilege('giromesa_worker', 'onboarding_records', 'selected_plan_snapshot', 'update') worker_selection_update,
-        has_table_privilege('giromesa_app', 'audit_events', 'update') app_audit_update
+        has_table_privilege('giromesa_app', 'audit_events', 'update') app_audit_update,
+        has_table_privilege('giromesa_app', 'memberships', 'update') app_membership_update,
+        has_table_privilege('giromesa_app', 'role_bindings', 'update') app_role_binding_update,
+        has_function_privilege('giromesa_app', 'giromesa_lock_onboarding_owner(uuid,uuid)', 'execute') app_owner_lock_execute
     `;
     assert.deepEqual(privileges, {
       force_runs: true,
@@ -1623,6 +2028,9 @@ describe("durable onboarding provisioning", () => {
       app_selection_update: true,
       worker_selection_update: false,
       app_audit_update: false,
+      app_membership_update: false,
+      app_role_binding_update: false,
+      app_owner_lock_execute: true,
     });
   });
 });
