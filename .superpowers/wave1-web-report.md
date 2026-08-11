@@ -30,7 +30,7 @@ A Onda 1A foi implementada em quatro commits recuperáveis, um por task. O traba
 
 - RED: 6 falhas por módulos ainda ausentes; o primeiro E2E também demonstrou que `no-store` global era uma política incorreta.
 - GREEN: Ops 59/59, Site 14/14 e Customer 11/11; typecheck dos três apps; E2E PWA 5/5; Biome e `diff --check` focados.
-- Política: cache limitado a assets estáticos, TTL de 7 dias, preservação apenas da versão atual e anterior e exclusão de autenticação, sessão, mutações, `Set-Cookie`, `private` e `no-store`.
+- Política: cache limitado a assets estáticos, TTL de 7 dias, preservação apenas da versão atual e anterior e exclusão de autenticação, sessão e mutações.
 - Atualização: não recarrega durante mutação em voo; permite ação manual segura; migração/limpeza de IndexedDB e limpeza no logout foram cobertas.
 
 ### Task 11 — iconografia
@@ -87,6 +87,39 @@ O detector foi executado uma única vez, conforme o brief. Ele retornou 9 warnin
 - O canal de e-mail real depende de `NEXT_PUBLIC_CONTACT_EMAIL`; o WhatsApp real depende de `NEXT_PUBLIC_WHATSAPP_NUMBER`. Sem configuração válida, a UI aponta para `/contato` e não inventa endereço.
 - Permanecem warnings de estilo preexistentes no CSS de Ops e no detector Impeccable, registrados acima.
 - Não houve provider real, push, deploy, alteração de Task 13+ nem declaração de aprovação de produção.
+
+## Correções da revisão cruzada
+
+Uma revisão independente posterior encontrou três achados Important e três Minor. Todos foram corrigidos em quatro commits incrementais:
+
+| Commit | Correção |
+| --- | --- |
+| `0c622ff` | Allowlist de cache por path e destination, `Cache-Control: public` explícito, fetch sem credenciais e TTL rígido de 7 dias sem stale-if-error |
+| `a3b4b50` | Boundary HTTP compartilhado para mutações de Ops, Site e Customer, incluindo fetches antes diretos, sem dupla contagem |
+| `e663298` | Marca Google SVG real, checks da família SVG, scanner regressivo, theme-color coerente e alvos PWA de 48 px |
+| `726cb71` | Espera determinística por imagens decodificadas, fontes e layout estável antes dos screenshots |
+
+### Evidência TDD da remediação
+
+- Cache/TTL RED: path arbitrário era aceito, resposta sem política pública entrava no cache, o fetch preservava credenciais e um asset vencido podia voltar durante falha de rede. GREEN: 5/5 testes, com paridade da política nos três apps.
+- Mutações RED: o subpath compartilhado e os boundaries dos apps ainda não existiam. GREEN: requests atrasadas de Ops, Site e Customer mantêm a ativação bloqueada até a resposta; nesting síncrono permanece em contagem 1.
+- Craft RED: o scanner encontrou `G` textual, check Unicode, theme-color divergente e alvo de 44 px. GREEN: 3/3 checks de fonte após incluir também a estabilidade visual.
+- Visual RED: a reprodução da revisão oscilava em tablet/mobile por imagens lazy e altura de layout. GREEN: duas execuções consecutivas aprovaram desktop, tablet e mobile sem atualizar snapshots.
+
+### Gate consolidado após a remediação
+
+- Testes: UI 5/5; Ops 65/65; Site 18/18 Node + 3/3 Vitest; Customer 13/13.
+- TypeScript: UI, Ops, Site e Customer aprovados.
+- Builds: Ops/Vite, Site/Next e Customer/Next aprovados.
+- E2E focado: 13/13 para PWA nos três apps, conectividade, acessibilidade, teclado, reduced motion, canais reais, LCP e visual desktop/tablet/mobile.
+- Regressão visual isolada: duas confirmações consecutivas de 3/3, sem atualização dos snapshots; imagens inspecionadas nos três breakpoints.
+- Biome exato sobre os arquivos de remediação: sem erros; permanecem os mesmos 54 warnings preexistentes em `apps/ops/src/styles.css`.
+- `git diff --check 11e9435..HEAD`: aprovado antes do commit deste relatório.
+- O detector Impeccable não foi repetido, conforme a instrução explícita da revisão.
+
+O cache runtime não usa `Set-Cookie` como fronteira de segurança, pois esse header não é legível de forma confiável no browser. A defesa agora combina allowlist de paths/destinations, ausência total de query, requests com `credentials: "omit"` e resposta com política `public` explícita. Assets expirados são removidos antes da tentativa de rede e nunca retornam como stale.
+
+Durante o screenshot full-page, o percurso intencional pelas imagens abaixo da dobra ainda produz o aviso de LCP do Next. O gate isolado de LCP em viewport normal permanece verde; o aviso não representa o carregamento inicial do usuário.
 
 ## Fechamento
 
