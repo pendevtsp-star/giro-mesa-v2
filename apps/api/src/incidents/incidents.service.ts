@@ -304,16 +304,6 @@ export class IncidentsService {
           code: "INCIDENT_INDEPENDENT_APPROVAL_REQUIRED",
           message: "A decisão exige uma identidade diferente do relator.",
         });
-      const [updated] = await tx
-        .update(managementIncidents)
-        .set({
-          status: target,
-          approverIdentityId: independentApproval ? identityId : incident.approverIdentityId,
-          updatedAt: new Date(),
-        })
-        .where(eq(managementIncidents.id, incident.id))
-        .returning();
-      if (!updated) throw new Error("Incident update returned no row.");
       await tx.insert(managementIncidentEvents).values({
         organizationId,
         unitId,
@@ -326,6 +316,16 @@ export class IncidentsService {
         requestHash,
         actorIdentityId: identityId,
       });
+      const [updated] = await tx
+        .update(managementIncidents)
+        .set({
+          status: target,
+          approverIdentityId: independentApproval ? identityId : incident.approverIdentityId,
+          updatedAt: new Date(),
+        })
+        .where(eq(managementIncidents.id, incident.id))
+        .returning();
+      if (!updated) throw new Error("Incident update returned no row.");
       return this.incidentDto(updated, false);
     });
   }

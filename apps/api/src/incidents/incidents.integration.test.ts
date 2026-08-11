@@ -77,6 +77,32 @@ it("keeps neutral evidence, dual approval and an append-only trail without payro
       },
     );
     assert.equal(incident.status, "reported");
+    const appContext = {
+      source: "http" as const,
+      organizationId: organization.id,
+      unitId: unit.id,
+      actorIdentityId: reporter.id,
+    };
+    await assert.rejects(() =>
+      database.withTenantContext(appContext, (tx) =>
+        tx
+          .update(managementIncidents)
+          .set({
+            neutralSummary: "Resumo adulterado sem evento.",
+            evidence: [],
+            amountCents: 0,
+          })
+          .where(eq(managementIncidents.id, incident.incidentId)),
+      ),
+    );
+    await assert.rejects(() =>
+      database.withTenantContext(appContext, (tx) =>
+        tx
+          .update(managementIncidents)
+          .set({ status: "under_review" })
+          .where(eq(managementIncidents.id, incident.incidentId)),
+      ),
+    );
     await service.review(
       reporter.id,
       organization.id,

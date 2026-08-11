@@ -182,6 +182,46 @@ END;
 $$;
 CREATE TRIGGER "management_returnable_movements_immutable" BEFORE UPDATE OR DELETE ON "management_returnable_movements" FOR EACH ROW EXECUTE FUNCTION public.giromesa_reject_management_ledger_mutation();
 CREATE TRIGGER "management_incident_events_immutable" BEFORE UPDATE OR DELETE ON "management_incident_events" FOR EACH ROW EXECUTE FUNCTION public.giromesa_reject_management_ledger_mutation();
+CREATE OR REPLACE FUNCTION public.giromesa_guard_incident_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF NEW.id IS DISTINCT FROM OLD.id
+    OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
+    OR NEW.unit_id IS DISTINCT FROM OLD.unit_id
+    OR NEW.incident_type IS DISTINCT FROM OLD.incident_type
+    OR NEW.neutral_summary IS DISTINCT FROM OLD.neutral_summary
+    OR NEW.evidence IS DISTINCT FROM OLD.evidence
+    OR NEW.amount_cents IS DISTINCT FROM OLD.amount_cents
+    OR NEW.payroll_action IS DISTINCT FROM OLD.payroll_action
+    OR NEW.idempotency_key IS DISTINCT FROM OLD.idempotency_key
+    OR NEW.request_hash IS DISTINCT FROM OLD.request_hash
+    OR NEW.reporter_identity_id IS DISTINCT FROM OLD.reporter_identity_id
+    OR NEW.occurred_at IS DISTINCT FROM OLD.occurred_at
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at
+  THEN
+    RAISE EXCEPTION 'incident evidence and report facts are immutable' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.status IS DISTINCT FROM OLD.status OR NEW.approver_identity_id IS DISTINCT FROM OLD.approver_identity_id THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.management_incident_events AS event
+      WHERE event.organization_id = OLD.organization_id
+        AND event.unit_id = OLD.unit_id
+        AND event.incident_id = OLD.id
+        AND event.from_status = OLD.status
+        AND event.to_status = NEW.status
+        AND event.created_at >= transaction_timestamp()
+    ) THEN
+      RAISE EXCEPTION 'incident transition requires an audit event in the same transaction' USING ERRCODE = '55000';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "management_incidents_guard_update" BEFORE UPDATE ON "management_incidents" FOR EACH ROW EXECUTE FUNCTION public.giromesa_guard_incident_update();
 --> statement-breakpoint
 ALTER TABLE "management_unit_conversions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "management_unit_conversions" FORCE ROW LEVEL SECURITY;
@@ -196,7 +236,9 @@ ALTER TABLE "management_incidents" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "management_incident_events" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "management_incident_events" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "management_unit_conversions", "management_returnable_assets", "management_returnable_serials", "management_returnable_movements", "management_incidents", "management_incident_events" FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_internal, giromesa_legacy_transition;
-GRANT SELECT, INSERT, UPDATE ON "management_unit_conversions", "management_returnable_assets", "management_returnable_serials", "management_incidents" TO giromesa_app;
+GRANT SELECT, INSERT, UPDATE ON "management_unit_conversions", "management_returnable_assets", "management_returnable_serials" TO giromesa_app;
+GRANT SELECT, INSERT ON "management_incidents" TO giromesa_app;
+GRANT UPDATE ("status", "approver_identity_id", "updated_at") ON "management_incidents" TO giromesa_app;
 GRANT SELECT, INSERT ON "management_returnable_movements", "management_incident_events" TO giromesa_app;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "management_unit_conversions" FOR ALL TO giromesa_app USING (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id)) WITH CHECK (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id));
