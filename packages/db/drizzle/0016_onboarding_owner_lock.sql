@@ -11,13 +11,21 @@ DECLARE
   context_organization_id text := current_setting('app.current_organization_id', true);
   context_identity_id text := current_setting('app.current_actor_identity_id', true);
 BEGIN
-  -- Validate before casting so malformed or missing transaction context fails closed.
-  -- PostgreSQL UUID comparison then accepts canonical case differences safely.
-  IF context_organization_id IS NULL
-     OR context_identity_id IS NULL
-     OR context_organization_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-     OR context_identity_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-     OR context_organization_id::uuid IS DISTINCT FROM p_organization_id
+  -- Missing context fails closed before any expression can inspect or cast it.
+  IF context_organization_id IS NULL OR context_identity_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- Keep lexical validation in its own step. PostgreSQL may reorder boolean
+  -- expressions, so this guard must not share an expression with a UUID cast.
+  IF context_organization_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     OR context_identity_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    RETURN false;
+  END IF;
+
+  -- Cast only values that passed the complete UUID grammar. UUID comparison
+  -- then accepts canonical case differences safely.
+  IF context_organization_id::uuid IS DISTINCT FROM p_organization_id
      OR context_identity_id::uuid IS DISTINCT FROM p_identity_id THEN
     RETURN false;
   END IF;

@@ -143,10 +143,12 @@ describe("durable onboarding provisioning", () => {
         runtime_bypass_rls: boolean;
         runtime_migrator_membership: boolean;
         migrator_destructive_table_privilege: boolean;
+        definition: string;
       }[]
     >`
       select
         owner_role.rolname owner,
+        pg_get_functiondef(procedure.oid) definition,
         procedure.prosecdef security_definer,
         procedure.proconfig configuration,
         has_function_privilege('public', procedure.oid, 'execute') public_execute,
@@ -212,7 +214,22 @@ describe("durable onboarding provisioning", () => {
         and procedure.proname = 'giromesa_lock_onboarding_owner'
         and pg_get_function_identity_arguments(procedure.oid) = 'p_organization_id uuid, p_identity_id uuid'
     `;
-    assert.deepEqual(metadata, {
+    assert.ok(metadata);
+    const { definition, ...access } = metadata;
+    const missingGuard = definition.indexOf("IF context_organization_id IS NULL");
+    const regexGuard = definition.indexOf("IF context_organization_id !~*");
+    const castGuard = definition.indexOf("IF context_organization_id::uuid");
+    assert.ok(missingGuard >= 0, "missing/null context guard must be explicit");
+    assert.ok(regexGuard > missingGuard, "regex validation must follow missing/null validation");
+    assert.ok(castGuard > regexGuard, "UUID casts must follow regex validation");
+    const regexGuardEnd = definition.indexOf("END IF;", regexGuard);
+    assert.ok(regexGuardEnd > regexGuard, "regex validation must be a separate PL/pgSQL step");
+    assert.doesNotMatch(
+      definition.slice(regexGuard, regexGuardEnd),
+      /::uuid/,
+      "validation expressions must never contain a UUID cast",
+    );
+    assert.deepEqual(access, {
       owner: "giromesa_migrator",
       security_definer: true,
       configuration: ["search_path=pg_catalog, public"],
@@ -235,20 +252,24 @@ describe("durable onboarding provisioning", () => {
   }
 
   async function callOwnerLockWithRawContext(
-    organizationSetting: string,
-    actorSetting: string,
+    organizationSetting: string | undefined,
+    actorSetting: string | undefined,
     organizationId: string,
     identityId: string,
   ) {
     if (!appConnection) throw new Error("application database is not configured");
     return appConnection.client.begin(async (transaction) => {
       await transaction.unsafe("set local role giromesa_app");
-      await transaction.unsafe(
-        `select
-          set_config('app.current_organization_id', $1, true),
-          set_config('app.current_actor_identity_id', $2, true)`,
-        [organizationSetting, actorSetting],
-      );
+      if (organizationSetting !== undefined) {
+        await transaction.unsafe("select set_config('app.current_organization_id', $1, true)", [
+          organizationSetting,
+        ]);
+      }
+      if (actorSetting !== undefined) {
+        await transaction.unsafe("select set_config('app.current_actor_identity_id', $1, true)", [
+          actorSetting,
+        ]);
+      }
       const [result] = await transaction.unsafe<{ authorized: boolean }[]>(
         `
         select public.giromesa_lock_onboarding_owner(
@@ -1232,17 +1253,14 @@ describe("durable onboarding provisioning", () => {
     await owner.db
       .delete(posProductPrices)
       .where(eq(posProductPrices.organizationId, subject.organizationId));
-    await refresh();
     await owner.db
       .update(posDiningTables)
       .set({ active: false })
       .where(eq(posDiningTables.organizationId, subject.organizationId));
-    await refresh();
     await owner.db
       .update(memberships)
       .set({ status: "disabled" })
       .where(eq(memberships.id, subject.cashierMembershipId));
-    await refresh();
     await owner.db
       .update(memberships)
       .set({ status: "disabled" })
@@ -1254,17 +1272,20 @@ describe("durable onboarding provisioning", () => {
         .select()
         .from(auditEvents)
         .where(eq(auditEvents.organizationId, subject.organizationId))
-        .orderBy(auditEvents.occurredAt)
     ).filter((event) => event.action === "onboarding.system_evidence_changed");
+    const blockedEvents = history.filter(
+      (event) =>
+        (event.metadata.after as { status?: string } | undefined)?.status === "blocked" &&
+        event.metadata.reason === "onboarding_get_refresh",
+    );
+    assert.equal(blockedEvents.length, 4);
     for (const item of ["catalog", "tables", "cashier", "team"]) {
-      const transitions = history.filter((event) => event.metadata.item === item);
-      assert.ok(transitions.length >= 1, `missing ${item} system audit`);
-      const last = transitions.at(-1);
-      assert.equal((last?.metadata.after as { status?: string } | undefined)?.status, "blocked");
-      assert.ok(last?.metadata.before);
-      assert.equal(last?.actorIdentityId, null);
-      assert.equal(last?.metadata.actorIdentityId, null);
-      assert.equal(last?.metadata.reason, "onboarding_get_refresh");
+      const transitions = blockedEvents.filter((event) => event.metadata.item === item);
+      assert.equal(transitions.length, 1, `expected one unique blocked ${item} audit`);
+      const [transition] = transitions;
+      assert.ok(transition?.metadata.before);
+      assert.equal(transition?.actorIdentityId, null);
+      assert.equal(transition?.metadata.actorIdentityId, null);
     }
     const countBeforeNoopRefresh = history.length;
     await refresh();
@@ -1275,6 +1296,35 @@ describe("durable onboarding provisioning", () => {
         .where(eq(auditEvents.organizationId, subject.organizationId))
     ).filter((event) => event.action === "onboarding.system_evidence_changed").length;
     assert.equal(countAfterNoopRefresh, countBeforeNoopRefresh);
+
+    const simultaneousAction = `onboarding.test_same_timestamp.${randomUUID()}`;
+    await owner.client.begin(async (transaction) => {
+      await transaction.unsafe(
+        `insert into audit_events
+          (organization_id, action, entity_type, entity_id, metadata, occurred_at)
+         values
+          ($1::uuid, $2, 'test_marker', 'alpha', $3::jsonb, transaction_timestamp()),
+          ($1::uuid, $2, 'test_marker', 'beta', $4::jsonb, transaction_timestamp())`,
+        [
+          subject.organizationId,
+          simultaneousAction,
+          JSON.stringify({ marker: "alpha" }),
+          JSON.stringify({ marker: "beta" }),
+        ],
+      );
+    });
+    const simultaneous = (
+      await owner.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.organizationId, subject.organizationId))
+    ).filter((event) => event.action === simultaneousAction);
+    assert.equal(simultaneous.length, 2);
+    assert.equal(new Set(simultaneous.map((event) => event.occurredAt.toISOString())).size, 1);
+    assert.deepEqual(
+      new Set(simultaneous.map((event) => event.metadata.marker)),
+      new Set(["alpha", "beta"]),
+    );
   });
 
   it("rechecks owner after the organization lock and preserves the selection after demotion", async (context) => {
@@ -2114,18 +2164,49 @@ describe("durable onboarding provisioning", () => {
       ),
       true,
     );
+    const malformedContexts: Array<[string, string | undefined, string | undefined]> = [
+      ["missing both", undefined, undefined],
+      ["missing organization", undefined, tenantB.ownerIdentityId],
+      ["missing actor", tenantB.organizationId, undefined],
+      ["empty", "", ""],
+      ["whitespace", "  ", "\t"],
+      ["garbage organization", "not-a-uuid", tenantB.ownerIdentityId],
+      ["garbage actor", tenantB.organizationId, "not-an-identity"],
+      ["nearly uuid", tenantB.organizationId.slice(0, -1), tenantB.ownerIdentityId],
+      ["overflow uuid", `${tenantB.organizationId}f`, tenantB.ownerIdentityId],
+      ["sql-ish", "'::uuid; select pg_sleep(1); --", tenantB.ownerIdentityId],
+    ];
+    for (const [label, organizationSetting, actorSetting] of malformedContexts) {
+      assert.equal(
+        await callOwnerLockWithRawContext(
+          organizationSetting,
+          actorSetting,
+          tenantB.organizationId,
+          tenantB.ownerIdentityId,
+        ),
+        false,
+        label,
+      );
+    }
     assert.equal(
       await callOwnerLockWithRawContext(
-        "not-a-uuid",
+        randomUUID(),
         tenantB.ownerIdentityId,
         tenantB.organizationId,
         tenantB.ownerIdentityId,
       ),
       false,
+      "wrong tenant context",
     );
     assert.equal(
-      await callOwnerLockWithRawContext("", "", tenantB.organizationId, tenantB.ownerIdentityId),
+      await callOwnerLockWithRawContext(
+        tenantB.organizationId,
+        randomUUID(),
+        tenantB.organizationId,
+        tenantB.ownerIdentityId,
+      ),
       false,
+      "wrong actor context",
     );
     await owner.db
       .update(onboardingChecklistItems)

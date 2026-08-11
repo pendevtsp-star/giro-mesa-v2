@@ -164,3 +164,27 @@ O onboarding agora usa evidencias normalizadas e uma saga persistida por organiz
 
 - O papel owner continua `BYPASSRLS` e `NOLOGIN` por ser o owner compartilhado das funcoes definer existentes; nenhum papel runtime o herda ou possui bypass. O novo poder exposto permanece exclusivamente na funcao booleana estreita, sem SQL dinamico, mutacao ou retorno de dados de autorizacao.
 - Nenhum container foi criado ou removido, e nao houve push, deploy ou chamada de provider real.
+
+## Fix round 5
+
+### RED e correcoes aplicadas
+
+- O gate estrutural passou a inspecionar a funcao realmente instalada e exige tres blocos PL/pgSQL ordenados e independentes: contexto ausente/nulo, validacao lexical e, somente depois, comparacao com cast UUID. A versao anterior falhou esse contrato porque regex e casts compartilhavam a mesma expressao booleana, cuja ordem de avaliacao o PostgreSQL nao garante.
+- `0016_onboarding_owner_lock.sql` agora retorna `false` para contexto ausente antes da regex, retorna `false` para qualquer texto fora da gramatica UUID antes de existir um cast e somente converte os dois valores no terceiro bloco. Owner, `SECURITY DEFINER`, `search_path`, ACLs e fail-closed por escopo foram preservados.
+- O gate `giromesa_app` cobre contexto ausente, vazio, whitespace, garbage, UUID quase valido, UUID excedente, texto SQL-like, tenant errado e ator errado. Todos os malformados retornam `false`, sem `invalid_text_representation`; UUID canonico e uppercase continuam autorizando o owner correto.
+- O teste de auditoria deixou de ordenar por `occurredAt` e usar `.at(-1)`. Ele identifica a transicao unica por `action`, `metadata.item`, `metadata.reason` e `metadata.after`; um caso adicional grava dois eventos na mesma transacao e no mesmo `transaction_timestamp()` e os valida por metadata, sem inferir ordem temporal entre UUIDs.
+
+### Gates do breaker
+
+- PostgreSQL 17: integracao Task 7 **20/20**, incluindo fresh, upgrade, reaplicacao idempotente de `0016`, matriz de contexto, RLS/ACL e corridas existentes.
+- PostgreSQL 16: o mesmo gate **20/20**.
+- O caso focado de auditoria e o caso focado de FORCE RLS/owner lock passaram isoladamente antes do rerun integral.
+- `pnpm typecheck`: verde, sem erros TypeScript.
+- Biome focado no teste alterado e `git diff --check`: verdes.
+- Os containers descartaveis exclusivos `giromesa-task7-r5-pg16` e `giromesa-task7-r5-pg17` foram removidos. Nenhum container compartilhado foi alterado.
+
+### Self-review
+
+- Nao ha cast em nenhuma expressao de validacao; o teste consulta `pg_get_functiondef`, portanto protege tambem fresh, upgrade e rerun contra regressao estrutural.
+- O boundary constante de 5xx e as permissoes estreitas da funcao permaneceram inalterados.
+- Nao houve push, deploy, chamada de provider real nem ampliacao funcional alem dos dois findings da rodada final.
