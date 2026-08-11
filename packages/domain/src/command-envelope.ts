@@ -1,5 +1,16 @@
 export const MAX_RESOURCE_VERSION = 2_147_483_647;
 export const MAX_AGGREGATE_SEQUENCE = 2_147_483_647;
+export const MAX_SYNC_RESOURCE_PRECONDITIONS = 128;
+export const MAX_SYNC_PRICE_REFERENCES = 2_048;
+export const MAX_SYNC_PAYLOAD_BYTES = 65_536;
+export const MAX_SYNC_EVENT_BYTES = 950_000;
+export const MAX_SYNC_BATCH_BYTES = 1_000_000;
+export const MAX_SYNC_BATCH_EVENTS = 100;
+export const MAX_OFFLINE_COMMAND_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
+export const PRICE_REFERENCE_VALIDITY_MS = 35 * 24 * 60 * 60 * 1_000;
+export const PRICE_REFERENCE_DELIVERY_GRACE_MS = 5 * 24 * 60 * 60 * 1_000;
+export const PRICE_REFERENCE_KEY_RETENTION_MS =
+  PRICE_REFERENCE_VALIDITY_MS + PRICE_REFERENCE_DELIVERY_GRACE_MS;
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isoTimestampPattern =
@@ -20,6 +31,7 @@ export type ResourcePrecondition = Readonly<{
 export type PriceReference = Readonly<{
   kind: "product" | "modifier-option";
   entityId: string;
+  priceRevision: string;
   token: string;
 }>;
 
@@ -102,16 +114,33 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
       }),
     ),
   );
+  if (resourcePreconditions.length > MAX_SYNC_RESOURCE_PRECONDITIONS) {
+    throw new TypeError(
+      `resourcePreconditions must contain at most ${MAX_SYNC_RESOURCE_PRECONDITIONS} entries`,
+    );
+  }
   const priceReferences = Object.freeze(
     (input.priceReferences ?? []).map((reference) =>
       Object.freeze({
         kind: reference.kind,
         entityId: requiredUuid(reference.entityId, "priceReferences.entityId"),
+        priceRevision: boundedText(
+          reference.priceRevision,
+          "priceReferences.priceRevision",
+          1,
+          100,
+        ),
         token: boundedText(reference.token, "priceReferences.token", 32, 2_048),
       }),
     ),
   );
-  return Object.freeze({
+  if (priceReferences.length > MAX_SYNC_PRICE_REFERENCES) {
+    throw new TypeError(`priceReferences must contain at most ${MAX_SYNC_PRICE_REFERENCES} entries`);
+  }
+  if (Buffer.byteLength(JSON.stringify(input.payload), "utf8") > MAX_SYNC_PAYLOAD_BYTES) {
+    throw new TypeError(`payload must not exceed ${MAX_SYNC_PAYLOAD_BYTES} bytes`);
+  }
+  const envelope = {
     commandId: requiredUuid(input.commandId, "commandId"),
     idempotencyKey: boundedText(input.idempotencyKey, "idempotencyKey", 8, 160),
     organizationId: requiredUuid(context.organizationId, "organizationId"),
@@ -138,5 +167,9 @@ export function createCommandEnvelope<TPayload extends Record<string, unknown>>(
     occurredAt: timestamp(input.occurredAt, "occurredAt"),
     receivedAt: timestamp(context.receivedAt, "receivedAt"),
     payload: input.payload,
-  });
+  };
+  if (Buffer.byteLength(JSON.stringify(input), "utf8") > MAX_SYNC_EVENT_BYTES) {
+    throw new TypeError(`command event must not exceed ${MAX_SYNC_EVENT_BYTES} bytes`);
+  }
+  return Object.freeze(envelope);
 }

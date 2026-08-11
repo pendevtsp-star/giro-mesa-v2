@@ -105,9 +105,15 @@ internal sealed record PilotSyncMetadata(
             resources.Add(new(entry.Type, entry.Id, epoch, version.Value));
         }
         var primaryResourceId = requested.First(item => item.Type == "tab").Id;
+        var uniquePriceReferences = priceReferences
+            .DistinctBy(item => (item.Kind, item.EntityId, item.PriceRevision))
+            .OrderBy(item => item.Kind, StringComparer.Ordinal)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .ThenBy(item => item.PriceRevision, StringComparer.Ordinal)
+            .ToArray();
         return new(
             resources.OrderBy(item => item.Type, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray(),
-            priceReferences.OrderBy(item => item.Kind, StringComparer.Ordinal).ThenBy(item => item.EntityId, StringComparer.Ordinal).ToArray(),
+            uniquePriceReferences,
             primaryResourceId);
     }
 
@@ -159,6 +165,8 @@ internal sealed record PilotSyncMetadata(
             var price = FindBy(root["catalog"]?["prices"]?.AsArray(), "productId", productId)
                 ?? throw new OperationalConflictException("PRODUCT_PRICE_NOT_CONFIGURED");
             references.Add(new("product", productId,
+                OptionalString(price, "priceRevision")
+                    ?? throw new OperationalConflictException("PRICE_REFERENCE_UNAVAILABLE"),
                 OptionalString(price, "priceReference")
                     ?? throw new OperationalConflictException("PRICE_REFERENCE_UNAVAILABLE")));
             foreach (var optionId in item["modifierOptionIds"]?.AsArray()
@@ -167,6 +175,8 @@ internal sealed record PilotSyncMetadata(
                 var option = FindById(root["catalog"]?["modifierOptions"]?.AsArray(), optionId)
                     ?? throw new OperationalConflictException("INVALID_MODIFIER_SELECTION");
                 references.Add(new("modifier-option", optionId,
+                    OptionalString(option, "priceRevision")
+                        ?? throw new OperationalConflictException("PRICE_REFERENCE_UNAVAILABLE"),
                     OptionalString(option, "priceReference")
                         ?? throw new OperationalConflictException("PRICE_REFERENCE_UNAVAILABLE")));
             }

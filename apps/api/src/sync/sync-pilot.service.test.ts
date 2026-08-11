@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import type { DatabaseService } from "../database/database.module.js";
 import type { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
 import { PilotResourceConflict } from "../pilot-operations/pilot-resource-boundary.js";
-import { stableOperationalId } from "./stable-operational-id.js";
 import { createPriceReference } from "./price-reference.js";
+import { stableOperationalId } from "./stable-operational-id.js";
 import type { NormalizedSyncEventInput, SyncEventInput } from "./sync.schemas.js";
 import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";
 
@@ -103,23 +103,27 @@ function orderedEvent(
       {
         kind: "product" as const,
         entityId: item.productId,
+        priceRevision: "2026-08-10T12:00:00.000Z",
         token: createPriceReference({
           kind: "product",
           entityId: item.productId,
           organizationId,
           unitId,
           priceCents: 1_000,
+          priceRevision: "2026-08-10T12:00:00.000Z",
         }),
       },
       ...item.modifierOptionIds.map((optionId) => ({
         kind: "modifier-option" as const,
         entityId: optionId,
+        priceRevision: "2026-08-10T12:00:00.000Z",
         token: createPriceReference({
           kind: "modifier-option",
           entityId: optionId,
           organizationId,
           unitId,
           priceCents: 0,
+          priceRevision: "2026-08-10T12:00:00.000Z",
         }),
       })),
     ]),

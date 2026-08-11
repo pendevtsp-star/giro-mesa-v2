@@ -122,6 +122,93 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
     }
 
     [Fact]
+    public void SupportsMaximumMergeVectorAndDeduplicatesRepeatedPriceReferences()
+    {
+        var primaryId = Guid.NewGuid().ToString();
+        var resources = Enumerable.Range(0, 51)
+            .SelectMany(index => new[]
+            {
+                new ResourcePrecondition("tab", index == 0 ? primaryId : Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), 1),
+                new ResourcePrecondition("table", Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), 1),
+            })
+            .ToArray();
+        var reference = new PriceReference(
+            "product",
+            Guid.NewGuid().ToString(),
+            "2026-08-10T12:00:00.000Z",
+            new string('t', 64));
+        var pending = OrderedPending(resources, primaryId, [reference, reference]);
+
+        var outbound = CloudSyncWorker.CreateOutboundEvent(pending);
+        var json = JsonSerializer.SerializeToElement(outbound, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        Assert.Equal(102, json.GetProperty("resourcePreconditions").GetArrayLength());
+        Assert.Single(json.GetProperty("priceReferences").EnumerateArray());
+        Assert.Throws<LocalEnvelopeException>(() => CloudSyncWorker.CreateOutboundEvent(
+            OrderedPending(
+                resources.Concat(Enumerable.Range(0, 27).Select(_ =>
+                    new ResourcePrecondition("table", Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), 1))).ToArray(),
+                primaryId,
+                [])));
+    }
+
+    [Fact]
+    public async Task QuarantinesOversizedV2EventWithoutPoisoningValidSibling()
+    {
+        var options = Options.Create(new HubOptions
+        {
+            DataDirectory = _directory,
+            DatabaseKey = "test-database-key-32-characters-long",
+            CloudApiBaseUrl = "https://cloud.example",
+            CloudSyncKey = "cloud-sync-secret",
+        });
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var oversized = ValidCommand();
+        var sibling = ValidCommand();
+        await store.AcceptCommandAsync(oversized);
+        await store.AcceptCommandAsync(sibling);
+        var primaryId = Guid.NewGuid().ToString();
+        var resources = JsonSerializer.Serialize(new[]
+        {
+            new ResourcePrecondition("tab", primaryId, Guid.NewGuid().ToString(), 1),
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        await using (var connection = OpenConnection(options.Value))
+        {
+            await connection.OpenAsync();
+            var update = connection.CreateCommand();
+            update.CommandText = """
+                UPDATE operational_events SET protocol_version = 2,
+                  resource_preconditions = $resources, aggregate_sequence = 1,
+                  primary_resource_id = $primary,
+                  payload = CASE WHEN id = $oversized THEN $oversizedPayload ELSE payload END
+                WHERE id IN ($oversized, $sibling);
+                """;
+            update.Parameters.AddWithValue("$resources", resources);
+            update.Parameters.AddWithValue("$primary", primaryId);
+            update.Parameters.AddWithValue("$oversized", oversized.Id);
+            update.Parameters.AddWithValue("$sibling", sibling.Id);
+            update.Parameters.AddWithValue("$oversizedPayload", JsonSerializer.Serialize(new { pad = new string('x', SyncEnvelopeLimits.MaximumPayloadBytes) }));
+            await update.ExecuteNonQueryAsync();
+        }
+        var handler = new SingleAcceptedEventHandler(sibling.Id);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(sibling.Id, handler.UploadedEventId);
+        Assert.Equal("reconciling", worker.Status);
+        var reconciliation = await store.GetReconciliationAsync(10);
+        Assert.Contains(reconciliation, item =>
+            item.Id == oversized.Id && item.Reason == "LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+        Assert.Empty(await store.GetPendingAsync(10));
+    }
+
+    [Fact]
     public async Task ASecondAckOnlyResponseCannotOverwriteAReconciliationSnapshot()
     {
         var options = Options.Create(new HubOptions
@@ -169,7 +256,40 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         JsonDocument.Parse("{\"orderId\":\"order-1\"}").RootElement.Clone(),
         1,
         DateTimeOffset.UtcNow,
-        "edge-command-0001");
+        $"edge-{Guid.NewGuid():N}");
+
+    private static PendingEvent OrderedPending(
+        IReadOnlyList<ResourcePrecondition> resources,
+        string primaryId,
+        IReadOnlyList<PriceReference> references) => new(
+            Guid.NewGuid().ToString(),
+            ValidOrganizationId,
+            ValidUnitId,
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            $"idem-{Guid.NewGuid():N}",
+            "pos.tabs.merge_requested",
+            "{}",
+            1,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            2,
+            resources,
+            1,
+            references,
+            primaryId);
+
+    private static SqliteConnection OpenConnection(HubOptions options)
+    {
+        var path = Path.Combine(Path.GetFullPath(options.DataDirectory), "giromesa-edge.db").Replace('\\', '/');
+        return new(new SqliteConnectionStringBuilder
+        {
+            DataSource = $"file:{path}?cipher=sqlcipher&legacy=4",
+            Mode = SqliteOpenMode.ReadWrite,
+            Password = options.DatabaseKey,
+            Pooling = false,
+        }.ToString());
+    }
 
     private sealed class SyncHandler(HubStore store, string eventId, string cloudCommandId)
         : HttpMessageHandler
@@ -313,5 +433,35 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
             tabDetails = new { },
             kds = new { tickets = Array.Empty<object>(), items = Array.Empty<object>() },
         };
+    }
+
+    private sealed class SingleAcceptedEventHandler(string acceptedId) : HttpMessageHandler
+    {
+        public string? UploadedEventId { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var events = body.RootElement.GetProperty("events").EnumerateArray().ToArray();
+            Assert.Single(events);
+            UploadedEventId = events[0].GetProperty("commandId").GetString();
+            var result = new
+            {
+                acceptedEventIds = new[] { acceptedId },
+                rejectedEvents = Array.Empty<object>(),
+                eventResults = Array.Empty<object>(),
+                commands = Array.Empty<object>(),
+                serverTime = DateTimeOffset.UtcNow,
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    Encoding.UTF8,
+                    "application/json"),
+            };
+        }
     }
 }

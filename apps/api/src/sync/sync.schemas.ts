@@ -1,3 +1,12 @@
+import {
+  MAX_OFFLINE_COMMAND_AGE_MS,
+  MAX_SYNC_BATCH_BYTES,
+  MAX_SYNC_BATCH_EVENTS,
+  MAX_SYNC_EVENT_BYTES,
+  MAX_SYNC_PAYLOAD_BYTES,
+  MAX_SYNC_PRICE_REFERENCES,
+  MAX_SYNC_RESOURCE_PRECONDITIONS,
+} from "@giromesa/domain";
 import { z } from "zod";
 
 const maximumInteger = 2_147_483_647;
@@ -5,14 +14,14 @@ const maximumInteger = 2_147_483_647;
 const boundedJson = z
   .record(z.string(), z.unknown())
   .refine(
-    (value) => Buffer.byteLength(JSON.stringify(value), "utf8") <= 65_536,
+    (value) => Buffer.byteLength(JSON.stringify(value), "utf8") <= MAX_SYNC_PAYLOAD_BYTES,
     "Payload exceeds 64 KiB.",
   );
 
 const edgeTimestamp = z.iso.datetime({ offset: true }).refine((value) => {
   const timestamp = new Date(value).getTime();
   const now = Date.now();
-  return timestamp >= now - 30 * 24 * 60 * 60 * 1000 && timestamp <= now + 5 * 60 * 1000;
+  return timestamp >= now - MAX_OFFLINE_COMMAND_AGE_MS && timestamp <= now + 5 * 60 * 1000;
 }, "Timestamp is outside the accepted clock window.");
 
 const eventBase = {
@@ -37,6 +46,7 @@ const priceReferenceSchema = z
   .object({
     kind: z.enum(["product", "modifier-option"]),
     entityId: z.uuid(),
+    priceRevision: z.string().trim().min(1).max(100),
     token: z.string().trim().min(32).max(2_048),
   })
   .strict();
@@ -47,7 +57,11 @@ export const legacySyncEventSchema = z
     ...eventBase,
     version: z.number().int().positive().max(100),
   })
-  .strict();
+  .strict()
+  .refine(
+    (event) => Buffer.byteLength(JSON.stringify(event), "utf8") <= MAX_SYNC_EVENT_BYTES,
+    `Serialized event exceeds ${MAX_SYNC_EVENT_BYTES} bytes.`,
+  );
 
 export const syncEventSchema = z
   .object({
@@ -57,8 +71,11 @@ export const syncEventSchema = z
     occupancyEpoch: z.uuid(),
     resourceVersion: z.number().int().nonnegative().max(maximumInteger),
     aggregateSequence: z.number().int().positive().max(maximumInteger),
-    resourcePreconditions: z.array(resourcePreconditionSchema).max(64).default([]),
-    priceReferences: z.array(priceReferenceSchema).max(600).default([]),
+    resourcePreconditions: z
+      .array(resourcePreconditionSchema)
+      .max(MAX_SYNC_RESOURCE_PRECONDITIONS)
+      .default([]),
+    priceReferences: z.array(priceReferenceSchema).max(MAX_SYNC_PRICE_REFERENCES).default([]),
   })
   .strict()
   .superRefine((event, context) => {
@@ -79,6 +96,16 @@ export const syncEventSchema = z
         message: "Resource preconditions must be unique.",
       });
     }
+    const referenceKeys = event.priceReferences.map(
+      (reference) => `${reference.kind}:${reference.entityId}:${reference.priceRevision}`,
+    );
+    if (new Set(referenceKeys).size !== referenceKeys.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["priceReferences"],
+        message: "Price references must be unique by kind, entity and revision.",
+      });
+    }
     const primary = event.resourcePreconditions.find(
       (resource) => resource.type === event.aggregate.type && resource.id === event.aggregate.id,
     );
@@ -91,6 +118,12 @@ export const syncEventSchema = z
         code: "custom",
         path: ["resourcePreconditions"],
         message: "Singular aggregate must match its vector entry.",
+      });
+    }
+    if (Buffer.byteLength(JSON.stringify(event), "utf8") > MAX_SYNC_EVENT_BYTES) {
+      context.addIssue({
+        code: "custom",
+        message: `Serialized event exceeds ${MAX_SYNC_EVENT_BYTES} bytes.`,
       });
     }
   });
@@ -108,7 +141,7 @@ const legacySyncBatchSchema = z
   .object({
     protocolVersion: z.literal(1),
     ...syncBatchBase,
-    events: z.array(legacySyncEventSchema).max(100).default([]),
+    events: z.array(legacySyncEventSchema).max(MAX_SYNC_BATCH_EVENTS).default([]),
   })
   .strict();
 
@@ -116,14 +149,16 @@ const orderedSyncBatchSchema = z
   .object({
     protocolVersion: z.literal(2),
     ...syncBatchBase,
-    events: z.array(syncEventSchema).max(100).default([]),
+    events: z.array(syncEventSchema).max(MAX_SYNC_BATCH_EVENTS).default([]),
   })
   .strict();
 
-export const syncBatchSchema = z.discriminatedUnion("protocolVersion", [
-  legacySyncBatchSchema,
-  orderedSyncBatchSchema,
-]);
+export const syncBatchSchema = z
+  .discriminatedUnion("protocolVersion", [legacySyncBatchSchema, orderedSyncBatchSchema])
+  .refine(
+    (batch) => Buffer.byteLength(JSON.stringify(batch), "utf8") <= MAX_SYNC_BATCH_BYTES,
+    `Serialized sync batch exceeds ${MAX_SYNC_BATCH_BYTES} bytes.`,
+  );
 
 export type SyncEventInput = z.infer<typeof legacySyncEventSchema>;
 export type OrderedSyncEventInput = z.infer<typeof syncEventSchema>;

@@ -1,10 +1,16 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using GiroMesa.EdgeHub.Storage;
 using Microsoft.Extensions.Options;
 
 namespace GiroMesa.EdgeHub.Sync;
+
+public sealed class LocalEnvelopeException(string code) : Exception(code)
+{
+    public string Code { get; } = code;
+}
 
 public sealed record EdgeConflictInput(
     string CommandType,
@@ -143,19 +149,41 @@ public sealed class CloudSyncWorker(
         try
         {
             Status = "syncing";
-            var pending = await store.GetPendingAsync(100, includeSecrets: true);
+            var pending = await store.GetPendingAsync(SyncEnvelopeLimits.MaximumBatchEvents, includeSecrets: true);
             var pendingAcknowledgements = await store.GetPendingCloudAcknowledgementsAsync(100);
             IReadOnlyList<string> acknowledgements = pendingAcknowledgements;
             var responses = new List<SyncResponse>();
-            foreach (var group in pending.GroupBy(item => item.ProtocolVersion).OrderBy(group => group.Key))
+            var sendable = new List<PendingEvent>();
+            var needsReconciliation = false;
+            foreach (var item in pending)
             {
-                responses.Add(await PostBatchAsync(group.ToArray(), acknowledgements, group.Key, cancellationToken));
-                acknowledgements = [];
+                try
+                {
+                    _ = CreateOutboundEvent(item);
+                    sendable.Add(item);
+                }
+                catch (LocalEnvelopeException exception)
+                {
+                    await store.RejectEventAsync(item.Id, exception.Code);
+                    _authoritativeOutcomes[item.Id] = new(
+                        item.Id,
+                        false,
+                        new("reconcile", exception.Code));
+                    needsReconciliation = true;
+                }
+            }
+            AuthoritativeOutcomes = _authoritativeOutcomes.Values.OrderBy(value => value.Id).ToArray();
+            foreach (var group in sendable.GroupBy(item => item.ProtocolVersion).OrderBy(group => group.Key))
+            {
+                foreach (var batch in PartitionBatches(group.ToArray(), acknowledgements, group.Key))
+                {
+                    responses.Add(await PostBatchAsync(batch, acknowledgements, group.Key, cancellationToken));
+                    acknowledgements = [];
+                }
             }
             if (responses.Count == 0)
                 responses.Add(await PostBatchAsync([], acknowledgements, 2, cancellationToken));
 
-            var needsReconciliation = false;
             foreach (var response in responses)
                 needsReconciliation = await ApplyResponseAsync(response, needsReconciliation);
             await store.MarkCloudAcknowledgementsAsync(pendingAcknowledgements);
@@ -245,9 +273,17 @@ public sealed class CloudSyncWorker(
         if (events.Any(item => item.ProtocolVersion != protocolVersion))
             throw new InvalidOperationException("A sync batch cannot mix protocol versions.");
         var outboundEvents = events.Select(CreateOutboundEvent).ToArray();
+        var batch = new SyncBatch(
+            protocolVersion,
+            HubVersion(),
+            new Dictionary<string, object>(),
+            acknowledgedCommandIds,
+            outboundEvents);
+        if (JsonSerializer.SerializeToUtf8Bytes(batch, JsonOptions).Length > SyncEnvelopeLimits.MaximumBatchBytes)
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
         using var response = await httpClient.PostAsJsonAsync(
             "/api/v1/sync/batches",
-            new SyncBatch(protocolVersion, HubVersion(), new Dictionary<string, object>(), acknowledgedCommandIds, outboundEvents),
+            batch,
             cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<SyncResponse>(cancellationToken)
@@ -256,22 +292,57 @@ public sealed class CloudSyncWorker(
 
     public static object CreateOutboundEvent(PendingEvent item)
     {
+        if (!Guid.TryParse(item.Id, out _) || !Guid.TryParse(item.ActorId, out _) ||
+            !Guid.TryParse(item.DeviceId, out _) || item.IdempotencyKey.Trim().Length is < 8 or > 160 ||
+            item.Type.Trim().Length is < 3 or > 100 ||
+            item.OccurredAt < DateTimeOffset.UtcNow.AddDays(-SyncEnvelopeLimits.MaximumOfflineCommandAgeDays) ||
+            item.OccurredAt > DateTimeOffset.UtcNow.AddMinutes(5))
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+        if (Encoding.UTF8.GetByteCount(item.Payload) > SyncEnvelopeLimits.MaximumPayloadBytes)
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
         if (item.ProtocolVersion == 1)
-            return new LegacySyncEvent(
+        {
+            var legacy = new LegacySyncEvent(
                 item.Id, item.ActorId, item.DeviceId, item.IdempotencyKey, item.Type,
                 ParsePayload(item.Payload), item.Version, item.OccurredAt);
+            if (JsonSerializer.SerializeToUtf8Bytes(legacy, JsonOptions).Length > SyncEnvelopeLimits.MaximumEventBytes)
+                throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+            return legacy;
+        }
         if (item.ProtocolVersion != 2 || item.ResourcePreconditions is not { Count: > 0 } ||
             item.AggregateSequence is null)
-            throw new InvalidOperationException("Ordered event metadata is incomplete.");
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
         var resources = item.ResourcePreconditions
             .OrderBy(resource => resource.Type, StringComparer.Ordinal)
             .ThenBy(resource => resource.Id, StringComparer.Ordinal)
             .ToArray();
+        if (resources.Length > SyncEnvelopeLimits.MaximumResourcePreconditions)
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+        if (resources.Select(resource => $"{resource.Type}:{resource.Id}").Distinct(StringComparer.Ordinal).Count() != resources.Length ||
+            resources.Any(resource => resource.Type.Trim().Length is < 1 or > 80 ||
+                !Guid.TryParse(resource.Id, out _) || !Guid.TryParse(resource.OccupancyEpoch, out _) ||
+                resource.ResourceVersion < 0))
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
         if (item.PrimaryResourceId is null)
-            throw new InvalidOperationException("Ordered primary resource is missing.");
-        var primary = resources.Single(resource =>
-            resource.Type == "tab" && resource.Id == item.PrimaryResourceId);
-        return new OrderedSyncEvent(
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+        var primary = resources.SingleOrDefault(resource =>
+            resource.Type == "tab" && resource.Id == item.PrimaryResourceId)
+            ?? throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+        var priceReferences = (item.PriceReferences ?? [])
+            .DistinctBy(reference => (reference.Kind, reference.EntityId, reference.PriceRevision))
+            .OrderBy(reference => reference.Kind, StringComparer.Ordinal)
+            .ThenBy(reference => reference.EntityId, StringComparer.Ordinal)
+            .ThenBy(reference => reference.PriceRevision, StringComparer.Ordinal)
+            .ToArray();
+        if (priceReferences.Length > SyncEnvelopeLimits.MaximumPriceReferences)
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+        if (priceReferences.Any(reference =>
+                reference.Kind is not ("product" or "modifier-option") ||
+                !Guid.TryParse(reference.EntityId, out _) ||
+                string.IsNullOrWhiteSpace(reference.PriceRevision) || reference.PriceRevision.Trim().Length > 100 ||
+                string.IsNullOrWhiteSpace(reference.Token) || reference.Token.Trim().Length is < 32 or > 2_048))
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+        var outbound = new OrderedSyncEvent(
             item.Id, item.ActorId, item.DeviceId, item.IdempotencyKey, item.Type,
             ParsePayload(item.Payload),
             new CommandAggregate(primary.Type, primary.Id),
@@ -279,7 +350,39 @@ public sealed class CloudSyncWorker(
             primary.ResourceVersion,
             item.AggregateSequence.Value,
             resources,
-            item.PriceReferences ?? []);
+            priceReferences);
+        if (JsonSerializer.SerializeToUtf8Bytes(outbound, JsonOptions).Length > SyncEnvelopeLimits.MaximumEventBytes)
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+        return outbound;
+    }
+
+    private static IReadOnlyList<IReadOnlyList<PendingEvent>> PartitionBatches(
+        IReadOnlyList<PendingEvent> events,
+        IReadOnlyList<string> acknowledgedCommandIds,
+        int protocolVersion)
+    {
+        var batches = new List<IReadOnlyList<PendingEvent>>();
+        var current = new List<PendingEvent>();
+        IReadOnlyList<string> acknowledgements = acknowledgedCommandIds;
+        foreach (var item in events)
+        {
+            var candidate = current.Append(item).ToArray();
+            var outbound = candidate.Select(CreateOutboundEvent).ToArray();
+            var size = JsonSerializer.SerializeToUtf8Bytes(
+                new SyncBatch(protocolVersion, HubVersion(), new Dictionary<string, object>(), acknowledgements, outbound),
+                JsonOptions).Length;
+            if (size <= SyncEnvelopeLimits.MaximumBatchBytes)
+            {
+                current.Add(item);
+                continue;
+            }
+            if (current.Count == 0) throw new LocalEnvelopeException("LOCAL_ENVELOPE_LIMIT_EXCEEDED");
+            batches.Add(current.ToArray());
+            current = [item];
+            acknowledgements = [];
+        }
+        if (current.Count > 0) batches.Add(current.ToArray());
+        return batches;
     }
 
     private bool CanSynchronize() =>
@@ -301,9 +404,20 @@ public sealed class CloudSyncWorker(
 
     private static JsonElement ParsePayload(string payload)
     {
-        using var document = JsonDocument.Parse(payload);
-        return document.RootElement.Clone();
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            throw new LocalEnvelopeException("LOCAL_ENVELOPE_INVALID");
+        }
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 public sealed record SyncBatch(

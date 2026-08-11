@@ -177,6 +177,7 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
         Assert.Equal(3, pending[2].ResourcePreconditions!.Count);
         Assert.Single(pending[3].PriceReferences!);
         Assert.Equal("server-issued-price-reference-0001", pending[3].PriceReferences![0].Token);
+        Assert.Equal("2026-08-10T12:00:00.000Z", pending[3].PriceReferences![0].PriceRevision);
         Assert.Equal(3, pending[3].ResourcePreconditions!.Single().ResourceVersion);
     }
 
@@ -493,6 +494,7 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
         }
         root["catalog"]!["prices"]![0]!["priceReference"] =
             "server-issued-price-reference-0001";
+        root["catalog"]!["prices"]![0]!["priceRevision"] = "2026-08-10T12:00:00.000Z";
         return JsonSerializer.Deserialize<OperationalSnapshot>(
             root.ToJsonString(),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;

@@ -165,6 +165,86 @@ describe("edge sync boundaries", () => {
     );
   });
 
+  it("covers the 50-source merge cap and rejects duplicate or oversized reference material", () => {
+    const resources = Array.from({ length: 102 }, (_, index) => ({
+      type: index < 51 ? "tab" : "table",
+      id: crypto.randomUUID(),
+      occupancyEpoch: crypto.randomUUID(),
+      resourceVersion: 1,
+    })).sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`));
+    const primary = resources.find((resource) => resource.type === "tab");
+    assert.ok(primary);
+    const event = {
+      commandId: crypto.randomUUID(),
+      actorId: crypto.randomUUID(),
+      deviceId: crypto.randomUUID(),
+      idempotencyKey: "maximum-merge-vector",
+      type: "pos.tabs.merge_requested",
+      payload: {},
+      aggregate: { type: primary.type, id: primary.id },
+      occupancyEpoch: primary.occupancyEpoch,
+      resourceVersion: primary.resourceVersion,
+      aggregateSequence: 1,
+      resourcePreconditions: resources,
+      priceReferences: [],
+      occurredAt: new Date().toISOString(),
+    };
+    const batch = { protocolVersion: 2 as const, hubVersion: "2.1.0", events: [event] };
+    assert.equal(syncBatchSchema.safeParse(batch).success, true);
+    assert.equal(
+      syncBatchSchema.safeParse({
+        ...batch,
+        events: [
+          {
+            ...event,
+            resourcePreconditions: [
+              ...resources,
+              ...Array.from({ length: 27 }, () => ({
+                type: "table",
+                id: crypto.randomUUID(),
+                occupancyEpoch: crypto.randomUUID(),
+                resourceVersion: 1,
+              })),
+            ].sort((left, right) =>
+              `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+            ),
+          },
+        ],
+      }).success,
+      false,
+    );
+    const reference = {
+      kind: "product" as const,
+      entityId: crypto.randomUUID(),
+      priceRevision: "2026-08-10T12:00:00.000Z",
+      token: "t".repeat(64),
+    };
+    assert.equal(
+      syncBatchSchema.safeParse({
+        ...batch,
+        events: [{ ...event, priceReferences: [reference, reference] }],
+      }).success,
+      false,
+    );
+    assert.equal(
+      syncBatchSchema.safeParse({
+        ...batch,
+        events: [
+          {
+            ...event,
+            priceReferences: Array.from({ length: 470 }, (_, index) => ({
+              kind: "product" as const,
+              entityId: crypto.randomUUID(),
+              priceRevision: `revision-${index}`,
+              token: "t".repeat(2_048),
+            })),
+          },
+        ],
+      }).success,
+      false,
+    );
+  });
+
   it("accepts only the dedicated authorization scheme", () => {
     assert.equal(hubSyncKey("GiroMesaHub one-time-secret"), "one-time-secret");
     assert.equal(hubSyncKey("Bearer one-time-secret"), undefined);

@@ -474,41 +474,49 @@ export class SyncPilotService {
     if (!("aggregate" in event) || event.aggregate.type === "legacy.operational_command") {
       throw new PilotConflictException({ outcome: "reject", code: "PRICE_REFERENCE_REQUIRED" });
     }
-    const references = new Map(
-      event.priceReferences.map((reference) => [
-        `${reference.kind}:${reference.entityId}`,
-        reference,
-      ]),
-    );
+    const referenceFor = (kind: "product" | "modifier-option", entityId: string) => {
+      const matches = event.priceReferences.filter(
+        (reference) => reference.kind === kind && reference.entityId === entityId,
+      );
+      const [match] = matches;
+      if (!match || matches.length !== 1) throw new Error("PRICE_REFERENCE_REQUIRED");
+      return match;
+    };
     const products = new Map<string, number>();
     const modifierOptions = new Map<string, number>();
     try {
       for (const item of body.items) {
-        const productReference = references.get(`product:${item.productId}`);
-        if (!productReference) throw new Error("PRICE_REFERENCE_REQUIRED");
+        const productReference = referenceFor("product", item.productId);
         products.set(
           item.productId,
           verifyPriceReference(productReference.token, {
             kind: "product",
             entityId: item.productId,
+            priceRevision: productReference.priceRevision,
+            occurredAt: event.occurredAt,
             ...scope,
           }),
         );
         for (const optionId of item.modifierOptionIds) {
-          const optionReference = references.get(`modifier-option:${optionId}`);
-          if (!optionReference) throw new Error("PRICE_REFERENCE_REQUIRED");
+          const optionReference = referenceFor("modifier-option", optionId);
           modifierOptions.set(
             optionId,
             verifyPriceReference(optionReference.token, {
               kind: "modifier-option",
               entityId: optionId,
+              priceRevision: optionReference.priceRevision,
+              occurredAt: event.occurredAt,
               ...scope,
             }),
           );
         }
       }
-    } catch {
-      throw new PilotConflictException({ outcome: "reject", code: "PRICE_REFERENCE_INVALID" });
+    } catch (error) {
+      const code =
+        error instanceof Error && error.message.startsWith("PRICE_REFERENCE_")
+          ? error.message
+          : "PRICE_REFERENCE_INVALID";
+      throw new PilotConflictException({ outcome: "reject", code });
     }
     return { products, modifierOptions };
   }

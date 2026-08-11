@@ -223,10 +223,10 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const openId = randomUUID();
     const occupancyEpoch = randomUUID();
     const disconnectedSnapshot = await snapshots.capture(organizationA.id, unitA.id);
-    const capturedPriceReference = disconnectedSnapshot.catalog.prices.find(
+    const capturedPrice = disconnectedSnapshot.catalog.prices.find(
       (price) => price.productId === product.id,
-    )?.priceReference;
-    assert.ok(capturedPriceReference);
+    );
+    assert.ok(capturedPrice);
     await database.db
       .update(posProductPrices)
       .set({ priceCents: 3_000, updatedAt: new Date() })
@@ -282,7 +282,8 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
             {
               kind: "product" as const,
               entityId: product.id,
-              token: capturedPriceReference,
+              priceRevision: capturedPrice.priceRevision,
+              token: capturedPrice.priceReference,
             },
           ],
           idempotencyKey: `offline-order-${suffix}`,
@@ -660,8 +661,8 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const concurrentRejection = concurrentResults.find(
       (result): result is PromiseRejectedResult => result.status === "rejected",
     );
-    assert.ok(concurrentRejection?.reason instanceof PilotConflictException);
-    assert.equal(concurrentRejection.reason.decision.code, "RESOURCE_VERSION_CONFLICT");
+    assert.ok(concurrentRejection?.reason instanceof Error);
+    assert.equal(concurrentRejection.reason.message, "PILOT_RESOURCE_TOPOLOGY_CHANGED");
 
     const [beforeOnlineRace] = await database.db
       .select()
@@ -737,6 +738,134 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     const [afterOnlineRace] = await database.db.select().from(posTabs).where(eq(posTabs.id, openId));
     assert.equal(afterOnlineRace?.tipCents, 777);
     assert.equal(afterOnlineRace?.serviceChargeBasisPoints, 1_000);
+
+    const [topologyRequestedTable, topologyChangedTable] = await database.db
+      .insert(posDiningTables)
+      .values([
+        {
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          roomId: room.id,
+          label: "Topology requested",
+        },
+        {
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          roomId: room.id,
+          label: "Topology changed",
+        },
+      ])
+      .returning();
+    assert.ok(topologyRequestedTable && topologyChangedTable && afterOnlineRace?.tableId);
+    const [topologyCurrentTable] = await database.db
+      .select()
+      .from(posDiningTables)
+      .where(eq(posDiningTables.id, afterOnlineRace.tableId));
+    assert.ok(topologyCurrentTable);
+    const topologyVersionsBefore = new Map(
+      [afterOnlineRace, topologyCurrentTable, topologyRequestedTable, topologyChangedTable].map(
+        (row) => [row.id, row.resourceVersion],
+      ),
+    );
+    let signalTopologyLock!: () => void;
+    let releaseTopologyWriter!: () => void;
+    const topologyLockReady = new Promise<void>((resolve) => {
+      signalTopologyLock = resolve;
+    });
+    const topologyWriterRelease = new Promise<void>((resolve) => {
+      releaseTopologyWriter = resolve;
+    });
+    const topologyLockKey = `pos-resource:${organizationA.id}:${unitA.id}:tab:${openId}`;
+    const topologyWriter = database.client.begin(async (client) => {
+      await client.unsafe("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        topologyLockKey,
+      ]);
+      signalTopologyLock();
+      await topologyWriterRelease;
+      await client.unsafe(
+        "update pos_tabs set table_id = $1 where organization_id = $2 and unit_id = $3 and id = $4",
+        [topologyChangedTable.id, organizationA.id, unitA.id, openId],
+      );
+    });
+    await topologyLockReady;
+    const topologyRaceId = randomUUID();
+    const topologyRace = database.withTenantContext(
+      {
+        source: "internal",
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        actorIdentityId: null,
+      },
+      () =>
+        pilot.apply(
+          {
+            ...orderedCommand(topologyRaceId, 101, afterOnlineRace.resourceVersion),
+            id: topologyRaceId,
+            version: afterOnlineRace.resourceVersion,
+            commandId: topologyRaceId,
+            idempotencyKey: `topology-race-${suffix}`,
+            type: "pos.tab.transfer_requested",
+            resourcePreconditions: [
+              resource(
+                "tab",
+                openId,
+                afterOnlineRace.occupancyEpoch,
+                afterOnlineRace.resourceVersion,
+              ),
+              resource(
+                "table",
+                topologyCurrentTable.id,
+                topologyCurrentTable.occupancyEpoch,
+                topologyCurrentTable.resourceVersion,
+              ),
+              resource(
+                "table",
+                topologyRequestedTable.id,
+                topologyRequestedTable.occupancyEpoch,
+                topologyRequestedTable.resourceVersion,
+              ),
+            ].sort((left, right) =>
+              `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+            ),
+            payload: {
+              kind: "pilot.mutation",
+              action: "transfer-tab",
+              data: {
+                tabId: openId,
+                body: { tableId: topologyRequestedTable.id, reason: "Topology race" },
+              },
+            },
+          },
+          { organizationId: organizationA.id, unitId: unitA.id },
+        ),
+    );
+    let observedAdvisoryWait = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const [waiting] = await database.client<{ waiting: number }[]>`
+        select count(*)::int as waiting from pg_stat_activity
+        where wait_event_type = 'Lock' and wait_event = 'advisory'
+          and query like '%hashtextextended%'
+      `;
+      if ((waiting?.waiting ?? 0) > 0) {
+        observedAdvisoryWait = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    releaseTopologyWriter();
+    await topologyWriter;
+    assert.equal(observedAdvisoryWait, true);
+    await assert.rejects(topologyRace, /PILOT_RESOURCE_TOPOLOGY_CHANGED/);
+    const [topologyTabAfter] = await database.db.select().from(posTabs).where(eq(posTabs.id, openId));
+    const topologyTablesAfter = await database.db
+      .select()
+      .from(posDiningTables)
+      .where(eq(posDiningTables.organizationId, organizationA.id));
+    assert.equal(topologyTabAfter?.tableId, topologyChangedTable.id);
+    assert.equal(topologyTabAfter?.resourceVersion, topologyVersionsBefore.get(openId));
+    for (const tableRow of topologyTablesAfter.filter((row) => topologyVersionsBefore.has(row.id))) {
+      assert.equal(tableRow.resourceVersion, topologyVersionsBefore.get(tableRow.id));
+    }
 
     const cloudCommand = await sync.enqueuePublicCommand({
       organizationId: organizationA.id,

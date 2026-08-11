@@ -3,6 +3,17 @@ using System.Text;
 
 namespace GiroMesa.EdgeHub;
 
+public static class SyncEnvelopeLimits
+{
+    public const int MaximumResourcePreconditions = 128;
+    public const int MaximumPriceReferences = 2_048;
+    public const int MaximumPayloadBytes = 65_536;
+    public const int MaximumEventBytes = 950_000;
+    public const int MaximumBatchBytes = 1_000_000;
+    public const int MaximumBatchEvents = 100;
+    public const int MaximumOfflineCommandAgeDays = 30;
+}
+
 public sealed record OperationalCommand(
     string Id,
     string OrganizationId,
@@ -57,7 +68,7 @@ public sealed record OperationalCommand(
         {
             errors[nameof(Payload)] = ["Payload must be an object."];
         }
-        else if (Encoding.UTF8.GetByteCount(Payload.GetRawText()) > 65_536)
+        else if (Encoding.UTF8.GetByteCount(Payload.GetRawText()) > SyncEnvelopeLimits.MaximumPayloadBytes)
         {
             errors[nameof(Payload)] = ["Payload exceeds 64 KiB."];
         }
@@ -118,7 +129,7 @@ public sealed record ResourcePrecondition(
     string OccupancyEpoch,
     int ResourceVersion);
 
-public sealed record PriceReference(string Kind, string EntityId, string Token);
+public sealed record PriceReference(string Kind, string EntityId, string PriceRevision, string Token);
 
 public sealed record CloudCommand(
     string Id,
