@@ -6,6 +6,17 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+
+export {
+  createTelemetryRuntime,
+  type OtlpSignalConfig,
+  parseTelemetryConfig,
+  startTelemetryFromEnv,
+  type TelemetryConfig,
+  type TelemetryRuntime,
+  type TelemetryRuntimeComponents,
+} from "./runtime.js";
 
 export type TelemetryAttributeValue = string | number | boolean;
 export type TelemetryAttributes = Record<string, TelemetryAttributeValue>;
@@ -94,7 +105,7 @@ const ATTRIBUTE_VALIDATORS: Readonly<Record<string, AttributeValidator>> = {
   "messaging.operation.name": token,
   "error.type": token,
   "error.code": token,
-  outcome: stringEnum("success", "error", "retry", "timeout", "rejected"),
+  outcome: stringEnum("success", "error", "retry", "timeout", "rejected", "client_rejected"),
 };
 
 function containsSensitiveValue(value: string) {
@@ -283,14 +294,12 @@ export class OpenTelemetryBackend implements TelemetryBackend {
   private readonly histograms = new Map<string, Histogram>();
   private readonly tracer;
   private readonly meter;
+  private readonly logger;
 
-  constructor(
-    scopeName: string,
-    scopeVersion = "0.1.0",
-    private readonly writeLog: (line: string) => void = (line) => process.stdout.write(line),
-  ) {
+  constructor(scopeName: string, scopeVersion = "0.1.0") {
     this.tracer = trace.getTracer(scopeName, scopeVersion);
     this.meter = metrics.getMeter(scopeName, scopeVersion);
+    this.logger = logs.getLogger(scopeName, scopeVersion);
   }
 
   emit(signal: TelemetrySignal) {
@@ -310,7 +319,18 @@ export class OpenTelemetryBackend implements TelemetryBackend {
       return;
     }
     if (signal.kind === "log") {
-      this.writeLog(`${JSON.stringify(signal)}\n`);
+      const severityNumbers = {
+        debug: SeverityNumber.DEBUG,
+        info: SeverityNumber.INFO,
+        warn: SeverityNumber.WARN,
+        error: SeverityNumber.ERROR,
+      } as const;
+      this.logger.emit({
+        body: signal.name,
+        severityNumber: severityNumbers[signal.severity],
+        severityText: signal.severity.toUpperCase(),
+        attributes,
+      });
       return;
     }
     if (signal.kind === "span") {
