@@ -330,12 +330,15 @@ export function createTelemetryRuntime(
     async shutdown() {
       if (!started) return;
       shutdownPromise ??= (async () => {
-        await Promise.all([
-          spanProcessor.forceFlush(),
-          metricReader.forceFlush(),
-          logProcessor.forceFlush(),
-        ]);
-        await sdk.shutdown();
+        try {
+          await Promise.all([
+            spanProcessor.forceFlush(),
+            metricReader.forceFlush(),
+            logProcessor.forceFlush(),
+          ]);
+        } finally {
+          await sdk.shutdown();
+        }
       })();
       await shutdownPromise;
     },
