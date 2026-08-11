@@ -188,6 +188,10 @@ summary:focus-visible {
     color 160ms ease,
     border-color 160ms ease;
 }
+.button .gm-icon {
+  width: 17px;
+  height: 17px;
+}
 .button:hover {
   transform: translateY(-2px);
 }
@@ -542,8 +546,14 @@ summary:focus-visible {
 .plan li {
   margin: 11px 0;
   font-size: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
-.plan li::first-letter {
+.plan li .gm-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
   color: var(--orange);
 }
 .plan .button {
@@ -576,8 +586,9 @@ summary:focus-visible {
   border-radius: var(--radius);
   background: var(--paper);
 }
-.trust-cards article > span {
-  font-size: 27px;
+.trust-cards article > .gm-icon {
+  width: 27px;
+  height: 27px;
   color: var(--orange);
 }
 .trust-cards h3 {
@@ -694,8 +705,9 @@ summary:focus-visible {
   text-decoration: none;
   box-shadow: 0 12px 30px rgba(14, 75, 43, 0.32);
 }
-.whatsapp span {
-  font-size: 20px;
+.whatsapp .gm-icon {
+  width: 20px;
+  height: 20px;
 }
 .whatsapp-label {
   font-size: 12px;
@@ -975,8 +987,9 @@ summary:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
-.support-grid article > span:first-child {
-  font-size: 24px;
+.support-grid article > .gm-icon {
+  width: 24px;
+  height: 24px;
   color: var(--orange);
 }
 .support-grid h2 {

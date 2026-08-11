@@ -1,3 +1,4 @@
+import { Icon } from "@giromesa/ui";
 import type { Metadata } from "next";
 import { Footer } from "../components/footer";
 import { Header } from "../components/header";
@@ -7,6 +8,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "GiroMesa | Gestão para food service", template: "%s | GiroMesa" },
   description: "Salão, balcão, produção, estoque e gestão conectados em uma só operação.",
+  icons: {
+    icon: [
+      { url: "/icons/pwa-192.svg", type: "image/svg+xml", sizes: "192x192" },
+      { url: "/icons/pwa-512.svg", type: "image/svg+xml", sizes: "512x512" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -36,7 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               : "Abrir página de contato"
           }
         >
-          <span aria-hidden="true">◉</span>
+          <Icon name={whatsappNumber ? "sparkles" : "mail"} />
           <b className="whatsapp-label">{whatsappNumber ? "WhatsApp" : "Contato"}</b>
         </a>
       </body>

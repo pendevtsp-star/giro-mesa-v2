@@ -1,3 +1,4 @@
+import { Icon } from "@giromesa/ui";
 import Image from "next/image";
 import Link from "next/link";
 import { formatBRL, getCommercialPlans } from "../lib/commercial";
@@ -80,7 +81,7 @@ export default async function Home() {
             </p>
             <div className="hero-actions">
               <Link className="button button-primary button-large" href="/teste-gratis">
-                Testar 14 dias grátis <span>→</span>
+                Testar 14 dias grátis <Icon name="arrow-right" />
               </Link>
               <a className="button button-outline button-large" href="#produto">
                 Ver demonstração
@@ -246,7 +247,9 @@ export default async function Home() {
                 <p className="annual">Anual: {formatBRL(plan.annualPriceCents)}</p>
                 <ul>
                   {plan.features.map((feature) => (
-                    <li key={feature}>✓ {feature}</li>
+                    <li key={feature}>
+                      <Icon name="check" /> {feature}
+                    </li>
                   ))}
                 </ul>
                 <Link
@@ -273,12 +276,12 @@ export default async function Home() {
           </div>
           <div className="trust-cards">
             <article>
-              <span>◈</span>
+              <Icon name="shield" />
               <h3>Privacidade por projeto</h3>
               <p>Permissões, auditoria, retenção e exportação pensadas para a LGPD.</p>
             </article>
             <article>
-              <span>⌁</span>
+              <Icon name="layers" />
               <h3>Operação local planejada</h3>
               <p>
                 Hub por unidade para manter pedidos, KDS e impressão durante quedas de internet.
@@ -341,7 +344,7 @@ export default async function Home() {
           </h2>
           <div>
             <Link className="button button-light button-large" href="/teste-gratis">
-              Solicitar teste assistido →
+              Solicitar teste assistido <Icon name="arrow-right" />
             </Link>
             <Link className="button button-dark button-large" href="/contato">
               Falar com especialista

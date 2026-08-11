@@ -352,6 +352,15 @@ textarea:focus-visible {
     linear-gradient(145deg, #e8decf, #c5d1bd);
   text-shadow: 0 8px 15px rgba(60, 40, 20, 0.18);
 }
+.food-visual .gm-icon {
+  width: 72px;
+  height: 72px;
+  color: var(--green);
+}
+.customer-visual-copy {
+  font-size: 42px;
+  line-height: 1;
+}
 .food-croquete,
 .food-steak {
   background: linear-gradient(145deg, #d8bd9b, #7e9a79);
@@ -427,8 +436,9 @@ textarea:focus-visible {
   text-align: center;
   color: var(--muted);
 }
-.empty-state span {
-  font-size: 40px;
+.empty-state .gm-icon {
+  width: 40px;
+  height: 40px;
 }
 .empty-state h3 {
   color: var(--ink);
@@ -471,9 +481,11 @@ textarea:focus-visible {
   font-weight: 750;
   cursor: pointer;
 }
-.table-actions button span {
+.table-actions button .gm-icon {
   display: block;
-  font-size: 19px;
+  width: 21px;
+  height: 21px;
+  margin: 0 auto 4px;
 }
 .table-actions button:disabled {
   color: #7c8580;
@@ -549,7 +561,9 @@ textarea:focus-visible {
   font-size: 10px;
 }
 .service-card-action {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-top: 13px;
   color: var(--green);
   font-size: 11px;
@@ -677,6 +691,9 @@ textarea:focus-visible {
   font-weight: 750;
 }
 .preference-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--green);
   font-weight: 750;
 }
@@ -822,6 +839,11 @@ dialog::backdrop {
   font-size: 100px;
   background: linear-gradient(145deg, #e8decf, #c5d1bd);
 }
+.product-hero .gm-icon {
+  width: 108px;
+  height: 108px;
+  color: var(--green);
+}
 .product-hero > button {
   position: absolute;
   top: 15px;
@@ -940,6 +962,10 @@ fieldset label input {
   font-size: 20px;
   cursor: pointer;
 }
+.quantity button .gm-icon {
+  width: 18px;
+  height: 18px;
+}
 .quantity output {
   min-width: 28px;
   text-align: center;
@@ -1025,6 +1051,11 @@ fieldset label input {
   border-radius: 10px;
   background: var(--cream);
   font-size: 26px;
+}
+.cart-visual .gm-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
 }
 .cart-lines h3 {
   margin: 0;
@@ -1229,10 +1260,11 @@ fieldset label input {
   background: #f1f7f2;
   text-align: center;
 }
-.order-receipt > span {
-  display: inline-grid;
+.order-receipt-icon {
+  display: inline-block;
   width: 42px;
   height: 42px;
+  padding: 9px;
   place-items: center;
   border-radius: 50%;
   background: var(--green);

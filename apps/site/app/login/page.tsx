@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
@@ -163,7 +164,7 @@ export default function LoginPage() {
                 />
               </label>
               <button className="button button-primary" type="submit">
-                Confirmar acesso →
+                Confirmar acesso <Icon name="arrow-right" />
               </button>
               <button
                 className="button button-secondary"
@@ -217,7 +218,7 @@ export default function LoginPage() {
                 <Link href="/recuperar-senha">Esqueci minha senha</Link>
               </div>
               <button className="button button-primary" type="submit">
-                Entrar →
+                Entrar <Icon name="arrow-right" />
               </button>
             </form>
           )}

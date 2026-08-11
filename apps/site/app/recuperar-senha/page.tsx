@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -115,7 +116,9 @@ export default function ForgotPasswordPage() {
           {message}
         </p>
         <p className="auth-footer">
-          <Link href="/login">← Voltar para o login</Link>
+          <Link href="/login">
+            <Icon name="arrow-left" /> Voltar para o login
+          </Link>
         </p>
       </section>
     </main>

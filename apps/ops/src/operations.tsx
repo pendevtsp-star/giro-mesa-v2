@@ -1,4 +1,4 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
@@ -387,7 +387,7 @@ export function RealCatalogPage({ scope }: { scope: PilotScope }) {
       {(catalog) =>
         catalog.products.length === 0 ? (
           <EmptyState
-            icon="▦"
+            icon={<Icon name="menu" />}
             title="Catálogo ainda não configurado"
             description="Cadastre produtos, preços e disponibilidade antes de lançar pedidos reais."
           />
@@ -489,7 +489,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               </div>
               {data.tables.length === 0 ? (
                 <EmptyState
-                  icon="◫"
+                  icon={<Icon name="dish" />}
                   title="Nenhuma mesa cadastrada"
                   description="A estrutura do salão precisa ser configurada por um gerente."
                 />
@@ -525,7 +525,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             <aside className="ops-panel">
               {!table ? (
                 <EmptyState
-                  icon="◫"
+                  icon={<Icon name="dish" />}
                   title="Selecione uma mesa"
                   description="Abra ou acompanhe a comanda sem sair do mapa."
                 />
@@ -674,7 +674,7 @@ export function RealCounterPage({ scope }: { scope: PilotScope }) {
                 />
               ) : (
                 <EmptyState
-                  icon="＋"
+                  icon={<Icon name="plus" />}
                   title="Selecione uma comanda"
                   description="Escolha uma comanda aberta ou crie uma nova."
                 />
@@ -932,7 +932,7 @@ function TabWorkspace({
                             }
                             type="button"
                           >
-                            ×
+                            <Icon name="close" />
                           </button>
                         </div>
                       ))}
@@ -1411,7 +1411,7 @@ export function RealKdsPage({ scope }: { scope: PilotScope }) {
         if (activeTickets.length === 0)
           return (
             <EmptyState
-              icon="✓"
+              icon={<Icon name="check" />}
               title="Produção em dia"
               description="Nenhum ticket ativo foi retornado pelo servidor."
             />

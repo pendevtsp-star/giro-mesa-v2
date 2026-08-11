@@ -1976,8 +1976,12 @@ small {
 }
 .table-tile__seats {
   color: #bec5c0;
-  font-size: 0.55rem;
-  letter-spacing: 0.2rem;
+  display: flex;
+  gap: 2px;
+}
+.table-tile__seats .gm-icon {
+  width: 9px;
+  height: 9px;
 }
 .table-tile > strong {
   font-family: var(--gm-display);

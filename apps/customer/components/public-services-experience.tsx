@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@giromesa/ui";
 import { type FormEvent, useRef, useState } from "react";
 import { formatMoney } from "../lib/menu";
 import {
@@ -164,7 +165,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
   return (
     <main className="public-service-page">
       <a className="preference-back" href={`/m/${menuSlug}`}>
-        ← Voltar ao cardápio
+        <Icon name="arrow-left" /> Voltar ao cardápio
       </a>
       <p className="preference-eyebrow">Serviços da unidade</p>
       <h1>Solicite sem perder o contexto.</h1>

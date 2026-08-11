@@ -1,4 +1,4 @@
-import { demoMenu, type MenuItem } from "./menu.ts";
+import { demoMenu, MENU_ICON_NAMES, type MenuItem } from "./menu.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -36,7 +36,8 @@ function isMenuItem(value: unknown): value is MenuItem {
     typeof value.description === "string" &&
     Number.isInteger(value.priceCents) &&
     (value.priceCents as number) >= 0 &&
-    typeof value.visual === "string" &&
+    (value.visual === undefined || typeof value.visual === "string") &&
+    (value.icon === undefined || MENU_ICON_NAMES.some((icon) => icon === value.icon)) &&
     typeof value.available === "boolean" &&
     validTags &&
     validGroups
