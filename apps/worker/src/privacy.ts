@@ -21,6 +21,11 @@ const LOCAL_DOMAINS = ["identity", "organization_membership"] as const;
 const EXPORT_TTL_MS = 15 * 60_000;
 
 export interface PrivacyProcessingEvent {
+  topic: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  organization_id: string | null;
+  unit_id: string | null;
   payload: Record<string, unknown>;
 }
 
@@ -39,6 +44,15 @@ function processingInput(event: PrivacyProcessingEvent) {
   ) {
     throw new Error("PRIVACY_EVENT_INVALID");
   }
+  if (
+    event.topic !== "privacy.request.processing" ||
+    event.aggregate_type !== "privacy_request" ||
+    event.aggregate_id !== requestId ||
+    event.organization_id !== organizationId ||
+    event.unit_id !== null
+  ) {
+    throw new Error("PRIVACY_EVENT_CONTEXT_INVALID");
+  }
   return { organizationId, requestId, attempt };
 }
 
@@ -48,6 +62,9 @@ function privacyExportKey() {
 
 export async function processPrivacyRequest(db: Database, event: PrivacyProcessingEvent) {
   const input = processingInput(event);
+  await db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`privacy-request:${input.organizationId}:${input.requestId}`}, 0))`,
+  );
   const [request] = await db
     .select()
     .from(privacyRequests)

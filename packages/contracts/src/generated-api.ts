@@ -5016,6 +5016,103 @@ export interface components {
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
     };
+    PrivacyStepResponse: {
+      /** @enum {string} */
+      domain:
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups";
+      mandatory: boolean;
+      /** @enum {string} */
+      status: "pending" | "processing" | "completed" | "blocked" | "failed";
+      reasonCode: Record<string, never> | null;
+      /** Format: int32 */
+      attempts: number;
+    };
+    PrivacyRequestStatusResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      type: "access_export" | "correction" | "anonymization" | "deletion";
+      /** @enum {string} */
+      state:
+        | "verification_pending"
+        | "approval_pending"
+        | "processing"
+        | "partial"
+        | "completed"
+        | "rejected"
+        | "failed";
+      /** Format: int32 */
+      attempts: number;
+      lastErrorCode: Record<string, never> | null;
+      /** Format: date-time */
+      verifiedAt: string | null;
+      /** Format: date-time */
+      approvedAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      steps: components["schemas"]["PrivacyStepResponse"][];
+    };
+    PrivacyExportIdentityResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      displayName: string;
+      /** Format: date-time */
+      emailVerifiedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PrivacyExportMembershipResponse: {
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      organizationId: string;
+      status: string;
+      role: Record<string, never> | null;
+      /** Format: uuid */
+      unitId: Record<string, never> | null;
+    };
+    PrivacyExportDataResponse: {
+      identity: components["schemas"]["PrivacyExportIdentityResponse"];
+      organizationMemberships: components["schemas"]["PrivacyExportMembershipResponse"][];
+    };
+    PrivacyExportResponse: {
+      /**
+       * Format: int32
+       * @enum {integer}
+       */
+      schemaVersion: 1;
+      /** Format: uuid */
+      requestId: string;
+      /** Format: date-time */
+      generatedAt: string;
+      partial: boolean;
+      blockedDomains: (
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups"
+      )[];
+      data: components["schemas"]["PrivacyExportDataResponse"];
+    };
   };
   responses: never;
   parameters: never;
@@ -10737,7 +10834,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
       };
     };
   };
@@ -10784,7 +10883,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10803,7 +10904,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
       };
     };
   };
@@ -10850,7 +10953,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10870,7 +10975,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10890,7 +10997,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10906,11 +11015,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10926,11 +11037,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10946,11 +11059,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10966,11 +11081,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -10986,11 +11103,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -11006,11 +11125,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -11032,11 +11153,13 @@ export interface operations {
       };
     };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -11058,11 +11181,13 @@ export interface operations {
       };
     };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
       };
     };
   };
@@ -11078,11 +11203,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
+        };
       };
     };
   };
@@ -11098,11 +11225,13 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
+        };
       };
     };
   };

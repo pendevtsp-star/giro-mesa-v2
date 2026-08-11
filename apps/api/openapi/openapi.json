@@ -12586,7 +12586,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12711,7 +12718,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12742,7 +12759,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12867,7 +12891,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12898,7 +12932,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12929,7 +12970,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12959,8 +13007,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12990,8 +13045,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13021,8 +13083,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13052,8 +13121,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13083,8 +13159,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13114,8 +13197,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13145,8 +13235,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13194,8 +13291,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestStatusResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13243,8 +13347,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyExportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -13274,8 +13385,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyExportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23385,6 +23503,271 @@
           "createdAt",
           "updatedAt",
           "steps"
+        ]
+      },
+      "PrivacyStepResponse": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "enum": [
+              "identity",
+              "organization_membership",
+              "operations",
+              "management_finance",
+              "growth_crm",
+              "objects_media",
+              "offline_edge",
+              "backups"
+            ]
+          },
+          "mandatory": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "completed",
+              "blocked",
+              "failed"
+            ]
+          },
+          "reasonCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "domain",
+          "mandatory",
+          "status",
+          "reasonCode",
+          "attempts"
+        ]
+      },
+      "PrivacyRequestStatusResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "access_export",
+              "correction",
+              "anonymization",
+              "deletion"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "verification_pending",
+              "approval_pending",
+              "processing",
+              "partial",
+              "completed",
+              "rejected",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "lastErrorCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrivacyStepResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "state",
+          "attempts",
+          "lastErrorCode",
+          "verifiedAt",
+          "approvedAt",
+          "completedAt",
+          "createdAt",
+          "updatedAt",
+          "steps"
+        ]
+      },
+      "PrivacyExportIdentityResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "emailVerifiedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PrivacyExportMembershipResponse": {
+        "type": "object",
+        "properties": {
+          "membershipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "role": {
+            "type": "object",
+            "nullable": true
+          },
+          "unitId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "membershipId",
+          "organizationId",
+          "status",
+          "role",
+          "unitId"
+        ]
+      },
+      "PrivacyExportDataResponse": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/PrivacyExportIdentityResponse"
+          },
+          "organizationMemberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrivacyExportMembershipResponse"
+            }
+          }
+        },
+        "required": [
+          "identity",
+          "organizationMemberships"
+        ]
+      },
+      "PrivacyExportResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "enum": [
+              1
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "blockedDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "organization_membership",
+                "operations",
+                "management_finance",
+                "growth_crm",
+                "objects_media",
+                "offline_edge",
+                "backups"
+              ]
+            }
+          },
+          "data": {
+            "$ref": "#/components/schemas/PrivacyExportDataResponse"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "generatedAt",
+          "partial",
+          "blockedDomains",
+          "data"
         ]
       }
     }

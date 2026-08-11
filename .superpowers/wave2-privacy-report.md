@@ -19,6 +19,8 @@ Implemented a fail-closed, tenant-scoped privacy request lifecycle for access/ex
 - Privacy HTTP responses are `Cache-Control: no-store`.
 - Audit metadata is allowlisted and excludes payload, name, e-mail, credentials and export content.
 - Platform/internal role receives no privacy-table content grant.
+- The worker validates topic, aggregate, tenant and unit from the durable outbox envelope against the payload before opening any request state.
+- Processing is serialized with a transaction-scoped advisory lock per organization/request, so concurrent deliveries converge to one effect and one replay.
 
 The technical data inventory is in `docs/privacy/data-inventory.md`. It explicitly separates technical behavior from legal approval and records unresolved retention/base-legal decisions.
 
@@ -31,7 +33,7 @@ Routes exist under both `/api/v1/organizations/{organizationId}/privacy` and `/v
 - approve, reject and retry;
 - one-time export download.
 
-OpenAPI, TypeScript client types and both generated C# route trees were regenerated. The C# project builds with zero warnings/errors.
+OpenAPI now publishes explicit status, step and one-time export response schemas for every transition and both route aliases. TypeScript client types and both generated C# route trees were regenerated; the C# project builds with zero warnings/errors.
 
 ## TDD and gates
 
@@ -45,6 +47,8 @@ RED was first observed in `@giromesa/domain` for the missing privacy state/regis
 - PostgreSQL fresh migration on disposable `giromesa_privacy_task37` — all migrations through 0025 applied.
 - Real PostgreSQL API lifecycle — step-up, create replay/conflict, approval replay/outbox uniqueness and RLS visibility passed.
 - Real PostgreSQL worker lifecycle — FORCE RLS, cross-tenant denial, internal-role denial, encrypted TTL export, one-time download, replay, blocked mutation, failed state and database completed-guard passed.
+- Real PostgreSQL worker hardening — forged tenant/aggregate envelopes fail before database access; two concurrent deliveries produce exactly one effect plus one replay.
+- Real PostgreSQL API contract — lifecycle and generated response schemas passed on both route aliases.
 - Real PostgreSQL upgrade — migrations through 0016 followed by 0025 preserved an existing session and installed all three FORCE-RLS tables.
 - `rtk pnpm run typecheck` — 12/12 Turbo tasks passed.
 - Focused Biome checks on every changed/new source file passed with formatter/assist disabled for pre-existing CRLF files; new privacy files pass the complete check. The repository-wide formatter gate remains red on pre-existing CRLF formatting outside this task.

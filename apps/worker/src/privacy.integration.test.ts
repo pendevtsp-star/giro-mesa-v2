@@ -38,6 +38,14 @@ describe("privacy lifecycle on real PostgreSQL", () => {
     const failedRequest = randomUUID();
     const encryptionSecret = randomBytes(32).toString("base64");
     process.env.PRIVACY_EXPORT_ENCRYPTION_KEY = encryptionSecret;
+    const processingEvent = (organizationId: string, requestId: string, attempt = 1) => ({
+      topic: "privacy.request.processing",
+      aggregate_type: "privacy_request",
+      aggregate_id: requestId,
+      organization_id: organizationId,
+      unit_id: null,
+      payload: { organizationId, requestId, attempt },
+    });
 
     await database.client`
       insert into organizations (id, legal_name, trade_name, document)
@@ -116,9 +124,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
       },
     );
 
-    const event = {
-      payload: { organizationId: organizationA, requestId: requestA, attempt: 1 },
-    };
+    const event = processingEvent(organizationA, requestA);
     const processed = await withWorkerContext(database, (tx) =>
       processPrivacyRequest(tx as never, event),
     );
@@ -127,6 +133,41 @@ describe("privacy lifecycle on real PostgreSQL", () => {
       processPrivacyRequest(tx as never, event),
     );
     assert.deepEqual(replayed, { replayed: true });
+
+    await assert.rejects(
+      () =>
+        withWorkerContext(database, (tx) =>
+          processPrivacyRequest(tx as never, {
+            ...processingEvent(organizationB, requestB),
+            organization_id: organizationA,
+          }),
+        ),
+      (error: unknown) =>
+        error instanceof Error && error.message === "PRIVACY_EVENT_CONTEXT_INVALID",
+    );
+    const concurrentResults = await Promise.all([
+      withWorkerContext(database, (tx) =>
+        processPrivacyRequest(tx as never, processingEvent(organizationB, requestB)),
+      ),
+      withWorkerContext(database, (tx) =>
+        processPrivacyRequest(tx as never, processingEvent(organizationB, requestB)),
+      ),
+    ]);
+    assert.equal(
+      concurrentResults.filter((result) => result.replayed === false).length,
+      1,
+    );
+    assert.equal(
+      concurrentResults.filter((result) => result.replayed === true).length,
+      1,
+    );
+    const [requestBAudit] = await database.client<{ count: number }[]>`
+      select count(*)::int as count from audit_events
+      where organization_id = ${organizationB}
+        and entity_id = ${requestB}
+        and action = 'privacy.processing_partial'
+    `;
+    assert.equal(requestBAudit?.count, 1);
 
     const [persisted] = await database.client<
       { state: string; last_error_code: string | null; display_name: string }[]
@@ -275,9 +316,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
       },
     );
     await withWorkerContext(database, (tx) =>
-      processPrivacyRequest(tx as never, {
-        payload: { organizationId: organizationA, requestId: correctionRequest, attempt: 1 },
-      }),
+      processPrivacyRequest(tx as never, processingEvent(organizationA, correctionRequest)),
     );
     const [unchanged] = await database.client<{ display_name: string; state: string }[]>`
       select identity.display_name, request.state
@@ -289,9 +328,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
 
     await seedRequest(organizationA, identityA, failedRequest);
     process.env.PRIVACY_EXPORT_ENCRYPTION_KEY = "invalid";
-    const failedEvent = {
-      payload: { organizationId: organizationA, requestId: failedRequest, attempt: 1 },
-    };
+    const failedEvent = processingEvent(organizationA, failedRequest);
     await assert.rejects(() =>
       withWorkerContext(database, (tx) => processPrivacyRequest(tx as never, failedEvent)),
     );
