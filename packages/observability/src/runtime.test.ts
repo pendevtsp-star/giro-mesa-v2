@@ -87,15 +87,15 @@ it("starts real providers and exports manual traces, metrics and logs with bound
   await runtime.start();
 
   const telemetry = new SafeTelemetry(new OpenTelemetryBackend("giromesa.runtime.test"));
-  telemetry.span("giromesa.runtime.span", 3, { outcome: "success" });
-  telemetry.counter("giromesa.runtime.counter", 1, { outcome: "success" });
-  telemetry.histogram("giromesa.runtime.duration", 2, { outcome: "success" });
-  telemetry.log("info", "giromesa.runtime.log", { outcome: "success" });
+  telemetry.span("http.server.request", 3, { outcome: "success" });
+  telemetry.counter("http.server.request.count", 1, { outcome: "success" });
+  telemetry.histogram("http.server.request.duration", 2, { outcome: "success" });
+  telemetry.log("info", "giromesa.http.request.failed", { outcome: "success" });
   await runtime.forceFlush();
 
   const spans = traceExporter.getFinishedSpans();
   assert.equal(spans.length, 1);
-  assert.equal(spans[0]?.name, "giromesa.runtime.span");
+  assert.equal(spans[0]?.name, "http.server.request");
   assert.equal(spans[0]?.resource.attributes["service.name"], "giromesa.api");
   assert.equal(spans[0]?.resource.attributes["deployment.environment.name"], "test");
 
@@ -104,11 +104,11 @@ it("starts real providers and exports manual traces, metrics and logs with bound
     .flatMap((resourceMetrics) => resourceMetrics.scopeMetrics)
     .flatMap((scopeMetrics) => scopeMetrics.metrics)
     .map((metric) => metric.descriptor.name);
-  assert.ok(metricNames.includes("giromesa.runtime.counter"));
-  assert.ok(metricNames.includes("giromesa.runtime.duration"));
+  assert.ok(metricNames.includes("http.server.request.count"));
+  assert.ok(metricNames.includes("http.server.request.duration"));
 
   const logs = logExporter.getFinishedLogRecords();
   assert.equal(logs.length, 1);
-  assert.equal(logs[0]?.body, "giromesa.runtime.log");
+  assert.equal(logs[0]?.body, "giromesa.http.request.failed");
   assert.equal(logs[0]?.resource.attributes["service.name"], "giromesa.api");
 });

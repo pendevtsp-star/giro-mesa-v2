@@ -65,9 +65,9 @@ after(async () => {
 
 it("exports traces, metrics and logs through the configured OTLP HTTP collector", async () => {
   const telemetry = new SafeTelemetry(new OpenTelemetryBackend("giromesa.otlp.test"));
-  telemetry.span("giromesa.otlp.span", 1, { outcome: "success" });
-  telemetry.counter("giromesa.otlp.counter", 1, { outcome: "success" });
-  telemetry.log("info", "giromesa.otlp.log", { outcome: "success" });
+  telemetry.span("outbox.dispatch", 1, { outcome: "success" });
+  telemetry.counter("giromesa.worker.jobs.completed", 1, { outcome: "success" });
+  telemetry.log("info", "giromesa.http.request.failed", { outcome: "success" });
   await runtime.forceFlush();
 
   assert.deepEqual(received.map((signal) => signal.path).sort(), [

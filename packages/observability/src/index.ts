@@ -22,22 +22,34 @@ export type TelemetryAttributeValue = string | number | boolean;
 export type TelemetryAttributes = Record<string, TelemetryAttributeValue>;
 export type UnsafeTelemetryAttributes = Readonly<Record<string, unknown>>;
 
+export const TELEMETRY_SIGNAL_NAMES = [
+  "http.server.request",
+  "http.server.request.count",
+  "http.server.request.duration",
+  "giromesa.http.request.failed",
+  "outbox.dispatch",
+  "giromesa.worker.jobs.completed",
+  "giromesa.worker.jobs.failed",
+  "giromesa.worker.job.duration",
+] as const;
+export type TelemetrySignalName = (typeof TELEMETRY_SIGNAL_NAMES)[number];
+
 export type TelemetrySignal =
   | {
       kind: "counter" | "histogram";
-      name: string;
+      name: TelemetrySignalName;
       value: number;
       attributes: TelemetryAttributes;
     }
   | {
       kind: "log";
-      name: string;
+      name: TelemetrySignalName;
       severity: "debug" | "info" | "warn" | "error";
       attributes: TelemetryAttributes;
     }
   | {
       kind: "span";
-      name: string;
+      name: TelemetrySignalName;
       durationMs: number;
       attributes: TelemetryAttributes;
     };
@@ -234,10 +246,10 @@ export class CardinalityGuard {
   }
 }
 
-const SIGNAL_NAME_PATTERN = /^[a-z][a-z0-9_.-]{2,95}$/;
+const TELEMETRY_SIGNAL_NAME_ALLOWLIST = new Set<string>(TELEMETRY_SIGNAL_NAMES);
 
-function boundedSignalName(name: string) {
-  return SIGNAL_NAME_PATTERN.test(name) ? name : "giromesa.invalid_signal";
+function allowedSignalName(name: string): TelemetrySignalName | null {
+  return TELEMETRY_SIGNAL_NAME_ALLOWLIST.has(name) ? (name as TelemetrySignalName) : null;
 }
 
 export class SafeTelemetry {
@@ -252,9 +264,11 @@ export class SafeTelemetry {
 
   counter(name: string, value: number, attributes: UnsafeTelemetryAttributes = {}) {
     if (!Number.isFinite(value) || value < 0) return;
+    const allowedName = allowedSignalName(name);
+    if (!allowedName) return;
     this.backend.emit({
       kind: "counter",
-      name: boundedSignalName(name),
+      name: allowedName,
       value,
       attributes: this.attributes(attributes),
     });
@@ -262,9 +276,11 @@ export class SafeTelemetry {
 
   histogram(name: string, value: number, attributes: UnsafeTelemetryAttributes = {}) {
     if (!Number.isFinite(value) || value < 0) return;
+    const allowedName = allowedSignalName(name);
+    if (!allowedName) return;
     this.backend.emit({
       kind: "histogram",
-      name: boundedSignalName(name),
+      name: allowedName,
       value,
       attributes: this.attributes(attributes),
     });
@@ -275,9 +291,11 @@ export class SafeTelemetry {
     eventName: string,
     attributes: UnsafeTelemetryAttributes = {},
   ) {
+    const allowedName = allowedSignalName(eventName);
+    if (!allowedName) return;
     this.backend.emit({
       kind: "log",
-      name: boundedSignalName(eventName),
+      name: allowedName,
       severity,
       attributes: this.attributes(attributes),
     });
@@ -285,9 +303,11 @@ export class SafeTelemetry {
 
   span(name: string, durationMs: number, attributes: UnsafeTelemetryAttributes = {}) {
     if (!Number.isFinite(durationMs) || durationMs < 0) return;
+    const allowedName = allowedSignalName(name);
+    if (!allowedName) return;
     this.backend.emit({
       kind: "span",
-      name: boundedSignalName(name),
+      name: allowedName,
       durationMs,
       attributes: this.attributes(attributes),
     });

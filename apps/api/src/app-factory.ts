@@ -44,7 +44,6 @@ export async function createApplication() {
     timeWindow: "1 minute",
   });
   await app.register(websocket, { options: { maxPayload: 16_384 } });
-  app.enableShutdownHooks();
   app.enableCors(corsConfiguration());
 
   const metrics = app.get(MetricsService);
