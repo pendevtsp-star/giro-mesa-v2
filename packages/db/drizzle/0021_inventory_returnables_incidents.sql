@@ -66,11 +66,14 @@ CREATE TABLE "management_returnable_assets" (
   "name" varchar(160) NOT NULL,
   "tracking_mode" varchar(16) NOT NULL,
   "deposit_cents" integer,
+  "idempotency_key" varchar(160) NOT NULL,
+  "request_hash" varchar(64) NOT NULL,
   "active" boolean DEFAULT true NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "management_returnable_assets_scope_id_unique" UNIQUE("organization_id", "unit_id", "id"),
   CONSTRAINT "management_returnable_assets_sku_unique" UNIQUE("organization_id", "unit_id", "sku"),
+  CONSTRAINT "management_returnable_assets_idempotency_unique" UNIQUE("organization_id", "unit_id", "idempotency_key"),
   CONSTRAINT "management_returnable_assets_mode_check" CHECK ("tracking_mode" IN ('aggregate','serialized')),
   CONSTRAINT "management_returnable_assets_deposit_check" CHECK ("deposit_cents" IS NULL OR "deposit_cents" >= 0)
 );

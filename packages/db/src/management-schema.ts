@@ -653,6 +653,167 @@ export const managementUnitConversions = pgTable(
   ],
 );
 
+export const managementReturnableAssets = pgTable(
+  "management_returnable_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sku: varchar("sku", { length: 80 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    trackingMode: varchar("tracking_mode", { length: 16 })
+      .$type<"aggregate" | "serialized">()
+      .notNull(),
+    depositCents: integer("deposit_cents"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_returnable_assets_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("management_returnable_assets_sku_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sku,
+    ),
+    unique("management_returnable_assets_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "management_returnable_assets_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check(
+      "management_returnable_assets_mode_check",
+      sql`${table.trackingMode} in ('aggregate','serialized')`,
+    ),
+    check(
+      "management_returnable_assets_deposit_check",
+      sql`${table.depositCents} is null or ${table.depositCents} >= 0`,
+    ),
+  ],
+);
+
+export const managementReturnableSerials = pgTable(
+  "management_returnable_serials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    serialNumber: varchar("serial_number", { length: 120 }).notNull(),
+    state: varchar("state", { length: 24 })
+      .$type<"available" | "in_custody" | "with_supplier" | "broken" | "lost">()
+      .notNull()
+      .default("available"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_returnable_serials_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("management_returnable_serials_number_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.assetId,
+      table.serialNumber,
+    ),
+    foreignKey({
+      name: "management_returnable_serials_asset_fk",
+      columns: [table.organizationId, table.unitId, table.assetId],
+      foreignColumns: [
+        managementReturnableAssets.organizationId,
+        managementReturnableAssets.unitId,
+        managementReturnableAssets.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_returnable_serials_state_check",
+      sql`${table.state} in ('available','in_custody','with_supplier','broken','lost')`,
+    ),
+  ],
+);
+
+export const managementReturnableMovements = pgTable(
+  "management_returnable_movements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    assetId: uuid("asset_id").notNull(),
+    serialId: uuid("serial_id"),
+    movementType: varchar("movement_type", { length: 32 })
+      .$type<
+        | "receive"
+        | "circulate"
+        | "return_empty"
+        | "send_supplier"
+        | "receive_supplier"
+        | "broken"
+        | "lost"
+        | "reconcile_adjustment"
+      >()
+      .notNull(),
+    quantity: integer("quantity").notNull(),
+    fromCustodyType: varchar("from_custody_type", { length: 24 }),
+    fromCustodyId: varchar("from_custody_id", { length: 160 }),
+    toCustodyType: varchar("to_custody_type", { length: 24 }),
+    toCustodyId: varchar("to_custody_id", { length: 160 }),
+    supplierReference: varchar("supplier_reference", { length: 160 }),
+    lotReference: varchar("lot_reference", { length: 160 }),
+    reason: varchar("reason", { length: 240 }),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    approverIdentityId: uuid("approver_identity_id").references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_returnable_movements_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("management_returnable_movements_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "management_returnable_movements_asset_fk",
+      columns: [table.organizationId, table.unitId, table.assetId],
+      foreignColumns: [
+        managementReturnableAssets.organizationId,
+        managementReturnableAssets.unitId,
+        managementReturnableAssets.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_movements_serial_fk",
+      columns: [table.organizationId, table.unitId, table.serialId],
+      foreignColumns: [
+        managementReturnableSerials.organizationId,
+        managementReturnableSerials.unitId,
+        managementReturnableSerials.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_returnable_movements_quantity_check", sql`${table.quantity} > 0`),
+  ],
+);
+
 export const managementStockBalances = pgTable(
   "management_stock_balances",
   {

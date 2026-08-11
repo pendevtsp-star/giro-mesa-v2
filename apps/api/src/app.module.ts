@@ -12,11 +12,12 @@ import { ManagementModule } from "./management/management.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
+import { PaymentsModule } from "./payments/payments.module.js";
 import { PilotOperationsModule } from "./pilot-operations/pilot-operations.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
-import { PaymentsModule } from "./payments/payments.module.js";
 import { PublicMenuModule } from "./public-menu/public-menu.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { ReturnablesModule } from "./returnables/returnables.module.js";
 import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
@@ -32,6 +33,7 @@ import { SyncModule } from "./sync/sync.module.js";
     OperationsModule,
     PublicMenuModule,
     RealtimeModule,
+    ReturnablesModule,
     PilotOperationsModule,
     PaymentsModule,
     PlatformModule,
