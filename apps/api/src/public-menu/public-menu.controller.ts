@@ -25,6 +25,7 @@ import { ZodPipe } from "../common/zod.pipe.js";
 import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
+import { TableSessionService } from "./table-session.js";
 
 const publicMenuDraftSchema = z.object({
   expectedVersion: z.number().int().nonnegative(),
@@ -75,6 +76,7 @@ const publicMenuDraftSchema = z.object({
 
 const expectedVersionSchema = z.object({ expectedVersion: z.number().int().nonnegative() });
 const publishSchema = z.object({ expectedPublishEpoch: z.number().int().nonnegative() });
+const tableSessionSchema = z.object({ qrToken: z.string().min(40).max(2_048) });
 
 @DatabaseContext("public-menu")
 @Controller(["api/v1/public/menus", "public/v1/menus"])
@@ -82,6 +84,7 @@ export class PublicMenuController {
   constructor(
     private readonly publicMenuService: PublicMenuService,
     private readonly publicOrderService: PublicOrderService,
+    private readonly tableSessionService: TableSessionService,
   ) {}
 
   @Get(":slug")
@@ -105,6 +108,15 @@ export class PublicMenuController {
   @Get(":slug/order-options")
   orderOptions(@Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string) {
     return this.publicOrderService.options(slug);
+  }
+
+  @Post(":slug/table-session")
+  tableSession(
+    @Req() request: { ip?: string },
+    @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
+    @Body(new ZodPipe(tableSessionSchema)) body: z.infer<typeof tableSessionSchema>,
+  ) {
+    return this.tableSessionService.issue(slug, body.qrToken, request.ip ?? "unknown");
   }
 
   @Post(":slug/orders")
@@ -135,6 +147,23 @@ export class PublicMenuController {
 ])
 export class PublicMenuAdminController {
   constructor(private readonly publicMenuService: PublicMenuService) {}
+
+  @Post(":menuId/tables/:tableId/qr")
+  tableQr(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("menuId", ParseUUIDPipe) menuId: string,
+    @Param("tableId", ParseUUIDPipe) tableId: string,
+  ) {
+    return this.publicMenuService.issueTableQr(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      menuId,
+      tableId,
+    );
+  }
 
   @Put(":menuId/draft")
   saveDraft(

@@ -17,7 +17,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { posTabs } from "./operations-schema.js";
+import { posDiningTables, posTabs, tableOccupancies } from "./operations-schema.js";
 import { identities, organizations, publicMenus, units } from "./schema.js";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -955,6 +955,119 @@ export const publicMenuVersions = pgTable(
   ],
 );
 
+export type PublicTableCapability = "call_waiter" | "request_bill" | "view_partial";
+
+export const publicTableSessions = pgTable(
+  "public_table_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    tableId: uuid("table_id").notNull(),
+    occupancyId: uuid("occupancy_id").notNull(),
+    occupancyEpoch: uuid("occupancy_epoch").notNull(),
+    nonceHash: varchar("nonce_hash", { length: 64 }).notNull(),
+    capabilities: jsonb("capabilities")
+      .$type<PublicTableCapability[]>()
+      .notNull()
+      .default(["call_waiter", "request_bill", "view_partial"]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokeReason: varchar("revoke_reason", { length: 80 }),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_table_sessions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("public_table_sessions_nonce_unique").on(table.nonceHash),
+    index("public_table_sessions_occupancy_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.occupancyId,
+      table.expiresAt,
+    ),
+    check("public_table_sessions_version_check", sql`${table.resourceVersion} >= 0`),
+    foreignKey({
+      name: "public_table_sessions_menu_scope_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "public_table_sessions_table_scope_fk",
+      columns: [table.organizationId, table.unitId, table.tableId],
+      foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "public_table_sessions_occupancy_scope_fk",
+      columns: [table.organizationId, table.unitId, table.occupancyId],
+      foreignColumns: [
+        tableOccupancies.organizationId,
+        tableOccupancies.unitId,
+        tableOccupancies.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const publicTableSessionNonces = pgTable(
+  "public_table_session_nonces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    nonceHash: varchar("nonce_hash", { length: 64 }).notNull(),
+    purpose: varchar("purpose", { length: 60 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("public_table_session_nonces_unique").on(table.sessionId, table.nonceHash),
+    foreignKey({
+      name: "public_table_session_nonces_session_scope_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [
+        publicTableSessions.organizationId,
+        publicTableSessions.unitId,
+        publicTableSessions.id,
+      ],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicTableSessionRateLimits = pgTable(
+  "public_table_session_rate_limits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    bucketHash: varchar("bucket_hash", { length: 64 }).notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    requestCount: integer("request_count").notNull().default(1),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_table_session_rate_bucket_unique").on(
+      table.menuId,
+      table.bucketHash,
+      table.windowStartedAt,
+    ),
+    check("public_table_session_rate_count_check", sql`${table.requestCount} > 0`),
+    foreignKey({
+      name: "public_table_session_rate_menu_scope_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
 // RLS is declared in Drizzle as well as in the hand-authored policy migration so
 // a later schema generation cannot silently remove the live tenant boundary.
 export const growthTenantTables = [
@@ -983,6 +1096,9 @@ export const growthTenantTables = [
   publicMenuMediaAssets,
   publicMenuDrafts,
   publicMenuVersions,
+  publicTableSessions,
+  publicTableSessionNonces,
+  publicTableSessionRateLimits,
 ] as const;
 
 for (const table of growthTenantTables) table.enableRLS();

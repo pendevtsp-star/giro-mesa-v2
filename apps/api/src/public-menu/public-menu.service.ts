@@ -9,6 +9,7 @@ import {
   publicMenuMediaAssets,
   publicMenuVersions,
   publicMenus,
+  posDiningTables,
 } from "@giromesa/db";
 import {
   BadRequestException,
@@ -22,6 +23,7 @@ import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm"
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { SyncService } from "../sync/sync.service.js";
+import { TableSessionCodec } from "./table-session.js";
 
 export type PublicMenuDraftInput = {
   expectedVersion: number;
@@ -106,6 +108,43 @@ export class PublicMenuService {
     private readonly sync: SyncService,
     private readonly scope: ScopeService,
   ) {}
+
+  async issueTableQr(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    menuId: string,
+    tableId: string,
+  ) {
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager"]);
+    const [row] = await this.database.db
+      .select({ menuId: publicMenus.id, tableId: posDiningTables.id })
+      .from(publicMenus)
+      .innerJoin(
+        posDiningTables,
+        and(
+          eq(posDiningTables.organizationId, publicMenus.organizationId),
+          eq(posDiningTables.unitId, publicMenus.unitId),
+        ),
+      )
+      .where(
+        and(
+          eq(publicMenus.id, menuId),
+          eq(publicMenus.organizationId, organizationId),
+          eq(publicMenus.unitId, unitId),
+          eq(posDiningTables.id, tableId),
+          eq(posDiningTables.active, true),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new NotFoundException({ code: "TABLE_QR_SCOPE_NOT_FOUND", message: "Mesa ou cardápio não encontrado." });
+    return {
+      qrToken: new TableSessionCodec().issueTableQr({ organizationId, unitId, menuId, tableId }),
+      tableId,
+      menuId,
+    };
+  }
 
   async menu(slug: string) {
     const menu = await this.resolveMenu(slug);
