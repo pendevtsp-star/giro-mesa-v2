@@ -13,6 +13,7 @@ import {
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiHeader,
   ApiOkResponse,
   ApiProperty,
@@ -23,6 +24,10 @@ import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PlatformAdminGuard } from "./platform.guard.js";
 import { PlatformService } from "./platform.service.js";
 import { PlatformExceptionFilter } from "./platform-exception.filter.js";
+import {
+  platformProjectionModels,
+  platformProjectionResponseSchema,
+} from "./platform-projection.dto.js";
 
 const platformActions = [
   "tenant.suspend",
@@ -72,33 +77,6 @@ class PlatformTenantContextResponse {
     | null;
 }
 
-class PlatformProjectionResponse {
-  @ApiProperty({
-    enum: [
-      "tenant",
-      "plan",
-      "entitlements",
-      "users",
-      "onboarding",
-      "billing",
-      "integrations",
-      "incidents",
-      "audit",
-      "leads",
-      "support",
-    ],
-  })
-  declare resource: string;
-  @ApiProperty({ enum: ["available", "unavailable"] }) declare availability: string;
-  @ApiProperty({ required: false }) declare reasonCode?: string;
-  @ApiProperty({
-    type: [Object],
-    description: "Sanitized rows for the selected tenant and resource.",
-  })
-  declare items: Array<Record<string, unknown>>;
-  @ApiProperty({ nullable: true, type: String }) declare nextCursor: string | null;
-}
-
 class PlatformActionPayloadResponse {
   @ApiProperty() declare expectedState: string;
   @ApiProperty({ required: false }) declare restoreTo?: string;
@@ -144,6 +122,7 @@ class PlatformDecisionRequest {
 @UseGuards(SessionGuard, PlatformAdminGuard)
 @UseFilters(PlatformExceptionFilter)
 @DatabaseContext("platform")
+@ApiExtraModels(...platformProjectionModels)
 @Controller(["api/v1/platform", "v1/platform"])
 export class PlatformController {
   constructor(private readonly platform: PlatformService) {}
@@ -165,7 +144,7 @@ export class PlatformController {
   }
 
   @Get("tenants/:organizationId/resources/:resource")
-  @ApiOkResponse({ type: PlatformProjectionResponse })
+  @ApiOkResponse({ schema: platformProjectionResponseSchema })
   projection(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId") organizationId: string,

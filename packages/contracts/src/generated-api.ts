@@ -4952,6 +4952,262 @@ export interface components {
       updatedAt: string;
       steps: components["schemas"]["ProvisioningStepResponse"][];
     };
+    PlatformProjectionUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+      units: components["schemas"]["PlatformProjectionUnitResponse"][];
+    };
+    PlatformPlanProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      planId: string;
+      slug: string;
+      name: string;
+      selectionRevision: number;
+      /** Format: date-time */
+      selectedAt: string | null;
+    };
+    PlatformEntitlementProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      entitlement: string;
+      state: string;
+      /** Format: date-time */
+      activatedAt: string | null;
+      /** Format: date-time */
+      revokedAt: string | null;
+    };
+    PlatformUserRoleProjectionResponse: {
+      role: string;
+      /** Format: uuid */
+      unitId: string | null;
+    };
+    PlatformUserProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      identityId: string;
+      displayName: string;
+      email: string;
+      status: string;
+      roles: components["schemas"]["PlatformUserRoleProjectionResponse"][];
+    };
+    PlatformOnboardingChecklistProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "checklist";
+      item: string;
+      status: string;
+      source: string;
+      /** Format: date-time */
+      verifiedAt: string | null;
+    };
+    PlatformOnboardingProvisioningProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "provisioning";
+      /** Format: uuid */
+      id: string;
+      state: string;
+      checkpoint: string;
+      lastErrorCode: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformBillingProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      planId: string;
+      cycle: string;
+      state: string;
+      /** Format: date-time */
+      currentPeriodEndsAt: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformIntegrationProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string | null;
+      provider: string;
+      status: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformAuditProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      action: string;
+      entityType: string;
+      entityId: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+    };
+    PlatformUnavailableProjectionItemResponse: {
+      /** @enum {boolean} */
+      unavailable: true;
+    };
+    PlatformTenantProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "tenant";
+      items: components["schemas"]["PlatformTenantProjectionItemResponse"][];
+    };
+    PlatformPlanProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "plan";
+      items: components["schemas"]["PlatformPlanProjectionItemResponse"][];
+    };
+    PlatformEntitlementsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "entitlements";
+      items: components["schemas"]["PlatformEntitlementProjectionItemResponse"][];
+    };
+    PlatformUsersProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "users";
+      items: components["schemas"]["PlatformUserProjectionItemResponse"][];
+    };
+    PlatformOnboardingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "onboarding";
+      items: (
+        | components["schemas"]["PlatformOnboardingChecklistProjectionItemResponse"]
+        | components["schemas"]["PlatformOnboardingProvisioningProjectionItemResponse"]
+      )[];
+    };
+    PlatformBillingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "billing";
+      items: components["schemas"]["PlatformBillingProjectionItemResponse"][];
+    };
+    PlatformIntegrationsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "integrations";
+      items: components["schemas"]["PlatformIntegrationProjectionItemResponse"][];
+    };
+    PlatformAuditProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "audit";
+      items: components["schemas"]["PlatformAuditProjectionItemResponse"][];
+    };
+    PlatformLeadsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "leads";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
+    PlatformSupportProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "support";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
+    PlatformIncidentsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "incidents";
+      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+    };
     PlatformCountsResponse: {
       organizations: number;
       active: number;
@@ -4987,27 +5243,6 @@ export interface components {
       units: components["schemas"]["PlatformUnitResponse"][];
       /** Format: uuid */
       selectedUnitId: string | null;
-    };
-    PlatformProjectionResponse: {
-      /** @enum {string} */
-      resource:
-        | "tenant"
-        | "plan"
-        | "entitlements"
-        | "users"
-        | "onboarding"
-        | "billing"
-        | "integrations"
-        | "incidents"
-        | "audit"
-        | "leads"
-        | "support";
-      /** @enum {string} */
-      availability: "available" | "unavailable";
-      reasonCode?: string;
-      /** @description Sanitized rows for the selected tenant and resource. */
-      items: Record<string, never>[];
-      nextCursor: string | null;
     };
     PlatformActionPayloadResponse: {
       expectedState: string;
@@ -10833,7 +11068,18 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["PlatformProjectionResponse"];
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
         };
       };
     };
@@ -10859,7 +11105,18 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["PlatformProjectionResponse"];
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
         };
       };
     };

@@ -9,20 +9,18 @@ namespace GiroMesa.ApiClient.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class PlatformProjectionResponse : IAdditionalDataHolder, IParsable
+    public partial class PlatformBillingProjectionResponse : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The availability property</summary>
-        public global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_availability? Availability { get; set; }
-        /// <summary>Sanitized rows for the selected tenant and resource.</summary>
+        public global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_availability? Availability { get; set; }
+        /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public List<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items>? Items { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionItemResponse>? Items { get; set; }
 #nullable restore
 #else
-        public List<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items> Items { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionItemResponse> Items { get; set; }
 #endif
         /// <summary>The nextCursor property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -41,23 +39,16 @@ namespace GiroMesa.ApiClient.Models
         public string ReasonCode { get; set; }
 #endif
         /// <summary>The resource property</summary>
-        public global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_resource? Resource { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.PlatformProjectionResponse"/> and sets the default values.
-        /// </summary>
-        public PlatformProjectionResponse()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
+        public global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_resource? Resource { get; set; }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.PlatformProjectionResponse"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse"/></returns>
         /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-        public static global::GiroMesa.ApiClient.Models.PlatformProjectionResponse CreateFromDiscriminatorValue(IParseNode parseNode)
+        public static global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse CreateFromDiscriminatorValue(IParseNode parseNode)
         {
             if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-            return new global::GiroMesa.ApiClient.Models.PlatformProjectionResponse();
+            return new global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse();
         }
         /// <summary>
         /// The deserialization information for the current model
@@ -67,11 +58,11 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "availability", n => { Availability = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_availability>(); } },
-                { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items>(global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "availability", n => { Availability = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_availability>(); } },
+                { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionItemResponse>(global::GiroMesa.ApiClient.Models.PlatformBillingProjectionItemResponse.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "nextCursor", n => { NextCursor = n.GetStringValue(); } },
                 { "reasonCode", n => { ReasonCode = n.GetStringValue(); } },
-                { "resource", n => { Resource = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_resource>(); } },
+                { "resource", n => { Resource = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_resource>(); } },
             };
         }
         /// <summary>
@@ -81,12 +72,11 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_availability>("availability", Availability);
-            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items>("items", Items);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_availability>("availability", Availability);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionItemResponse>("items", Items);
             writer.WriteStringValue("nextCursor", NextCursor);
             writer.WriteStringValue("reasonCode", ReasonCode);
-            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_resource>("resource", Resource);
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformBillingProjectionResponse_resource>("resource", Resource);
         }
     }
 }

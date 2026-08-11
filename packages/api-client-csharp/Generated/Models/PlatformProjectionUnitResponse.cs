@@ -9,27 +9,38 @@ namespace GiroMesa.ApiClient.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class PlatformProjectionResponse_items : IAdditionalDataHolder, IParsable
+    public partial class PlatformProjectionUnitResponse : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items"/> and sets the default values.
-        /// </summary>
-        public PlatformProjectionResponse_items()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
+        /// <summary>The active property</summary>
+        public bool? Active { get; set; }
+        /// <summary>The id property</summary>
+        public Guid? Id { get; set; }
+        /// <summary>The name property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Name { get; set; }
+#nullable restore
+#else
+        public string Name { get; set; }
+#endif
+        /// <summary>The timezone property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Timezone { get; set; }
+#nullable restore
+#else
+        public string Timezone { get; set; }
+#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.PlatformProjectionUnitResponse"/></returns>
         /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-        public static global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items CreateFromDiscriminatorValue(IParseNode parseNode)
+        public static global::GiroMesa.ApiClient.Models.PlatformProjectionUnitResponse CreateFromDiscriminatorValue(IParseNode parseNode)
         {
             if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-            return new global::GiroMesa.ApiClient.Models.PlatformProjectionResponse_items();
+            return new global::GiroMesa.ApiClient.Models.PlatformProjectionUnitResponse();
         }
         /// <summary>
         /// The deserialization information for the current model
@@ -39,6 +50,10 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "active", n => { Active = n.GetBoolValue(); } },
+                { "id", n => { Id = n.GetGuidValue(); } },
+                { "name", n => { Name = n.GetStringValue(); } },
+                { "timezone", n => { Timezone = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -48,7 +63,10 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteBoolValue("active", Active);
+            writer.WriteGuidValue("id", Id);
+            writer.WriteStringValue("name", Name);
+            writer.WriteStringValue("timezone", Timezone);
         }
     }
 }

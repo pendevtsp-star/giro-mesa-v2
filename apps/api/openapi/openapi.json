@@ -12704,7 +12704,57 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformProjectionResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PlatformTenantProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformPlanProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformEntitlementsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformUsersProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformOnboardingProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformBillingProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformIntegrationsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformAuditProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformLeadsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformSupportProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformIncidentsProjectionResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "resource",
+                    "mapping": {
+                      "tenant": "#/components/schemas/PlatformTenantProjectionResponse",
+                      "plan": "#/components/schemas/PlatformPlanProjectionResponse",
+                      "entitlements": "#/components/schemas/PlatformEntitlementsProjectionResponse",
+                      "users": "#/components/schemas/PlatformUsersProjectionResponse",
+                      "onboarding": "#/components/schemas/PlatformOnboardingProjectionResponse",
+                      "billing": "#/components/schemas/PlatformBillingProjectionResponse",
+                      "integrations": "#/components/schemas/PlatformIntegrationsProjectionResponse",
+                      "audit": "#/components/schemas/PlatformAuditProjectionResponse",
+                      "leads": "#/components/schemas/PlatformLeadsProjectionResponse",
+                      "support": "#/components/schemas/PlatformSupportProjectionResponse",
+                      "incidents": "#/components/schemas/PlatformIncidentsProjectionResponse"
+                    }
+                  }
                 }
               }
             }
@@ -12766,7 +12816,57 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformProjectionResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PlatformTenantProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformPlanProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformEntitlementsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformUsersProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformOnboardingProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformBillingProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformIntegrationsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformAuditProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformLeadsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformSupportProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformIncidentsProjectionResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "resource",
+                    "mapping": {
+                      "tenant": "#/components/schemas/PlatformTenantProjectionResponse",
+                      "plan": "#/components/schemas/PlatformPlanProjectionResponse",
+                      "entitlements": "#/components/schemas/PlatformEntitlementsProjectionResponse",
+                      "users": "#/components/schemas/PlatformUsersProjectionResponse",
+                      "onboarding": "#/components/schemas/PlatformOnboardingProjectionResponse",
+                      "billing": "#/components/schemas/PlatformBillingProjectionResponse",
+                      "integrations": "#/components/schemas/PlatformIntegrationsProjectionResponse",
+                      "audit": "#/components/schemas/PlatformAuditProjectionResponse",
+                      "leads": "#/components/schemas/PlatformLeadsProjectionResponse",
+                      "support": "#/components/schemas/PlatformSupportProjectionResponse",
+                      "incidents": "#/components/schemas/PlatformIncidentsProjectionResponse"
+                    }
+                  }
                 }
               }
             }
@@ -23289,6 +23389,829 @@
           "steps"
         ]
       },
+      "PlatformProjectionUnitResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformTenantProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "billingState": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformProjectionUnitResponse"
+            }
+          }
+        },
+        "required": [
+          "organizationId",
+          "name",
+          "billingState",
+          "updatedAt",
+          "units"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformPlanProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "selectionRevision": {
+            "type": "integer"
+          },
+          "selectedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "planId",
+          "slug",
+          "name",
+          "selectionRevision",
+          "selectedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformEntitlementProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entitlement": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "entitlement",
+          "state",
+          "activatedAt",
+          "revokedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformUserRoleProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "role",
+          "unitId"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformUserProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "membershipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserRoleProjectionResponse"
+            }
+          }
+        },
+        "required": [
+          "organizationId",
+          "membershipId",
+          "identityId",
+          "displayName",
+          "email",
+          "status",
+          "roles"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformOnboardingChecklistProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "checklist"
+            ]
+          },
+          "item": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "kind",
+          "item",
+          "status",
+          "source",
+          "verifiedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformOnboardingProvisioningProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "provisioning"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "checkpoint": {
+            "type": "string"
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "organizationId",
+          "kind",
+          "id",
+          "state",
+          "checkpoint",
+          "lastErrorCode",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformBillingProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cycle": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "currentPeriodEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "organizationId",
+          "id",
+          "planId",
+          "cycle",
+          "state",
+          "currentPeriodEndsAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformIntegrationProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "unitId",
+          "provider",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformAuditProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "entityType",
+          "entityId",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformUnavailableProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "unavailable": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "unavailable"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformTenantProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "tenant"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformTenantProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformPlanProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "plan"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformPlanProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformEntitlementsProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "entitlements"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformEntitlementProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformUsersProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "users"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformOnboardingProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "onboarding"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PlatformOnboardingChecklistProjectionItemResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/PlatformOnboardingProvisioningProjectionItemResponse"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "checklist": "#/components/schemas/PlatformOnboardingChecklistProjectionItemResponse",
+                  "provisioning": "#/components/schemas/PlatformOnboardingProvisioningProjectionItemResponse"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformBillingProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "billing"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformBillingProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformIntegrationsProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "integrations"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformIntegrationProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformAuditProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "audit"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAuditProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformLeadsProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "leads"
+            ]
+          },
+          "items": {
+            "maxItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformSupportProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "support"
+            ]
+          },
+          "items": {
+            "maxItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformIncidentsProjectionResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "incidents"
+            ]
+          },
+          "items": {
+            "maxItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+            }
+          }
+        },
+        "required": [
+          "availability",
+          "nextCursor",
+          "resource",
+          "items"
+        ],
+        "additionalProperties": false
+      },
       "PlatformCountsResponse": {
         "type": "object",
         "properties": {
@@ -23421,54 +24344,6 @@
           "organization",
           "units",
           "selectedUnitId"
-        ]
-      },
-      "PlatformProjectionResponse": {
-        "type": "object",
-        "properties": {
-          "resource": {
-            "type": "string",
-            "enum": [
-              "tenant",
-              "plan",
-              "entitlements",
-              "users",
-              "onboarding",
-              "billing",
-              "integrations",
-              "incidents",
-              "audit",
-              "leads",
-              "support"
-            ]
-          },
-          "availability": {
-            "type": "string",
-            "enum": [
-              "available",
-              "unavailable"
-            ]
-          },
-          "reasonCode": {
-            "type": "string"
-          },
-          "items": {
-            "description": "Sanitized rows for the selected tenant and resource.",
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "resource",
-          "availability",
-          "items",
-          "nextCursor"
         ]
       },
       "PlatformActionPayloadResponse": {

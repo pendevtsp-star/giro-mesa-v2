@@ -5,16 +5,12 @@ namespace GiroMesa.ApiClient.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public enum PlatformProjectionResponse_availability
+    public enum PlatformIntegrationsProjectionResponse_resource
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "available")]
+        [EnumMember(Value = "integrations")]
         #pragma warning disable CS1591
-        Available,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "unavailable")]
-        #pragma warning disable CS1591
-        Unavailable,
+        Integrations,
         #pragma warning restore CS1591
     }
 }
