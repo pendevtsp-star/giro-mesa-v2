@@ -1,7 +1,7 @@
 {
   "version": 1,
   "title": "GiroMesa — confiabilidade operacional",
-  "variables": ["deployment.environment", "service.name"],
+  "variables": ["deployment.environment.name", "service.name", "service.version"],
   "panels": [
     {
       "id": "availability",

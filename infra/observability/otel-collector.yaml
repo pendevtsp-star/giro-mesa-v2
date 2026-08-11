@@ -20,7 +20,7 @@ processors:
       - key: service.namespace
         value: giromesa
         action: upsert
-      - key: deployment.environment
+      - key: deployment.environment.name
         value: ${env:DEPLOYMENT_ENVIRONMENT}
         action: upsert
   attributes/cardinality:
@@ -33,7 +33,8 @@ processors:
     allow_all_keys: false
     allowed_keys:
       - service.name
-      - deployment.environment
+      - service.version
+      - deployment.environment.name
       - http.request.method
       - http.route
       - http.response.status_code

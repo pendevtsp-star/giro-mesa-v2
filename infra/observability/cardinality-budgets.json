@@ -4,7 +4,8 @@
   "overflowValue": "__overflow__",
   "attributes": {
     "service.name": 16,
-    "deployment.environment": 8,
+    "service.version": 32,
+    "deployment.environment.name": 8,
     "http.request.method": 8,
     "http.route": 256,
     "http.response.status_code": 64,

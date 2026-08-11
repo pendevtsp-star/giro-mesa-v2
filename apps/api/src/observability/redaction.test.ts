@@ -11,6 +11,21 @@ const otherOrganizationId = "a2222222-2222-4222-8222-222222222222";
 const unitId = "b1111111-1111-4111-8111-111111111111";
 const deviceId = "c1111111-1111-4111-8111-111111111111";
 
+it("keeps bounded standard resource attributes", () => {
+  assert.deepEqual(
+    redactTelemetryAttributes({
+      "service.name": "giromesa.api",
+      "service.version": "0.1.0",
+      "deployment.environment.name": "test",
+    }),
+    {
+      "service.name": "giromesa.api",
+      "service.version": "0.1.0",
+      "deployment.environment.name": "test",
+    },
+  );
+});
+
 it("keeps only bounded operational attributes and drops arbitrary identifiers and payloads", () => {
   const attributes = redactTelemetryAttributes({
     "http.request.method": "POST",

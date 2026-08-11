@@ -12,7 +12,7 @@ Este diretório contém contratos vendor-neutral para receber e encaminhar OTLP,
 
 ## Ativação
 
-O processo deve inicializar um SDK OpenTelemetry antes da aplicação e registrar o provider global consumido por `@opentelemetry/api`. O deploy fornece `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT` e, quando necessário, `OTEL_EXPORTER_OTLP_HEADERS` por secret reference.
+API e worker inicializam o NodeSDK antes de importar a aplicação e registram providers globais de traces, metrics e logs. O ambiente deve fornecer `OTEL_EXPORTER_OTLP_ENDPOINT` (ou os três endpoints por sinal) e, quando necessário, `OTEL_EXPORTER_OTLP_HEADERS` por secret reference. HTTP exige `OTEL_EXPORTER_OTLP_INSECURE=true`; o único protocolo aceito é `http/protobuf`. Service names são fixos (`giromesa.api` e `giromesa.worker`) e o recurso usa `service.version` e `deployment.environment.name`.
 
 O arquivo `otel-collector.yaml` encaminha OTLP para um endpoint configurado no ambiente. Sem endpoint válido, a observabilidade externa permanece deliberadamente não configurada; a aplicação não inventa um backend.
 

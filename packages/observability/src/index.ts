@@ -52,6 +52,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const UUID_FRAGMENT_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
 const TOKEN_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,95}$/;
+const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,31}$/;
 const ROUTE_PATTERN = /^\/[A-Za-z0-9._~:/-]{0,159}$/;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const BEARER_PATTERN = /\bbearer\s+[A-Za-z0-9._~+/=-]{4,}/i;
@@ -78,6 +79,10 @@ const token: AttributeValidator = (value) =>
   typeof value === "string" && TOKEN_PATTERN.test(value) && !containsSensitiveValue(value)
     ? value
     : null;
+const version: AttributeValidator = (value) =>
+  typeof value === "string" && VERSION_PATTERN.test(value) && !containsSensitiveValue(value)
+    ? value
+    : null;
 const uuid: AttributeValidator = (value) =>
   typeof value === "string" && UUID_PATTERN.test(value) ? value.toLowerCase() : null;
 const statusCode: AttributeValidator = (value) =>
@@ -92,7 +97,9 @@ const route: AttributeValidator = (value) => {
 
 const ATTRIBUTE_VALIDATORS: Readonly<Record<string, AttributeValidator>> = {
   "service.name": token,
+  "service.version": version,
   "deployment.environment": stringEnum("local", "test", "staging", "production"),
+  "deployment.environment.name": stringEnum("local", "test", "staging", "production"),
   "http.request.method": stringEnum("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"),
   "http.route": route,
   "http.response.status_code": statusCode,
@@ -161,7 +168,9 @@ export function redactTelemetryAttributes(source: UnsafeTelemetryAttributes): Te
 
 export const DEFAULT_CARDINALITY_BUDGETS: Readonly<Record<string, number>> = {
   "service.name": 16,
+  "service.version": 32,
   "deployment.environment": 8,
+  "deployment.environment.name": 8,
   "http.request.method": 8,
   "http.route": 256,
   "http.response.status_code": 64,
