@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const INT32_MAX = 2_147_483_647;
+
 export type {
   components as ApiComponents,
   operations as ApiOperations,
@@ -111,6 +113,19 @@ const checklistProgressEvidenceSchema = z
     note: z.string().trim().min(1).max(240).optional(),
   })
   .strict();
+const checklistProgressItem = (status: "pending" | "in_progress" | "blocked") =>
+  z
+    .object({
+      status: z.literal(status),
+      evidenceReference: checklistEvidenceReferenceSchema.optional(),
+      evidence: checklistProgressEvidenceSchema.optional(),
+    })
+    .strict();
+const checklistProgressOptions = [
+  checklistProgressItem("pending"),
+  checklistProgressItem("in_progress"),
+  checklistProgressItem("blocked"),
+] as const;
 const checklistProgressSchema = z
   .object({
     status: z.enum(["pending", "in_progress", "blocked"]),
@@ -118,6 +133,14 @@ const checklistProgressSchema = z
     evidence: checklistProgressEvidenceSchema.optional(),
   })
   .strict();
+const productionProgressItem = (status: "in_progress" | "blocked") =>
+  z
+    .object({
+      status: z.literal(status),
+      evidenceReference: checklistEvidenceReferenceSchema.optional(),
+      evidence: productionInProgressSchema,
+    })
+    .strict();
 const productionRouteEvidenceBaseSchema = z.object({
   configurationReference: z.string().trim().min(3).max(120).optional(),
 });
@@ -142,16 +165,11 @@ const productionInProgressSchema = z.discriminatedUnion("mode", [
     })
     .strict(),
 ]);
-const productionProgressSchema = z.union([
+const productionProgressOptions = [
   z.object({ status: z.literal("pending") }).strict(),
-  z
-    .object({
-      status: z.enum(["in_progress", "blocked"]),
-      evidenceReference: checklistEvidenceReferenceSchema.optional(),
-      evidence: productionInProgressSchema,
-    })
-    .strict(),
-]);
+  productionProgressItem("in_progress"),
+  productionProgressItem("blocked"),
+] as const;
 const verifiedChecklistItem = <T extends z.ZodType>(evidence: T) =>
   z
     .object({
@@ -196,22 +214,31 @@ const onboardingChecklistItemsInputSchema = z
     business: checklistProgressSchema,
     unit: checklistProgressSchema,
     plan: checklistProgressSchema,
-    fiscalChoice: z.union([
-      checklistProgressSchema,
+    fiscalChoice: z.discriminatedUnion("status", [
+      ...checklistProgressOptions,
       verifiedChecklistItem(fiscalEvidenceSchema),
       waivedChecklistItem(fiscalWaiverEvidenceSchema),
     ]),
     catalog: checklistProgressSchema,
     tables: checklistProgressSchema,
     team: checklistProgressSchema,
-    qr: z.union([checklistProgressSchema, waivedChecklistItem(qrWaiverEvidenceSchema)]),
-    production: z.union([
-      productionProgressSchema,
+    qr: z.discriminatedUnion("status", [
+      ...checklistProgressOptions,
+      waivedChecklistItem(qrWaiverEvidenceSchema),
+    ]),
+    production: z.discriminatedUnion("status", [
+      ...productionProgressOptions,
       verifiedChecklistItem(productionEvidenceSchema),
     ]),
     cashier: checklistProgressSchema,
-    training: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),
-    rehearsal: z.union([checklistProgressSchema, verifiedChecklistItem(completedEvidenceSchema)]),
+    training: z.discriminatedUnion("status", [
+      ...checklistProgressOptions,
+      verifiedChecklistItem(completedEvidenceSchema),
+    ]),
+    rehearsal: z.discriminatedUnion("status", [
+      ...checklistProgressOptions,
+      verifiedChecklistItem(completedEvidenceSchema),
+    ]),
   })
   .partial()
   .strict();
@@ -281,7 +308,7 @@ export const onboardingEvidenceResponseSchema = z
     kdsStationIds: z.array(idSchema).max(24).optional(),
     printerProfileIds: z.array(idSchema).max(24).optional(),
     configurationReference: z.string().max(120).nullable().optional(),
-    catalogVersion: z.number().int().nonnegative().nullable().optional(),
+    catalogVersion: z.number().int().nonnegative().max(INT32_MAX).nullable().optional(),
     slug: z.enum(["operacao", "crescimento", "rede"]).nullable().optional(),
     note: z.string().max(240).optional(),
     choice: z.enum(["disabled", "focus", "external"]).optional(),
@@ -327,10 +354,10 @@ export const onboardingPlanResponseSchema = z
   .object({
     id: idSchema,
     slug: z.enum(["operacao", "crescimento", "rede"]),
-    catalogVersion: z.number().int().nonnegative(),
+    catalogVersion: z.number().int().nonnegative().max(INT32_MAX),
     monthlyPriceCents: moneyCentsSchema,
     annualPriceCents: moneyCentsSchema,
-    includedUnits: z.number().int().positive(),
+    includedUnits: z.number().int().positive().max(INT32_MAX),
     entitlements: z.array(z.string().min(1).max(120)).max(100),
   })
   .strict();
@@ -339,7 +366,7 @@ export const onboardingSelectionResponseSchema = z
   .object({
     selectedUnitId: idSchema,
     plan: onboardingPlanResponseSchema,
-    revision: z.number().int().positive(),
+    revision: z.number().int().positive().max(INT32_MAX),
     selectedAt: z.iso.datetime({ offset: true }),
     updatedAt: z.iso.datetime({ offset: true }),
   })
@@ -372,7 +399,7 @@ export const provisioningSummaryResponseSchema = z
     id: idSchema,
     state: provisioningStateSchema,
     checkpoint: provisioningCheckpointSchema,
-    attempts: z.number().int().nonnegative(),
+    attempts: z.number().int().nonnegative().max(INT32_MAX),
     lastErrorCode: z.string().max(120).nullable(),
     nextRetryAt: z.iso.datetime({ offset: true }).nullable(),
     completedAt: z.iso.datetime({ offset: true }).nullable(),
@@ -404,7 +431,7 @@ export const provisioningStepResponseSchema = z
       "compensation",
     ]),
     status: z.enum(["pending", "in_progress", "completed", "failed", "compensated"]),
-    attempts: z.number().int().nonnegative(),
+    attempts: z.number().int().nonnegative().max(INT32_MAX),
     startedAt: z.iso.datetime({ offset: true }).nullable(),
     completedAt: z.iso.datetime({ offset: true }).nullable(),
     compensatedAt: z.iso.datetime({ offset: true }).nullable(),

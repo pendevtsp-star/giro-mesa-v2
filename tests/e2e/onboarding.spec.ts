@@ -521,6 +521,7 @@ test("PATCH 400 associa somente erros seguros ao campo e foca o primeiro inváli
           details: {
             fieldErrors: {
               "items.fiscalChoice.evidence.choice": ["Valor inválido."],
+              "items.fiscalChoice.evidence": ["Campo não permitido."],
             },
           },
         },
@@ -972,6 +973,227 @@ test("aborta body 503 atrasado quando GET troca revisão e run", async ({ page }
   await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
   await page.waitForTimeout(1_600);
   await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("retoma polling automático depois de refresh manual 503 sem timers duplicados", async ({
+  page,
+}) => {
+  let statusCalls = 0;
+  let failNextRefresh = false;
+  let completed = false;
+  const summary = (state: "publishing" | "completed") => ({
+    id: runId,
+    state,
+    checkpoint: state === "completed" ? "published" : "activation_committed",
+    attempts: 1,
+    lastErrorCode: null,
+    nextRetryAt: null,
+    completedAt: state === "completed" ? "2026-08-11T10:10:00.000Z" : null,
+    failedAt: null,
+    createdAt: "2026-08-11T10:00:00.000Z",
+    updatedAt: "2026-08-11T10:10:00.000Z",
+  });
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname.endsWith(`/provisioning/${runId}`)) {
+        statusCalls += 1;
+        completed = true;
+        await route.fulfill({ json: { ...summary("completed"), steps: [] } });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+        if (failNextRefresh) {
+          failNextRefresh = false;
+          await route.fulfill({
+            status: 503,
+            json: {
+              statusCode: 503,
+              code: "SERVICE_UNAVAILABLE",
+              message: "Atualização temporariamente indisponível.",
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          json: onboardingSnapshot({
+            items: verifiedItems(),
+            selection: selectedPlan(1),
+            provisioning: summary(completed ? "completed" : "publishing"),
+            activatedAt: completed ? "2026-08-11T10:10:00.000Z" : null,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const refreshCurrentRun = page
+    .locator("button:not([disabled])")
+    .filter({ hasText: "Atualizar status" })
+    .first();
+  failNextRefresh = true;
+  await refreshCurrentRun.click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
+    timeout: 5_000,
+  });
+  expect(statusCalls).toBe(1);
+  await page.waitForTimeout(1_200);
+  expect(statusCalls).toBe(1);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("suprime 409 de ativação antigo depois de refresh autoritativo terminal", async ({ page }) => {
+  let completed = false;
+  const completedAt = "2026-08-11T10:10:00.000Z";
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (request.method() === "POST" && url.pathname.endsWith("/activate")) {
+        completed = true;
+        await route.fulfill({
+          status: 409,
+          json: {
+            statusCode: 409,
+            code: "ACTIVATION_ALREADY_RUNNING",
+            message: "Uma ativação anterior já resolveu este onboarding.",
+            details: { provisioningRunId: runId },
+          },
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+        await route.fulfill({
+          json: onboardingSnapshot({
+            items: verifiedItems(),
+            selection: selectedPlan(1),
+            provisioning: completed
+              ? {
+                  id: runId,
+                  state: "completed",
+                  checkpoint: "published",
+                  attempts: 1,
+                  lastErrorCode: null,
+                  nextRetryAt: null,
+                  completedAt,
+                  failedAt: null,
+                  createdAt: completedAt,
+                  updatedAt: completedAt,
+                }
+              : null,
+            activatedAt: completed ? completedAt : null,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const activation = page.locator(".onboarding-activation");
+  await activation.getByRole("checkbox").check();
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible();
+  await page.waitForTimeout(150);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("não deixa erro de ativação cruzar a troca de unidade durante refresh de recuperação", async ({
+  page,
+}) => {
+  let delayRecovery = false;
+  let secondScope = false;
+  let markRecoveryStarted: (() => void) | undefined;
+  const recoveryStarted = new Promise<void>((resolve) => {
+    markRecoveryStarted = resolve;
+  });
+  let releaseRecovery: (() => void) | undefined;
+  const recoveryMayFinish = new Promise<void>((resolve) => {
+    releaseRecovery = resolve;
+  });
+  await page.route(
+    `http://localhost:3200/v1/organizations/${organizationId}/onboarding**`,
+    async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (request.method() === "POST" && url.pathname.endsWith("/activate")) {
+        delayRecovery = true;
+        await route.fulfill({
+          status: 409,
+          json: {
+            statusCode: 409,
+            code: "ACTIVATION_ALREADY_RUNNING",
+            message: "Este erro pertence à unidade anterior.",
+            details: { provisioningRunId: runId },
+          },
+        });
+        return;
+      }
+      if (request.method() === "PUT" && url.pathname.endsWith("/selection")) {
+        await route.fulfill({ json: selectedPlan(2, secondUnitId) });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/onboarding")) {
+        if (delayRecovery) {
+          delayRecovery = false;
+          markRecoveryStarted?.();
+          await recoveryMayFinish;
+        }
+        await route
+          .fulfill({
+            json: onboardingSnapshot({
+              items: verifiedItems(),
+              selection: selectedPlan(secondScope ? 2 : 1, secondScope ? secondUnitId : unitId),
+            }),
+          })
+          .catch(() => undefined);
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        json: { statusCode: 404, code: "NOT_FOUND", message: "Not found" },
+      });
+    },
+  );
+
+  await enterDemo(page);
+  await openOnboarding(page);
+  const activation = page.locator(".onboarding-activation");
+  await activation.getByRole("checkbox").check();
+  await activation.getByRole("button", { name: "Ativar trial de 14 dias" }).click();
+  await recoveryStarted;
+  secondScope = true;
+  const selection = page.getByLabel("Unidade da ativação");
+  await selection.evaluate((element) => {
+    (element as HTMLSelectElement).disabled = false;
+  });
+  await selection.selectOption(secondUnitId);
+  await page.getByLabel(/Confirmo a reseleção/).check();
+  const saveSelection = page.getByRole("button", { name: "Confirmar reseleção" });
+  await saveSelection.evaluate((element) => {
+    (element as HTMLButtonElement).disabled = false;
+  });
+  await saveSelection.click();
+  await expectActiveUnit(page, "Aurora Lagoa");
+  releaseRecovery?.();
+  await page.waitForTimeout(200);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 

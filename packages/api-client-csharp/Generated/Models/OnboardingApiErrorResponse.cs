@@ -42,7 +42,7 @@ namespace GiroMesa.ApiClient.Models
         public string MessageEscaped { get; set; }
 #endif
         /// <summary>The statusCode property</summary>
-        public double? StatusCode { get; set; }
+        public int? StatusCode { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.OnboardingApiErrorResponse"/> and sets the default values.
         /// </summary>
@@ -71,7 +71,7 @@ namespace GiroMesa.ApiClient.Models
                 { "code", n => { Code = n.GetStringValue(); } },
                 { "details", n => { Details = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails>(global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails.CreateFromDiscriminatorValue); } },
                 { "message", n => { MessageEscaped = n.GetStringValue(); } },
-                { "statusCode", n => { StatusCode = n.GetDoubleValue(); } },
+                { "statusCode", n => { StatusCode = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -84,7 +84,7 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteStringValue("code", Code);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingApiErrorDetails>("details", Details);
             writer.WriteStringValue("message", MessageEscaped);
-            writer.WriteDoubleValue("statusCode", StatusCode);
+            writer.WriteIntValue("statusCode", StatusCode);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

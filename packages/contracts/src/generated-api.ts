@@ -4548,6 +4548,7 @@ export interface components {
       /** Format: uuid */
       selectedUnitId?: string | null;
       selectedUnitActive?: boolean;
+      /** Format: int32 */
       activeMembersObserved?: number;
       menuPublished?: boolean;
       tablesConfigured?: boolean;
@@ -4559,6 +4560,7 @@ export interface components {
       kdsStationIds?: string[];
       printerProfileIds?: string[];
       configurationReference?: string | null;
+      /** Format: int32 */
       catalogVersion?: number | null;
       /** @enum {string|null} */
       slug?: "operacao" | "crescimento" | "rede" | null;
@@ -4604,9 +4606,13 @@ export interface components {
       id: string;
       /** @enum {string} */
       slug: "operacao" | "crescimento" | "rede";
+      /** Format: int32 */
       catalogVersion: number;
+      /** Format: int64 */
       monthlyPriceCents: number;
+      /** Format: int64 */
       annualPriceCents: number;
+      /** Format: int32 */
       includedUnits: number;
       entitlements: string[];
     };
@@ -4614,6 +4620,7 @@ export interface components {
       /** Format: uuid */
       selectedUnitId: string;
       plan: components["schemas"]["OnboardingPlanResponse"];
+      /** Format: int32 */
       revision: number;
       /** Format: date-time */
       selectedAt: string;
@@ -4704,6 +4711,7 @@ export interface components {
       formErrors?: string[];
     };
     OnboardingApiErrorResponse: {
+      /** Format: int32 */
       statusCode: number;
       code: string;
       message: string;
@@ -6742,7 +6750,23 @@ export interface operations {
             fiscalChoice?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -6794,7 +6818,23 @@ export interface operations {
             qr?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -6811,37 +6851,60 @@ export interface operations {
                   waiverReason: string;
                 };
             production?:
-              | (
-                  | {
-                      /** @enum {string} */
-                      status: "pending";
-                    }
-                  | {
-                      /** @enum {string} */
-                      status: "in_progress" | "blocked";
-                      evidenceReference?: string;
-                      evidence:
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "kds";
-                            kdsStationIds: string[];
-                          }
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "print";
-                            printerProfileIds: string[];
-                          }
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "both";
-                            kdsStationIds: string[];
-                            printerProfileIds: string[];
-                          };
-                    }
-                )
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
               | {
                   /** @enum {string} */
                   status: "verified";
@@ -6862,7 +6925,23 @@ export interface operations {
             training?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -6880,7 +6959,23 @@ export interface operations {
             rehearsal?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -7086,7 +7181,23 @@ export interface operations {
             fiscalChoice?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -7138,7 +7249,23 @@ export interface operations {
             qr?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -7155,37 +7282,60 @@ export interface operations {
                   waiverReason: string;
                 };
             production?:
-              | (
-                  | {
-                      /** @enum {string} */
-                      status: "pending";
-                    }
-                  | {
-                      /** @enum {string} */
-                      status: "in_progress" | "blocked";
-                      evidenceReference?: string;
-                      evidence:
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "kds";
-                            kdsStationIds: string[];
-                          }
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "print";
-                            printerProfileIds: string[];
-                          }
-                        | {
-                            configurationReference?: string;
-                            /** @enum {string} */
-                            mode: "both";
-                            kdsStationIds: string[];
-                            printerProfileIds: string[];
-                          };
-                    }
-                )
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
               | {
                   /** @enum {string} */
                   status: "verified";
@@ -7206,7 +7356,23 @@ export interface operations {
             training?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;
@@ -7224,7 +7390,23 @@ export interface operations {
             rehearsal?:
               | {
                   /** @enum {string} */
-                  status: "pending" | "in_progress" | "blocked";
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
                   evidenceReference?: string;
                   evidence?: {
                     note?: string;

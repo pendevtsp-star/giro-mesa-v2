@@ -15,9 +15,9 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The annualPriceCents property</summary>
-        public double? AnnualPriceCents { get; set; }
+        public long? AnnualPriceCents { get; set; }
         /// <summary>The catalogVersion property</summary>
-        public double? CatalogVersion { get; set; }
+        public int? CatalogVersion { get; set; }
         /// <summary>The entitlements property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -29,9 +29,9 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The id property</summary>
         public Guid? Id { get; set; }
         /// <summary>The includedUnits property</summary>
-        public double? IncludedUnits { get; set; }
+        public int? IncludedUnits { get; set; }
         /// <summary>The monthlyPriceCents property</summary>
-        public double? MonthlyPriceCents { get; set; }
+        public long? MonthlyPriceCents { get; set; }
         /// <summary>The slug property</summary>
         public global::GiroMesa.ApiClient.Models.OnboardingPlanResponse_slug? Slug { get; set; }
         /// <summary>
@@ -59,12 +59,12 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "annualPriceCents", n => { AnnualPriceCents = n.GetDoubleValue(); } },
-                { "catalogVersion", n => { CatalogVersion = n.GetDoubleValue(); } },
+                { "annualPriceCents", n => { AnnualPriceCents = n.GetLongValue(); } },
+                { "catalogVersion", n => { CatalogVersion = n.GetIntValue(); } },
                 { "entitlements", n => { Entitlements = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
-                { "includedUnits", n => { IncludedUnits = n.GetDoubleValue(); } },
-                { "monthlyPriceCents", n => { MonthlyPriceCents = n.GetDoubleValue(); } },
+                { "includedUnits", n => { IncludedUnits = n.GetIntValue(); } },
+                { "monthlyPriceCents", n => { MonthlyPriceCents = n.GetLongValue(); } },
                 { "slug", n => { Slug = n.GetEnumValue<global::GiroMesa.ApiClient.Models.OnboardingPlanResponse_slug>(); } },
             };
         }
@@ -75,12 +75,12 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteDoubleValue("annualPriceCents", AnnualPriceCents);
-            writer.WriteDoubleValue("catalogVersion", CatalogVersion);
+            writer.WriteLongValue("annualPriceCents", AnnualPriceCents);
+            writer.WriteIntValue("catalogVersion", CatalogVersion);
             writer.WriteCollectionOfPrimitiveValues<string>("entitlements", Entitlements);
             writer.WriteGuidValue("id", Id);
-            writer.WriteDoubleValue("includedUnits", IncludedUnits);
-            writer.WriteDoubleValue("monthlyPriceCents", MonthlyPriceCents);
+            writer.WriteIntValue("includedUnits", IncludedUnits);
+            writer.WriteLongValue("monthlyPriceCents", MonthlyPriceCents);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.OnboardingPlanResponse_slug>("slug", Slug);
             writer.WriteAdditionalData(AdditionalData);
         }

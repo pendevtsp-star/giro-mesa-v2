@@ -8,9 +8,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
     public enum OnboardingPatchRequestBody_items_rehearsalMember2_status
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "verified")]
+        [EnumMember(Value = "in_progress")]
         #pragma warning disable CS1591
-        Verified,
+        In_progress,
         #pragma warning restore CS1591
     }
 }

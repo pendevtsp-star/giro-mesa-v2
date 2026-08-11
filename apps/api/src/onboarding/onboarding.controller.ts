@@ -39,6 +39,9 @@ import { ZodPipe } from "../common/zod.pipe.js";
 import { OnboardingService } from "./onboarding.service.js";
 import { OnboardingExceptionFilter } from "./onboarding-exception.filter.js";
 
+const INT32_MAX = 2_147_483_647;
+const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
+
 class OnboardingApiErrorDetails {
   @ApiProperty({ required: false, format: "uuid" })
   declare provisioningRunId?: string;
@@ -75,7 +78,7 @@ class OnboardingApiErrorDetails {
 }
 
 class OnboardingApiErrorResponse {
-  @ApiProperty()
+  @ApiProperty({ type: "integer", format: "int32" })
   declare statusCode: number;
 
   @ApiProperty()
@@ -91,17 +94,22 @@ class OnboardingApiErrorResponse {
 class OnboardingPlanResponse {
   @ApiProperty({ format: "uuid" }) declare id: string;
   @ApiProperty({ enum: ["operacao", "crescimento", "rede"] }) declare slug: string;
-  @ApiProperty() declare catalogVersion: number;
-  @ApiProperty() declare monthlyPriceCents: number;
-  @ApiProperty() declare annualPriceCents: number;
-  @ApiProperty() declare includedUnits: number;
+  @ApiProperty({ type: "integer", format: "int32", minimum: 0, maximum: INT32_MAX })
+  declare catalogVersion: number;
+  @ApiProperty({ type: "integer", format: "int64", minimum: 0, maximum: MAX_SAFE_INTEGER })
+  declare monthlyPriceCents: number;
+  @ApiProperty({ type: "integer", format: "int64", minimum: 0, maximum: MAX_SAFE_INTEGER })
+  declare annualPriceCents: number;
+  @ApiProperty({ type: "integer", format: "int32", minimum: 1, maximum: INT32_MAX })
+  declare includedUnits: number;
   @ApiProperty({ type: [String] }) declare entitlements: string[];
 }
 
 class OnboardingSelectionResponse {
   @ApiProperty({ format: "uuid" }) declare selectedUnitId: string;
   @ApiProperty({ type: () => OnboardingPlanResponse }) declare plan: OnboardingPlanResponse;
-  @ApiProperty() declare revision: number;
+  @ApiProperty({ type: "integer", format: "int32", minimum: 1, maximum: INT32_MAX })
+  declare revision: number;
   @ApiProperty({ format: "date-time" }) declare selectedAt: string;
   @ApiProperty({ format: "date-time" }) declare updatedAt: string;
 }
@@ -110,7 +118,14 @@ class OnboardingEvidenceResponse {
   @ApiProperty({ required: false, nullable: true, type: String, format: "uuid" })
   declare selectedUnitId?: string | null;
   @ApiProperty({ required: false }) declare selectedUnitActive?: boolean;
-  @ApiProperty({ required: false, minimum: 0 }) declare activeMembersObserved?: number;
+  @ApiProperty({
+    required: false,
+    type: "integer",
+    format: "int32",
+    minimum: 0,
+    maximum: 10_000,
+  })
+  declare activeMembersObserved?: number;
   @ApiProperty({ required: false }) declare menuPublished?: boolean;
   @ApiProperty({ required: false }) declare tablesConfigured?: boolean;
   @ApiProperty({ required: false }) declare capabilitiesConfigured?: boolean;
@@ -129,7 +144,14 @@ class OnboardingEvidenceResponse {
   declare printerProfileIds?: string[];
   @ApiProperty({ required: false, nullable: true, type: String, maxLength: 120 })
   declare configurationReference?: string | null;
-  @ApiProperty({ required: false, nullable: true, type: Number, minimum: 0 })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: "integer",
+    format: "int32",
+    minimum: 0,
+    maximum: INT32_MAX,
+  })
   declare catalogVersion?: number | null;
   @ApiProperty({
     required: false,
@@ -224,7 +246,8 @@ class ProvisioningSummaryResponse {
     ],
   })
   declare checkpoint: string;
-  @ApiProperty({ type: "integer", format: "int32", minimum: 0 }) declare attempts: number;
+  @ApiProperty({ type: "integer", format: "int32", minimum: 0, maximum: INT32_MAX })
+  declare attempts: number;
   @ApiProperty({ nullable: true, type: String, maxLength: 120 })
   declare lastErrorCode: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
@@ -275,7 +298,8 @@ class ProvisioningStepResponse {
   declare step: string;
   @ApiProperty({ enum: ["pending", "in_progress", "completed", "failed", "compensated"] })
   declare status: string;
-  @ApiProperty({ type: "integer", format: "int32", minimum: 0 }) declare attempts: number;
+  @ApiProperty({ type: "integer", format: "int32", minimum: 0, maximum: INT32_MAX })
+  declare attempts: number;
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   declare startedAt: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" })

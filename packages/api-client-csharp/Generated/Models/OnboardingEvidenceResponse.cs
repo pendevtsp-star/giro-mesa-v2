@@ -13,13 +13,13 @@ namespace GiroMesa.ApiClient.Models
     #pragma warning restore CS1591
     {
         /// <summary>The activeMembersObserved property</summary>
-        public double? ActiveMembersObserved { get; set; }
+        public int? ActiveMembersObserved { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The capabilitiesConfigured property</summary>
         public bool? CapabilitiesConfigured { get; set; }
         /// <summary>The catalogVersion property</summary>
-        public double? CatalogVersion { get; set; }
+        public int? CatalogVersion { get; set; }
         /// <summary>The choice property</summary>
         public global::GiroMesa.ApiClient.Models.OnboardingEvidenceResponse_choice? Choice { get; set; }
         /// <summary>The completed property</summary>
@@ -103,9 +103,9 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "activeMembersObserved", n => { ActiveMembersObserved = n.GetDoubleValue(); } },
+                { "activeMembersObserved", n => { ActiveMembersObserved = n.GetIntValue(); } },
                 { "capabilitiesConfigured", n => { CapabilitiesConfigured = n.GetBoolValue(); } },
-                { "catalogVersion", n => { CatalogVersion = n.GetDoubleValue(); } },
+                { "catalogVersion", n => { CatalogVersion = n.GetIntValue(); } },
                 { "choice", n => { Choice = n.GetEnumValue<global::GiroMesa.ApiClient.Models.OnboardingEvidenceResponse_choice>(); } },
                 { "completed", n => { Completed = n.GetBoolValue(); } },
                 { "configurationReference", n => { ConfigurationReference = n.GetStringValue(); } },
@@ -132,9 +132,9 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteDoubleValue("activeMembersObserved", ActiveMembersObserved);
+            writer.WriteIntValue("activeMembersObserved", ActiveMembersObserved);
             writer.WriteBoolValue("capabilitiesConfigured", CapabilitiesConfigured);
-            writer.WriteDoubleValue("catalogVersion", CatalogVersion);
+            writer.WriteIntValue("catalogVersion", CatalogVersion);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.OnboardingEvidenceResponse_choice>("choice", Choice);
             writer.WriteBoolValue("completed", Completed);
             writer.WriteStringValue("configurationReference", ConfigurationReference);

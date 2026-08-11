@@ -282,28 +282,42 @@ describe("onboarding real HTTP error contract", () => {
       exactError(conflict.json(), 409, "ONBOARDING_ALREADY_ACTIVATED");
 
       const callsBeforeInvalidEvidence = updateCalls;
-      const invalidEvidence = await app.inject({
-        method: "PATCH",
-        url: base,
-        headers: { authorization: "Bearer test" },
-        payload: {
-          items: {
-            fiscalChoice: {
-              status: "verified",
-              evidenceReference: "fiscal-http-contract",
-              evidence: { choice: "must-not-cross-secret" },
+      for (const [evidence, expectedFieldErrors] of [
+        [{}, { "items.fiscalChoice.evidence.choice": ["Valor inválido."] }],
+        [
+          { choice: "must-not-cross-secret", providerToken: "must-not-cross-secret" },
+          {
+            "items.fiscalChoice.evidence.choice": ["Valor inválido."],
+            "items.fiscalChoice.evidence": ["Campo não permitido."],
+          },
+        ],
+      ]) {
+        const invalidEvidence = await app.inject({
+          method: "PATCH",
+          url: base,
+          headers: { authorization: "Bearer test" },
+          payload: {
+            items: {
+              fiscalChoice: {
+                status: "verified",
+                evidenceReference: "fiscal-http-contract",
+                evidence,
+              },
             },
           },
-        },
-      });
-      const invalidEvidenceBody = exactError(invalidEvidence.json(), 400, "VALIDATION_ERROR");
-      assert.deepEqual(invalidEvidenceBody.details, {
-        fieldErrors: {
-          "items.fiscalChoice.evidence.choice": ["Valor inválido."],
-        },
-      });
+        });
+        const invalidEvidenceBody = exactError(invalidEvidence.json(), 400, "VALIDATION_ERROR");
+        assert.ok(
+          invalidEvidenceBody.details &&
+            typeof invalidEvidenceBody.details === "object" &&
+            !Array.isArray(invalidEvidenceBody.details),
+        );
+        const fieldErrors = (invalidEvidenceBody.details as Record<string, unknown>).fieldErrors;
+        assert.ok(fieldErrors && typeof fieldErrors === "object" && !Array.isArray(fieldErrors));
+        assert.deepEqual(fieldErrors, expectedFieldErrors);
+        assert.doesNotMatch(invalidEvidence.body, /must-not-cross-secret|providerToken/i);
+      }
       assert.equal(updateCalls, callsBeforeInvalidEvidence);
-      assert.doesNotMatch(invalidEvidence.body, /must-not-cross-secret/i);
 
       const unavailable = await app.inject({
         method: "POST",

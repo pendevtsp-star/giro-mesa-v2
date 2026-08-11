@@ -8,9 +8,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
     public enum OnboardingPatchRequestBody_items_fiscalChoiceMember3_status
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "not_applicable")]
+        [EnumMember(Value = "blocked")]
         #pragma warning disable CS1591
-        Not_applicable,
+        Blocked,
         #pragma warning restore CS1591
     }
 }

@@ -23,7 +23,7 @@ namespace GiroMesa.ApiClient.Models
         public global::GiroMesa.ApiClient.Models.OnboardingPlanResponse Plan { get; set; }
 #endif
         /// <summary>The revision property</summary>
-        public double? Revision { get; set; }
+        public int? Revision { get; set; }
         /// <summary>The selectedAt property</summary>
         public DateTimeOffset? SelectedAt { get; set; }
         /// <summary>The selectedUnitId property</summary>
@@ -56,7 +56,7 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "plan", n => { Plan = n.GetObjectValue<global::GiroMesa.ApiClient.Models.OnboardingPlanResponse>(global::GiroMesa.ApiClient.Models.OnboardingPlanResponse.CreateFromDiscriminatorValue); } },
-                { "revision", n => { Revision = n.GetDoubleValue(); } },
+                { "revision", n => { Revision = n.GetIntValue(); } },
                 { "selectedAt", n => { SelectedAt = n.GetDateTimeOffsetValue(); } },
                 { "selectedUnitId", n => { SelectedUnitId = n.GetGuidValue(); } },
                 { "updatedAt", n => { UpdatedAt = n.GetDateTimeOffsetValue(); } },
@@ -70,7 +70,7 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.OnboardingPlanResponse>("plan", Plan);
-            writer.WriteDoubleValue("revision", Revision);
+            writer.WriteIntValue("revision", Revision);
             writer.WriteDateTimeOffsetValue("selectedAt", SelectedAt);
             writer.WriteGuidValue("selectedUnitId", SelectedUnitId);
             writer.WriteDateTimeOffsetValue("updatedAt", UpdatedAt);

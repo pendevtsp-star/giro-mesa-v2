@@ -131,6 +131,36 @@ O segundo round fecha os três achados importantes e o achado menor da nova revi
 - Biome focado em **10 arquivos TypeScript/TSX: verde**. `git diff --check`: **verde**.
 - O detector Impeccable não foi repetido, conforme o limite explícito. O OpenAPI foi gerado apenas com uma URL PostgreSQL local placeholder necessária ao bootstrap; não houve conexão com provider, credencial real, deploy ou push.
 
+## Fix round 3 — discriminação, retomada e reconciliação
+
+O terceiro round fecha os três achados importantes e o achado menor da nova revisão, mantendo o escopo da Task 8 e sem repetir o detector Impeccable.
+
+### RED adicional capturado
+
+- O desempate do `ZodPipe` ainda podia escolher um ramo incompatível da union: fiscal `verified` com `evidence: {}` apontava para `status`, e escolha inválida acompanhada de chave extra não chegava ao campo `evidence.choice`. O teste HTTP real reproduziu ambos os bodies antes da correção.
+- Um refresh manual abortava o polling corrente; quando o refresh recebia 503 sem alterar as dependências React, nenhum novo timer era agendado. O E2E reproduziu a saga presa em `publishing`.
+- Um 409 antigo de ativação ainda podia renderizar alerta depois de um refresh autoritativo `completed` ou atravessar a troca de unidade. Os testes determinísticos capturaram as duas reconciliações incorretas.
+- `catalogVersion`, `revision`, `includedUnits`, contagens e preços em centavos ainda eram `number` sem formato OpenAPI completo, produzindo `double?` no cliente C# e aceitando overflow de int32 no boundary Zod.
+
+### Correções
+
+- Os cinco itens aplicáveis (`fiscalChoice`, `qr`, `production`, `training` e `rehearsal`) agora usam unions discriminadas por `status`, eliminando a ambiguidade sem ampliar os demais schemas. O boundary HTTP retorna paths completos derivados apenas de `issue.path`; `evidence: {}` e escolha inválida com chave extra associam mensagem, `aria-invalid`, `aria-describedby` e foco a `items.fiscalChoice.evidence.choice`, sem ecoar valores, payloads ou segredos.
+- Refresh passa a devolver outcome aplicado/falho/ignorado. Uma falha corrente rearma o scheduler único somente se snapshot, organização, unidade, revisão e run continuarem elegíveis, incrementa o backoff limitado e preserva os guards de cancelamento. O E2E prova `publishing → refresh 503 → polling automático → completed`, sem tight loop ou timers duplicados.
+- A recuperação da ativação carrega a mesma ordem monotônica, generation e identidade de escopo. Depois do `await`, o erro antigo só pode aparecer se o request ainda for corrente e o snapshot não tiver sido resolvido terminalmente; 409 anterior a `completed` e resposta após reseleção são descartados.
+- Todos os inteiros do onboarding têm limites Zod e formato OpenAPI coerentes: versões, revisão, unidades, tentativas, membros observados e status usam `int32`; centavos usam `int64` limitado ao inteiro seguro. Os clientes TypeScript/C# foram regenerados e o C# usa `int?`/`long?`, sem `double?` nesses campos.
+
+### Gates do fix round 3
+
+- Contratos: **9/9**; inclui discriminação fiscal e limites de todos os inteiros onboarding.
+- API completa sem env de integração: **92 passed, 42 skipped declarados, 0 failures**; o HTTP real valida os dois bodies fiscais e o OpenAPI gerado.
+- Ops unit/component/runtime boundary: **13 arquivos, 50/50 testes**.
+- Playwright onboarding: **30/30**, 15 cenários em desktop + mobile; inclui retomada após refresh 503, ausência de timer duplicado, reconciliação terminal e troca real de unidade durante recovery.
+- PostgreSQL 17 focal unit-scope: **1/1**. A autorização não mudou neste round; as matrizes PG16+17 completas do round 1 permanecem a regressão de referência. O container descartável `giromesa-task8-fix3-pg17` foi conferido e removido.
+- Clientes TypeScript e C#: regeneração **verde**. `C:\Users\maxue\.dotnet\dotnet.exe build --no-restore`: **verde, 0 warnings, 0 errors** (`net10.0`).
+- Workspace typecheck: **12/12 tasks**. Workspace test: **12/12 tasks**. Workspace build: **8/8 tasks**.
+- Biome focado em **8 arquivos TypeScript/TSX: verde**. `git diff --check`: **verde**.
+- A matriz regenerou as quatro capturas desktop/mobile de topo/ativação sem mudança visual regressiva. O detector Impeccable não foi repetido, conforme o limite explícito. OpenAPI usou somente URL PostgreSQL local placeholder de bootstrap; não houve provider, credencial real, push ou deploy.
+
 ## Limites conhecidos
 
 - O E2E interceptado prova comportamento e renderização do cliente; a autorização e as regressões da Task 7 foram validadas separadamente em PostgreSQL 16 e 17 descartáveis. Nenhum provider externo, credencial real, deploy ou push foi usado.

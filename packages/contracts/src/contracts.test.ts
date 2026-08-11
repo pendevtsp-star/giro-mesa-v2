@@ -5,8 +5,12 @@ import {
   contactRequestSchema,
   createOrganizationSchema,
   loginRequestSchema,
+  onboardingEvidenceResponseSchema,
+  onboardingPlanResponseSchema,
+  onboardingSelectionResponseSchema,
   onboardingSelectionSchema,
   operationalCommandSchema,
+  provisioningStatusResponseSchema,
   publicOrderSchema,
   registerRequestSchema,
   registerSchema,
@@ -159,6 +163,28 @@ describe("public contracts", () => {
       false,
     );
     for (const evidence of [
+      {},
+      { choice: "must-not-cross-secret", providerToken: "must-not-cross-secret" },
+    ]) {
+      const result = updateOnboardingSchema.safeParse({
+        items: {
+          fiscalChoice: {
+            status: "verified",
+            evidenceReference: "fiscal-choice-2026-08-11",
+            evidence,
+          },
+        },
+      });
+      assert.equal(result.success, false);
+      if (!result.success) {
+        assert.ok(
+          result.error.issues.some(
+            (issue) => issue.path.join(".") === "items.fiscalChoice.evidence.choice",
+          ),
+        );
+      }
+    }
+    for (const evidence of [
       { completed: true, secret: "must-not-be-stored" },
       { completed: true, notes: "x".repeat(2_000) },
       { completed: true, nested: { arbitrary: true } },
@@ -197,6 +223,57 @@ describe("public contracts", () => {
             evidence: { mode: "off", providerToken: "secret" },
           },
         },
+      }).success,
+      false,
+    );
+  });
+
+  it("bounds every onboarding integer to its documented wire format", () => {
+    const int32Overflow = 2_147_483_648;
+    const plan = {
+      id: crypto.randomUUID(),
+      slug: "operacao" as const,
+      catalogVersion: 1,
+      monthlyPriceCents: 19_900,
+      annualPriceCents: 199_000,
+      includedUnits: 1,
+      entitlements: [],
+    };
+    assert.equal(
+      onboardingPlanResponseSchema.safeParse({ ...plan, catalogVersion: int32Overflow }).success,
+      false,
+    );
+    assert.equal(
+      onboardingPlanResponseSchema.safeParse({ ...plan, includedUnits: int32Overflow }).success,
+      false,
+    );
+    assert.equal(
+      onboardingSelectionResponseSchema.safeParse({
+        selectedUnitId: crypto.randomUUID(),
+        plan,
+        revision: int32Overflow,
+        selectedAt: "2026-08-11T10:00:00.000Z",
+        updatedAt: "2026-08-11T10:00:00.000Z",
+      }).success,
+      false,
+    );
+    assert.equal(
+      onboardingEvidenceResponseSchema.safeParse({ catalogVersion: int32Overflow }).success,
+      false,
+    );
+    assert.equal(
+      provisioningStatusResponseSchema.safeParse({
+        id: crypto.randomUUID(),
+        state: "publishing",
+        checkpoint: "activation_committed",
+        attempts: int32Overflow,
+        lastErrorCode: null,
+        nextRetryAt: null,
+        completedAt: null,
+        failedAt: null,
+        createdAt: "2026-08-11T10:00:00.000Z",
+        updatedAt: "2026-08-11T10:00:00.000Z",
+        steps: [],
       }).success,
       false,
     );

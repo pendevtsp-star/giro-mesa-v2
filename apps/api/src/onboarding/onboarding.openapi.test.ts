@@ -205,6 +205,26 @@ describe("onboarding generated contract", () => {
       assert.match(source, /public int\? Attempts \{ get; set; \}/);
       assert.doesNotMatch(source, /public double\? Attempts/);
     }
+    for (const [model, integerProperties, longProperties] of [
+      ["OnboardingApiErrorResponse.cs", ["StatusCode"], []],
+      ["OnboardingEvidenceResponse.cs", ["ActiveMembersObserved", "CatalogVersion"], []],
+      [
+        "OnboardingPlanResponse.cs",
+        ["CatalogVersion", "IncludedUnits"],
+        ["MonthlyPriceCents", "AnnualPriceCents"],
+      ],
+      ["OnboardingSelectionResponse.cs", ["Revision"], []],
+    ] as const) {
+      const source = await readFile(new URL(model, csharpModelsRoot), "utf8");
+      for (const name of integerProperties) {
+        assert.match(source, new RegExp(`public int\\? ${name} \\{ get; set; \\}`));
+        assert.doesNotMatch(source, new RegExp(`public double\\? ${name}`));
+      }
+      for (const name of longProperties) {
+        assert.match(source, new RegExp(`public long\\? ${name} \\{ get; set; \\}`));
+        assert.doesNotMatch(source, new RegExp(`public double\\? ${name}`));
+      }
+    }
   });
 
   it("describes checklist evidence and provisioning with closed enums and date-times", async () => {
@@ -293,7 +313,37 @@ describe("onboarding generated contract", () => {
       assert.equal(property(schema, "properties", "attempts", "type"), "integer");
       assert.equal(property(schema, "properties", "attempts", "format"), "int32");
       assert.equal(property(schema, "properties", "attempts", "minimum"), 0);
+      assert.equal(property(schema, "properties", "attempts", "maximum"), 2_147_483_647);
     }
+    for (const [schema, name, minimum, maximum] of [
+      [schemas.OnboardingPlanResponse, "catalogVersion", 0, 2_147_483_647],
+      [schemas.OnboardingPlanResponse, "includedUnits", 1, 2_147_483_647],
+      [schemas.OnboardingSelectionResponse, "revision", 1, 2_147_483_647],
+      [schemas.OnboardingEvidenceResponse, "activeMembersObserved", 0, 10_000],
+      [schemas.OnboardingEvidenceResponse, "catalogVersion", 0, 2_147_483_647],
+    ] as const) {
+      assert.equal(property(schema, "properties", name, "type"), "integer");
+      assert.equal(property(schema, "properties", name, "format"), "int32");
+      assert.equal(property(schema, "properties", name, "minimum"), minimum);
+      assert.equal(property(schema, "properties", name, "maximum"), maximum);
+    }
+    for (const name of ["monthlyPriceCents", "annualPriceCents"]) {
+      assert.equal(property(schemas.OnboardingPlanResponse, "properties", name, "type"), "integer");
+      assert.equal(property(schemas.OnboardingPlanResponse, "properties", name, "format"), "int64");
+      assert.equal(property(schemas.OnboardingPlanResponse, "properties", name, "minimum"), 0);
+      assert.equal(
+        property(schemas.OnboardingPlanResponse, "properties", name, "maximum"),
+        Number.MAX_SAFE_INTEGER,
+      );
+    }
+    assert.equal(
+      property(schemas.OnboardingApiErrorResponse, "properties", "statusCode", "type"),
+      "integer",
+    );
+    assert.equal(
+      property(schemas.OnboardingApiErrorResponse, "properties", "statusCode", "format"),
+      "int32",
+    );
     assert.deepEqual(property(schemas.ProvisioningSummaryResponse, "properties", "state", "enum"), [
       "requested",
       "validating",

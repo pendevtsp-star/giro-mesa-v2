@@ -3347,15 +3347,75 @@
                         "additionalProperties": false
                       },
                       "fiscalChoice": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -3564,15 +3624,75 @@
                         "additionalProperties": false
                       },
                       "qr": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -3644,155 +3764,279 @@
                         ]
                       },
                       "production": {
-                        "anyOf": [
+                        "oneOf": [
                           {
-                            "anyOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "pending"
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "status"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "in_progress",
-                                      "blocked"
-                                    ]
-                                  },
-                                  "evidenceReference": {
-                                    "type": "string",
-                                    "minLength": 3,
-                                    "maxLength": 240
-                                  },
-                                  "evidence": {
-                                    "oneOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "kds"
-                                            ]
-                                          },
-                                          "kdsStationIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "kdsStationIds"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "print"
-                                            ]
-                                          },
-                                          "printerProfileIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "printerProfileIds"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "both"
-                                            ]
-                                          },
-                                          "kdsStationIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          },
-                                          "printerProfileIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "kdsStationIds",
-                                          "printerProfileIds"
-                                        ],
-                                        "additionalProperties": false
-                                      }
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "status",
-                                  "evidence"
-                                ],
-                                "additionalProperties": false
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending"
+                                ]
                               }
-                            ]
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "kds"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "print"
+                                        ]
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "both"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "kds"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "print"
+                                        ]
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "both"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           },
                           {
                             "type": "object",
@@ -3867,15 +4111,75 @@
                         "additionalProperties": false
                       },
                       "training": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -3941,15 +4245,75 @@
                         ]
                       },
                       "rehearsal": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -4353,15 +4717,75 @@
                         "additionalProperties": false
                       },
                       "fiscalChoice": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -4570,15 +4994,75 @@
                         "additionalProperties": false
                       },
                       "qr": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -4650,155 +5134,279 @@
                         ]
                       },
                       "production": {
-                        "anyOf": [
+                        "oneOf": [
                           {
-                            "anyOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "pending"
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "status"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "in_progress",
-                                      "blocked"
-                                    ]
-                                  },
-                                  "evidenceReference": {
-                                    "type": "string",
-                                    "minLength": 3,
-                                    "maxLength": 240
-                                  },
-                                  "evidence": {
-                                    "oneOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "kds"
-                                            ]
-                                          },
-                                          "kdsStationIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "kdsStationIds"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "print"
-                                            ]
-                                          },
-                                          "printerProfileIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "printerProfileIds"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "configurationReference": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 120
-                                          },
-                                          "mode": {
-                                            "type": "string",
-                                            "enum": [
-                                              "both"
-                                            ]
-                                          },
-                                          "kdsStationIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          },
-                                          "printerProfileIds": {
-                                            "minItems": 1,
-                                            "maxItems": 24,
-                                            "type": "array",
-                                            "items": {
-                                              "type": "string",
-                                              "format": "uuid",
-                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "mode",
-                                          "kdsStationIds",
-                                          "printerProfileIds"
-                                        ],
-                                        "additionalProperties": false
-                                      }
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "status",
-                                  "evidence"
-                                ],
-                                "additionalProperties": false
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending"
+                                ]
                               }
-                            ]
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "kds"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "print"
+                                        ]
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "both"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "blocked"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "kds"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "print"
+                                        ]
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "configurationReference": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 120
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "both"
+                                        ]
+                                      },
+                                      "kdsStationIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      },
+                                      "printerProfileIds": {
+                                        "minItems": 1,
+                                        "maxItems": 24,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "mode",
+                                      "kdsStationIds",
+                                      "printerProfileIds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "evidence"
+                            ],
+                            "additionalProperties": false
                           },
                           {
                             "type": "object",
@@ -4873,15 +5481,75 @@
                         "additionalProperties": false
                       },
                       "training": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -4947,15 +5615,75 @@
                         ]
                       },
                       "rehearsal": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "type": "object",
                             "properties": {
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "pending",
-                                  "in_progress",
+                                  "pending"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_progress"
+                                ]
+                              },
+                              "evidenceReference": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 240
+                              },
+                              "evidence": {
+                                "type": "object",
+                                "properties": {
+                                  "note": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
                                   "blocked"
                                 ]
                               },
@@ -21213,8 +21941,10 @@
             "type": "boolean"
           },
           "activeMembersObserved": {
-            "type": "number",
-            "minimum": 0
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 10000
           },
           "menuPublished": {
             "type": "boolean"
@@ -21261,9 +21991,11 @@
             "maxLength": 120
           },
           "catalogVersion": {
-            "type": "number",
+            "type": "integer",
             "nullable": true,
-            "minimum": 0
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "slug": {
             "type": "string",
@@ -21439,16 +22171,28 @@
             ]
           },
           "catalogVersion": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "monthlyPriceCents": {
-            "type": "number"
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991
           },
           "annualPriceCents": {
-            "type": "number"
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991
           },
           "includedUnits": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 2147483647
           },
           "entitlements": {
             "type": "array",
@@ -21478,7 +22222,10 @@
             "$ref": "#/components/schemas/OnboardingPlanResponse"
           },
           "revision": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 2147483647
           },
           "selectedAt": {
             "type": "string",
@@ -21533,7 +22280,8 @@
           "attempts": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "lastErrorCode": {
             "type": "string",
@@ -21692,7 +22440,8 @@
         "type": "object",
         "properties": {
           "statusCode": {
-            "type": "number"
+            "type": "integer",
+            "format": "int32"
           },
           "code": {
             "type": "string"
@@ -21792,7 +22541,8 @@
           "attempts": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "startedAt": {
             "type": "string",
@@ -21865,7 +22615,8 @@
           "attempts": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "lastErrorCode": {
             "type": "string",

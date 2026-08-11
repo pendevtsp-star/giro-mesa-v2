@@ -8,9 +8,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Onboarding
     public enum OnboardingPatchRequestBody_items_qrMember2_status
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "not_applicable")]
+        [EnumMember(Value = "in_progress")]
         #pragma warning disable CS1591
-        Not_applicable,
+        In_progress,
         #pragma warning restore CS1591
     }
 }

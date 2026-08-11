@@ -469,6 +469,17 @@ function snapshotIdentity(snapshot: OnboardingResponse | null, scopeKey: string)
   ].join(":");
 }
 
+type RefreshOutcome =
+  | { status: "applied"; requestOrder: number; snapshot: OnboardingResponse }
+  | { status: "failed" | "ignored"; requestOrder: number };
+
+function snapshotResolvedTerminally(snapshot: OnboardingResponse | null) {
+  return Boolean(
+    snapshot?.activatedAt ||
+      (snapshot?.provisioning && isTerminalProvisioningState(snapshot.provisioning.state)),
+  );
+}
+
 export function OnboardingPage({
   organizationId,
   unitId,
@@ -579,8 +590,13 @@ export function OnboardingPage({
   );
 
   const refresh = useCallback(
-    async (expectedGeneration = generationRef.current, expectedScope = scopeKeyRef.current) => {
-      if (!authorized || !organizationId) return;
+    async (
+      expectedGeneration = generationRef.current,
+      expectedScope = scopeKeyRef.current,
+    ): Promise<RefreshOutcome> => {
+      if (!authorized || !organizationId) {
+        return { status: "ignored", requestOrder: snapshotRequestOrderRef.current };
+      }
       const sequence = ++refreshSequenceRef.current;
       const requestOrder = ++snapshotRequestOrderRef.current;
       pollControllerRef.current?.abort();
@@ -596,9 +612,11 @@ export function OnboardingPage({
           sequence !== refreshSequenceRef.current ||
           requestOrder !== snapshotRequestOrderRef.current
         ) {
-          return;
+          return { status: "ignored", requestOrder };
         }
-        applySnapshot(next, expectedGeneration, expectedScope, requestOrder);
+        return applySnapshot(next, expectedGeneration, expectedScope, requestOrder)
+          ? { status: "applied", requestOrder, snapshot: next }
+          : { status: "ignored", requestOrder };
       } catch (caught) {
         if (
           !isAbortError(caught) &&
@@ -608,7 +626,16 @@ export function OnboardingPage({
           scopeKeyRef.current === expectedScope
         ) {
           showError(caught);
+          const currentRun = snapshotRef.current?.provisioning;
+          if (
+            currentRun &&
+            shouldPollProvisioning({ online: true, visible: true, state: currentRun.state })
+          ) {
+            setPollAttempt((attempt) => Math.min(attempt + 1, MAX_POLL_ATTEMPTS));
+          }
+          return { status: "failed", requestOrder };
         }
+        return { status: "ignored", requestOrder };
       } finally {
         if (
           sequence === refreshSequenceRef.current &&
@@ -883,7 +910,16 @@ export function OnboardingPage({
         return;
       }
       if (caught instanceof ApiClientError && caught.details?.provisioningRunId) {
-        await refresh(expectedGeneration, expectedScope);
+        const recovery = await refresh(expectedGeneration, expectedScope);
+        if (
+          sequence !== mutationSequenceRef.current ||
+          generationRef.current !== expectedGeneration ||
+          scopeKeyRef.current !== expectedScope ||
+          recovery.requestOrder !== snapshotRequestOrderRef.current
+        ) {
+          return;
+        }
+        if (recovery.status === "applied" && snapshotResolvedTerminally(recovery.snapshot)) return;
       }
       showError(caught);
     } finally {
