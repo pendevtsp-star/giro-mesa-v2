@@ -6,14 +6,6 @@
     <meta name="theme-color" content="#146b4c" />
     <meta name="description" content="GiroMesa — operação de salão, balcão e gestão." />
     <title>GiroMesa Operação</title>
-    <script>
-      if (!window.HybridWebView) {
-        const bridgeScript = document.createElement("script");
-        bridgeScript.src = "_framework/hybridwebview.js";
-        bridgeScript.onload = () => window.dispatchEvent(new Event("GiroMesaHybridWebViewReady"));
-        document.head.appendChild(bridgeScript);
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>
