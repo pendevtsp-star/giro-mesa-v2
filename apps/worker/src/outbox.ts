@@ -347,7 +347,7 @@ export class OutboxWorker {
       throw new EmailDeliveryError("EMAIL_SECRET_DECRYPTION_FAILED", false);
     }
     const configuration = emailProviderConfiguration();
-    const actionUrl = `${configuration.appUrl}/verificar-email?token=${encodeURIComponent(token)}`;
+    const actionUrl = `${configuration.appUrl}/verificar-email#token=${encodeURIComponent(token)}`;
     await deliverEmail(
       {
         to: identity.email,

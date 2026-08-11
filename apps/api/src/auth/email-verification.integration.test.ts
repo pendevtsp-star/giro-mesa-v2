@@ -9,12 +9,15 @@ import {
   emailVerificationRequests,
   emailVerificationTokens,
   identities,
+  mfaChallenges,
+  mfaFactors,
   outboxEvents,
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
 import { and, eq, isNull } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { AuthService } from "./auth.service.js";
+import { encryptMfaSecret, mfaKey, recoveryCodeHash } from "./mfa.js";
 
 const integrationUrl = process.env.EMAIL_VERIFICATION_DATABASE_URL;
 const migrationsDirectory = fileURLToPath(
@@ -62,7 +65,21 @@ describe("email verification", () => {
       const migrations = (await readdir(migrationsDirectory))
         .filter((file) => /^\d{4}_.+\.sql$/.test(file))
         .sort();
-      for (const file of migrations) await applyMigration(migrator.client, file);
+      const emailMigration = migrations.find((file) => file.startsWith("0013_"));
+      assert.ok(emailMigration);
+      for (const file of migrations.filter((file) => file !== emailMigration)) {
+        await applyMigration(migrator.client, file);
+      }
+      const upgradeIdentityId = randomUUID();
+      await migrator.client`
+        insert into identities (id, email, display_name, email_verified_at)
+        values (${upgradeIdentityId}, ${`upgrade-${suffix}@example.test`}, 'Upgrade survivor', now())
+      `;
+      await applyMigration(migrator.client, emailMigration);
+      const upgraded = await migrator.client<{ id: string }[]>`
+        select id from identities where id = ${upgradeIdentityId}
+      `;
+      assert.equal(upgraded[0]?.id, upgradeIdentityId);
       await migrator.client.unsafe(
         `create role "${loginRole}" login password '${password}' noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
       );
@@ -80,6 +97,13 @@ describe("email verification", () => {
     auth = new AuthService(database);
     process.env.EMAIL_PROVIDER_ENABLED = "true";
     process.env.OUTBOX_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    process.env.MFA_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    process.env.DATABASE_URL = applicationUrl(databaseUrl.toString(), loginRole, password);
+    process.env.APP_URL = "https://app.example.test";
+    process.env.OPS_APP_URL = "https://ops.example.test";
+    process.env.API_URL = "https://api.example.test";
+    process.env.CORS_ORIGINS = "https://app.example.test";
+    process.env.NODE_ENV = "production";
   });
 
   after(async () => {
@@ -215,22 +239,118 @@ describe("email verification", () => {
     );
   });
 
+  it("keeps a legacy verified MFA factor between e-mail confirmation and session creation", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const email = `mfa-verification-${suffix}@example.test`;
+    const service = auth;
+    await database.withRoleContext("identity", null, () =>
+      service.register({
+        email,
+        displayName: "MFA Owner",
+        password: "a-secure-mfa-owner-password",
+      }),
+    );
+    const [identity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, email));
+    assert.ok(identity);
+    const recoveryCode = "legacy-recovery-code";
+    const key = mfaKey();
+    await testOwner.db.insert(mfaFactors).values({
+      identityId: identity.id,
+      ...encryptMfaSecret("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", key),
+      recoveryCodeHashes: [recoveryCodeHash(recoveryCode, key)],
+      verifiedAt: new Date(),
+    });
+    const [event] = await testOwner.db
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.topic, "auth.email_verification_requested"),
+          eq(outboxEvents.aggregateId, identity.id),
+        ),
+      );
+    assert.ok(event);
+    const token = decryptSecret(
+      event.payload.verificationTokenEnvelope as SecretEnvelope,
+      encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY"),
+      `email-verification:${identity.id}:${event.id}`,
+    );
+
+    const confirmations = await Promise.all([
+      database.withRoleContext("identity", null, () => service.verifyEmail({ token })),
+      database.withRoleContext("identity", null, () => service.verifyEmail({ token })),
+    ]);
+    const mfa = confirmations.find((result) => result.status === "mfa_required");
+    assert.ok(mfa && "challengeToken" in mfa);
+    assert.equal(confirmations.filter((result) => result.status === "already_verified").length, 1);
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(authSessions)
+          .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)))
+      ).length,
+      0,
+    );
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(mfaChallenges)
+          .where(and(eq(mfaChallenges.identityId, identity.id), isNull(mfaChallenges.usedAt)))
+      ).length,
+      1,
+    );
+
+    const session = await database.withRoleContext("identity", null, () =>
+      service.verifyMfaChallenge({ challengeToken: mfa.challengeToken, recoveryCode }),
+    );
+    assert.ok(session.token);
+    assert.equal(
+      (
+        await testOwner.db
+          .select()
+          .from(authSessions)
+          .where(and(eq(authSessions.identityId, identity.id), isNull(authSessions.revokedAt)))
+      ).length,
+      1,
+    );
+    await assert.rejects(
+      database.withRoleContext("identity", null, () =>
+        service.verifyMfaChallenge({ challengeToken: mfa.challengeToken, recoveryCode }),
+      ),
+      (error: unknown) => JSON.stringify(error).includes("INVALID_MFA_CHALLENGE"),
+    );
+  });
+
   it("is enumeration-safe and enforces durable rate limits and least privilege", async (context) => {
     if (!integrationUrl || !testOwner || !database || !auth) {
       context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
       return;
     }
     const service = auth;
+    const outboxCountBefore = (
+      await testOwner.db
+        .select({ id: outboxEvents.id })
+        .from(outboxEvents)
+        .where(eq(outboxEvents.topic, "auth.email_verification_requested"))
+    ).length;
     const unknownEmail = `unknown-${suffix}@example.test`;
     const accepted = await database.withRoleContext("identity", null, () =>
       service.requestEmailVerification({ email: unknownEmail }),
     );
     assert.deepEqual(accepted, { accepted: true });
-    await assert.rejects(
-      database.withRoleContext("identity", null, () =>
+    assert.deepEqual(
+      await database.withRoleContext("identity", null, () =>
         service.requestEmailVerification({ email: unknownEmail }),
       ),
-      (error: unknown) => JSON.stringify(error).includes("EMAIL_VERIFICATION_RATE_LIMITED"),
+      { accepted: true },
     );
 
     const concurrentEmail = `concurrent-${suffix}@example.test`;
@@ -242,8 +362,8 @@ describe("email verification", () => {
         service.requestEmailVerification({ email: concurrentEmail }),
       ),
     ]);
-    assert.equal(concurrent.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(concurrent.filter((result) => result.status === "rejected").length, 1);
+    assert.equal(concurrent.filter((result) => result.status === "fulfilled").length, 2);
+    assert.equal(concurrent.filter((result) => result.status === "rejected").length, 0);
 
     const hourlyEmail = `hourly-${suffix}@example.test`;
     const hourlyHash = createHash("sha256").update(hourlyEmail).digest("hex");
@@ -253,11 +373,11 @@ describe("email verification", () => {
         requestedAt: new Date(Date.now() - (index + 1) * 2 * 60_000),
       })),
     );
-    await assert.rejects(
-      database.withRoleContext("identity", null, () =>
+    assert.deepEqual(
+      await database.withRoleContext("identity", null, () =>
         service.requestEmailVerification({ email: hourlyEmail }),
       ),
-      (error: unknown) => JSON.stringify(error).includes("EMAIL_VERIFICATION_RATE_LIMITED"),
+      { accepted: true },
     );
 
     const dailyEmail = `daily-${suffix}@example.test`;
@@ -268,12 +388,20 @@ describe("email verification", () => {
         requestedAt: new Date(Date.now() - (index + 2) * 65 * 60_000),
       })),
     );
-    await assert.rejects(
-      database.withRoleContext("identity", null, () =>
+    assert.deepEqual(
+      await database.withRoleContext("identity", null, () =>
         service.requestEmailVerification({ email: dailyEmail }),
       ),
-      (error: unknown) => JSON.stringify(error).includes("EMAIL_VERIFICATION_RATE_LIMITED"),
+      { accepted: true },
     );
+
+    const outboxCountAfter = (
+      await testOwner.db
+        .select({ id: outboxEvents.id })
+        .from(outboxEvents)
+        .where(eq(outboxEvents.topic, "auth.email_verification_requested"))
+    ).length;
+    assert.equal(outboxCountAfter, outboxCountBefore);
 
     const [privileges] = await testOwner.client<
       {
@@ -298,6 +426,157 @@ describe("email verification", () => {
       worker_requests: false,
       worker_tokens: false,
     });
+  });
+
+  it("returns uniform resend HTTP responses and sets a session cookie only after MFA", async (context) => {
+    if (!integrationUrl || !testOwner || !database || !auth) {
+      context.skip("EMAIL_VERIFICATION_DATABASE_URL not configured");
+      return;
+    }
+    const service = auth;
+    const pendingEmail = `http-pending-${suffix}@example.test`;
+    await database.withRoleContext("identity", null, () =>
+      service.register({
+        email: pendingEmail,
+        displayName: "HTTP MFA Owner",
+        password: "a-secure-http-mfa-password",
+      }),
+    );
+    const [pendingIdentity] = await testOwner.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, pendingEmail));
+    assert.ok(pendingIdentity);
+    const recoveryCode = "http-recovery-code";
+    const key = mfaKey();
+    await testOwner.db.insert(mfaFactors).values({
+      identityId: pendingIdentity.id,
+      ...encryptMfaSecret("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", key),
+      recoveryCodeHashes: [recoveryCodeHash(recoveryCode, key)],
+      verifiedAt: new Date(),
+    });
+    const [verificationEvent] = await testOwner.db
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.topic, "auth.email_verification_requested"),
+          eq(outboxEvents.aggregateId, pendingIdentity.id),
+        ),
+      );
+    assert.ok(verificationEvent);
+    const verificationToken = decryptSecret(
+      verificationEvent.payload.verificationTokenEnvelope as SecretEnvelope,
+      encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY"),
+      `email-verification:${pendingIdentity.id}:${verificationEvent.id}`,
+    );
+
+    const verifiedEmail = `http-verified-${suffix}@example.test`;
+    await testOwner.db.insert(identities).values({
+      email: verifiedEmail,
+      displayName: "Verified HTTP identity",
+      emailVerifiedAt: new Date(),
+    });
+    const unknownEmail = `http-unknown-${suffix}@example.test`;
+    const quotaEmail = `http-quota-${suffix}@example.test`;
+    const quotaHash = createHash("sha256").update(quotaEmail).digest("hex");
+    await testOwner.db.insert(emailVerificationRequests).values(
+      Array.from({ length: 10 }, (_, index) => ({
+        emailHash: quotaHash,
+        requestedAt: new Date(Date.now() - (index + 1) * 2 * 60_000),
+      })),
+    );
+    const beforeOutbox = (
+      await testOwner.db
+        .select({ id: outboxEvents.id })
+        .from(outboxEvents)
+        .where(eq(outboxEvents.topic, "auth.email_verification_requested"))
+    ).length;
+
+    const { createApplication } = await import("../app-factory.js");
+    const { app } = await createApplication();
+    try {
+      await app.init();
+      await app.getHttpAdapter().getInstance().ready();
+      const confirmation = await app.inject({
+        method: "POST",
+        url: "/v1/auth/email-verification/confirm",
+        payload: { token: verificationToken },
+      });
+      assert.equal(confirmation.statusCode, 200);
+      assert.equal(confirmation.headers["set-cookie"], undefined);
+      assert.equal(confirmation.headers["cache-control"], "no-store");
+      const challenge = confirmation.json<{
+        status: string;
+        mfaRequired: boolean;
+        challengeToken: string;
+      }>();
+      assert.equal(challenge.status, "mfa_required");
+      assert.equal(challenge.mfaRequired, true);
+
+      const responses = await Promise.all(
+        [pendingEmail, verifiedEmail, unknownEmail, quotaEmail].map((email) =>
+          app.inject({
+            method: "POST",
+            url: "/v1/auth/email-verification/request",
+            payload: { email },
+          }),
+        ),
+      );
+      for (const response of responses) {
+        assert.equal(response.statusCode, 202);
+        assert.deepEqual(response.json(), { accepted: true });
+        assert.equal(response.headers["retry-after"], "60");
+        assert.equal(response.headers["cache-control"], "no-store");
+      }
+
+      const secondFactor = await app.inject({
+        method: "POST",
+        url: "/v1/auth/mfa/challenge/verify",
+        payload: { challengeToken: challenge.challengeToken, recoveryCode },
+      });
+      assert.equal(secondFactor.statusCode, 200);
+      assert.equal("token" in secondFactor.json(), false);
+      const cookie = String(secondFactor.headers["set-cookie"]);
+      assert.match(cookie, /giromesa_session=/);
+      assert.match(cookie, /HttpOnly/i);
+      assert.match(cookie, /SameSite=Lax/i);
+      assert.match(cookie, /Secure/i);
+    } finally {
+      await app.close();
+    }
+
+    const afterOutbox = (
+      await testOwner.db
+        .select({ id: outboxEvents.id })
+        .from(outboxEvents)
+        .where(eq(outboxEvents.topic, "auth.email_verification_requested"))
+    ).length;
+    assert.equal(afterOutbox, beforeOutbox);
+
+    const { app: rateLimitedApp } = await createApplication();
+    try {
+      await rateLimitedApp.init();
+      await rateLimitedApp.getHttpAdapter().getInstance().ready();
+      const results = [];
+      for (let index = 0; index < 11; index += 1) {
+        results.push(
+          await rateLimitedApp.inject({
+            method: "POST",
+            url: "/v1/auth/email-verification/request",
+            payload: { email: `ip-limit-${index}-${suffix}@example.test` },
+          }),
+        );
+      }
+      assert.equal(
+        results.slice(0, 10).every((response) => response.statusCode === 202),
+        true,
+      );
+      assert.equal(results[10]?.statusCode, 429);
+      assert.ok(Number(results[10]?.headers["retry-after"]) > 0);
+    } finally {
+      await rateLimitedApp.close();
+    }
   });
 
   it("rejects expired links while a verified Google identity needs no verification token", async (context) => {

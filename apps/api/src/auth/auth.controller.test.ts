@@ -31,6 +31,7 @@ it("keeps opaque browser session tokens confined to the HttpOnly cookie", async 
   } as unknown as AuthService;
   const cookies: string[] = [];
   const reply = {
+    header: () => reply,
     setCookie: (_name: string, value: string) => {
       cookies.push(value);
     },

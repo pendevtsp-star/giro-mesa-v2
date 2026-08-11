@@ -236,7 +236,7 @@ export class AuthService {
 
   async verifyEmail(input: VerifyEmailInput) {
     const suppliedHash = tokenHash(input.token);
-    return this.database.db.transaction(async (tx) => {
+    const verification = await this.database.db.transaction(async (tx) => {
       const [candidate] = await tx
         .select({ identityId: emailVerificationTokens.identityId })
         .from(emailVerificationTokens)
@@ -312,18 +312,6 @@ export class AuthService {
           and(eq(authSessions.identityId, record.identity.id), isNull(authSessions.revokedAt)),
         );
 
-      const token = randomBytes(32).toString("base64url");
-      const expiresAt = this.sessionExpiration(false);
-      const [session] = await tx
-        .insert(authSessions)
-        .values({
-          identityId: record.identity.id,
-          tokenHash: tokenHash(token),
-          trustedDevice: false,
-          expiresAt,
-        })
-        .returning({ id: authSessions.id });
-      if (!session) throw new Error("Verification session was not created");
       await tx.insert(auditEvents).values({
         actorIdentityId: record.identity.id,
         action: "auth.email_verified",
@@ -331,16 +319,24 @@ export class AuthService {
         entityId: record.identity.id,
       });
       return {
-        status: "verified" as const,
-        token,
-        expiresAt,
-        identity: {
+        verifiedIdentity: {
           id: record.identity.id,
           email: record.identity.email,
           displayName: record.identity.displayName,
         },
       };
     });
+    if ("status" in verification) return verification;
+
+    const access = await this.beginIdentitySession(
+      verification.verifiedIdentity,
+      false,
+      "auth.email_verification_session",
+    );
+    if ("mfaRequired" in access) {
+      return { status: "mfa_required" as const, ...access };
+    }
+    return { status: "verified" as const, ...access };
   }
 
   async verifyMfaChallenge(input: {
@@ -806,6 +802,7 @@ export class AuthService {
         hourCount >= 5 ||
         requests.length >= 10
       ) {
+        if (enumerationSafe) return EMAIL_VERIFICATION_ACCEPTED;
         throw new HttpException(
           {
             code: "EMAIL_VERIFICATION_RATE_LIMITED",

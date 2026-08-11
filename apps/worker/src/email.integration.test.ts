@@ -114,7 +114,73 @@ test("decrypts and idempotently delivers auth e-mails through Resend", async (co
     );
     assert.match(String(requests[1]?.payload.subject), /Confirme seu e-mail/);
     assert.match(String(requests[1]?.payload.text), new RegExp(verificationToken));
+    assert.match(
+      String(requests[1]?.payload.text),
+      new RegExp(`/verificar-email#token=${verificationToken}`),
+    );
+    assert.doesNotMatch(String(requests[1]?.payload.text), /verificar-email\?token=/);
     assert.doesNotMatch(JSON.stringify(verificationEvent.payload), new RegExp(verificationToken));
+
+    const queueVerificationProbe = async (options: {
+      aggregateId?: string;
+      expiresAt?: Date;
+      aadEventId?: string;
+      expectedError?: RegExp;
+    }) => {
+      const id = randomUUID();
+      const probeToken = randomBytes(32).toString("base64url");
+      const [probe] = await database.db
+        .insert(outboxEvents)
+        .values({
+          id,
+          topic: "auth.email_verification_requested",
+          aggregateType: "identity",
+          aggregateId: options.aggregateId ?? identity.id,
+          payload: {
+            identityId: identity.id,
+            verificationTokenEnvelope: encryptSecret(
+              probeToken,
+              encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY"),
+              `email-verification:${identity.id}:${options.aadEventId ?? id}`,
+            ),
+            expiresAt: (options.expiresAt ?? new Date(Date.now() + 60_000)).toISOString(),
+          },
+        })
+        .returning();
+      assert.ok(probe);
+      eventIds.push(probe.id);
+      const requestCount = requests.length;
+      assert.equal(await worker?.runOnce(1), 1);
+      const [processedProbe] = await database.db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, probe.id));
+      assert.ok(processedProbe?.processedAt);
+      assert.equal(requests.length, requestCount);
+      if (options.expectedError) {
+        assert.match(String(processedProbe.lastError), options.expectedError);
+      } else {
+        assert.equal(processedProbe.lastError, null);
+      }
+    };
+
+    await queueVerificationProbe({
+      aggregateId: randomUUID(),
+      expectedError: /DEAD_LETTER:EMAIL_EVENT_CONTEXT_INVALID/,
+    });
+    await queueVerificationProbe({
+      expiresAt: new Date(Date.now() - 1_000),
+      expectedError: /DEAD_LETTER:EMAIL_LINK_EXPIRED/,
+    });
+    await queueVerificationProbe({
+      aadEventId: randomUUID(),
+      expectedError: /DEAD_LETTER:EMAIL_SECRET_DECRYPTION_FAILED/,
+    });
+    await database.db
+      .update(identities)
+      .set({ emailVerifiedAt: new Date() })
+      .where(eq(identities.id, identity.id));
+    await queueVerificationProbe({});
   } finally {
     if (worker) await worker.close();
     for (const eventId of eventIds) {

@@ -9,6 +9,8 @@ const SENSITIVE_AUTH_ENDPOINTS = new Set([
   "password/forgot",
   "password-reset/request",
   "password-reset/confirm",
+  "email-verification/request",
+  "email-verification/confirm",
 ]);
 
 export function isSensitiveAuthRequest(url: string) {

@@ -69,3 +69,36 @@ Regenerating the C# client also materialized the current Task 5 sync schemas alr
 ## Security decisions
 
 Ambiguity was resolved fail-closed: local registration returns 503 unless both the provider flag and a valid outbox encryption key are configured; unverified identities cannot log in or authenticate with old sessions; invalid, expired, revoked and replayed tokens share the same rejection; plaintext verification tokens are never persisted.
+
+## Fix round 1
+
+This section supersedes the original statements that confirmation always creates a session and that Task 5 client files were regenerated. The independent review found four load-bearing gaps; all four were reproduced or covered by a new failing test before the corrected behavior was accepted.
+
+### RED
+
+`rtk pnpm --filter @giromesa/site test` failed with `ERR_MODULE_NOT_FOUND` for `apps/site/lib/email-verification.ts`. The new browser-boundary test established that the client had no implementation capable of consuming a fragment token, removing it from browser-visible state, or proving that fetch URLs and referrers omit the bearer token. The GREEN suite includes a focused HTTP transport test that sends a document URL containing a fragment to a real loopback server and proves the received request URL and referrer contain no token.
+
+### GREEN
+
+- Verification messages now link to `/verificar-email#token=...`; no path or query contains the bearer token. The client consumes and removes the fragment immediately, also strips a legacy `token` query parameter without accepting it, uses `Referrer-Policy: no-referrer`, rejects non-HTTPS remote API endpoints, and sends the token only in the HTTPS API JSON body. No token is logged.
+- E-mail confirmation now reuses `beginIdentitySession`. A verified MFA factor returns the typed in-memory challenge with no session and no cookie; the existing MFA state machine creates the session only after the second factor and retains attempt limits, one-time recovery codes and replay protection. Concurrent confirmation of a legacy identity yields one MFA challenge and one `already_verified` result.
+- Resend is enumeration-safe for pending, verified, nonexistent and quota-exhausted addresses. Durable one-minute/five-hour/ten-day limits silently suppress delivery and create no outbox row. Every public 202 has the same `{ "accepted": true }`, `Retry-After: 60` and `Cache-Control: no-store`; the independent IP limiter uses the shared `auth` bucket and returns 429 with `Retry-After` regardless of the e-mail.
+- Named OpenAPI schemas define the exact 202 response and the discriminated 200 union for `verified`, `mfa_required` and `already_verified`. TypeScript and C# clients were regenerated. Kiota now creates a discriminator-aware composed response, and neither generated request method returns `void` or `Stream`.
+- The PostgreSQL integration applies migrations through `0012`, inserts a surviving identity, then applies `0013` before running the suite. Worker negative cases cover invalid context, expired events, tampered AAD and already-verified identities.
+
+### Exact verification results
+
+| Gate | Result |
+| --- | --- |
+| browser-boundary site suite | PASS; 14 tests, 14 pass, 0 fail |
+| API suite without PG variables | PASS; 98 tests, 84 pass, 14 expected skips, 0 fail; OpenAPI/C# contract tests 2/2 |
+| focused API integration on disposable PostgreSQL 16 | PASS; 5 tests, 5 pass, 0 fail; includes real `0012 -> 0013`, MFA concurrency/replay, HTTP cookie/header behavior, uniform resend history/quota/concurrency and independent IP 429 |
+| focused worker integration on an isolated disposable database | PASS; 1 test, 1 pass, 0 fail; positive delivery plus all required negative events |
+| `pnpm openapi:generate`, `pnpm clients:generate:ts`, `pnpm clients:generate:csharp` | PASS; no polymorphism warning; remaining Kiota warnings are pre-existing unsupported `email`/`uri` formats and pre-existing Task 5 sync error-shape warnings |
+| C# Release build | PASS; 0 warnings, 0 errors |
+| repository `pnpm typecheck` | PASS; 12 tasks, 12 successful |
+| repository `pnpm build` | PASS; 8 tasks, 8 successful |
+| focused Biome checks and `git diff --check` | PASS |
+| Task 5 regression check | PASS; no changed sync path and no changed sync line in the generated TypeScript client |
+
+The tests used only `giromesa-task6-fix1` on host port 55440 with separate API and worker databases; the `--rm` container was stopped and its absence verified after the gates. No real Resend request, persistent migration, push or deployment was performed.

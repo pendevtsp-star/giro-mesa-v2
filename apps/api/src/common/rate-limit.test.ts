@@ -7,6 +7,8 @@ it("shares the stricter auth rate-limit bucket across public aliases", () => {
   assert.equal(isSensitiveAuthRequest("/v1/auth/mfa/challenge/verify?source=ops"), true);
   assert.equal(isSensitiveAuthRequest("/api/v1/auth/mfa/disable"), true);
   assert.equal(isSensitiveAuthRequest("/api/v1/auth/mfa/oauth/verify"), true);
+  assert.equal(isSensitiveAuthRequest("/v1/auth/email-verification/request"), true);
+  assert.equal(isSensitiveAuthRequest("/public/v1/auth/email-verification/confirm"), true);
   assert.equal(isSensitiveAuthRequest("/public/v1/auth/password-reset/request/"), true);
   assert.equal(isSensitiveAuthRequest("/api/v1/auth/me"), false);
   assert.equal(isSensitiveAuthRequest("/api/v1/operations/orders"), false);

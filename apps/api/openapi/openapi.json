@@ -707,7 +707,23 @@
         "parameters": [],
         "responses": {
           "202": {
-            "description": ""
+            "description": "Resposta pública uniforme; o envio pode ser silenciosamente suprimido.",
+            "headers": {
+              "Retry-After": {
+                "description": "Intervalo público uniforme antes de um novo pedido.",
+                "schema": {
+                  "type": "integer",
+                  "example": 60
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationAcceptedResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -742,7 +758,23 @@
         "parameters": [],
         "responses": {
           "202": {
-            "description": ""
+            "description": "Resposta pública uniforme; o envio pode ser silenciosamente suprimido.",
+            "headers": {
+              "Retry-After": {
+                "description": "Intervalo público uniforme antes de um novo pedido.",
+                "schema": {
+                  "type": "integer",
+                  "example": 60
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationAcceptedResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -777,7 +809,23 @@
         "parameters": [],
         "responses": {
           "202": {
-            "description": ""
+            "description": "Resposta pública uniforme; o envio pode ser silenciosamente suprimido.",
+            "headers": {
+              "Retry-After": {
+                "description": "Intervalo público uniforme antes de um novo pedido.",
+                "schema": {
+                  "type": "integer",
+                  "example": 60
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationAcceptedResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -812,7 +860,32 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationSessionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationMfaResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "status",
+                    "mapping": {
+                      "verified": "#/components/schemas/EmailVerificationSessionResponse",
+                      "mfa_required": "#/components/schemas/EmailVerificationMfaResponse",
+                      "already_verified": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -846,7 +919,32 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationSessionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationMfaResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "status",
+                    "mapping": {
+                      "verified": "#/components/schemas/EmailVerificationSessionResponse",
+                      "mfa_required": "#/components/schemas/EmailVerificationMfaResponse",
+                      "already_verified": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -880,7 +978,32 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Verificação concluída, já consumida ou aguardando segundo fator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationSessionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationMfaResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "status",
+                    "mapping": {
+                      "verified": "#/components/schemas/EmailVerificationSessionResponse",
+                      "mfa_required": "#/components/schemas/EmailVerificationMfaResponse",
+                      "already_verified": "#/components/schemas/EmailVerificationAlreadyVerifiedResponse"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -18463,6 +18586,111 @@
         "type": "http"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "EmailVerificationAcceptedResponse": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "accepted"
+        ]
+      },
+      "EmailVerificationIdentityResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName"
+        ]
+      },
+      "EmailVerificationSessionResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/EmailVerificationIdentityResponse"
+          }
+        },
+        "required": [
+          "status",
+          "expiresAt",
+          "identity"
+        ]
+      },
+      "EmailVerificationMfaResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "mfa_required"
+            ]
+          },
+          "mfaRequired": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "challengeToken": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 128
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "mfaRequired",
+          "challengeToken",
+          "expiresAt"
+        ]
+      },
+      "EmailVerificationAlreadyVerifiedResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "already_verified"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
   }
 }

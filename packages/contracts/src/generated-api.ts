@@ -4439,7 +4439,48 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: never;
+  schemas: {
+    EmailVerificationAcceptedResponse: {
+      /** @enum {boolean} */
+      accepted: true;
+    };
+    EmailVerificationIdentityResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      displayName: string;
+    };
+    EmailVerificationSessionResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "verified";
+      /** Format: date-time */
+      expiresAt: string;
+      identity: components["schemas"]["EmailVerificationIdentityResponse"];
+    };
+    EmailVerificationMfaResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "mfa_required";
+      /** @enum {boolean} */
+      mfaRequired: true;
+      challengeToken: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
+    EmailVerificationAlreadyVerifiedResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "already_verified";
+    };
+  };
   responses: never;
   parameters: never;
   requestBodies: never;
@@ -4791,11 +4832,16 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
       202: {
         headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
       };
     };
   };
@@ -4815,11 +4861,16 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
       202: {
         headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
       };
     };
   };
@@ -4839,11 +4890,16 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
       202: {
         headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
       };
     };
   };
@@ -4862,11 +4918,17 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
       };
     };
   };
@@ -4885,11 +4947,17 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
       };
     };
   };
@@ -4908,11 +4976,17 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
       };
     };
   };
