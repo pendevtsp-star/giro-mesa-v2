@@ -7,6 +7,8 @@ import {
   identities,
   memberships,
   organizations,
+  paymentIntents,
+  paymentProviderEvents,
   roleBindings,
   units,
 } from "@giromesa/db";
@@ -197,6 +199,103 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
     );
     assert.equal(reconciled.status, "authorized");
     assert.equal(reconciled.intentStatus, "paid");
+
+    const callbackKey = "payment-attempt-callback";
+    simulator.setScenario(callbackKey, "unknown_then_authorized");
+    const callbackIntent = await uncertainPayments.createPaymentIntent(
+      identity.id,
+      organization.id,
+      unit.id,
+      "payment-intent-callback",
+      { sourceType: "order", sourceId: randomUUID(), amountCents: 1_200 },
+    );
+    const callbackAttempt = await uncertainPayments.executePaymentAttempt(
+      identity.id,
+      organization.id,
+      unit.id,
+      callbackKey,
+      { intentId: callbackIntent.intentId, amountCents: 1_200, method: "credit" },
+    );
+    const previousSecret = process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET;
+    process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET = "callback-secret-with-at-least-32-bytes";
+    const callbackInput = {
+      attemptId: callbackAttempt.attemptId,
+      providerEventId: `provider-event-${randomUUID()}`,
+      status: "authorized" as const,
+      providerReference: callbackAttempt.providerReference ?? undefined,
+      amountCents: 1_200,
+      safePayload: { network: "simulator" },
+    };
+    try {
+      await assert.rejects(
+        () =>
+          uncertainPayments.handleProviderCallback(
+            "api-simulator",
+            "invalid-signature",
+            organization.id,
+            unit.id,
+            callbackInput,
+          ),
+        hasCode("PAYMENT_CALLBACK_UNAUTHORIZED"),
+      );
+
+      await database.db
+        .update(paymentIntents)
+        .set({ capturedCents: 1_200, status: "paid" })
+        .where(eq(paymentIntents.id, callbackIntent.intentId));
+      await assert.rejects(() =>
+        uncertainPayments.handleProviderCallback(
+          "api-simulator",
+          process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET as string,
+          organization.id,
+          unit.id,
+          callbackInput,
+        ),
+      );
+      assert.equal(
+        (
+          await database.db
+            .select()
+            .from(paymentProviderEvents)
+            .where(eq(paymentProviderEvents.providerEventId, callbackInput.providerEventId))
+        ).length,
+        0,
+      );
+
+      await database.db
+        .update(paymentIntents)
+        .set({ capturedCents: 0, status: "pending" })
+        .where(eq(paymentIntents.id, callbackIntent.intentId));
+      const applied = await uncertainPayments.handleProviderCallback(
+        "api-simulator",
+        process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
+        organization.id,
+        unit.id,
+        callbackInput,
+      );
+      const replay = await uncertainPayments.handleProviderCallback(
+        "api-simulator",
+        process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
+        organization.id,
+        unit.id,
+        callbackInput,
+      );
+      assert.equal(applied.status, "authorized");
+      assert.equal(replay.status, "authorized");
+      assert.equal(replay.idempotentReplay, true);
+      assert.equal(
+        (
+          await database.db
+            .select()
+            .from(paymentProviderEvents)
+            .where(eq(paymentProviderEvents.providerEventId, callbackInput.providerEventId))
+        ).length,
+        1,
+      );
+    } finally {
+      if (previousSecret === undefined) delete process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET;
+      else process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET = previousSecret;
+    }
     await assert.rejects(() =>
       database.db
         .update(financialLedgerTransactions)

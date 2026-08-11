@@ -14,9 +14,11 @@ import {
   type PaymentAttemptInput,
   type PaymentIntentInput,
   type PaymentManualReviewInput,
+  type PaymentProviderCallbackInput,
   paymentAttemptSchema,
   paymentIntentSchema,
   paymentManualReviewSchema,
+  paymentProviderCallbackSchema,
 } from "./payments.schemas.js";
 import { PaymentsService } from "./payments.service.js";
 
@@ -92,6 +94,27 @@ export class PaymentsController {
       unitId,
       attemptId,
       body,
+    );
+  }
+}
+
+@Controller(["api/v1/payment-provider-callbacks", "v1/payment-provider-callbacks"])
+export class PaymentCallbacksController {
+  constructor(private readonly payments: PaymentsService) {}
+
+  @Post(":adapter")
+  callback(
+    @Param("adapter") adapter: string,
+    @Headers("x-provider-signature") signature: string | undefined,
+    @Body(new ZodPipe(paymentProviderCallbackSchema)) body: PaymentProviderCallbackInput,
+  ) {
+    const { organizationId, unitId, ...payload } = body;
+    return this.payments.handleProviderCallback(
+      adapter,
+      signature,
+      organizationId,
+      unitId,
+      payload,
     );
   }
 }

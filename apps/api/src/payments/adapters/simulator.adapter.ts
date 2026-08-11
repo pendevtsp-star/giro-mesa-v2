@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   assertSafePaymentPayload,
   type PaymentAdapterRequest,
@@ -67,6 +67,18 @@ export class SimulatorPaymentAdapter implements PaymentProviderAdapter {
         providerReference,
         errorCode: "SIMULATED_REFERENCE_NOT_FOUND",
       }
+    );
+  }
+
+  verifyCallback(signature: string | undefined, payload: unknown) {
+    assertSafePaymentPayload(payload);
+    const expected = process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET;
+    if (!expected || expected.length < 32 || !signature) return false;
+    const expectedBytes = Buffer.from(expected);
+    const signatureBytes = Buffer.from(signature);
+    return (
+      expectedBytes.length === signatureBytes.length &&
+      timingSafeEqual(expectedBytes, signatureBytes)
     );
   }
 }

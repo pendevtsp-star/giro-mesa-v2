@@ -2996,6 +2996,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/overview": {
     parameters: {
       query?: never;
@@ -12272,6 +12304,82 @@ export interface operations {
           /** @enum {string} */
           status: "authorized" | "declined";
           reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
         };
       };
     };

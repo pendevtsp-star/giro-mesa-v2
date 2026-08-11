@@ -24,6 +24,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
@@ -402,6 +403,8 @@ export class PaymentsService {
   }
 
   async handleProviderCallback(
+    adapterName: string,
+    signature: string | undefined,
     organizationId: string,
     unitId: string,
     input: {
@@ -414,27 +417,31 @@ export class PaymentsService {
     },
   ) {
     assertSafePaymentPayload(input);
+    if (
+      adapterName !== this.paymentAdapter.name ||
+      !(await this.paymentAdapter.verifyCallback(signature, input))
+    ) {
+      throw new UnauthorizedException({
+        code: "PAYMENT_CALLBACK_UNAUTHORIZED",
+        message: "Callback do provedor não autenticado.",
+      });
+    }
     if (input.providerEventId.trim().length === 0 || input.providerEventId.length > 160) {
       throw new BadRequestException({
         code: "INVALID_PROVIDER_EVENT",
         message: "O callback exige identificador de evento do provedor.",
       });
     }
-    const [inserted] = await this.database.db
-      .insert(paymentProviderEvents)
-      .values({
-        organizationId,
-        unitId,
-        attemptId: input.attemptId,
-        adapter: this.paymentAdapter.name,
-        providerEventId: input.providerEventId.trim(),
-        outcome: input.status,
-        safePayload: input.safePayload ?? {},
-      })
-      .onConflictDoNothing()
-      .returning({ id: paymentProviderEvents.id });
-    if (!inserted) {
-      const [attempt] = await this.database.db
+    const normalized = normalizeAdapterResult({
+      status: input.status,
+      ...(input.providerReference ? { providerReference: input.providerReference } : {}),
+      ...(input.amountCents !== undefined ? { amountCents: input.amountCents } : {}),
+    });
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.attemptId}::uuid for update`,
+      );
+      const [attempt] = await tx
         .select()
         .from(paymentAttempts)
         .where(
@@ -450,18 +457,45 @@ export class PaymentsService {
           code: "PAYMENT_ATTEMPT_NOT_FOUND",
           message: "Tentativa de pagamento não encontrada nesta unidade.",
         });
-      return this.describeAttempt(attempt, true);
-    }
-    return this.applyAttemptResult(
-      organizationId,
-      unitId,
-      input.attemptId,
-      normalizeAdapterResult({
-        status: input.status,
-        ...(input.providerReference ? { providerReference: input.providerReference } : {}),
-        ...(input.amountCents !== undefined ? { amountCents: input.amountCents } : {}),
-      }),
-    );
+      const [inserted] = await tx
+        .insert(paymentProviderEvents)
+        .values({
+          organizationId,
+          unitId,
+          attemptId: input.attemptId,
+          adapter: this.paymentAdapter.name,
+          providerEventId: input.providerEventId.trim(),
+          outcome: input.status,
+          safePayload: input.safePayload ?? {},
+        })
+        .onConflictDoNothing()
+        .returning({ id: paymentProviderEvents.id });
+      if (!inserted) {
+        const [intent] = await tx
+          .select({ status: paymentIntents.status })
+          .from(paymentIntents)
+          .where(eq(paymentIntents.id, attempt.intentId))
+          .limit(1);
+        return {
+          attemptId: attempt.id,
+          intentId: attempt.intentId,
+          status: attempt.status,
+          intentStatus: intent?.status ?? "pending",
+          amountCents: attempt.amountCents,
+          providerReference: attempt.providerReference,
+          reviewRequired: attempt.reviewRequired,
+          nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
+          idempotentReplay: true,
+        };
+      }
+      return this.applyAttemptResultInTransaction(
+        tx,
+        organizationId,
+        unitId,
+        input.attemptId,
+        normalized,
+      );
+    });
   }
 
   private async describeAttempt(
@@ -492,111 +526,121 @@ export class PaymentsService {
     attemptId: string,
     result: ReturnType<typeof normalizeAdapterResult>,
   ) {
-    return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attemptId}::uuid for update`,
-      );
-      const [attempt] = await tx
-        .select()
-        .from(paymentAttempts)
-        .where(
-          and(
-            eq(paymentAttempts.organizationId, organizationId),
-            eq(paymentAttempts.unitId, unitId),
-            eq(paymentAttempts.id, attemptId),
-          ),
-        )
+    return this.database.db.transaction((tx) =>
+      this.applyAttemptResultInTransaction(tx, organizationId, unitId, attemptId, result),
+    );
+  }
+
+  private async applyAttemptResultInTransaction(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+    result: ReturnType<typeof normalizeAdapterResult>,
+  ) {
+    await tx.execute(
+      sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attemptId}::uuid for update`,
+    );
+    const [attempt] = await tx
+      .select()
+      .from(paymentAttempts)
+      .where(
+        and(
+          eq(paymentAttempts.organizationId, organizationId),
+          eq(paymentAttempts.unitId, unitId),
+          eq(paymentAttempts.id, attemptId),
+        ),
+      )
+      .limit(1);
+    if (!attempt) throw new Error("Payment attempt disappeared during reconciliation.");
+    if (attempt.status === "authorized" || attempt.status === "declined") {
+      const [intent] = await tx
+        .select({ status: paymentIntents.status })
+        .from(paymentIntents)
+        .where(eq(paymentIntents.id, attempt.intentId))
         .limit(1);
-      if (!attempt) throw new Error("Payment attempt disappeared during reconciliation.");
-      if (attempt.status === "authorized" || attempt.status === "declined") {
-        const [intent] = await tx
-          .select({ status: paymentIntents.status })
-          .from(paymentIntents)
-          .where(eq(paymentIntents.id, attempt.intentId))
-          .limit(1);
-        return {
-          attemptId: attempt.id,
-          intentId: attempt.intentId,
-          status: attempt.status,
-          intentStatus: intent?.status ?? "pending",
-          amountCents: attempt.amountCents,
-          providerReference: attempt.providerReference,
-          reviewRequired: attempt.reviewRequired,
-          nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
-          idempotentReplay: true,
-        };
-      }
-      const amountMatches =
-        result.amountCents === undefined || result.amountCents === attempt.amountCents;
-      const status = amountMatches ? result.status : "unknown";
-      const reviewRequired = status === "unknown";
-      const reviewReason = amountMatches
-        ? reviewRequired
-          ? (result.errorCode ?? "PAYMENT_OUTCOME_UNKNOWN")
-          : null
-        : "ADAPTER_AMOUNT_MISMATCH";
-      let intentStatus: "pending" | "partially_paid" | "paid" | "cancelled" = "pending";
-      if (status === "authorized") {
-        await tx.execute(
-          sql`select id from payment_intents where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attempt.intentId}::uuid for update`,
-        );
-        const [intent] = await tx
-          .select()
-          .from(paymentIntents)
-          .where(eq(paymentIntents.id, attempt.intentId))
-          .limit(1);
-        if (!intent) throw new Error("Payment intent disappeared during reconciliation.");
-        const capturedCents = intent.capturedCents + attempt.amountCents;
-        if (!Number.isSafeInteger(capturedCents) || capturedCents > intent.amountCents)
-          throw new ConflictException({
-            code: "PAYMENT_CAPTURE_EXCEEDS_INTENT",
-            message: "A captura conciliada excederia o valor da intenção.",
-          });
-        intentStatus = capturedCents === intent.amountCents ? "paid" : "partially_paid";
-        await tx
-          .update(paymentIntents)
-          .set({
-            capturedCents,
-            status: intentStatus,
-            version: intent.version + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(paymentIntents.id, intent.id));
-      } else {
-        const [intent] = await tx
-          .select({ status: paymentIntents.status })
-          .from(paymentIntents)
-          .where(eq(paymentIntents.id, attempt.intentId))
-          .limit(1);
-        intentStatus = intent?.status ?? "pending";
-      }
-      const [updated] = await tx
-        .update(paymentAttempts)
+      return {
+        attemptId: attempt.id,
+        intentId: attempt.intentId,
+        status: attempt.status,
+        intentStatus: intent?.status ?? "pending",
+        amountCents: attempt.amountCents,
+        providerReference: attempt.providerReference,
+        reviewRequired: attempt.reviewRequired,
+        nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
+        idempotentReplay: true,
+      };
+    }
+    const amountMatches =
+      result.amountCents === undefined || result.amountCents === attempt.amountCents;
+    const status = amountMatches ? result.status : "unknown";
+    const reviewRequired = status === "unknown";
+    const reviewReason = amountMatches
+      ? reviewRequired
+        ? (result.errorCode ?? "PAYMENT_OUTCOME_UNKNOWN")
+        : null
+      : "ADAPTER_AMOUNT_MISMATCH";
+    let intentStatus: "pending" | "partially_paid" | "paid" | "cancelled" = "pending";
+    if (status === "authorized") {
+      await tx.execute(
+        sql`select id from payment_intents where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${attempt.intentId}::uuid for update`,
+      );
+      const [intent] = await tx
+        .select()
+        .from(paymentIntents)
+        .where(eq(paymentIntents.id, attempt.intentId))
+        .limit(1);
+      if (!intent) throw new Error("Payment intent disappeared during reconciliation.");
+      const capturedCents = intent.capturedCents + attempt.amountCents;
+      if (!Number.isSafeInteger(capturedCents) || capturedCents > intent.amountCents)
+        throw new ConflictException({
+          code: "PAYMENT_CAPTURE_EXCEEDS_INTENT",
+          message: "A captura conciliada excederia o valor da intenção.",
+        });
+      intentStatus = capturedCents === intent.amountCents ? "paid" : "partially_paid";
+      await tx
+        .update(paymentIntents)
         .set({
-          status,
-          providerReference: result.providerReference ?? attempt.providerReference,
-          reviewRequired,
-          reviewReason,
-          lastLookupAt: attempt.status === "unknown" ? new Date() : attempt.lastLookupAt,
-          resolvedAt: status === "unknown" ? null : new Date(),
-          version: attempt.version + 1,
+          capturedCents,
+          status: intentStatus,
+          version: intent.version + 1,
           updatedAt: new Date(),
         })
-        .where(eq(paymentAttempts.id, attempt.id))
-        .returning();
-      if (!updated) throw new Error("Payment attempt update returned no row.");
-      return {
-        attemptId: updated.id,
-        intentId: updated.intentId,
-        status: updated.status,
-        intentStatus,
-        amountCents: updated.amountCents,
-        providerReference: updated.providerReference,
-        reviewRequired: updated.reviewRequired,
-        nextAction: updated.reviewRequired ? "lookup_or_reconcile" : "none",
-        idempotentReplay: false,
-      };
-    });
+        .where(eq(paymentIntents.id, intent.id));
+    } else {
+      const [intent] = await tx
+        .select({ status: paymentIntents.status })
+        .from(paymentIntents)
+        .where(eq(paymentIntents.id, attempt.intentId))
+        .limit(1);
+      intentStatus = intent?.status ?? "pending";
+    }
+    const [updated] = await tx
+      .update(paymentAttempts)
+      .set({
+        status,
+        providerReference: result.providerReference ?? attempt.providerReference,
+        reviewRequired,
+        reviewReason,
+        lastLookupAt: attempt.status === "unknown" ? new Date() : attempt.lastLookupAt,
+        resolvedAt: status === "unknown" ? null : new Date(),
+        version: attempt.version + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentAttempts.id, attempt.id))
+      .returning();
+    if (!updated) throw new Error("Payment attempt update returned no row.");
+    return {
+      attemptId: updated.id,
+      intentId: updated.intentId,
+      status: updated.status,
+      intentStatus,
+      amountCents: updated.amountCents,
+      providerReference: updated.providerReference,
+      reviewRequired: updated.reviewRequired,
+      nextAction: updated.reviewRequired ? "lookup_or_reconcile" : "none",
+      idempotentReplay: false,
+    };
   }
 
   private async persist(

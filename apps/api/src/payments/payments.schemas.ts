@@ -23,6 +23,20 @@ export const paymentManualReviewSchema = z
   })
   .strict();
 
+export const paymentProviderCallbackSchema = z
+  .object({
+    organizationId: z.uuid(),
+    unitId: z.uuid(),
+    attemptId: z.uuid(),
+    providerEventId: z.string().trim().min(1).max(160),
+    status: z.enum(["authorized", "declined", "unknown"]),
+    providerReference: z.string().trim().min(1).max(160).optional(),
+    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    safePayload: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 export type PaymentIntentInput = z.infer<typeof paymentIntentSchema>;
 export type PaymentAttemptInput = z.infer<typeof paymentAttemptSchema>;
 export type PaymentManualReviewInput = z.infer<typeof paymentManualReviewSchema>;
+export type PaymentProviderCallbackInput = z.infer<typeof paymentProviderCallbackSchema>;

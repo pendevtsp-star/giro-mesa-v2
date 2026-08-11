@@ -26,6 +26,7 @@ export interface PaymentProviderAdapter {
   readonly name: string;
   execute(request: PaymentAdapterRequest): Promise<PaymentAdapterResult>;
   lookup(providerReference: string): Promise<PaymentAdapterResult>;
+  verifyCallback(signature: string | undefined, payload: unknown): boolean | Promise<boolean>;
 }
 
 const sensitiveKeys =
