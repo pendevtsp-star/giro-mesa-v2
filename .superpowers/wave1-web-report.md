@@ -121,6 +121,31 @@ O cache runtime não usa `Set-Cookie` como fronteira de segurança, pois esse he
 
 Durante o screenshot full-page, o percurso intencional pelas imagens abaixo da dobra ainda produz o aviso de LCP do Next. O gate isolado de LCP em viewport normal permanece verde; o aviso não representa o carregamento inicial do usuário.
 
+## Correções da segunda revisão cruzada
+
+Os dois achados Important e o achado Minor restantes foram fechados no commit `53ba0e5`:
+
+- `withPwaMutation` passou a criar um token explícito por boundary assíncrona. Somente chamadas que propagam o mesmo token são suprimidas; mutações paralelas independentes continuam incrementando o contador.
+- Site e Customer delegam a ativação ao helper compartilhado `requestPwaActivation`, que consulta o contador autoritativo imediatamente antes de enviar `SKIP_WAITING`. Assim, uma mutação iniciada depois do render ainda bloqueia o clique.
+- As duas marcas `G` restantes foram substituídas pelo SVG `platform`; o scanner agora cobre o header do Site e o footer do Customer.
+
+### Evidência TDD da segunda remediação
+
+- RED de contexto: o nesting atrasado produzia a sequência `0, 1, 2, 1, 0`; os novos testes também exigiram que duas operações paralelas chegassem a 2. GREEN: a boundary atrasada com token produz `0, 1, 0`, enquanto operações independentes continuam em 2 até cada conclusão.
+- RED de ativação: não havia helper autoritativo compartilhado para o clique de Site/Customer. GREEN: com mutação iniciada após o estado renderizado, o worker não recebe mensagem; encerrada a mutação, recebe uma única `SKIP_WAITING`.
+- RED de iconografia: o scanner encontrou as duas marcas textuais. GREEN: o scanner ampliado confirma os dois componentes com `Icon name="platform"` e sem `G` textual.
+- Refinamento RED do Ops: o gate detectou contagem 2 no `logout` atrasado enquanto o contexto ainda não atravessava a API. GREEN: o token explícito chega ao fetch interno e mantém a contagem em 1.
+
+### Gate final da segunda remediação
+
+- Testes: UI 7/7; Ops 68/68; Site 19/19 Node + 3/3 Vitest; Customer 13/13.
+- TypeScript: UI, Ops, Site e Customer aprovados.
+- E2E PWA focado: 5/5 para manifests/service workers, política no-store do Ops e conectividade dos três apps.
+- Visual: desktop e tablet permaneceram idênticos; o novo SVG alterou em 1 px a altura mobile. O snapshot mobile foi regenerado, inspecionado e a confirmação limpa seguinte passou 3/3.
+- `git diff --check`: aprovado antes dos commits de implementação e relatório.
+
+O aviso do Next sobre LCP durante captura full-page permanece limitado ao percurso artificial por imagens abaixo da dobra; nenhum provider, push ou deploy foi executado.
+
 ## Fechamento
 
-Os quatro commits de produto estão separados por task. O commit final registra este relatório, o brief da trilha e normaliza os EOF de seis SVGs apontados pelo `diff --check`. A branch foi mantida no worktree isolado para integração pelo responsável da trilha.
+Os commits de produto e de remediação permanecem recuperáveis, e o commit final registra este relatório. A branch foi mantida no worktree isolado para integração pelo responsável da trilha.
