@@ -82,3 +82,27 @@ As branches paralelas mantêm journals próprios após o índice 15. O merge dev
 - A geração OpenAPI mantém os aliases `/api/v1` e `/v1`, por isso o cliente C# contém ambas as árvores, conforme o contrato existente.
 - Providers de pagamento/fiscal, hardware, credenciais, homologação externa e comportamento de produção não foram exercitados nem alegados.
 - Nenhum merge, push ou deploy foi realizado.
+
+## Hardening complementar de grants e state machines
+
+Commit de implementação: `673d918` (`fix(finance): enforce database state machines`).
+
+- Os grants amplos de `UPDATE` foram removidos de `payment_terminals`, `payment_intents`, `payment_attempts`, `remuneration_rule_sets`, `remuneration_rule_versions`, `remuneration_calculation_runs` e `fiscal_documents` nas migrations reservadas `0020`, `0022` e `0023`.
+- `payment_terminals` e `remuneration_rule_sets` não concedem mais nenhum `UPDATE` a `giromesa_app`. As demais tabelas concedem somente as colunas efetivamente atualizadas pelos serviços.
+- Triggers fail-closed validam estado inicial, transições, incremento de versão, aprovação independente e imutabilidade de escopo, valor, idempotência, memória congelada e vínculo/payload de provider. Estados terminais não podem regredir e os registros protegidos não podem ser apagados.
+- O teste SQL `financial-state-machines.integration.test.ts` executa como `giromesa_app`, confirma privilégios por coluna, exercita transições válidas e rejeita inserts terminais, saltos de estado e mutações proibidas. Os modos fresh e upgrade passaram em PostgreSQL 16 e 17.
+- O teste de callback deixou de resetar artificialmente uma intenção paga; agora usa uma segunda intenção para provar sucesso/replay sem violar monotonicidade. O detector de PAN continua fail-closed para cartões e chaves sensíveis, mas reconhece UUIDs canônicos para não bloquear identificadores internos válidos.
+- Os testes DB foram serializados no runner porque migrations concorrentes alteram os mesmos papéis globais do PostgreSQL e podem produzir `tuple concurrently updated`; isso não muda a concorrência exercitada dentro dos testes funcionais.
+
+### Gates do hardening
+
+- RED: fresh e upgrade falharam inicialmente porque `giromesa_app` possuía `UPDATE` de tabela/colunas imutáveis; um segundo RED provou que inserts já terminais ainda contornavam as state machines.
+- PostgreSQL 17: state machines fresh + upgrade, 2/2.
+- PostgreSQL 16: state machines fresh + upgrade, 2/2 em container efêmero isolado.
+- DB completo: 6/6, incluindo o upgrade histórico de RLS.
+- API completa: 104 pass, 44 skips condicionais; os cinco testes reais de payments, remuneration e fiscal passaram contra um banco recém-migrado.
+- Domain: 52/52, incluindo UUID canônico sem falso positivo e rejeição existente de PAN/CVV/track/credenciais.
+- Turbo `typecheck` + `build`: 8/8 tarefas nos pacotes API, DB, domain e dependência contracts.
+- Biome focado e `git diff --check`: sem erros.
+
+O banco PG17 descartável `giromesa_finance_gate_w1p` e o container PG16 `giromesa-finance-pg16-w1p` foram usados apenas para os gates e removidos ao final. Nenhum provider real, push ou deploy foi executado.
