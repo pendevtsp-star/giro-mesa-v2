@@ -113,6 +113,13 @@
       "when": 1786440800000,
       "tag": "0016_onboarding_owner_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786450000000,
+      "tag": "0017_public_menu_branding",
+      "breakpoints": true
     }
   ]
 }

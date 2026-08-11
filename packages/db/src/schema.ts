@@ -615,10 +615,13 @@ export const publicMenus = pgTable(
     slug: varchar("slug", { length: 100 }).notNull(),
     items: jsonb("items").$type<Record<string, unknown>[]>().notNull().default([]),
     active: boolean("active").notNull().default(false),
+    publishedVersionId: uuid("published_version_id"),
+    publishEpoch: integer("publish_epoch").notNull().default(0),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
+    unique("public_menus_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     uniqueIndex("public_menus_slug_unique").on(table.slug),
     foreignKey({
       name: "public_menus_organization_unit_fk",

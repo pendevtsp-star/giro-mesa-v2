@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -17,7 +18,13 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { posTabs } from "./operations-schema.js";
-import { identities, organizations, units } from "./schema.js";
+import { identities, organizations, publicMenus, units } from "./schema.js";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -72,6 +79,11 @@ export const transferStatus = pgEnum("growth_transfer_status", [
   "in_transit",
   "received",
   "canceled",
+]);
+export const publicMenuAssetKind = pgEnum("public_menu_asset_kind", [
+  "logo",
+  "cover",
+  "product",
 ]);
 
 export const growthCustomers = pgTable(
@@ -815,6 +827,134 @@ export const growthIntegrations = pgTable(
   ],
 );
 
+export type PublicMenuBranding = {
+  name: string;
+  description: string;
+  primaryColor: string;
+  surfaceColor: string;
+  textColor: string;
+  logoAssetId: string | null;
+  coverAssetId: string | null;
+};
+
+export type PublicMenuItemSnapshot = {
+  id: string;
+  category: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  available: boolean;
+  imageAssetId: string | null;
+  tags?: string[];
+  modifierGroups?: Array<{
+    id: string;
+    name: string;
+    required: boolean;
+    maxSelections: number;
+    options: Array<{ id: string; name: string; priceCents: number }>;
+  }>;
+};
+
+export const publicMenuMediaAssets = pgTable(
+  "public_menu_media_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: publicMenuAssetKind("kind").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    storageKey: varchar("storage_key", { length: 240 }).notNull(),
+    mimeType: varchar("mime_type", { length: 40 }).notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    bytes: bytea("bytes").notNull(),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_menu_media_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("public_menu_media_scope_hash_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sha256,
+      table.kind,
+    ),
+    uniqueIndex("public_menu_media_storage_key_unique").on(table.storageKey),
+    check("public_menu_media_dimensions_check", sql`${table.width} > 0 and ${table.height} > 0`),
+    check("public_menu_media_byte_size_check", sql`${table.byteSize} > 0`),
+    foreignKey({
+      name: "public_menu_media_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicMenuDrafts = pgTable(
+  "public_menu_drafts",
+  {
+    menuId: uuid("menu_id")
+      .primaryKey()
+      .references(() => publicMenus.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    branding: jsonb("branding").$type<PublicMenuBranding>().notNull(),
+    items: jsonb("items").$type<PublicMenuItemSnapshot[]>().notNull().default([]),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    previewTokenHash: varchar("preview_token_hash", { length: 64 }),
+    previewExpiresAt: timestamp("preview_expires_at", { withTimezone: true }),
+    updatedByIdentityId: uuid("updated_by_identity_id").references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("public_menu_drafts_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.menuId,
+    ),
+    check("public_menu_drafts_resource_version_check", sql`${table.resourceVersion} >= 0`),
+    foreignKey({
+      name: "public_menu_drafts_menu_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const publicMenuVersions = pgTable(
+  "public_menu_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    menuId: uuid("menu_id").notNull(),
+    version: integer("version").notNull(),
+    sourceResourceVersion: integer("source_resource_version").notNull(),
+    checksum: varchar("checksum", { length: 64 }).notNull(),
+    branding: jsonb("branding").$type<PublicMenuBranding>().notNull(),
+    items: jsonb("items").$type<PublicMenuItemSnapshot[]>().notNull(),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("public_menu_versions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("public_menu_versions_menu_version_unique").on(table.menuId, table.version),
+    uniqueIndex("public_menu_versions_menu_checksum_unique").on(table.menuId, table.checksum),
+    check("public_menu_versions_version_check", sql`${table.version} > 0`),
+    foreignKey({
+      name: "public_menu_versions_menu_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.menuId],
+      foreignColumns: [publicMenus.organizationId, publicMenus.unitId, publicMenus.id],
+    }).onDelete("cascade"),
+  ],
+);
+
 // RLS is declared in Drizzle as well as in the hand-authored policy migration so
 // a later schema generation cannot silently remove the live tenant boundary.
 export const growthTenantTables = [
@@ -840,6 +980,9 @@ export const growthTenantTables = [
   webhookEndpoints,
   webhookPublications,
   growthIntegrations,
+  publicMenuMediaAssets,
+  publicMenuDrafts,
+  publicMenuVersions,
 ] as const;
 
 for (const table of growthTenantTables) table.enableRLS();

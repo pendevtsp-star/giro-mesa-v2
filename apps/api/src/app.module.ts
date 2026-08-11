@@ -8,6 +8,7 @@ import { TenantContextInterceptor } from "./database/tenant-context.interceptor.
 import { GrowthModule } from "./growth/growth.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ManagementModule } from "./management/management.module.js";
+import { MediaModule } from "./media/media.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
@@ -32,6 +33,7 @@ import { SyncModule } from "./sync/sync.module.js";
     PilotOperationsModule,
     PlatformModule,
     ManagementModule,
+    MediaModule,
     GrowthModule,
     SyncModule,
   ],

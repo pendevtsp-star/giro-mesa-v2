@@ -12,10 +12,20 @@ export type MenuItem = {
   name: string;
   description: string;
   priceCents: number;
-  visual: string;
+  visual: "plate" | "drink" | "dessert";
+  imageUrl?: string | null;
   tags?: string[];
   available: boolean;
   modifierGroups?: ModifierGroup[];
+};
+export type MenuBranding = {
+  name: string;
+  description: string;
+  primaryColor: string;
+  surfaceColor: string;
+  textColor: string;
+  logoUrl: string | null;
+  coverUrl: string | null;
 };
 export type CartItem = {
   lineId: string;
@@ -32,7 +42,7 @@ export const demoMenu: MenuItem[] = [
     name: "Bruschetta da casa",
     description: "Pão artesanal, tomates assados, manjericão e azeite.",
     priceCents: 2790,
-    visual: "🍅",
+    visual: "plate",
     tags: ["vegetariano"],
     available: true,
   },
@@ -42,7 +52,7 @@ export const demoMenu: MenuItem[] = [
     name: "Croquete de costela",
     description: "Quatro unidades, aioli defumado e picles da casa.",
     priceCents: 3490,
-    visual: "🥟",
+    visual: "plate",
     available: true,
   },
   {
@@ -51,7 +61,7 @@ export const demoMenu: MenuItem[] = [
     name: "Burger Giro",
     description: "Blend 180g, queijo, cebola tostada e molho da casa.",
     priceCents: 4890,
-    visual: "🍔",
+    visual: "plate",
     available: true,
     modifierGroups: [
       {
@@ -83,7 +93,7 @@ export const demoMenu: MenuItem[] = [
     name: "Ravioli de abóbora",
     description: "Manteiga de sálvia, castanhas e parmesão curado.",
     priceCents: 5590,
-    visual: "🍝",
+    visual: "plate",
     tags: ["vegetariano"],
     available: true,
   },
@@ -93,7 +103,7 @@ export const demoMenu: MenuItem[] = [
     name: "Peixe do dia",
     description: "Purê de raízes, legumes grelhados e molho cítrico.",
     priceCents: 6890,
-    visual: "🐟",
+    visual: "plate",
     tags: ["sem glúten"],
     available: true,
   },
@@ -103,7 +113,7 @@ export const demoMenu: MenuItem[] = [
     name: "Steak com fritas",
     description: "Corte alto, batatas rústicas e manteiga de ervas.",
     priceCents: 7990,
-    visual: "🥩",
+    visual: "plate",
     available: false,
   },
   {
@@ -112,7 +122,7 @@ export const demoMenu: MenuItem[] = [
     name: "Pudim de leite",
     description: "Fatia cremosa com caramelo e flor de sal.",
     priceCents: 2190,
-    visual: "🍮",
+    visual: "dessert",
     available: true,
   },
   {
@@ -121,7 +131,7 @@ export const demoMenu: MenuItem[] = [
     name: "Chocolate & café",
     description: "Texturas de chocolate, café e creme fresco.",
     priceCents: 2990,
-    visual: "🍫",
+    visual: "dessert",
     available: true,
   },
   {
@@ -130,7 +140,7 @@ export const demoMenu: MenuItem[] = [
     name: "Água mineral",
     description: "Com ou sem gás, 350 ml.",
     priceCents: 690,
-    visual: "💧",
+    visual: "drink",
     available: true,
     modifierGroups: [
       {
@@ -151,7 +161,7 @@ export const demoMenu: MenuItem[] = [
     name: "Soda artesanal",
     description: "Limão siciliano, frutas vermelhas ou gengibre.",
     priceCents: 1690,
-    visual: "🍹",
+    visual: "drink",
     available: true,
   },
 ];

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   type CartItem,
   cartTotal,
   filterMenu,
   formatMoney,
+  type MenuBranding,
   type MenuItem,
   type Modifier,
   type ModifierGroup,
@@ -30,12 +32,31 @@ type OrderOptionsState =
   | { status: "unavailable" }
   | { status: "ready"; data: PublicOrderOptions };
 
+function MenuItemVisual({ item }: { item: MenuItem }) {
+  if (item.imageUrl) {
+    return <Image src={item.imageUrl} alt="" fill sizes="(max-width: 560px) 45vw, 260px" />;
+  }
+  const path =
+    item.visual === "drink"
+      ? "M7 3h10l-1 17H8L7 3Zm1.5 5h7M10 23h4"
+      : item.visual === "dessert"
+        ? "M4 19h16M6 16l6-11 6 11H6Zm3-5h6"
+        : "M4 18h16M6 15a6 6 0 0 1 12 0H6Zm6-8V5";
+  return (
+    <svg viewBox="0 0 24 24" role="img" aria-label="Imagem não cadastrada">
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function MenuExperience({
   initialItems,
+  branding,
   menuSlug,
   demo,
 }: {
   initialItems: MenuItem[];
+  branding: MenuBranding | null;
   menuSlug: string;
   demo: boolean;
 }) {
@@ -82,6 +103,11 @@ export function MenuExperience({
   );
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const demoAck = demo && process.env.NEXT_PUBLIC_DEMO_HUB_ACK === "true";
+  const menuStyle = {
+    "--green": branding?.primaryColor ?? "#173f35",
+    "--paper": branding?.surfaceColor ?? "#fffdfa",
+    "--ink": branding?.textColor ?? "#17231f",
+  } as CSSProperties;
 
   useEffect(() => {
     let active = true;
@@ -357,18 +383,36 @@ export function MenuExperience({
       (fulfillment === "pickup" || Boolean(selectedZone && deliveryAddressComplete)));
 
   return (
-    <main className="menu-app">
+    <main className="menu-app" style={menuStyle}>
       <a className="skip-link" href="#cardapio">
         Pular para o cardápio
       </a>
-      <header className="restaurant-header">
+      <header className={`restaurant-header${branding?.coverUrl ? " has-cover" : ""}`}>
+        {branding?.coverUrl && (
+          <Image
+            className="restaurant-cover"
+            src={branding.coverUrl}
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 620px) 100vw, 620px"
+            aria-hidden="true"
+          />
+        )}
         <div className="restaurant-mark" aria-hidden="true">
-          A
+          {branding?.logoUrl ? (
+            <Image src={branding.logoUrl} alt="" fill sizes="58px" />
+          ) : (
+            (branding?.name ?? "Amora Cozinha").slice(0, 1).toLocaleUpperCase("pt-BR")
+          )}
         </div>
         <div>
           <p>{demo ? "Restaurante demonstrativo" : "Cardápio digital"}</p>
-          <h1>{demo ? "Amora Cozinha" : "Cardápio da unidade"}</h1>
-          <span>{demo ? "Mesa 12 · Jantar" : "Consulte os dados informados pela equipe"}</span>
+          <h1>{branding?.name ?? (demo ? "Amora Cozinha" : "Cardápio da unidade")}</h1>
+          <span>
+            {branding?.description ||
+              (demo ? "Mesa 12 · Jantar" : "Consulte os dados informados pela equipe")}
+          </span>
         </div>
         <button
           type="button"
@@ -454,8 +498,8 @@ export function MenuExperience({
                 onClick={() => openProduct(item)}
                 aria-label={`${item.name}, ${formatMoney(item.priceCents)}${item.available ? "" : ", indisponível"}`}
               >
-                <span className={`food-visual food-${item.id}`} aria-hidden="true">
-                  {item.visual}
+                <span className={`food-visual food-${item.id}`}>
+                  <MenuItemVisual item={item} />
                 </span>
                 <span className="menu-card-copy">
                   <span className="item-name">{item.name}</span>
@@ -603,7 +647,9 @@ export function MenuExperience({
         {selected && (
           <div className="dialog-shell">
             <div className={`product-hero food-${selected.id}`}>
-              <span aria-hidden="true">{selected.visual}</span>
+              <span>
+                <MenuItemVisual item={selected} />
+              </span>
               <button type="button" aria-label="Fechar" onClick={closeProduct}>
                 ×
               </button>
@@ -733,8 +779,8 @@ export function MenuExperience({
                 <div className="cart-lines">
                   {cart.map((line) => (
                     <article key={line.lineId}>
-                      <span className="cart-visual" aria-hidden="true">
-                        {line.item.visual}
+                      <span className="cart-visual">
+                        <MenuItemVisual item={line.item} />
                       </span>
                       <div>
                         <h3>{line.item.name}</h3>
