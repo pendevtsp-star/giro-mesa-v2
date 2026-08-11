@@ -67,6 +67,7 @@ import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./
 import { RealPlatformPage } from "./platform";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { parseRoute, routeHref } from "./router";
+import { SalonMap, type SalonMapTable } from "./salon-map";
 import {
   calculateCartTotal,
   canAccess,
@@ -1892,9 +1893,7 @@ function SalonPage({
   setTables: (tables: DiningTable[]) => void;
   onCommand: CommandRecorder;
 }) {
-  const [area, setArea] = useState<DiningTable["area"] | "Todas">("Todas");
   const [selected, setSelected] = useState<DiningTable | null>(null);
-  const visible = tables.filter((table) => area === "Todas" || table.area === area);
 
   function occupy(table: DiningTable) {
     const updated = {
@@ -1909,104 +1908,76 @@ function SalonPage({
     onCommand("table.opened", { tableId: table.id });
   }
 
+  const statusByDemoStatus: Record<TableStatus, SalonMapTable["status"]> = {
+    free: "available",
+    occupied: "occupied",
+    attention: "attention",
+    closing: "paying",
+    reserved: "reserved",
+  };
+  const mapTables: SalonMapTable[] = tables.map((table, index) => ({
+    id: table.id,
+    label: table.name,
+    seats: table.seats,
+    status: statusByDemoStatus[table.status],
+    x: 70 + (index % 4) * 210,
+    y: 85 + Math.floor(index / 4) * 165,
+    width: 168,
+    height: 124,
+    areaId: table.area,
+    totalCents: table.totalCents,
+    elapsedMinutes: table.openedMinutes,
+    ownerName: table.server,
+  }));
+
   return (
-    <div className="salon-layout">
-      <section>
-        <div className="filters-row">
-          <fieldset className="segmented">
-            <legend className="gm-sr-only">Filtrar área</legend>
-            {(["Todas", "Salão principal", "Varanda", "Balcão"] as const).map((item) => (
-              <button
-                aria-pressed={area === item}
-                key={item}
-                onClick={() => setArea(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-          </fieldset>
-          <div className="legend">
-            <span className="dot dot--free" />
-            Livre <span className="dot dot--busy" />
-            Ocupada <span className="dot dot--attention" />
-            Atenção
-          </div>
-        </div>
-        <div className="table-grid">
-          {visible.map((table) => (
-            <button
-              className={`table-tile table-tile--${table.status} ${selected?.id === table.id ? "selected" : ""}`}
-              key={table.id}
-              onClick={() => setSelected(table)}
-              type="button"
-            >
-              <span className="table-tile__top">
-                <strong>{table.name}</strong>
-                <Badge tone={tableStatus[table.status].tone}>
-                  {tableStatus[table.status].label}
-                </Badge>
-              </span>
-              <span className="table-tile__seats" aria-label={`${table.seats} lugares`} role="img">
-                {"●".repeat(Math.min(table.seats, 6))}
-              </span>
-              {table.status === "free" || table.status === "reserved" ? (
-                <small>
-                  {table.seats} lugares · {table.area}
-                </small>
-              ) : (
-                <>
-                  <strong>{formatMoney(table.totalCents ?? 0)}</strong>
-                  <small>
-                    {table.server} · {table.openedMinutes} min
-                  </small>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-      </section>
-      <Card className="table-drawer">
-        {!selected ? (
-          <EmptyState
-            icon="◫"
-            title="Selecione uma mesa"
-            description="Veja a comanda, lance itens ou atenda chamados."
-          />
-        ) : (
-          <>
-            <div className="card-header">
-              <div>
-                <p className="eyebrow">{selected.area}</p>
-                <h2>{selected.name}</h2>
-              </div>
-              <Badge tone={tableStatus[selected.status].tone}>
-                {tableStatus[selected.status].label}
-              </Badge>
-            </div>
-            {selected.status === "free" ? (
-              <EmptyState
-                icon="＋"
-                title="Mesa disponível"
-                description={`${selected.seats} lugares prontos para atendimento.`}
-                action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
-              />
-            ) : selected.status === "reserved" ? (
-              <>
-                <div className="reservation-info">
-                  <span>Reserva</span>
-                  <strong>Camila · 20:30</strong>
-                  <small>2 pessoas · confirmação por telefone</small>
+    <SalonMap
+      tables={mapTables}
+      selectedTableId={selected?.id ?? null}
+      onSelect={(tableId) => setSelected(tables.find((table) => table.id === tableId) ?? null)}
+      details={
+        <Card className="table-drawer">
+          {!selected ? (
+            <EmptyState
+              icon="◫"
+              title="Selecione uma mesa"
+              description="Veja a comanda, lance itens ou atenda chamados."
+            />
+          ) : (
+            <>
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">{selected.area}</p>
+                  <h2>{selected.name}</h2>
                 </div>
-                <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
-              </>
-            ) : (
-              <TableTab table={selected} onCommand={onCommand} />
-            )}
-          </>
-        )}
-      </Card>
-    </div>
+                <Badge tone={tableStatus[selected.status].tone}>
+                  {tableStatus[selected.status].label}
+                </Badge>
+              </div>
+              {selected.status === "free" ? (
+                <EmptyState
+                  icon="＋"
+                  title="Mesa disponível"
+                  description={`${selected.seats} lugares prontos para atendimento.`}
+                  action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
+                />
+              ) : selected.status === "reserved" ? (
+                <>
+                  <div className="reservation-info">
+                    <span>Reserva</span>
+                    <strong>Camila · 20:30</strong>
+                    <small>2 pessoas · confirmação por telefone</small>
+                  </div>
+                  <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
+                </>
+              ) : (
+                <TableTab table={selected} onCommand={onCommand} />
+              )}
+            </>
+          )}
+        </Card>
+      }
+    />
   );
 }
 

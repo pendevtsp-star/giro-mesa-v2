@@ -258,6 +258,10 @@ function pilotPath(organizationId: string, unitId: string, resource: string): st
   return `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/pilot/${resource}`;
 }
 
+function salonPath(organizationId: string, unitId: string, resource: string): string {
+  return `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/salon/${resource}`;
+}
+
 function growthPath(organizationId: string, resource: string): string {
   return `/v1/organizations/${encodeURIComponent(organizationId)}/growth/${resource}`;
 }
@@ -594,6 +598,12 @@ export const api = {
         "POST",
         { state },
         idempotencyKey,
+      ),
+  },
+  salon: {
+    map: (organizationId: string, unitId: string, roomId: string) =>
+      request<unknown>(
+        salonPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}/map`),
       ),
   },
   growth: {
