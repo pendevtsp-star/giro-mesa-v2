@@ -16,6 +16,7 @@ import { PilotOperationsModule } from "./pilot-operations/pilot-operations.modul
 import { PlatformModule } from "./platform/platform.module.js";
 import { PublicMenuModule } from "./public-menu/public-menu.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { SalonModule } from "./salon/salon.module.js";
 import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
@@ -30,6 +31,7 @@ import { SyncModule } from "./sync/sync.module.js";
     OperationsModule,
     PublicMenuModule,
     RealtimeModule,
+    SalonModule,
     PilotOperationsModule,
     PlatformModule,
     ManagementModule,

@@ -179,6 +179,26 @@ CREATE TRIGGER table_layout_nodes_published_immutable
 BEFORE UPDATE OR DELETE ON public.table_layout_nodes FOR EACH ROW
 EXECUTE FUNCTION public.giromesa_guard_published_layout();--> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION public.giromesa_guard_layout_version()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND OLD.state = 'published' THEN
+    RAISE EXCEPTION 'published layouts are immutable' USING ERRCODE = '55000';
+  END IF;
+  IF TG_OP = 'UPDATE' AND OLD.state = 'published' THEN
+    RAISE EXCEPTION 'published layouts are immutable' USING ERRCODE = '55000';
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.state = 'published'
+     AND (to_jsonb(NEW) - ARRAY['state','resource_version','published_at','updated_at'])
+       <> (to_jsonb(OLD) - ARRAY['state','resource_version','published_at','updated_at']) THEN
+    RAISE EXCEPTION 'layout publication may only freeze the draft' USING ERRCODE = '55000';
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END $$;--> statement-breakpoint
+CREATE TRIGGER table_layout_versions_immutable
+BEFORE UPDATE OR DELETE ON public.table_layout_versions FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_layout_version();--> statement-breakpoint
+
 CREATE OR REPLACE FUNCTION public.giromesa_append_only_occupancy_event()
 RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
   RAISE EXCEPTION 'occupancy events are append-only' USING ERRCODE = '55000';
