@@ -23,34 +23,52 @@ processors:
       - key: deployment.environment
         value: ${env:DEPLOYMENT_ENVIRONMENT}
         action: upsert
-  attributes/redaction:
+  attributes/cardinality:
     actions:
-      - key: authorization
+      - pattern: '(?i)^(?:customer|guest|table|tab|order|item|command|payment|user|enduser)(?:[._-].*)?$'
         action: delete
-      - key: cookie
+      - pattern: '(?i)^(?:url\.(?:full|query)|http\.(?:request|response)\.(?:body|header)(?:[._-].*)?)$'
         action: delete
-      - key: set-cookie
-        action: delete
-      - key: http.request.header.authorization
-        action: delete
-      - key: http.request.header.cookie
-        action: delete
-      - key: http.response.header.set_cookie
-        action: delete
-      - key: request.body
-        action: delete
-      - key: response.body
-        action: delete
-      - key: enduser.id
-        action: delete
-      - key: user.email
-        action: delete
-      - key: user.phone
-        action: delete
-      - key: payment.card.number
-        action: delete
-      - key: payment.card.cvv
-        action: delete
+  redaction/fail_closed:
+    allow_all_keys: false
+    allowed_keys:
+      - service.name
+      - deployment.environment
+      - http.request.method
+      - http.route
+      - http.response.status_code
+      - organization.id
+      - unit.id
+      - device.id
+      - device.type
+      - job.type
+      - queue.name
+      - messaging.operation.name
+      - error.type
+      - error.code
+      - outcome
+      - telemetry.dropped_attributes_count
+      - telemetry.redacted_attributes_count
+      - telemetry.cardinality_overflow_count
+    redact_all_types: true
+    blocked_key_patterns:
+      - '(?i)(^|[._-])(?:authorization|auth(?:entication)?|cookie|set[-_]?cookie|token|secret|password|passwd|api[-_]?key|email|phone|telefone|document|cpf|cnpj|pin|pan|cvv|track(?:data)?|payload|body)([._-]|$)'
+    blocked_values:
+      - '(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b'
+      - '(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{4,}'
+      - '\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b'
+      - '(?:\d[ -]?){13,19}'
+      - '(?i)(?:%B\d{13,19}\^|;\d{13,19}=)'
+      - '(?i)\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]{8,}\b'
+      - '(?i)(?:^|[^a-z0-9])pin[\s._:-]*(?:\d[\s._:-]*){4,12}(?:$|[^0-9])'
+      - '(?i)(?:^|[^a-z0-9])cvv[\s._:-]*(?:\d[\s._:-]*){3,4}(?:$|[^0-9])'
+      - '(?i)(?:^|[^a-z0-9])(?:cpf|cnpj|documento?|doc)[\s._:-]*(?:\d[\s./-]*){11,14}(?:$|[^0-9])'
+      - '(?i)(?:^|[^a-z0-9])(?:phone|telefone|tel)[\s._:+-]*(?:\d[\s().+-]*){8,15}(?:$|[^0-9])'
+    summary: info
+    url_sanitizer:
+      enabled: true
+      attributes: [http.route]
+      sanitize_span_name: true
   batch:
     send_batch_size: 512
     timeout: 5s
@@ -73,15 +91,15 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resource/giromesa, attributes/redaction, batch]
+      processors: [memory_limiter, resource/giromesa, attributes/cardinality, redaction/fail_closed, batch]
       exporters: [otlphttp/upstream]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource/giromesa, batch]
+      processors: [memory_limiter, resource/giromesa, attributes/cardinality, redaction/fail_closed, batch]
       exporters: [otlphttp/upstream]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource/giromesa, attributes/redaction, batch]
+      processors: [memory_limiter, resource/giromesa, attributes/cardinality, redaction/fail_closed, batch]
       exporters: [otlphttp/upstream]
   telemetry:
     logs:

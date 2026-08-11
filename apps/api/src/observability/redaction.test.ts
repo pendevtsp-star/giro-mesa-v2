@@ -77,6 +77,61 @@ it("redacts sensitive values even when an attribute name is allowed", () => {
   );
 });
 
+it("redacts normalized PIN, CVV, document, cookie and phone prefixes in allowed values", () => {
+  assert.deepEqual(
+    redactTelemetryAttributes({
+      "service.name": "PHONE_5511999999999",
+      "job.type": "Pin-1234",
+      "queue.name": "cookie_session-secret",
+      "messaging.operation.name": "cpf:123.456.789-00",
+      "error.type": "telefone.5511988887777",
+      "error.code": "CvV_123",
+    }),
+    {
+      "service.name": "[REDACTED]",
+      "job.type": "[REDACTED]",
+      "queue.name": "[REDACTED]",
+      "messaging.operation.name": "[REDACTED]",
+      "error.type": "[REDACTED]",
+      "error.code": "[REDACTED]",
+      "telemetry.redacted_attributes_count": 6,
+    },
+  );
+  assert.deepEqual(redactTelemetryAttributes({ "error.code": "ＰＩＮ＿１２３４" }), {
+    "error.code": "[REDACTED]",
+    "telemetry.redacted_attributes_count": 1,
+  });
+});
+
+it("does not mistake ordinary operational names for prefixed sensitive values", () => {
+  assert.deepEqual(
+    redactTelemetryAttributes({
+      "service.name": "phonebook-sync",
+      "job.type": "spinner-refresh",
+      "queue.name": "cookie_missing",
+      "error.type": "CvvParserError",
+      "error.code": "TOKEN_EXPIRED",
+    }),
+    {
+      "service.name": "phonebook-sync",
+      "job.type": "spinner-refresh",
+      "queue.name": "cookie_missing",
+      "error.type": "CvvParserError",
+      "error.code": "TOKEN_EXPIRED",
+    },
+  );
+});
+
+it("drops nested and array values without serializing their sensitive contents", () => {
+  const attributes = redactTelemetryAttributes({
+    "error.type": { name: "pin_1234", nested: { cookie: "session-secret" } },
+    "error.code": ["cvv_123", { phone: "+5511999999999" }],
+  });
+
+  assert.deepEqual(attributes, { "telemetry.dropped_attributes_count": 2 });
+  assert.doesNotMatch(JSON.stringify(attributes), /1234|session-secret|5511999999999/);
+});
+
 it("collapses controlled dimensions after their per-key cardinality budget", () => {
   const guard = new CardinalityGuard({ "organization.id": 1 });
   const first = guard.apply({ "organization.id": organizationId });

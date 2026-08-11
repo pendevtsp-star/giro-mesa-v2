@@ -49,6 +49,14 @@ const PAN_PATTERN = /(?:\d[ -]?){13,19}/;
 const TRACK_PATTERN = /(?:%B\d{13,19}\^|;\d{13,19}=)/i;
 const SECRET_PREFIX_PATTERN = /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]{8,}\b/i;
 const LONG_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,}$/;
+const PREFIXED_PIN_PATTERN = /(?:^|[^a-z0-9])pin[\s._:-]*(?:\d[\s._:-]*){4,12}(?:$|[^0-9])/i;
+const PREFIXED_CVV_PATTERN = /(?:^|[^a-z0-9])cvv[\s._:-]*(?:\d[\s._:-]*){3,4}(?:$|[^0-9])/i;
+const PREFIXED_DOCUMENT_PATTERN =
+  /(?:^|[^a-z0-9])(?:cpf|cnpj|documento?|doc)[\s._:-]*(?:\d[\s./-]*){11,14}(?:$|[^0-9])/i;
+const PREFIXED_PHONE_PATTERN =
+  /(?:^|[^a-z0-9])(?:phone|telefone|tel)[\s._:+-]*(?:\d[\s().+-]*){8,15}(?:$|[^0-9])/i;
+const PREFIXED_COOKIE_PATTERN =
+  /(?:^|[^a-z0-9])(?:cookie|session)[\s._:-]+(?=[a-z0-9._:=+-]{4,})(?=[a-z0-9._:=+-]*(?:[0-9=._:-]))[a-z0-9._:=+-]+/i;
 
 const stringEnum = (...allowed: string[]): AttributeValidator => {
   const values = new Set(allowed);
@@ -90,14 +98,20 @@ const ATTRIBUTE_VALIDATORS: Readonly<Record<string, AttributeValidator>> = {
 };
 
 function containsSensitiveValue(value: string) {
+  const normalized = value.normalize("NFKC");
   return (
-    EMAIL_PATTERN.test(value) ||
-    BEARER_PATTERN.test(value) ||
-    JWT_PATTERN.test(value) ||
-    PAN_PATTERN.test(value) ||
-    TRACK_PATTERN.test(value) ||
-    SECRET_PREFIX_PATTERN.test(value) ||
-    LONG_TOKEN_PATTERN.test(value)
+    EMAIL_PATTERN.test(normalized) ||
+    BEARER_PATTERN.test(normalized) ||
+    JWT_PATTERN.test(normalized) ||
+    PAN_PATTERN.test(normalized) ||
+    TRACK_PATTERN.test(normalized) ||
+    SECRET_PREFIX_PATTERN.test(normalized) ||
+    LONG_TOKEN_PATTERN.test(normalized) ||
+    PREFIXED_PIN_PATTERN.test(normalized) ||
+    PREFIXED_CVV_PATTERN.test(normalized) ||
+    PREFIXED_DOCUMENT_PATTERN.test(normalized) ||
+    PREFIXED_PHONE_PATTERN.test(normalized) ||
+    PREFIXED_COOKIE_PATTERN.test(normalized)
   );
 }
 
