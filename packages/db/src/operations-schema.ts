@@ -71,6 +71,27 @@ export const salonExceptionState = pgEnum("salon_exception_state", [
   "acknowledged",
   "resolved",
 ]);
+export const productionDispatchMode = pgEnum("production_dispatch_mode", [
+  "kds",
+  "print",
+  "both",
+  "kds_with_contingency_print",
+  "off",
+]);
+export const dispatchDestination = pgEnum("dispatch_destination", ["kds", "printer"]);
+export const dispatchEffectState = pgEnum("dispatch_effect_state", [
+  "pending",
+  "delivered",
+  "acked",
+  "canceled",
+  "dlq",
+]);
+export const dispatchOperation = pgEnum("dispatch_operation", [
+  "dispatch",
+  "reprint",
+  "cancel",
+  "contingency",
+]);
 
 export const posCatalogCategories = pgTable(
   "pos_catalog_categories",
@@ -833,7 +854,10 @@ export const serviceShifts = pgTable(
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("restrict"),
     check("service_shifts_resource_check", sql`${table.resourceVersion} >= 0`),
-    check("service_shifts_time_check", sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`),
+    check(
+      "service_shifts_time_check",
+      sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
   ],
 );
 
@@ -845,7 +869,9 @@ export const areaAssignments = pgTable(
     unitId: uuid("unit_id").notNull(),
     shiftId: uuid("shift_id").notNull(),
     areaId: uuid("area_id").notNull(),
-    primaryIdentityId: uuid("primary_identity_id").notNull().references(() => identities.id),
+    primaryIdentityId: uuid("primary_identity_id")
+      .notNull()
+      .references(() => identities.id),
     supportIdentityId: uuid("support_identity_id").references(() => identities.id),
     fallbackRole: varchar("fallback_role", { length: 30 }).notNull().default("manager"),
     resourceVersion: integer("resource_version").notNull().default(0),
@@ -876,7 +902,9 @@ export const tableGroups = pgTable(
     occupancyEpoch: uuid("occupancy_epoch").notNull().defaultRandom(),
     resourceVersion: integer("resource_version").notNull().default(0),
     active: boolean("active").notNull().default(true),
-    createdByIdentityId: uuid("created_by_identity_id").notNull().references(() => identities.id),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -983,7 +1011,9 @@ export const tableOccupancyEvents = pgTable(
     occupancyEpoch: uuid("occupancy_epoch").notNull(),
     sequence: integer("sequence").notNull(),
     type: varchar("type", { length: 60 }).notNull(),
-    actorIdentityId: uuid("actor_identity_id").notNull().references(() => identities.id),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     requestHash: varchar("request_hash", { length: 64 }).notNull(),
     before: jsonb("before").$type<Record<string, unknown>>().notNull(),
@@ -1021,7 +1051,9 @@ export const serviceIncidents = pgTable(
     type: varchar("type", { length: 60 }).notNull(),
     summary: varchar("summary", { length: 300 }).notNull(),
     state: varchar("state", { length: 20 }).notNull().default("open"),
-    reportedByIdentityId: uuid("reported_by_identity_id").notNull().references(() => identities.id),
+    reportedByIdentityId: uuid("reported_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
     resolvedByIdentityId: uuid("resolved_by_identity_id").references(() => identities.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     ...timestamps,
@@ -1041,7 +1073,9 @@ export const staffPresenceLeases = pgTable(
   {
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
-    identityId: uuid("identity_id").notNull().references(() => identities.id),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => identities.id),
     deviceId: uuid("device_id").notNull(),
     leaseEpoch: uuid("lease_epoch").notNull().defaultRandom(),
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
@@ -1091,6 +1125,183 @@ export const salonExceptions = pgTable(
   ],
 );
 
+export const productionStationRoutes = pgTable(
+  "production_station_routes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    stationId: uuid("station_id").notNull(),
+    mode: productionDispatchMode("mode").notNull().default("kds"),
+    kdsTargetRef: varchar("kds_target_ref", { length: 160 }),
+    printerTargetRef: varchar("printer_target_ref", { length: 160 }),
+    fallbackAfterSeconds: integer("fallback_after_seconds").notNull().default(45),
+    active: boolean("active").notNull().default(true),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    unique("production_station_routes_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("production_station_routes_station_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.stationId,
+    ),
+    foreignKey({
+      name: "production_station_routes_station_scope_fk",
+      columns: [table.organizationId, table.unitId, table.stationId],
+      foreignColumns: [
+        posProductionStations.organizationId,
+        posProductionStations.unitId,
+        posProductionStations.id,
+      ],
+    }).onDelete("cascade"),
+    check(
+      "production_station_routes_fallback_check",
+      sql`${table.fallbackAfterSeconds} between 5 and 3600`,
+    ),
+  ],
+);
+
+export const dispatchEffects = pgTable(
+  "dispatch_effects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    orderId: uuid("order_id").notNull(),
+    stationId: uuid("station_id").notNull(),
+    routeId: uuid("route_id"),
+    destination: dispatchDestination("destination").notNull(),
+    targetRef: varchar("target_ref", { length: 160 }).notNull(),
+    operation: dispatchOperation("operation").notNull().default("dispatch"),
+    effectKey: varchar("effect_key", { length: 240 }).notNull(),
+    state: dispatchEffectState("state").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    resourceVersion: integer("resource_version").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("dispatch_effects_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("dispatch_effects_exactly_once_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.effectKey,
+    ),
+    index("dispatch_effects_pending_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.state,
+      table.nextAttemptAt,
+    ),
+    foreignKey({
+      name: "dispatch_effects_order_scope_fk",
+      columns: [table.organizationId, table.unitId, table.orderId],
+      foreignColumns: [posOrders.organizationId, posOrders.unitId, posOrders.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "dispatch_effects_station_scope_fk",
+      columns: [table.organizationId, table.unitId, table.stationId],
+      foreignColumns: [
+        posProductionStations.organizationId,
+        posProductionStations.unitId,
+        posProductionStations.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "dispatch_effects_route_scope_fk",
+      columns: [table.organizationId, table.unitId, table.routeId],
+      foreignColumns: [
+        productionStationRoutes.organizationId,
+        productionStationRoutes.unitId,
+        productionStationRoutes.id,
+      ],
+    }).onDelete("restrict"),
+    check("dispatch_effects_attempt_check", sql`${table.attemptCount} >= 0`),
+  ],
+);
+
+export const dispatchAttempts = pgTable(
+  "dispatch_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    effectId: uuid("effect_id").notNull(),
+    attemptNumber: integer("attempt_number").notNull(),
+    deliveryKey: varchar("delivery_key", { length: 240 }).notNull(),
+    state: varchar("state", { length: 24 }).$type<"scheduled" | "delivered" | "failed">().notNull(),
+    error: text("error"),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("dispatch_attempts_number_unique").on(table.effectId, table.attemptNumber),
+    uniqueIndex("dispatch_attempts_delivery_key_unique").on(table.deliveryKey),
+    foreignKey({
+      name: "dispatch_attempts_effect_scope_fk",
+      columns: [table.organizationId, table.unitId, table.effectId],
+      foreignColumns: [dispatchEffects.organizationId, dispatchEffects.unitId, dispatchEffects.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const dispatchAcknowledgements = pgTable(
+  "dispatch_acknowledgements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    effectId: uuid("effect_id").notNull(),
+    acknowledgementKey: varchar("acknowledgement_key", { length: 160 }).notNull(),
+    acknowledgedByIdentityId: uuid("acknowledged_by_identity_id").references(() => identities.id),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("dispatch_acknowledgements_key_unique").on(
+      table.effectId,
+      table.acknowledgementKey,
+    ),
+    foreignKey({
+      name: "dispatch_acknowledgements_effect_scope_fk",
+      columns: [table.organizationId, table.unitId, table.effectId],
+      foreignColumns: [dispatchEffects.organizationId, dispatchEffects.unitId, dispatchEffects.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const dispatchDeadLetters = pgTable(
+  "dispatch_dead_letters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    effectId: uuid("effect_id").notNull(),
+    reason: text("reason").notNull(),
+    resolvedByIdentityId: uuid("resolved_by_identity_id").references(() => identities.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("dispatch_dead_letters_open_unique")
+      .on(table.effectId)
+      .where(sql`${table.resolvedAt} is null`),
+    foreignKey({
+      name: "dispatch_dead_letters_effect_scope_fk",
+      columns: [table.organizationId, table.unitId, table.effectId],
+      foreignColumns: [dispatchEffects.organizationId, dispatchEffects.unitId, dispatchEffects.id],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const operationsTenantTables = [
   posCatalogCategories,
   posAllergens,
@@ -1128,6 +1339,11 @@ export const operationsTenantTables = [
   serviceIncidents,
   staffPresenceLeases,
   salonExceptions,
+  productionStationRoutes,
+  dispatchEffects,
+  dispatchAttempts,
+  dispatchAcknowledgements,
+  dispatchDeadLetters,
 ] as const;
 
 for (const table of operationsTenantTables) table.enableRLS();

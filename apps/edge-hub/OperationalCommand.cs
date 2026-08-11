@@ -231,3 +231,21 @@ public sealed record ReconciliationEvent(
     DateTimeOffset OccurredAt,
     DateTimeOffset RejectedAt,
     string Reason);
+
+public sealed record LocalDispatchEffect(
+    string Id,
+    string OrganizationId,
+    string UnitId,
+    string EffectKey,
+    string Destination,
+    string TargetRef,
+    string Operation,
+    string Payload,
+    DateTimeOffset ScheduledAt);
+
+public sealed record ScheduledDispatch(LocalDispatchEffect Effect, string State, int AttemptCount, bool Inserted);
+
+public sealed record LocalDispatchDeadLetter(
+    string EffectId,
+    string Reason,
+    DateTimeOffset CreatedAt);

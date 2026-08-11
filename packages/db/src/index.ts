@@ -13,7 +13,11 @@ export * from "./operations-schema.js";
 export * from "./schema.js";
 export * from "./tenant-context.js";
 
-const schema = {
+const schema: typeof baseSchema &
+  typeof eventSchema &
+  typeof operationsSchema &
+  typeof managementSchema &
+  typeof growthSchema = {
   ...baseSchema,
   ...eventSchema,
   ...operationsSchema,
