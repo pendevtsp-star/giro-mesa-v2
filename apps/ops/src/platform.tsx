@@ -1,5 +1,12 @@
 import { Badge, Button, Card } from "@giromesa/ui";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { ApiClientError, api } from "./api";
 
 type Row = Record<string, unknown>;
@@ -622,6 +629,21 @@ export function RealPlatformPage({
     if (activeContext) void loadProjection(activeContext.organization.id, resource, unitId);
   }
 
+  function navigateResources(event: KeyboardEvent<HTMLButtonElement>, resource: PlatformResource) {
+    const currentIndex = resources.indexOf(resource);
+    let nextIndex: number | undefined;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % resources.length;
+    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + resources.length) % resources.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = resources.length - 1;
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    const nextResource = resources[nextIndex];
+    if (!nextResource) return;
+    selectResource(nextResource);
+    document.getElementById(`platform-tab-${nextResource}`)?.focus();
+  }
+
   return (
     <div className="platform-workspace">
       <header className="platform-commandbar">
@@ -720,10 +742,14 @@ export function RealPlatformPage({
           <div className="platform-tabs" role="tablist" aria-label="Domínios do backoffice">
             {resources.map((resource) => (
               <button
+                aria-controls={`platform-panel-${resource}`}
                 aria-selected={resource === selectedResource}
+                id={`platform-tab-${resource}`}
                 key={resource}
                 onClick={() => selectResource(resource)}
+                onKeyDown={(event) => navigateResources(event, resource)}
                 role="tab"
+                tabIndex={resource === selectedResource ? 0 : -1}
                 type="button"
               >
                 {resourceLabels[resource]}
@@ -732,7 +758,12 @@ export function RealPlatformPage({
           </div>
 
           <div className="platform-content-grid">
-            <section aria-labelledby="platform-projection-title" className="platform-projection">
+            <section
+              aria-labelledby={`platform-tab-${selectedResource}`}
+              className="platform-projection"
+              id={`platform-panel-${selectedResource}`}
+              role="tabpanel"
+            >
               <div className="platform-section-heading">
                 <div>
                   <h2 id="platform-projection-title">{resourceLabels[selectedResource]}</h2>

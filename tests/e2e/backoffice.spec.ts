@@ -212,6 +212,21 @@ async function openTenant(page: Page) {
   ).toContainText("Bar Aurora");
 }
 
+async function waitForStableVisual(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      [...document.images].map((image) =>
+        image.complete ? Promise.resolve() : image.decode().catch(() => undefined),
+      ),
+    );
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+}
+
 test("mantém contexto permanente, indisponibilidade verdadeira e leitura acessível", async ({
   page,
 }, testInfo) => {
@@ -219,12 +234,35 @@ test("mantém contexto permanente, indisponibilidade verdadeira e leitura acess�
   await openTenant(page);
 
   await expect(page.getByRole("button", { name: "Criar proposta" })).toBeDisabled();
+  const tenantTab = page.getByRole("tab", { name: "Tenant" });
+  const planTab = page.getByRole("tab", { name: "Plano" });
+  await expect(tenantTab).toHaveAttribute("aria-controls", "platform-panel-tenant");
+  await expect(tenantTab).toHaveAttribute("tabindex", "0");
+  await expect(planTab).toHaveAttribute("tabindex", "-1");
+  await tenantTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(planTab).toBeFocused();
+  await expect(planTab).toHaveAttribute("aria-selected", "true");
+  const panel = page.getByRole("tabpanel");
+  await expect(panel).toHaveAttribute("aria-labelledby", "platform-tab-plan");
+  await expect(panel).toHaveAttribute("id", "platform-panel-plan");
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: "Suporte" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(tenantTab).toBeFocused();
   await page.getByRole("tab", { name: "Incidentes" }).click();
   await expect(page.getByText("Fonte ainda não conectada nesta base")).toBeVisible();
   await expect(page.getByText("Nenhum dado ou sucesso foi simulado.")).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page }).include(".platform-workspace").analyze();
+  const accessibility = await new AxeBuilder({ page }).include(".app-shell").analyze();
   expect(accessibility.violations).toEqual([]);
+  await waitForStableVisual(page);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  const shell = await page.locator(".app-shell").boundingBox();
+  const commandbar = await page.locator(".platform-commandbar").boundingBox();
+  expect(shell?.y).toBeGreaterThanOrEqual(0);
+  expect(commandbar?.y).toBeGreaterThanOrEqual(0);
+  expect(commandbar?.y).toBeLessThan(page.viewportSize()?.height ?? 0);
   await page.screenshot({
     fullPage: true,
     path: `.superpowers/screenshots/wave2-backoffice-${testInfo.project.name}.png`,
