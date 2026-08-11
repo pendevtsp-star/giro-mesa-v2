@@ -910,6 +910,8 @@ export const remunerationRuleSets = pgTable(
       .notNull(),
     name: varchar("name", { length: 160 }).notNull(),
     active: boolean("active").notNull().default(true),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -926,6 +928,11 @@ export const remunerationRuleSets = pgTable(
       table.unitId,
       table.kind,
       table.name,
+    ),
+    unique("remuneration_rule_sets_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
     ),
     foreignKey({
       name: "remuneration_rule_sets_unit_fk",

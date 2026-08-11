@@ -390,6 +390,28 @@ export const api = {
       request<unknown>(managementPath(organizationId, unitId, "purchases")),
     finance: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "finance")),
+    remunerationPortfolio: (
+      organizationId: string,
+      unitId: string,
+      periodStart: string,
+      periodEnd: string,
+    ) =>
+      request<unknown>(
+        `${managementPath(organizationId, unitId, "remuneration/portfolio")}?periodStart=${encodeURIComponent(periodStart)}&periodEnd=${encodeURIComponent(periodEnd)}`,
+      ),
+    remunerationExport: (
+      organizationId: string,
+      unitId: string,
+      runId: string,
+      format: "csv" | "pdf" | "print",
+    ) =>
+      request<Record<string, unknown>>(
+        managementPath(
+          organizationId,
+          unitId,
+          `remuneration/runs/${encodeURIComponent(runId)}/export/${format}`,
+        ),
+      ),
     cashShifts: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "cash-shifts")),
     people: (organizationId: string, unitId: string) =>

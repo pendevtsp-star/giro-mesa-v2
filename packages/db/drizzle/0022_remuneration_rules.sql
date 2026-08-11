@@ -5,11 +5,14 @@ CREATE TABLE "remuneration_rule_sets" (
   "kind" varchar(24) NOT NULL,
   "name" varchar(160) NOT NULL,
   "active" boolean DEFAULT true NOT NULL,
+  "idempotency_key" varchar(160) NOT NULL,
+  "request_hash" varchar(64) NOT NULL,
   "created_by_identity_id" uuid NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "remuneration_rule_sets_scope_id_unique" UNIQUE("organization_id", "unit_id", "id"),
   CONSTRAINT "remuneration_rule_sets_name_unique" UNIQUE("organization_id", "unit_id", "kind", "name"),
+  CONSTRAINT "remuneration_rule_sets_idempotency_unique" UNIQUE("organization_id", "unit_id", "idempotency_key"),
   CONSTRAINT "remuneration_rule_sets_kind_check" CHECK ("kind" IN ('service','commission','profit_sharing'))
 );
 CREATE TABLE "remuneration_rule_versions" (

@@ -52,6 +52,7 @@ export function ReturnablesLedger({ movements }: { movements: ReturnableMovement
       <EmptyState
         title="Sem movimentos"
         description="Nenhuma custódia registrada para este ativo."
+        icon="-"
       />
     );
   return (

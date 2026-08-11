@@ -35,8 +35,8 @@ export type RemunerationExpression =
         left: RemunerationExpression;
         right: RemunerationExpression;
       }>;
-      then: RemunerationExpression;
-      else: RemunerationExpression;
+      consequent: RemunerationExpression;
+      alternate: RemunerationExpression;
     }>;
 
 export interface RemunerationRuleVersion {
@@ -152,10 +152,10 @@ function evaluation(
               : left === right;
     trace.push({ path: `${path}.condition`, type: "condition", result: condition });
     result = evaluation(
-      condition ? expression.then : expression.else,
+      condition ? expression.consequent : expression.alternate,
       metrics,
       trace,
-      `${path}.${condition ? "then" : "else"}`,
+      `${path}.${condition ? "consequent" : "alternate"}`,
       depth + 1,
       budget,
     );

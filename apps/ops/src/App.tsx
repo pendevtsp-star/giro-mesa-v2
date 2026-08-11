@@ -66,6 +66,7 @@ import {
 import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./operations";
 import { RealPlatformPage } from "./platform";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
+import { RemunerationPage } from "./remuneration";
 import { parseRoute, routeHref } from "./router";
 import {
   calculateCartTotal,
@@ -117,6 +118,7 @@ const navItems: { route: RouteId; label: string; icon: ReactNode }[] = [
   { route: "inventory", label: "Estoque", icon: "◇" },
   { route: "purchases", label: "Compras", icon: "▱" },
   { route: "finance", label: "Financeiro", icon: "↗" },
+  { route: "remuneration", label: "Remuneração", icon: "$" },
   { route: "people", label: "Pessoas", icon: "♙" },
   { route: "delivery", label: "Delivery", icon: "▻" },
   { route: "reservations", label: "Reservas e espera", icon: "◷" },
@@ -1340,6 +1342,10 @@ const pageMeta: Record<RouteId, { title: string; description: string }> = {
     title: "Financeiro",
     description: "Contas, conciliação e caixa projetado.",
   },
+  remuneration: {
+    title: "Remuneração",
+    description: "Taxa de serviço, comissão e participação com memória e aprovação.",
+  },
   people: {
     title: "Pessoas",
     description: "Equipe, escalas, ponto e comissões.",
@@ -1479,6 +1485,8 @@ function PageContent({
       return session.demo ? <DemoPurchasesPage /> : <RealPurchasesPage scope={managementScope} />;
     case "finance":
       return session.demo ? <FinancePage /> : <RealFinancePage scope={managementScope} />;
+    case "remuneration":
+      return <RemunerationPage demo={session.demo} scope={managementScope} />;
     case "people":
       return session.demo ? <DemoPeoplePage /> : <RealPeoplePage scope={managementScope} />;
     case "delivery":
@@ -1638,6 +1646,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
   finance: {
     title: "Ler o financeiro",
     steps: ["Separe contas a pagar e receber.", "Conciliação exige fonte bancária homologada."],
+  },
+  remuneration: {
+    title: "Revisar remuneração",
+    steps: [
+      "Confirme a categoria e as fontes do cálculo.",
+      "Valores estimados exigem aprovação antes do fechamento.",
+      "Exporte CSV, PDF ou a versão de impressão somente após revisar a memória.",
+    ],
   },
   people: {
     title: "Acompanhar equipe",
