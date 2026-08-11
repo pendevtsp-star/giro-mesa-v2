@@ -15,6 +15,7 @@
     "test:production-baseline": "node --test scripts/check-production-baseline.test.mjs",
     "test:supply-chain": "node --test scripts/check-supply-chain.test.mjs",
     "test:disaster-recovery": "node --test scripts/backup-restore.test.mjs",
+    "test:load": "node --test load/*.test.mjs",
     "supply-chain:check": "node scripts/check-supply-chain.mjs",
     "production:baseline": "node scripts/check-production-baseline.mjs",
     "test:e2e": "playwright test",

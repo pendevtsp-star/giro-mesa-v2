@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "title": "GiroMesa — confiabilidade operacional",
+  "variables": ["deployment.environment.name", "service.name", "service.version"],
+  "panels": [
+    {
+      "id": "availability",
+      "title": "Disponibilidade HTTP mensal",
+      "signal": "http.server.request.duration",
+      "calculation": "1 - rate(status_code >= 500)",
+      "objective": 0.9995,
+      "window": "30d"
+    },
+    {
+      "id": "read-latency",
+      "title": "Latência p95 de leitura",
+      "signal": "http.server.request.duration",
+      "filter": "http.request.method in [GET, HEAD]",
+      "aggregation": "p95",
+      "objectiveMs": 300,
+      "window": "5m"
+    },
+    {
+      "id": "write-latency",
+      "title": "Latência p95 de escrita",
+      "signal": "http.server.request.duration",
+      "filter": "http.request.method in [POST, PUT, PATCH, DELETE]",
+      "aggregation": "p95",
+      "objectiveMs": 500,
+      "window": "5m"
+    },
+    {
+      "id": "worker-outcomes",
+      "title": "Jobs concluídos e falhos",
+      "signals": ["giromesa.worker.jobs.completed", "giromesa.worker.jobs.failed"],
+      "aggregation": "rate",
+      "window": "5m"
+    },
+    {
+      "id": "worker-duration",
+      "title": "Duração p95 de jobs",
+      "signal": "giromesa.worker.job.duration",
+      "aggregation": "p95",
+      "window": "5m"
+    },
+    {
+      "id": "cardinality-overflow",
+      "title": "Atributos colapsados por budget",
+      "signalAttribute": "telemetry.cardinality_overflow_count",
+      "aggregation": "sum",
+      "window": "5m"
+    },
+    {
+      "id": "synthetics",
+      "title": "Saúde dos checks sintéticos",
+      "signal": "giromesa.synthetic.check",
+      "aggregation": "latest",
+      "window": "5m"
+    }
+  ]
+}

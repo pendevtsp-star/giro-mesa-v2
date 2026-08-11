@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "scope": "per-process",
+  "overflowValue": "__overflow__",
+  "attributes": {
+    "service.name": 16,
+    "service.version": 32,
+    "deployment.environment.name": 8,
+    "http.request.method": 8,
+    "http.route": 256,
+    "http.response.status_code": 64,
+    "organization.id": 1000,
+    "unit.id": 5000,
+    "device.id": 50000,
+    "device.type": 8,
+    "job.type": 128,
+    "queue.name": 64,
+    "messaging.operation.name": 32,
+    "error.type": 128,
+    "error.code": 256,
+    "outcome": 8
+  },
+  "forbiddenDimensions": [
+    "customer.id",
+    "table.id",
+    "tab.id",
+    "order.id",
+    "request.body",
+    "response.body"
+  ]
+}
