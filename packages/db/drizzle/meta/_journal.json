@@ -132,6 +132,13 @@
       "idx": 18,
       "version": "7",
       "when": 1786485600000,
+      "tag": "0022_remuneration_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786489200000,
       "tag": "0023_fiscal_documents",
       "breakpoints": true
     }

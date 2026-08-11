@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -895,6 +896,192 @@ export const managementIncidentEvents = pgTable(
         managementIncidents.id,
       ],
     }).onDelete("restrict"),
+  ],
+);
+
+export const remunerationRuleSets = pgTable(
+  "remuneration_rule_sets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: varchar("kind", { length: 24 })
+      .$type<"service" | "commission" | "profit_sharing">()
+      .notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("remuneration_rule_sets_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("remuneration_rule_sets_name_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.kind,
+      table.name,
+    ),
+    foreignKey({
+      name: "remuneration_rule_sets_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check(
+      "remuneration_rule_sets_kind_check",
+      sql`${table.kind} in ('service','commission','profit_sharing')`,
+    ),
+  ],
+);
+
+export const remunerationRuleVersions = pgTable(
+  "remuneration_rule_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    ruleSetId: uuid("rule_set_id").notNull(),
+    version: integer("version").notNull(),
+    expression: jsonb("expression").$type<Record<string, unknown>>().notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+    effectiveUntil: timestamp("effective_until", { withTimezone: true }),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("remuneration_rule_versions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("remuneration_rule_versions_number_unique").on(table.ruleSetId, table.version),
+    uniqueIndex("remuneration_rule_versions_active_unique")
+      .on(table.organizationId, table.unitId, table.ruleSetId)
+      .where(sql`${table.effectiveUntil} is null`),
+    foreignKey({
+      name: "remuneration_rule_versions_set_fk",
+      columns: [table.organizationId, table.unitId, table.ruleSetId],
+      foreignColumns: [
+        remunerationRuleSets.organizationId,
+        remunerationRuleSets.unitId,
+        remunerationRuleSets.id,
+      ],
+    }).onDelete("restrict"),
+    check("remuneration_rule_versions_positive_check", sql`${table.version} > 0`),
+    check(
+      "remuneration_rule_versions_window_check",
+      sql`${table.effectiveUntil} is null or ${table.effectiveUntil} > ${table.effectiveFrom}`,
+    ),
+  ],
+);
+
+export const remunerationCalculationRuns = pgTable(
+  "remuneration_calculation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: varchar("kind", { length: 24 })
+      .$type<"service" | "commission" | "profit_sharing">()
+      .notNull(),
+    periodStart: date("period_start").notNull(),
+    periodEnd: date("period_end").notNull(),
+    status: varchar("status", { length: 16 })
+      .$type<"estimated" | "approved" | "closed">()
+      .notNull()
+      .default("estimated"),
+    ruleVersionId: uuid("rule_version_id").notNull(),
+    frozenRule: jsonb("frozen_rule").$type<Record<string, unknown>>().notNull(),
+    frozenMetrics: jsonb("frozen_metrics").$type<Record<string, number>>().notNull(),
+    sourceReferences: jsonb("source_references").$type<string[]>().notNull(),
+    evaluationTrace: jsonb("evaluation_trace").$type<Record<string, unknown>[]>().notNull(),
+    outputCents: integer("output_cents").notNull(),
+    memoryHash: varchar("memory_hash", { length: 64 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    adjustmentOf: uuid("adjustment_of").references(
+      (): AnyPgColumn => remunerationCalculationRuns.id,
+      { onDelete: "restrict" },
+    ),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    approvedByIdentityId: uuid("approved_by_identity_id").references(() => identities.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    closedByIdentityId: uuid("closed_by_identity_id").references(() => identities.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("remuneration_calculation_runs_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("remuneration_calculation_runs_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "remuneration_calculation_runs_rule_fk",
+      columns: [table.organizationId, table.unitId, table.ruleVersionId],
+      foreignColumns: [
+        remunerationRuleVersions.organizationId,
+        remunerationRuleVersions.unitId,
+        remunerationRuleVersions.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "remuneration_calculation_runs_kind_check",
+      sql`${table.kind} in ('service','commission','profit_sharing')`,
+    ),
+    check(
+      "remuneration_calculation_runs_status_check",
+      sql`${table.status} in ('estimated','approved','closed')`,
+    ),
+    check("remuneration_calculation_runs_output_check", sql`${table.outputCents} >= 0`),
+    check(
+      "remuneration_calculation_runs_period_check",
+      sql`${table.periodEnd} >= ${table.periodStart}`,
+    ),
+  ],
+);
+
+export const remunerationCalculationEntries = pgTable(
+  "remuneration_calculation_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    recipientReference: varchar("recipient_reference", { length: 160 }).notNull(),
+    recipientLabel: varchar("recipient_label", { length: 160 }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("remuneration_calculation_entries_recipient_unique").on(
+      table.runId,
+      table.recipientReference,
+    ),
+    foreignKey({
+      name: "remuneration_calculation_entries_run_fk",
+      columns: [table.organizationId, table.unitId, table.runId],
+      foreignColumns: [
+        remunerationCalculationRuns.organizationId,
+        remunerationCalculationRuns.unitId,
+        remunerationCalculationRuns.id,
+      ],
+    }).onDelete("restrict"),
+    check("remuneration_calculation_entries_amount_check", sql`${table.amountCents} >= 0`),
   ],
 );
 

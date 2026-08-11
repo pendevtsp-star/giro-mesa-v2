@@ -8,4 +8,5 @@ export * from "./onboarding.js";
 export * from "./payment-adapter.js";
 export * from "./permissions.js";
 export * from "./quantities.js";
+export * from "./remuneration-rules.js";
 export * from "./secret-envelope.js";
