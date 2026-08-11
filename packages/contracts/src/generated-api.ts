@@ -1300,6 +1300,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/onboarding/provisioning/{runId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OnboardingController_provisioningStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/onboarding/provisioning/{runId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OnboardingController_provisioningStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/billing/access": {
     parameters: {
       query?: never;
@@ -6349,7 +6381,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          checklist: {
+          checklist?: {
             business?: boolean;
             unit?: boolean;
             catalog?: boolean;
@@ -6359,6 +6391,116 @@ export interface operations {
             fiscalChoice?: boolean;
             training?: boolean;
             rehearsal?: boolean;
+          };
+          items?: {
+            business?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            unit?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            plan?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            fiscalChoice?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            catalog?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            tables?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            team?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            qr?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            production?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            cashier?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            training?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            rehearsal?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
           };
         };
       };
@@ -6403,7 +6545,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          checklist: {
+          checklist?: {
             business?: boolean;
             unit?: boolean;
             catalog?: boolean;
@@ -6413,6 +6555,116 @@ export interface operations {
             fiscalChoice?: boolean;
             training?: boolean;
             rehearsal?: boolean;
+          };
+          items?: {
+            business?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            unit?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            plan?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            fiscalChoice?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            catalog?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            tables?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            team?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            qr?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            production?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            cashier?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            training?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
+            rehearsal?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+              evidenceReference?: string;
+              evidence?: {
+                [key: string]: unknown;
+              };
+              waiverReason?: string;
+            };
           };
         };
       };
@@ -6429,7 +6681,10 @@ export interface operations {
   "OnboardingController_activate[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        /** @description Chave opaca, estável por tentativa de ativação (8 a 160 caracteres). */
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
       };
@@ -6455,7 +6710,10 @@ export interface operations {
   "OnboardingController_activate[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        /** @description Chave opaca, estável por tentativa de ativação (8 a 160 caracteres). */
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
       };
@@ -6471,6 +6729,46 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OnboardingController_provisioningStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OnboardingController_provisioningStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };

@@ -9,11 +9,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class OnboardingPatchRequestBody : IAdditionalDataHolder, IParsable
+    public partial class OnboardingPatchRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The checklist property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -22,13 +20,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_checklist Checklist { get; set; }
 #endif
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody"/> and sets the default values.
-        /// </summary>
-        public OnboardingPatchRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
+        /// <summary>The items property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items? Items { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items Items { get; set; }
+#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -48,6 +47,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "checklist", n => { Checklist = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_checklist>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_checklist.CreateFromDiscriminatorValue); } },
+                { "items", n => { Items = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items>(global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items.CreateFromDiscriminatorValue); } },
             };
         }
         /// <summary>
@@ -58,7 +58,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_checklist>("checklist", Checklist);
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingPatchRequestBody_items>("items", Items);
         }
     }
 }

@@ -9,6 +9,7 @@ import {
   registerRequestSchema,
   registerSchema,
   trialApplicationRequestSchema,
+  updateOnboardingSchema,
 } from "./index.js";
 
 describe("public contracts", () => {
@@ -124,6 +125,34 @@ describe("public contracts", () => {
         ...base,
         fulfillment: "pickup",
         paymentMethod: "credit_card",
+      }).success,
+      false,
+    );
+  });
+
+  it("accepts N-1 onboarding progress without treating booleans as evidence", () => {
+    assert.deepEqual(updateOnboardingSchema.parse({ checklist: { business: true } }), {
+      checklist: { business: true },
+    });
+    assert.equal(updateOnboardingSchema.safeParse({}).success, false);
+  });
+
+  it("keeps structured onboarding evidence strict", () => {
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: {
+          training: {
+            status: "verified",
+            evidenceReference: "training-session-2026-08-11",
+            evidence: { attendees: 4 },
+          },
+        },
+      }).success,
+      true,
+    );
+    assert.equal(
+      updateOnboardingSchema.safeParse({
+        items: { training: { status: "verified", browserVerified: true } },
       }).success,
       false,
     );

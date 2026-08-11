@@ -97,9 +97,53 @@ export const activationChecklistSchema = z.object({
   rehearsal: z.boolean(),
 });
 
-export const updateOnboardingSchema = z.object({
-  checklist: activationChecklistSchema.partial(),
-});
+export const onboardingChecklistStatusSchema = z.enum([
+  "pending",
+  "in_progress",
+  "verified",
+  "blocked",
+  "not_applicable",
+]);
+
+export const onboardingChecklistEvidenceInputSchema = z
+  .object({
+    status: onboardingChecklistStatusSchema,
+    evidenceReference: z.string().trim().min(3).max(240).optional(),
+    evidence: z.record(z.string(), z.unknown()).optional(),
+    waiverReason: z.string().trim().min(10).max(500).optional(),
+  })
+  .strict();
+
+const onboardingChecklistItemsInputSchema = z
+  .object({
+    business: onboardingChecklistEvidenceInputSchema,
+    unit: onboardingChecklistEvidenceInputSchema,
+    plan: onboardingChecklistEvidenceInputSchema,
+    fiscalChoice: onboardingChecklistEvidenceInputSchema,
+    catalog: onboardingChecklistEvidenceInputSchema,
+    tables: onboardingChecklistEvidenceInputSchema,
+    team: onboardingChecklistEvidenceInputSchema,
+    qr: onboardingChecklistEvidenceInputSchema,
+    production: onboardingChecklistEvidenceInputSchema,
+    cashier: onboardingChecklistEvidenceInputSchema,
+    training: onboardingChecklistEvidenceInputSchema,
+    rehearsal: onboardingChecklistEvidenceInputSchema,
+  })
+  .partial()
+  .strict();
+
+export const updateOnboardingSchema = z
+  .object({
+    /** N-1 compatibility. true records progress but never verifies an item. */
+    checklist: activationChecklistSchema.partial().optional(),
+    items: onboardingChecklistItemsInputSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      Object.keys(value.checklist ?? {}).length > 0 || Object.keys(value.items ?? {}).length > 0,
+    "At least one checklist item is required",
+  );
 
 export const activateTrialSchema = z.object({
   planSlug: z.enum(["operacao", "crescimento", "rede"]),

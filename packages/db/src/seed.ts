@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { createDatabase } from "./index.js";
 import { commercialCatalogVersions, commercialPlans } from "./schema.js";
+import { demoSeedConfiguration } from "./seed-policy.js";
+
+// The default seed is intentionally limited to the public commercial catalog.
+// Task 35 may opt into demo data only through this fail-closed policy.
+demoSeedConfiguration(process.env);
 
 const plans = [
   {

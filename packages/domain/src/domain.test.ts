@@ -35,11 +35,14 @@ describe("critical domain rules", () => {
   it("requires every activation gate", () => {
     assert.deepEqual(missingActivationItems({ business: true }), [
       "unit",
+      "plan",
+      "fiscalChoice",
       "catalog",
+      "tables",
       "team",
+      "qr",
       "production",
       "cashier",
-      "fiscalChoice",
       "training",
       "rehearsal",
     ]);
