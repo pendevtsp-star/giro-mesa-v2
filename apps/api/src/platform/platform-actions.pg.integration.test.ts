@@ -16,6 +16,10 @@ const organizationA = randomUUID();
 const organizationB = randomUUID();
 const identityA = randomUUID();
 const identityB = randomUUID();
+const ownerIdentityA = randomUUID();
+const ownerIdentityB = randomUUID();
+const ownerMembershipA = randomUUID();
+const ownerMembershipB = randomUUID();
 const sessionA = randomUUID();
 const sessionB = randomUUID();
 const emailA = `platform-a-${suffix}@example.test`;
@@ -41,7 +45,9 @@ before(async () => {
     "platform.action.approve",
     "platform.action.reject",
     "platform.tenant.suspend",
-    "platform.tenant.restore",
+      "platform.tenant.restore",
+      "platform.membership.disable",
+      "platform.membership.restore",
   ].join("|");
   process.env.PLATFORM_ADMIN_GRANTS = `${emailA}=${grants};${emailB}=${grants}`;
   await connection.client`
@@ -54,7 +60,19 @@ before(async () => {
     insert into identities (id, email, display_name, email_verified_at)
     values
       (${identityA}, ${emailA}, 'Operator A', now()),
-      (${identityB}, ${emailB}, 'Operator B', now())
+      (${identityB}, ${emailB}, 'Operator B', now()),
+      (${ownerIdentityA}, ${`owner-a-${suffix}@example.test`}, 'Owner A', now()),
+      (${ownerIdentityB}, ${`owner-b-${suffix}@example.test`}, 'Owner B', now())
+  `;
+  await connection.client`
+    insert into memberships (id, identity_id, organization_id, status)
+    values
+      (${ownerMembershipA}, ${ownerIdentityA}, ${organizationB}, 'active'),
+      (${ownerMembershipB}, ${ownerIdentityB}, ${organizationB}, 'active')
+  `;
+  await connection.client`
+    insert into role_bindings (membership_id, role)
+    values (${ownerMembershipA}, 'owner'), (${ownerMembershipB}, 'owner')
   `;
   await connection.client`
     insert into auth_sessions (id, identity_id, token_hash, expires_at)
@@ -81,7 +99,7 @@ before(async () => {
 after(async () => {
   if (!connection) return;
   await connection.client`delete from audit_events where organization_id in (${organizationA}, ${organizationB}) or actor_identity_id in (${identityA}, ${identityB})`;
-  await connection.client`delete from identities where id in (${identityA}, ${identityB})`;
+  await connection.client`delete from identities where id in (${identityA}, ${identityB}, ${ownerIdentityA}, ${ownerIdentityB})`;
   await connection.client`delete from organizations where id in (${organizationA}, ${organizationB})`;
   await connection.client.end();
   delete process.env.PLATFORM_ADMIN_EMAILS;
@@ -147,5 +165,93 @@ describe("platform actions in PostgreSQL", () => {
       tenantProjection.items.some((item) => Object.values(item).includes(organizationB)),
       false,
     );
+  });
+
+  it("binds a decision idempotency key to proposal, command, and body", async (context) => {
+    if (!service || !connection)
+      return context.skip("PLATFORM_ACTIONS_DATABASE_URL not configured");
+    const requester = auth(identityA, sessionA, emailA);
+    const approver = auth(identityB, sessionB, emailB);
+    const proposal = await service.propose(requester, organizationB, "decision-proposal-0001", {
+      action: "tenant.suspend",
+      targetId: organizationB,
+      justification: "Incidente isolado com evidência suficiente para decisão.",
+      payload: { expectedState: "active" },
+    });
+    const executed = await service.approve(
+      approver,
+      organizationB,
+      proposal.id,
+      "decision-command-0001",
+      1,
+    );
+    assert.equal(executed.status, "executed");
+    await assert.rejects(
+      service.reject(
+        approver,
+        organizationB,
+        proposal.id,
+        "decision-command-0001",
+        1,
+      ),
+      /PLATFORM_IDEMPOTENCY_CONFLICT/,
+    );
+  });
+
+  it("serializes owner changes by organization and never disables the final owner", async (context) => {
+    if (!service || !connection)
+      return context.skip("PLATFORM_ACTIONS_DATABASE_URL not configured");
+    const requester = auth(identityA, sessionA, emailA);
+    const approver = auth(identityB, sessionB, emailB);
+    const functionName = `platform_owner_delay_${suffix}`;
+    const triggerName = `platform_owner_delay_${suffix}`;
+    await connection.client.unsafe(`
+      create function "${functionName}"() returns trigger language plpgsql as $$
+      begin
+        if old.organization_id = '${organizationB}'::uuid and new.status = 'disabled' then
+          perform pg_sleep(0.4);
+        end if;
+        return new;
+      end
+      $$
+    `);
+    await connection.client.unsafe(`
+      create trigger "${triggerName}" before update on memberships
+      for each row execute function "${functionName}"()
+    `);
+    try {
+      const [proposalA, proposalB] = await Promise.all([
+        service.propose(requester, organizationB, "owner-proposal-a-0001", {
+          action: "membership.disable",
+          targetId: ownerMembershipA,
+          justification: "Desativação controlada do primeiro owner com revisão independente.",
+          payload: { expectedState: "active" },
+        }),
+        service.propose(requester, organizationB, "owner-proposal-b-0001", {
+          action: "membership.disable",
+          targetId: ownerMembershipB,
+          justification: "Desativação controlada do segundo owner com revisão independente.",
+          payload: { expectedState: "active" },
+        }),
+      ]);
+      const decisions = await Promise.allSettled([
+        service.approve(approver, organizationB, proposalA.id, "owner-approval-a-0001", 1),
+        service.approve(approver, organizationB, proposalB.id, "owner-approval-b-0001", 1),
+      ]);
+      assert.equal(decisions.filter((decision) => decision.status === "fulfilled").length, 1);
+      assert.equal(decisions.filter((decision) => decision.status === "rejected").length, 1);
+      const activeOwners = await connection.client<{ count: number }[]>`
+        select count(distinct membership.id)::int as count
+        from memberships as membership
+        join role_bindings as binding on binding.membership_id = membership.id
+        where membership.organization_id = ${organizationB}
+          and membership.status = 'active'
+          and binding.role = 'owner'
+      `;
+      assert.equal(activeOwners[0]?.count, 1);
+    } finally {
+      await connection.client.unsafe(`drop trigger if exists "${triggerName}" on memberships`);
+      await connection.client.unsafe(`drop function if exists "${functionName}"()`);
+    }
   });
 });

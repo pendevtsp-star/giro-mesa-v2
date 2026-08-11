@@ -137,4 +137,64 @@ describe("platform action contract", () => {
     assert.equal(snapshot.version, 3);
     assert.equal("accidentalSecret" in snapshot, false);
   });
+
+  it("fails closed when execution is not preceded by an independent approval", () => {
+    assert.throws(
+      () =>
+        platformActionFromAuditEvents(pending.organizationId, pending.id, [
+          {
+            action: "platform.action.proposed",
+            actorIdentityId: pending.requestedByIdentityId,
+            occurredAt: new Date(pending.requestedAt),
+            metadata: {
+              version: 1,
+              status: "pending",
+              action: pending.action,
+              targetType: pending.targetType,
+              targetId: pending.targetId,
+              justification: pending.justification,
+              payload: pending.payload,
+              expiresAt: pending.expiresAt,
+            },
+          },
+          {
+            action: "platform.action.executed",
+            actorIdentityId: pending.requestedByIdentityId,
+            occurredAt: new Date("2026-08-11T11:09:00.000Z"),
+            metadata: { version: 2, status: "executed" },
+          },
+        ]),
+      /INVALID_ACTION_LEDGER/,
+    );
+  });
+
+  it("fails closed when an event action disagrees with its ledger status", () => {
+    assert.throws(
+      () =>
+        platformActionFromAuditEvents(pending.organizationId, pending.id, [
+          {
+            action: "platform.action.proposed",
+            actorIdentityId: pending.requestedByIdentityId,
+            occurredAt: new Date(pending.requestedAt),
+            metadata: {
+              version: 1,
+              status: "pending",
+              action: pending.action,
+              targetType: pending.targetType,
+              targetId: pending.targetId,
+              justification: pending.justification,
+              payload: pending.payload,
+              expiresAt: pending.expiresAt,
+            },
+          },
+          {
+            action: "platform.action.rejected",
+            actorIdentityId: "018f47a0-37f2-7d15-8c08-2b71d8415f44",
+            occurredAt: new Date("2026-08-11T11:09:00.000Z"),
+            metadata: { version: 2, status: "approved" },
+          },
+        ]),
+      /INVALID_ACTION_LEDGER/,
+    );
+  });
 });

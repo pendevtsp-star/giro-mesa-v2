@@ -38,6 +38,7 @@ import {
 import {
   actionRequestFingerprint,
   assertPlatformActionTransition,
+  decisionRequestFingerprint,
   type PlatformActionInput,
   type PlatformActionSnapshot,
   parsePlatformActionInput,
@@ -84,17 +85,14 @@ export class PlatformService {
   async overview(auth: AuthContext) {
     const access = this.assertRead(auth);
     const [counts, stepUp] = await Promise.all([
-      this.database.db
-        .select({
-          organizations: sql<number>`count(*)::int`,
-          active: sql<number>`count(*) filter (where ${organizations.billingState} in ('trial_active', 'active'))::int`,
-          attention: sql<number>`count(*) filter (where ${organizations.billingState} in ('grace', 'restricted', 'suspended'))::int`,
-        })
-        .from(organizations),
+      this.database.db.execute(
+        sql<{ organizations: number; active: number; attention: number }>`select * from public.giromesa_platform_overview()`,
+      ),
       this.recentStepUp(auth),
     ]);
+    const [overview] = [...counts];
     return {
-      counts: counts[0] ?? { organizations: 0, active: 0, attention: 0 },
+      counts: overview ?? { organizations: 0, active: 0, attention: 0 },
       access: {
         permissions: access.permissions,
         stepUp: hasRecentPlatformStepUp(stepUp),
@@ -275,6 +273,12 @@ export class PlatformService {
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1)
       throw new BadRequestException("INVALID_PLATFORM_ACTION_VERSION");
     const keyHash = this.idempotencyHash(idempotencyKey);
+    const decisionFingerprint = decisionRequestFingerprint({
+      organizationId,
+      proposalId,
+      command,
+      expectedVersion,
+    });
     const initial = await this.loadAction(this.database.db, organizationId, proposalId);
     await this.assertMutation(auth, initial.action, command);
     try {
@@ -288,8 +292,16 @@ export class PlatformService {
           auth.identityId,
           keyHash,
         );
-        if (replay && (current.status === "executed" || current.status === "rejected"))
-          return current;
+        if (replay) {
+          if (replay.fingerprint !== decisionFingerprint)
+            throw new ConflictException("PLATFORM_IDEMPOTENCY_CONFLICT");
+          if (
+            current.status === "executed" ||
+            current.status === "rejected" ||
+            current.status === "failed"
+          )
+            return current;
+        }
         assertPlatformActionTransition(current, {
           command,
           actorIdentityId: auth.identityId,
@@ -307,6 +319,7 @@ export class PlatformService {
               version: current.version + 1,
               status: "rejected",
               decisionIdempotencyHash: keyHash,
+              decisionFingerprint,
             },
           });
           return this.loadAction(tx, organizationId, proposalId);
@@ -321,6 +334,7 @@ export class PlatformService {
             version: current.version + 1,
             status: "approved",
             decisionIdempotencyHash: keyHash,
+            decisionFingerprint,
           },
         });
         const effect = await this.executeAction(tx, auth.identityId, current);
@@ -334,6 +348,7 @@ export class PlatformService {
             version: current.version + 2,
             status: "executed",
             decisionIdempotencyHash: keyHash,
+            decisionFingerprint,
             before: effect.before,
             after: effect.after,
           },
@@ -342,7 +357,14 @@ export class PlatformService {
       });
     } catch (error) {
       if (this.isPolicyFailure(error)) throw error;
-      await this.recordFailedExecution(auth, organizationId, proposalId, keyHash, error);
+      await this.recordFailedExecution(
+        auth,
+        organizationId,
+        proposalId,
+        keyHash,
+        decisionFingerprint,
+        error,
+      );
       throw error;
     }
   }
@@ -547,7 +569,14 @@ export class PlatformService {
     }
     if (resource === "integrations") {
       const rows = await this.database.db
-        .select()
+        .select({
+          id: growthIntegrations.id,
+          organizationId: growthIntegrations.organizationId,
+          unitId: growthIntegrations.unitId,
+          provider: growthIntegrations.provider,
+          status: growthIntegrations.status,
+          updatedAt: growthIntegrations.updatedAt,
+        })
         .from(growthIntegrations)
         .where(
           unitId
@@ -651,6 +680,10 @@ export class PlatformService {
       return { before: { state: expected }, after: { state: updated.state } };
     }
 
+    await this.lock(
+      tx,
+      `platform:organization:${snapshot.organizationId}:membership-owners`,
+    );
     const [target] = await tx
       .select({ identityId: memberships.identityId, status: memberships.status })
       .from(memberships)
@@ -763,7 +796,10 @@ export class PlatformService {
     keyHash: string,
   ) {
     const [row] = await tx
-      .select({ id: auditEvents.id })
+      .select({
+        id: auditEvents.id,
+        fingerprint: sql<string>`${auditEvents.metadata}->>'decisionFingerprint'`,
+      })
       .from(auditEvents)
       .where(
         and(
@@ -774,7 +810,7 @@ export class PlatformService {
         ),
       )
       .limit(1);
-    return Boolean(row);
+    return row?.id ? { id: row.id, fingerprint: row.fingerprint } : null;
   }
 
   private async recordFailedExecution(
@@ -782,6 +818,7 @@ export class PlatformService {
     organizationId: string,
     proposalId: string,
     keyHash: string,
+    decisionFingerprint: string,
     error: unknown,
   ) {
     await this.database.db.transaction(async (tx) => {
@@ -798,6 +835,7 @@ export class PlatformService {
           version: current.version + 1,
           status: "failed",
           decisionIdempotencyHash: keyHash,
+          decisionFingerprint,
           failureCode: this.failureCode(error),
         },
       });
@@ -816,6 +854,7 @@ export class PlatformService {
       "PLATFORM_ACTION_VERSION_CONFLICT",
       "PLATFORM_ACTION_TERMINAL",
       "PLATFORM_ACTION_EXPIRED",
+      "PLATFORM_IDEMPOTENCY_CONFLICT",
     ].includes(message);
   }
 

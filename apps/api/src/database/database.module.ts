@@ -7,6 +7,7 @@ import {
   type TenantContext,
   type TenantTransaction,
   withDatabaseRoleContext,
+  withPlatformContext,
   withPublicMenuContext,
   withTenantContext,
   withWorkerContext,
@@ -53,6 +54,13 @@ export class DatabaseService implements OnModuleDestroy {
     work: (database: TenantTransaction) => Promise<T> | T,
   ) {
     return withDatabaseRoleContext(this.connection, role, actorIdentityId, work);
+  }
+
+  withPlatformContext<T>(
+    context: { actorIdentityId: string; sessionId: string; organizationId?: string | null },
+    work: (database: TenantTransaction) => Promise<T> | T,
+  ) {
+    return withPlatformContext(this.connection, context, work);
   }
 
   withPublicMenuContext<T>(

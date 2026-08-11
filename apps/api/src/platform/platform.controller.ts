@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseFilters,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -8,8 +19,10 @@ import {
 } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/session.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PlatformAdminGuard } from "./platform.guard.js";
 import { PlatformService } from "./platform.service.js";
+import { PlatformExceptionFilter } from "./platform-exception.filter.js";
 
 const platformActions = [
   "tenant.suspend",
@@ -129,6 +142,8 @@ class PlatformDecisionRequest {
 }
 
 @UseGuards(SessionGuard, PlatformAdminGuard)
+@UseFilters(PlatformExceptionFilter)
+@DatabaseContext("platform")
 @Controller(["api/v1/platform", "v1/platform"])
 export class PlatformController {
   constructor(private readonly platform: PlatformService) {}

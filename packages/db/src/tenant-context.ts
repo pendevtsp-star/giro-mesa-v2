@@ -14,6 +14,12 @@ export type TenantContext = Readonly<{
 export type TenantTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export type DatabaseContextRole = "identity" | "internal" | "public" | "worker";
 
+export type PlatformContext = Readonly<{
+  actorIdentityId: string;
+  sessionId: string;
+  organizationId: string | null;
+}>;
+
 interface ActiveTenantScope {
   context: TenantContext | null;
   database: TenantTransaction;
@@ -103,6 +109,32 @@ export async function withDatabaseRoleContext<T>(
       select set_config('app.current_actor_identity_id', ${optionalUuid(actorIdentityId, "actorIdentityId") ?? ""}, true)
     `);
     return activeTenantScope.run({ context: null, database: transaction }, () => work(transaction));
+  });
+}
+
+export async function withPlatformContext<T>(
+  connection: DatabaseConnection,
+  input: { actorIdentityId: string; sessionId: string; organizationId?: string | null },
+  work: (database: TenantTransaction, context: PlatformContext) => Promise<T> | T,
+): Promise<T> {
+  const context: PlatformContext = Object.freeze({
+    actorIdentityId: requiredUuid(input.actorIdentityId, "actorIdentityId"),
+    sessionId: requiredUuid(input.sessionId, "sessionId"),
+    organizationId: optionalUuid(input.organizationId, "organizationId"),
+  });
+  return connection.db.transaction(async (transaction) => {
+    await transaction.execute(sql.raw("set local role giromesa_platform"));
+    await transaction.execute(sql`
+      select
+        set_config('app.current_context_source', 'platform', true),
+        set_config('app.current_organization_id', ${context.organizationId ?? ""}, true),
+        set_config('app.current_unit_id', '', true),
+        set_config('app.current_actor_identity_id', ${context.actorIdentityId}, true),
+        set_config('app.current_session_id', ${context.sessionId}, true)
+    `);
+    return activeTenantScope.run({ context: null, database: transaction }, () =>
+      work(transaction, context),
+    );
   });
 }
 

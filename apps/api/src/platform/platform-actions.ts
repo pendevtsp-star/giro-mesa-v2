@@ -94,6 +94,15 @@ export function actionRequestFingerprint(organizationId: string, input: Platform
   return createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 }
 
+export function decisionRequestFingerprint(input: {
+  organizationId: string;
+  proposalId: string;
+  command: "approve" | "reject";
+  expectedVersion: number;
+}) {
+  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
+}
+
 export function platformActionTargetType(action: PlatformActionName) {
   return action.startsWith("tenant.") ? ("organization" as const) : ("membership" as const);
 }
@@ -156,6 +165,8 @@ export function platformActionFromAuditEvents(
     payload: metadata.payload,
   });
   if (targetType !== platformActionTargetType(action)) throw new Error("INVALID_ACTION_LEDGER");
+  if (requiredVersion(metadata) !== 1 || metadata.status !== "pending")
+    throw new Error("INVALID_ACTION_LEDGER");
   let snapshot: PlatformActionSnapshot = {
     id: proposalId,
     organizationId,
@@ -166,7 +177,7 @@ export function platformActionFromAuditEvents(
     justification: request.justification,
     payload: request.payload,
     status: "pending",
-    version: requiredVersion(metadata),
+    version: 1,
     requestedAt: proposed.occurredAt.toISOString(),
     expiresAt,
   };
@@ -176,13 +187,31 @@ export function platformActionFromAuditEvents(
     const status = requiredString(transition.metadata, "status") as PlatformActionStatus;
     if (!(["approved", "executed", "rejected", "expired", "failed"] as string[]).includes(status))
       throw new Error("INVALID_ACTION_LEDGER");
-    if (snapshot.status !== "pending" && !(snapshot.status === "approved" && status === "executed"))
+    if (transition.action !== `platform.action.${status}`)
       throw new Error("INVALID_ACTION_LEDGER");
+    const actorIdentityId = transition.actorIdentityId ?? undefined;
+    if (status === "approved") {
+      if (
+        snapshot.status !== "pending" ||
+        !actorIdentityId ||
+        actorIdentityId === snapshot.requestedByIdentityId
+      )
+        throw new Error("INVALID_ACTION_LEDGER");
+    } else if (status === "executed") {
+      if (
+        snapshot.status !== "approved" ||
+        !actorIdentityId ||
+        actorIdentityId !== snapshot.decidedByIdentityId
+      )
+        throw new Error("INVALID_ACTION_LEDGER");
+    } else if (snapshot.status !== "pending" || (status !== "expired" && !actorIdentityId)) {
+      throw new Error("INVALID_ACTION_LEDGER");
+    }
     snapshot = {
       ...snapshot,
       status,
       version,
-      decidedByIdentityId: transition.actorIdentityId ?? undefined,
+      decidedByIdentityId: actorIdentityId ?? snapshot.decidedByIdentityId,
       decidedAt: transition.occurredAt.toISOString(),
       failureCode:
         status === "failed" ? requiredString(transition.metadata, "failureCode") : undefined,
