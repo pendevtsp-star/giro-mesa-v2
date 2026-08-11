@@ -31,7 +31,6 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiProperty,
-  ApiServiceUnavailableResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
@@ -212,7 +211,6 @@ export class OnboardingController {
   @ApiForbiddenResponse({ type: OnboardingApiErrorResponse })
   @ApiNotFoundResponse({ type: OnboardingApiErrorResponse })
   @ApiConflictResponse({ type: OnboardingApiErrorResponse })
-  @ApiServiceUnavailableResponse({ type: OnboardingApiErrorResponse })
   @ApiInternalServerErrorResponse({ type: OnboardingApiErrorResponse })
   @ApiHeader({
     name: "Idempotency-Key",

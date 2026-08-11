@@ -122,6 +122,146 @@ describe("durable onboarding provisioning", () => {
     );
   }
 
+  async function ownerLockMetadata(client: DatabaseConnection["client"]) {
+    const [metadata] = await client<
+      {
+        owner: string;
+        security_definer: boolean;
+        configuration: string[] | null;
+        public_execute: boolean;
+        public_runtime_execute: boolean;
+        app_execute: boolean;
+        identity_execute: boolean;
+        worker_execute: boolean;
+        internal_execute: boolean;
+        legacy_execute: boolean;
+        migrator_execute: boolean;
+        app_grant_option: boolean;
+        non_owner_execute_grantees: string[];
+        migrator_login: boolean;
+        migrator_bypass_rls: boolean;
+        runtime_bypass_rls: boolean;
+        runtime_migrator_membership: boolean;
+        migrator_destructive_table_privilege: boolean;
+      }[]
+    >`
+      select
+        owner_role.rolname owner,
+        procedure.prosecdef security_definer,
+        procedure.proconfig configuration,
+        has_function_privilege('public', procedure.oid, 'execute') public_execute,
+        has_function_privilege('giromesa_public', procedure.oid, 'execute') public_runtime_execute,
+        has_function_privilege('giromesa_app', procedure.oid, 'execute') app_execute,
+        has_function_privilege('giromesa_identity', procedure.oid, 'execute') identity_execute,
+        has_function_privilege('giromesa_worker', procedure.oid, 'execute') worker_execute,
+        has_function_privilege('giromesa_internal', procedure.oid, 'execute') internal_execute,
+        has_function_privilege('giromesa_legacy_transition', procedure.oid, 'execute') legacy_execute,
+        has_function_privilege('giromesa_migrator', procedure.oid, 'execute') migrator_execute,
+        coalesce(
+          (
+            select bool_or(acl.is_grantable)
+            from aclexplode(procedure.proacl) acl
+            inner join pg_roles grantee on grantee.oid = acl.grantee
+            where grantee.rolname = 'giromesa_app' and acl.privilege_type = 'EXECUTE'
+          ),
+          false
+        ) app_grant_option,
+        coalesce(
+          (
+            select array_agg(
+              coalesce(grantee.rolname::text, 'PUBLIC')
+              order by coalesce(grantee.rolname::text, 'PUBLIC')
+            )
+            from aclexplode(procedure.proacl) acl
+            left join pg_roles grantee on grantee.oid = acl.grantee
+            where acl.privilege_type = 'EXECUTE' and acl.grantee <> procedure.proowner
+          ),
+          array[]::text[]
+        ) non_owner_execute_grantees,
+        owner_role.rolcanlogin migrator_login,
+        owner_role.rolbypassrls migrator_bypass_rls,
+        exists (
+          select 1
+          from pg_roles runtime_role
+          where runtime_role.rolname in (
+            'giromesa_app', 'giromesa_identity', 'giromesa_worker', 'giromesa_internal',
+            'giromesa_public', 'giromesa_legacy_transition'
+          ) and runtime_role.rolbypassrls
+        ) runtime_bypass_rls,
+        exists (
+          select 1
+          from pg_auth_members membership
+          inner join pg_roles runtime_role on runtime_role.oid = membership.member
+          where membership.roleid = owner_role.oid
+            and runtime_role.rolname in (
+              'giromesa_app', 'giromesa_identity', 'giromesa_worker', 'giromesa_internal',
+              'giromesa_public', 'giromesa_legacy_transition'
+            )
+        ) runtime_migrator_membership,
+        has_table_privilege('giromesa_migrator', 'memberships', 'insert')
+          or has_table_privilege('giromesa_migrator', 'memberships', 'delete')
+          or has_table_privilege('giromesa_migrator', 'memberships', 'truncate')
+          or has_table_privilege('giromesa_migrator', 'role_bindings', 'insert')
+          or has_table_privilege('giromesa_migrator', 'role_bindings', 'delete')
+          or has_table_privilege('giromesa_migrator', 'role_bindings', 'truncate')
+          migrator_destructive_table_privilege
+      from pg_proc procedure
+      inner join pg_namespace namespace on namespace.oid = procedure.pronamespace
+      inner join pg_roles owner_role on owner_role.oid = procedure.proowner
+      where namespace.nspname = 'public'
+        and procedure.proname = 'giromesa_lock_onboarding_owner'
+        and pg_get_function_identity_arguments(procedure.oid) = 'p_organization_id uuid, p_identity_id uuid'
+    `;
+    assert.deepEqual(metadata, {
+      owner: "giromesa_migrator",
+      security_definer: true,
+      configuration: ["search_path=pg_catalog, public"],
+      public_execute: false,
+      public_runtime_execute: false,
+      app_execute: true,
+      identity_execute: false,
+      worker_execute: false,
+      internal_execute: false,
+      legacy_execute: false,
+      migrator_execute: true,
+      app_grant_option: false,
+      non_owner_execute_grantees: ["giromesa_app"],
+      migrator_login: false,
+      migrator_bypass_rls: true,
+      runtime_bypass_rls: false,
+      runtime_migrator_membership: false,
+      migrator_destructive_table_privilege: false,
+    });
+  }
+
+  async function callOwnerLockWithRawContext(
+    organizationSetting: string,
+    actorSetting: string,
+    organizationId: string,
+    identityId: string,
+  ) {
+    if (!appConnection) throw new Error("application database is not configured");
+    return appConnection.client.begin(async (transaction) => {
+      await transaction.unsafe("set local role giromesa_app");
+      await transaction.unsafe(
+        `select
+          set_config('app.current_organization_id', $1, true),
+          set_config('app.current_actor_identity_id', $2, true)`,
+        [organizationSetting, actorSetting],
+      );
+      const [result] = await transaction.unsafe<{ authorized: boolean }[]>(
+        `
+        select public.giromesa_lock_onboarding_owner(
+          $1::uuid,
+          $2::uuid
+        ) authorized
+        `,
+        [organizationId, identityId],
+      );
+      return result?.authorized ?? false;
+    });
+  }
+
   async function fixture(label: string, ready = true) {
     if (!owner || !service) throw new Error("fixture database is not configured");
     documentCounter += 1;
@@ -469,6 +609,7 @@ describe("durable onboarding provisioning", () => {
     const fresh = createDatabase(freshUrl.toString(), { max: 1 });
     try {
       for (const file of migrations) await applyMigration(fresh.client, file);
+      await applyMigration(fresh.client, ownerLockMigration);
       const [metadata] = await fresh.client<{ force_rls: boolean; migration_tables: number }[]>`
         select
           (select relforcerowsecurity from pg_class where oid = 'provisioning_runs'::regclass) force_rls,
@@ -477,6 +618,7 @@ describe("durable onboarding provisioning", () => {
              and table_name in ('provisioning_runs','provisioning_steps','onboarding_checklist_items','subscription_entitlements')) migration_tables
       `;
       assert.deepEqual(metadata, { force_rls: true, migration_tables: 4 });
+      await ownerLockMetadata(fresh.client);
     } finally {
       await fresh.client.end();
       await admin.client.unsafe(
@@ -510,6 +652,8 @@ describe("durable onboarding provisioning", () => {
       await applyMigration(migrator.client, provisioningMigration);
       await applyMigration(migrator.client, selectionMigration);
       await applyMigration(migrator.client, ownerLockMigration);
+      await applyMigration(migrator.client, ownerLockMigration);
+      await ownerLockMetadata(migrator.client);
       const backfill = await migrator.client<{ item: string; status: string; source: string }[]>`
         select item, status::text, source::text
         from onboarding_checklist_items
@@ -1110,6 +1254,7 @@ describe("durable onboarding provisioning", () => {
         .select()
         .from(auditEvents)
         .where(eq(auditEvents.organizationId, subject.organizationId))
+        .orderBy(auditEvents.occurredAt)
     ).filter((event) => event.action === "onboarding.system_evidence_changed");
     for (const item of ["catalog", "tables", "cashier", "team"]) {
       const transitions = history.filter((event) => event.metadata.item === item);
@@ -1960,6 +2105,28 @@ describe("durable onboarding provisioning", () => {
         `) ?? Promise.reject(new Error("database unavailable")),
     );
     assert.equal(spoofedLock?.authorized, false);
+    assert.equal(
+      await callOwnerLockWithRawContext(
+        tenantB.organizationId.toUpperCase(),
+        tenantB.ownerIdentityId.toUpperCase(),
+        tenantB.organizationId,
+        tenantB.ownerIdentityId,
+      ),
+      true,
+    );
+    assert.equal(
+      await callOwnerLockWithRawContext(
+        "not-a-uuid",
+        tenantB.ownerIdentityId,
+        tenantB.organizationId,
+        tenantB.ownerIdentityId,
+      ),
+      false,
+    );
+    assert.equal(
+      await callOwnerLockWithRawContext("", "", tenantB.organizationId, tenantB.ownerIdentityId),
+      false,
+    );
     await owner.db
       .update(onboardingChecklistItems)
       .set({ status: "in_progress", source: "legacy_import" })

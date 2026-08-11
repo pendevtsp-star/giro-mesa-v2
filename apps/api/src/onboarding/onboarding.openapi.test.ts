@@ -74,7 +74,10 @@ describe("onboarding generated contract", () => {
       );
       assert.ok(property(document, "paths", `${base}/activate`, "post", "responses", "400"));
       assert.ok(property(document, "paths", `${base}/activate`, "post", "responses", "409"));
-      assert.ok(property(document, "paths", `${base}/activate`, "post", "responses", "503"));
+      assert.equal(
+        object(property(document, "paths", `${base}/activate`, "post", "responses"))["503"],
+        undefined,
+      );
       const parameters = property(document, "paths", `${base}/activate`, "post", "parameters");
       assert.ok(
         Array.isArray(parameters) &&
@@ -101,7 +104,7 @@ describe("onboarding generated contract", () => {
         [base, "get", ["400", "401", "403", "404", "500"]],
         [base, "patch", ["400", "401", "403", "404", "409", "500"]],
         [`${base}/selection`, "put", ["400", "401", "403", "404", "409", "500"]],
-        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "500", "503"]],
+        [`${base}/activate`, "post", ["400", "401", "403", "404", "409", "500"]],
         [`${base}/provisioning/{runId}`, "get", ["400", "401", "403", "404", "500"]],
       ] as const;
       for (const [path, method, statuses] of errorResponses) {
@@ -162,7 +165,7 @@ describe("onboarding generated contract", () => {
       new URL("Activate/ActivateRequestBuilder.cs", csharpRoot),
       "utf8",
     );
-    for (const status of ["400", "401", "403", "404", "409", "500", "503"]) {
+    for (const status of ["400", "401", "403", "404", "409", "500"]) {
       assert.match(
         activate,
         new RegExp(
@@ -170,6 +173,7 @@ describe("onboarding generated contract", () => {
         ),
       );
     }
+    assert.doesNotMatch(activate, /\{ "503",/);
     for (const root of [csharpRoot, csharpAliasRoot]) {
       for (const path of [
         "OnboardingRequestBuilder.cs",

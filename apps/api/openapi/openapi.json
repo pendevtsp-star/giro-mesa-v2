@@ -5331,16 +5331,6 @@
                 }
               }
             }
-          },
-          "503": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
-                }
-              }
-            }
           }
         },
         "tags": [
@@ -5453,16 +5443,6 @@
             }
           },
           "500": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OnboardingApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
             "description": "",
             "content": {
               "application/json": {

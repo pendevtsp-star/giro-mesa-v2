@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  InternalServerErrorException,
   Module,
   NotFoundException,
   ServiceUnavailableException,
@@ -20,6 +22,9 @@ const organizationId = crypto.randomUUID();
 const identityId = crypto.randomUUID();
 const managerIdentityId = crypto.randomUUID();
 const crashingRunId = crypto.randomUUID();
+const maliciousInternalRunId = crypto.randomUUID();
+const maliciousUnavailableRunId = crypto.randomUUID();
+const nestedCauseRunId = crypto.randomUUID();
 let updateCalls = 0;
 const fakeService = {
   get() {
@@ -34,7 +39,10 @@ const fakeService = {
   },
   select(actorIdentityId: string) {
     if (actorIdentityId === managerIdentityId) {
-      throw new ForbiddenException({ code: "INSUFFICIENT_ROLE", message: "Acesso não autorizado." });
+      throw new ForbiddenException({
+        code: "INSUFFICIENT_ROLE",
+        message: "Acesso não autorizado.",
+      });
     }
     throw new BadRequestException({
       code: "INVALID_ONBOARDING_UNIT",
@@ -49,8 +57,9 @@ const fakeService = {
   ) {
     if (input.planSlug === "rede") {
       throw new ServiceUnavailableException({
-        code: "PROVISIONING_TRANSIENT_FAILURE",
-        message: "O provisionamento foi preservado e pode ser retomado.",
+        code: "PROVISIONING_TRANSIENT_FAILURE_SECRET",
+        message: "database password must never cross this boundary",
+        details: { provisioningRunId: crashingRunId, secret: "provider-token" },
       });
     }
     throw new BadRequestException({
@@ -65,6 +74,28 @@ const fakeService = {
   provisioningStatus(_identityId: string, _organizationId: string, runId: string) {
     if (runId === crashingRunId) {
       throw new Error("database password and internal stack must stay private");
+    }
+    if (runId === maliciousInternalRunId) {
+      throw new InternalServerErrorException({
+        code: "MALICIOUS_INTERNAL_CODE",
+        message: "resend api key and sql must stay private",
+        details: { provisioningRunId: crashingRunId, secret: "resend-secret" },
+      });
+    }
+    if (runId === maliciousUnavailableRunId) {
+      throw new HttpException(
+        {
+          code: "MALICIOUS_UPSTREAM_CODE",
+          message: "upstream authorization header must stay private",
+          details: { provisioningRunId: crashingRunId, secret: "bearer-secret" },
+        },
+        503,
+      );
+    }
+    if (runId === nestedCauseRunId) {
+      throw new Error("outer database secret", {
+        cause: new Error("nested provider secret and internal stack"),
+      });
     }
     throw new NotFoundException();
   },
@@ -111,6 +142,14 @@ function exactError(payload: unknown, statusCode: number, code: string) {
   return body;
 }
 
+function exactInternalError(payload: unknown) {
+  assert.deepEqual(payload, {
+    statusCode: 500,
+    code: "INTERNAL_SERVER_ERROR",
+    message: "Não foi possível concluir a solicitação.",
+  });
+}
+
 describe("onboarding real HTTP error contract", () => {
   let app: NestFastifyApplication;
 
@@ -145,8 +184,24 @@ describe("onboarding real HTTP error contract", () => {
         url: `${base}/provisioning/${crashingRunId}`,
         headers: { authorization: "Bearer test" },
       });
-      exactError(internal.json(), 500, "INTERNAL_ERROR");
+      assert.equal(internal.statusCode, 500);
+      exactInternalError(internal.json());
       assert.doesNotMatch(internal.body, /password|stack|private|database/i);
+
+      for (const [runId, forbiddenContent] of [
+        [maliciousInternalRunId, /MALICIOUS|resend|secret|sql/i],
+        [maliciousUnavailableRunId, /MALICIOUS|upstream|authorization|bearer|secret/i],
+        [nestedCauseRunId, /outer|nested|provider|secret|stack/i],
+      ] as const) {
+        const serverFailure = await app.inject({
+          method: "GET",
+          url: `${base}/provisioning/${runId}`,
+          headers: { authorization: "Bearer test" },
+        });
+        assert.equal(serverFailure.statusCode, 500);
+        exactInternalError(serverFailure.json());
+        assert.doesNotMatch(serverFailure.body, forbiddenContent);
+      }
 
       const invalidHeader = await app.inject({
         method: "POST",
@@ -219,7 +274,12 @@ describe("onboarding real HTTP error contract", () => {
         },
         payload: { planSlug: "rede" },
       });
-      exactError(unavailable.json(), 503, "PROVISIONING_TRANSIENT_FAILURE");
+      assert.equal(unavailable.statusCode, 500);
+      exactInternalError(unavailable.json());
+      assert.doesNotMatch(
+        unavailable.body,
+        /PROVISIONING|database|password|provider|token|secret/i,
+      );
     });
   }
 });

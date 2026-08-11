@@ -136,3 +136,31 @@ O onboarding agora usa evidencias normalizadas e uma saga persistida por organiz
 - O `SECURITY DEFINER` nao aceita SQL dinamico, fixa `pg_catalog, public`, qualifica todas as relacoes e a propria chamada, nao devolve dados de autorizacao alem do booleano e nao concede escrita ao app. `PUBLIC` nao possui execute; chamadas sem GUC ou com ator divergente falham fechado. Os GUCs continuam parte do boundary transacional confiavel ja usado pelo RLS; uma credencial de banco comprometida permanece fora do modelo de usuario HTTP e nao ganha nova mutacao por essa funcao.
 - O freeze usa apenas snapshot cujo ID, versao e fingerprint ainda conferem internamente. Evidencias e erros continuam saindo por allowlists.
 - Nao houve push, deploy, provider real ou remocao de containers compartilhados.
+
+## Fix round 4
+
+### RED capturado
+
+- O filtro HTTP refletia `code`, `message` e detalhes allowlisted de `HttpException` 5xx. Testes HTTP reais mostraram que um `InternalServerErrorException` ou 503 malicioso podia controlar a resposta, e que o contrato ainda publicava 503 embora o boundary devesse ser constante.
+- A migration `0016` deixava a funcao com o owner da sessao de migracao e comparava GUCs como texto. Os novos gates exigiram owner deterministico, ACL estrita, rerun e equivalencia UUID canonica/uppercase.
+
+### Correcoes aplicadas
+
+- Qualquer excecao com status maior ou igual a 500 agora encerra o filtro antes de inspecionar o payload e devolve somente HTTP 500 com `{ statusCode: 500, code: "INTERNAL_SERVER_ERROR", message: "Nao foi possivel concluir a solicitacao." }`. Body, `details`, stack e `cause` nunca sao lidos ou refletidos.
+- Os aliases `/api/v1` e `/v1` exercitam `InternalServerErrorException` maliciosa, `HttpException` 503 maliciosa, `Error` simples e `Error` com causa aninhada. Todos produzem exatamente o mesmo corpo seguro. OpenAPI e clientes TypeScript/C# removem a resposta 503 e mantem o schema tipado de 500.
+- `0016_onboarding_owner_lock.sql` valida GUCs como UUID canonico antes do cast, aceita diferenca de caixa e falha fechado para ausente, malformado e escopo divergente. A funcao permanece `SECURITY DEFINER`, com `search_path = pg_catalog, public` e relacoes qualificadas.
+- A funcao passa a pertencer explicitamente a `giromesa_migrator`. ACLs antigas sao revogadas antes e depois da troca de owner; somente `giromesa_app` recebe `EXECUTE` sem grant option, alem do privilegio implicito do owner.
+- Gates fresh e upgrade reaplicam `0016` para provar rerun seguro e verificam `proowner`, `prosecdef`, `proconfig`, ACL efetiva de PUBLIC/app/identity/worker/internal/public-runtime/legacy/migrator, grant option, papel owner `NOLOGIN`, ausencia de membership/bypass nos papeis runtime e ausencia de privilegios destrutivos do migrator nas tabelas de autorizacao.
+
+### Gates do fix
+
+- HTTP real + OpenAPI focado: **4/4**.
+- PostgreSQL 17.10: integracao Task 7 **20/20**. Um primeiro gate expôs ordenacao nao deterministica no teste de auditoria (**19/20**): a consulta nao tinha `ORDER BY` e `.at(-1)` podia escolher o evento `verified` anterior. O teste passou a ordenar por `occurredAt`; o caso isolado passou **1/1** e o rerun integral passou **20/20**.
+- PostgreSQL 16.14: integracao Task 7 **20/20**. Depois do reforco final das assercoes de ACL, o caso fresh/upgrade/RLS foi repetido em PG 16 e PG 17, **1/1** em ambos.
+- `pnpm test`: **12/12 tasks** e gates de baseline/supply-chain **25/25**; `pnpm typecheck`: **12/12**; `pnpm build`: **8/8**.
+- Cliente C# compilou com **0 warnings e 0 errors**. OpenAPI, TypeScript e C# foram regenerados; Biome focado e `git diff --check` ficaram verdes.
+
+### Self-review
+
+- O papel owner continua `BYPASSRLS` e `NOLOGIN` por ser o owner compartilhado das funcoes definer existentes; nenhum papel runtime o herda ou possui bypass. O novo poder exposto permanece exclusivamente na funcao booleana estreita, sem SQL dinamico, mutacao ou retorno de dados de autorizacao.
+- Nenhum container foi criado ou removido, e nao houve push, deploy ou chamada de provider real.

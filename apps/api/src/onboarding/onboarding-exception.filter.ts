@@ -7,8 +7,6 @@ const DEFAULT_CODES: Record<number, string> = {
   403: "FORBIDDEN",
   404: "ONBOARDING_NOT_FOUND",
   409: "ONBOARDING_CONFLICT",
-  500: "INTERNAL_ERROR",
-  503: "ONBOARDING_UNAVAILABLE",
 };
 const DEFAULT_MESSAGES: Record<number, string> = {
   400: "Dados inválidos.",
@@ -16,8 +14,6 @@ const DEFAULT_MESSAGES: Record<number, string> = {
   403: "Acesso não autorizado.",
   404: "Onboarding não encontrado.",
   409: "A operação conflita com o estado atual do onboarding.",
-  500: "Não foi possível concluir a solicitação.",
-  503: "O onboarding está temporariamente indisponível.",
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -69,6 +65,14 @@ export class OnboardingExceptionFilter implements ExceptionFilter {
       status(code: number): { send(body: unknown): void };
     }>();
     const statusCode = exception instanceof HttpException ? exception.getStatus() : 500;
+    if (statusCode >= 500) {
+      response.status(500).send({
+        statusCode: 500,
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Não foi possível concluir a solicitação.",
+      });
+      return;
+    }
     const payload =
       exception instanceof HttpException ? record(exception.getResponse()) : ({} as const);
     const code =
