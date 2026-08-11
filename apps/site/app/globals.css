@@ -259,7 +259,7 @@ summary:focus-visible {
   gap: 62px;
 }
 .hero-copy h1 {
-  margin: 18px 0 24px;
+  margin: 0 0 24px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(49px, 5.4vw, 78px);
   line-height: 0.97;
@@ -293,16 +293,88 @@ summary:focus-visible {
     var(--shadow);
   transform: rotate(1.2deg);
 }
+.product-carousel-frame {
+  position: relative;
+  aspect-ratio: 3 / 2;
+}
+.product-carousel:focus-within .product-carousel-frame {
+  outline: 3px solid var(--orange);
+  outline-offset: 8px;
+}
 .hero-product-frame img {
   width: 100%;
   height: auto;
   display: block;
+}
+.product-carousel-frame img {
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+.product-carousel-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  box-shadow: 0 5px 18px rgba(13, 48, 40, 0.18);
 }
 .hero-product figcaption {
   margin: 18px 8px 0;
   display: flex;
   align-items: center;
   gap: 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.product-carousel figcaption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+}
+.carousel-copy {
+  display: grid;
+  gap: 2px;
+}
+.carousel-copy strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+.carousel-copy > span {
+  color: var(--muted);
+}
+.carousel-position {
+  color: var(--forest);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.carousel-controls {
+  display: flex;
+  gap: 7px;
+}
+.carousel-controls button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(23, 34, 29, 0.2);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--forest);
+  cursor: pointer;
+}
+.carousel-controls button:hover:not(:disabled) {
+  border-color: var(--forest);
+  background: #eef1e9;
+}
+.carousel-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.carousel-controls .gm-icon {
+  width: 17px;
+  height: 17px;
+  margin: auto;
+}
+.carousel-motion-note {
+  display: block;
+  margin: 8px 8px 0;
   color: var(--muted);
   font-size: 11px;
 }
@@ -657,6 +729,11 @@ summary:focus-visible {
 .footer-note {
   color: #839189;
   font-size: 11px;
+}
+.footer-contact {
+  color: #dbe6e0;
+  font-size: 13px;
+  font-weight: 750;
 }
 .site-footer h2 {
   margin: 4px 0 18px;
@@ -1276,6 +1353,12 @@ summary:focus-visible {
   .hero-product figcaption {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .product-carousel figcaption {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .carousel-controls {
+    grid-column: 1 / -1;
   }
   .product-gallery {
     grid-template-columns: 1fr;

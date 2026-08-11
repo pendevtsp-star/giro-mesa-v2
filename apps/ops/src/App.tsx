@@ -116,6 +116,8 @@ const browserRuntime: DeviceContext = {
   platform: "web",
 };
 
+const SEAT_MARKERS = ["one", "two", "three", "four", "five", "six"] as const;
+
 const navItems: { route: RouteId; label: string; icon: IconName }[] = [
   { route: "dashboard", label: "Visão geral", icon: "home" },
   { route: "onboarding", label: "Configurar operação", icon: "clipboard" },
@@ -1951,8 +1953,8 @@ function SalonPage({
                 </Badge>
               </span>
               <span className="table-tile__seats" aria-label={`${table.seats} lugares`} role="img">
-                {Array.from({ length: Math.min(table.seats, 6) }, (_, index) => (
-                  <Icon key={`${table.id}-seat-${index}`} name="user" />
+                {SEAT_MARKERS.slice(0, Math.min(table.seats, SEAT_MARKERS.length)).map((marker) => (
+                  <Icon key={`${table.id}-seat-${marker}`} name="user" />
                 ))}
               </span>
               {table.status === "free" || table.status === "reserved" ? (
