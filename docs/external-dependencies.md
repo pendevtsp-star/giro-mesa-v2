@@ -16,7 +16,9 @@ O código deve continuar funcional em modo demonstrativo e falhar de forma segur
 | Piloto | empresa, rede, impressoras, produtos, mesas, equipe e dados fiscais | tenant demonstrativo |
 | Hub em produção | certificado TLS local, instalador, provisionamento e cofre de segredos | SQLCipher, replay e reconciliação validados localmente |
 | Backup/DR | object storage versionado com object-lock, cofre para HMAC, agenda a cada 5 min, alertas e infraestrutura isolada de restore | scripts fail-closed e ensaio local; RPO/RTO reais ainda não homologados |
+| LGPD — retenção em backup | base legal, prazo por categoria, ledger externo de tombstones e prova de reaplicação após restore | export local completo; correção/anonimização/exclusão bloqueiam atomicamente com `BACKUP_RETENTION_POLICY_UNAPPROVED` |
 | Geocodificação | provedor e chave para converter endereço em coordenadas | endereço, região, taxa e pedido mínimo validados; ponto-no-polígono bloqueado |
 | DoseClub remoto | credencial tenant-scoped, endpoint administrativo e contrato de aggregate/version, heartbeat e requeue auditado | reconciliação local detectiva disponível; cobertura remota sinalizada como parcial conforme o [runbook](runbooks/doseclub-reconciliation.md) |
 
 Documentos jurídicos e procedimentos LGPD são modelos técnicos e exigem revisão profissional antes da publicação comercial.
+O bloqueio de mutação LGPD não é ausência de processador: é um gate deliberado até que a política e o mecanismo externo de restore sejam aprovados e homologados. Nenhuma exclusão em provider, objeto externo ou backup é inferida a partir do sucesso local.
