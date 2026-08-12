@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
+  cpSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -17,6 +18,9 @@ import test from "node:test";
 const enabled = process.env.DISASTER_RECOVERY_DOCKER_TEST === "1";
 const backupScript = join(process.cwd(), "scripts", "backup-production.ps1");
 const restoreScript = join(process.cwd(), "scripts", "restore-drill.ps1");
+const linuxRestoreScript = join(process.cwd(), "scripts", "restore-drill.sh").replaceAll("\\", "/");
+const bash = process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "bash";
+const shellPath = (value) => value.replaceAll("\\", "/");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -50,6 +54,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const source = `giromesa-dr-source-${suffix}`;
   const target = `giromesa-dr-target-${suffix}`;
+  const targetCross = `giromesa-dr-target-cross-${suffix}`;
   const directory = mkdtempSync(join(tmpdir(), "giromesa-dr-roundtrip-"));
   const backupRoot = join(directory, "backups");
   const objectSource = join(directory, "objects-source");
@@ -57,6 +62,8 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
   const configSource = join(directory, "configuration.enc");
   const runtimeEnv = join(directory, ".env");
   const configRestore = join(directory, "config-restored");
+  const objectRestoreCross = join(directory, "objects-restored-cross");
+  const configRestoreCross = join(directory, "config-restored-cross");
   const smokeSql = join(directory, "smoke.sql");
   const sourceArtifact = `git:${"a".repeat(40)}`;
   const targetArtifact = `git:${"b".repeat(40)}`;
@@ -71,6 +78,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
     writeFileSync(join(objectSource, "receipts", "receipt.json"), '{"amountCents":4200}\n');
     writeFileSync(configSource, Buffer.from([0, 255, 19, 71, 105, 114, 111, 77, 101, 115, 97]));
     writeFileSync(runtimeEnv, "POSTGRES_DB=giromesa\nSECRET=bound-only-by-hmac\n");
+    mkdirSync(backupRoot, { recursive: true });
     writeFileSync(
       smokeSql,
       [
@@ -83,7 +91,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
       ].join("\n"),
     );
 
-    for (const container of [source, target]) {
+    for (const container of [source, target, targetCross]) {
       run("docker", [
         "run",
         "--detach",
@@ -142,10 +150,18 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         "-RuntimeEnvFile",
         runtimeEnv,
       ],
-      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
+      {
+        env: {
+          ...process.env,
+          GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
+          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+        },
+      },
     );
     const backupDirectory = backupOutput.split(/\r?\n/).at(-1);
     assert.ok(backupDirectory);
+    const crossBackup = join(directory, "cross-backup");
+    cpSync(backupDirectory, crossBackup, { recursive: true });
 
     const evidencePath = run(
       "powershell",
@@ -176,7 +192,13 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         "-SmokeSqlFile",
         smokeSql,
       ],
-      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
+      {
+        env: {
+          ...process.env,
+          GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
+          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+        },
+      },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -226,8 +248,67 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
       readdirSync(backupDirectory).filter((name) => name.startsWith(".restore-evidence-")),
       [],
     );
+
+    const crossEvidence = run(
+      bash,
+      [
+        linuxRestoreScript,
+        "--backup-directory",
+        shellPath(crossBackup),
+        "--target-database-container",
+        targetCross,
+        "--database-name",
+        "giromesa",
+        "--database-user",
+        "giromesa",
+        "--expected-artifact",
+        sourceArtifact,
+        "--expected-source-migration-id",
+        sourceMigrationId,
+        "--expected-target-artifact",
+        targetArtifact,
+        "--expected-target-migration-id",
+        targetMigrationId,
+        "--restore-object-directory",
+        shellPath(objectRestoreCross),
+        "--restore-encrypted-config-directory",
+        shellPath(configRestoreCross),
+        "--smoke-sql-file",
+        shellPath(smokeSql),
+      ],
+      {
+        env: {
+          ...process.env,
+          MSYS_NO_PATHCONV: "1",
+          TMPDIR: shellPath(directory),
+          GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
+          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+        },
+      },
+    )
+      .split(/\r?\n/)
+      .at(-1);
+    assert.ok(crossEvidence);
+    assert.equal(
+      run("docker", [
+        "exec",
+        targetCross,
+        "psql",
+        "-U",
+        "giromesa",
+        "-d",
+        "giromesa",
+        "-Atc",
+        "SELECT payload FROM dr_probe WHERE id = 1",
+      ]),
+      "giromesa-dr-ok",
+    );
+    assert.deepEqual(
+      readFileSync(join(configRestoreCross, "runtime.env.restored")),
+      readFileSync(runtimeEnv),
+    );
   } finally {
-    for (const container of [source, target]) {
+    for (const container of [source, target, targetCross]) {
       spawnSync("docker", ["rm", "--force", container], { encoding: "utf8" });
     }
     rmSync(directory, { recursive: true, force: true });

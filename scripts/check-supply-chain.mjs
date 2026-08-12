@@ -130,34 +130,23 @@ export function validateSupplyChain() {
     "CI must validate the release supply-chain contract",
     errors,
   );
+  requireText(ci, /branches: \[main\]/, "only main CI may feed privileged publication", errors);
   requireText(
-    ci,
-    /branches: \[main, release\/rollback-0029\]/,
-    "CI must gate the exact recovery branch",
+    publish,
+    /authorize-recovery:/,
+    "main publication must authorize recovery from a versioned matrix",
     errors,
   );
   requireText(
-    ci,
-    /recovery-publish:[\s\S]*needs: \[typescript, dotnet, terraform, release-security\]/,
-    "recovery publication must depend on every CI gate",
+    publish,
+    /validate-recovery:/,
+    "main publication must reprove recovery compatibility",
     errors,
   );
   requireText(
-    ci,
-    /github\.ref == 'refs\/heads\/release\/rollback-0029'/,
-    "recovery publication must be branch exact",
-    errors,
-  );
-  requireText(
-    ci,
-    /cosign sign --yes "\$IMAGE"/,
-    "recovery images must use keyless Cosign signatures",
-    errors,
-  );
-  requireText(
-    ci,
-    /cosign sign-blob --yes/,
-    "recovery manifest must use a keyless Cosign signature",
+    publish,
+    /postgresMajors.*\[16,17\]/,
+    "recovery validation must cover PostgreSQL 16 and 17",
     errors,
   );
   requireText(

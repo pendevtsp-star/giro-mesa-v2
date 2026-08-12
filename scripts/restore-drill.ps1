@@ -39,7 +39,7 @@ function Get-ManifestKey {
 
 function Assert-ImmutableArtifact {
   param([string]$Value)
-  if ($Value -notmatch '^(git:)?[0-9a-fA-F]{40}$' -and $Value -notmatch '@sha256:[0-9a-fA-F]{64}$') {
+  if ($Value -notmatch '^(git:)?[0-9a-fA-F]{40}$' -and $Value -notmatch '@sha256:[0-9a-fA-F]{64}$' -and $Value -notmatch '^runtime-set:sha256:[0-9a-f]{64}$') {
     throw 'RESTORE_ARTIFACT_NOT_IMMUTABLE'
   }
 }
@@ -330,6 +330,7 @@ function Write-AtomicEvidence {
 
 Assert-ImmutableArtifact -Value $ExpectedSourceArtifact
 Assert-ImmutableArtifact -Value $ExpectedTargetArtifact
+if ($ExpectedTargetArtifact.StartsWith('runtime-set:', [StringComparison]::Ordinal)) { throw 'RESTORE_TARGET_ARTIFACT_INVALID' }
 $startedAt = [DateTimeOffset]::UtcNow
 $manifestKey = $null
 $stage = $null
@@ -365,6 +366,20 @@ try {
   if ([string]$payload.coverage.mode -ne 'embedded' -or -not [bool]$payload.coverage.database -or -not [bool]$payload.coverage.objects -or -not [bool]$payload.coverage.encryptedConfiguration) { throw 'BACKUP_COMPLETE_COVERAGE_REQUIRED' }
   if ([string]$payload.runtimeConfigurationHmacSha256 -notmatch '^[0-9a-f]{64}$') { throw 'BACKUP_RUNTIME_CONFIGURATION_BINDING_INVALID' }
   if ([string]$payload.sourceArtifact -ne $ExpectedSourceArtifact) { throw 'BACKUP_SOURCE_ARTIFACT_MISMATCH' }
+  if ($ExpectedSourceArtifact.StartsWith('runtime-set:sha256:', [StringComparison]::Ordinal)) {
+    $components = @($payload.sourceComponentImages)
+    if ($components.Count -ne 2) { throw 'BACKUP_SOURCE_RUNTIME_SET_INVALID' }
+    $services = @{}
+    foreach ($image in $components) {
+      $match = [regex]::Match([string]$image, '^ghcr\.io/pendevtsp-star/giro-mesa-v2-(api|worker)@sha256:[0-9a-f]{64}$')
+      if (-not $match.Success -or $services.ContainsKey($match.Groups[1].Value)) { throw 'BACKUP_SOURCE_RUNTIME_SET_INVALID' }
+      $services[$match.Groups[1].Value] = [string]$image
+    }
+    if (-not $services.ContainsKey('api') -or -not $services.ContainsKey('worker')) { throw 'BACKUP_SOURCE_RUNTIME_SET_INVALID' }
+    $canonical = ConvertTo-Json -InputObject @($components | Sort-Object -CaseSensitive) -Compress
+    $runtimeHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($canonical))).ToLowerInvariant()
+    if ($ExpectedSourceArtifact -cne "runtime-set:sha256:$runtimeHash") { throw 'BACKUP_SOURCE_RUNTIME_SET_INVALID' }
+  }
   if ([string]$payload.sourceMigrationId -ne $ExpectedSourceMigrationId) { throw 'BACKUP_SOURCE_MIGRATION_MISMATCH' }
   if ([string]$payload.targetArtifact -ne $ExpectedTargetArtifact) { throw 'BACKUP_TARGET_ARTIFACT_MISMATCH' }
   if ([string]$payload.targetMigrationId -ne $ExpectedTargetMigrationId) { throw 'BACKUP_TARGET_MIGRATION_MISMATCH' }

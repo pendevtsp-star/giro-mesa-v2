@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,46 @@ const rollbackScript = join(root, "deploy", "vps", "rollback-app.sh");
 const bootstrapScript = join(root, "deploy", "vps", "bootstrap-env.sh");
 const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
 const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
+const trustedEntrypoint = join(root, "deploy", "vps", "deploy-entrypoint.sh");
+
+test("Linux backup rejects incomplete, duplicate and forged runtime source sets before Docker", () => {
+  const api = `ghcr.io/pendevtsp-star/giro-mesa-v2-api@sha256:${"a".repeat(64)}`;
+  const worker = `ghcr.io/pendevtsp-star/giro-mesa-v2-worker@sha256:${"b".repeat(64)}`;
+  const canonical = JSON.stringify([api, worker].sort());
+  const validArtifact = `runtime-set:sha256:${createHash("sha256").update(canonical).digest("hex")}`;
+  const base = [
+    "--database-container",
+    "never-run",
+    "--database-name",
+    "giromesa",
+    "--database-user",
+    "giromesa",
+    "--output-directory",
+    "/tmp/never-run",
+    "--source-migration-id",
+    "0029_test",
+    "--target-artifact",
+    `git:${"c".repeat(40)}`,
+    "--target-migration-id",
+    "0029_test",
+  ];
+  const cases = [
+    [validArtifact, [api], "BACKUP_SOURCE_COMPONENTS_INVALID"],
+    [validArtifact, [api, api], "BACKUP_SOURCE_COMPONENTS_INVALID"],
+    [`runtime-set:sha256:${"f".repeat(64)}`, [worker, api], "BACKUP_SOURCE_RUNTIME_SET_MISMATCH"],
+  ];
+  for (const [artifact, images, expected] of cases) {
+    const args = [posix(backupScript), ...base, "--source-artifact", artifact];
+    for (const image of images) args.push("--source-component-image", image);
+    const result = spawnSync(bash, args, {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, MSYS_NO_PATHCONV: "1" },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(output(result), new RegExp(expected));
+  }
+});
 const imageProvenance = join(root, "deploy", "vps", "verify-image-provenance.sh");
 const imageLock = join(root, "deploy", "vps", "image-lock.json");
 const buildkitValidator = join(root, "deploy", "vps", "validate-buildkit-attestations.py");
@@ -45,7 +85,7 @@ function signedManifest(directory, payload, key) {
   writeFileSync(
     join(directory, "manifest.json"),
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       signedPayloadBase64: payloadBytes.toString("base64"),
       hmacSha256: createHmac("sha256", key).update(payloadBytes).digest("hex"),
     }),
@@ -86,7 +126,7 @@ test("Linux restore rejects a forged manifest before Docker", () => {
   try {
     writeFileSync(
       join(directory, "manifest.json"),
-      JSON.stringify({ schemaVersion: 1, signedPayloadBase64: "e30=", hmacSha256: "0".repeat(64) }),
+      JSON.stringify({ schemaVersion: 2, signedPayloadBase64: "e30=", hmacSha256: "0".repeat(64) }),
     );
     const result = run(
       restoreScript,
@@ -121,7 +161,7 @@ test("Linux restore rejects signed path traversal before Docker", () => {
     signedManifest(
       directory,
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         backupId: "traversal",
         artifact: `git:${"1".repeat(40)}`,
         migrationId: "0029_platform_incident_projection_actions",
@@ -428,11 +468,28 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(workflow, /cosign-release: v3\.0\.2/);
   assert.match(provenance, /workflow_trigger=workflow_run/);
   assert.match(provenance, /--certificate-github-workflow-trigger "\$workflow_trigger"/);
-  assert.match(provenance, /ci\.yml@refs\/heads\/release\/rollback-0029/);
-  assert.match(provenance, /workflow_trigger=push/);
+  assert.doesNotMatch(provenance, /ci\.yml@refs\/heads\/release\/rollback-0029/);
+  assert.match(provenance, /publish-images\.yml@refs\/heads\/main/);
   for (const line of workflow.match(/^\s*uses:\s*.+$/gm) ?? []) {
     assert.match(line, /@[0-9a-f]{40}(?:\s+#\s+v[^\s]+)?$/);
   }
+});
+
+test("trusted entrypoint sanitizes privileged execution and serializes release operations", () => {
+  const entrypoint = readFileSync(trustedEntrypoint, "utf8");
+  assert.match(entrypoint, /^#!\/bin\/bash/);
+  assert.match(entrypoint, /export PATH=\/usr\/sbin:\/usr\/bin:\/sbin:\/bin/);
+  assert.match(
+    entrypoint,
+    /unset BASH_ENV ENV CDPATH GLOBIGNORE PYTHONPATH PYTHONHOME LD_PRELOAD LD_LIBRARY_PATH/,
+  );
+  assert.match(entrypoint, /unset -f/);
+  assert.match(entrypoint, /python3 -I/);
+  assert.match(entrypoint, /flock -n 9/);
+  assert.match(entrypoint, /RELEASE_OPERATION_IN_PROGRESS/);
+  assert.match(entrypoint, /DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock/);
+  assert.match(entrypoint, /docker-empty/);
+  assert.doesNotMatch(entrypoint, /volume "\$docker_config:/);
 });
 
 test("BuildKit attestation validation accepts single and multi-platform structural views", () => {
