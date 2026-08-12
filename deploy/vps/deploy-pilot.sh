@@ -150,6 +150,7 @@ fi
 "${compose[@]}" --profile tools run --rm migrate
 "${compose[@]}" up -d --remove-orphans
 
+declare -A restart_counts
 for service in api worker site customer ops; do
   container_id=$("${compose[@]}" ps -q "$service")
   for _ in $(seq 1 30); do
@@ -162,6 +163,23 @@ for service in api worker site customer ops; do
   status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
   if [[ "$status" != healthy && "$status" != running ]]; then
     echo "Serviço $service não ficou saudável: $status" >&2
+    exit 1
+  fi
+  restart_counts[$service]=$(docker inspect --format '{{.RestartCount}}' "$container_id")
+done
+
+stability_seconds=${GIROMESA_STABILITY_SECONDS:-10}
+if [[ ! $stability_seconds =~ ^([5-9]|[1-5][0-9]|60)$ ]]; then
+  echo "GIROMESA_STABILITY_SECONDS deve estar entre 5 e 60." >&2
+  exit 1
+fi
+sleep "$stability_seconds"
+for service in api worker site customer ops; do
+  container_id=$("${compose[@]}" ps -q "$service")
+  status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
+  restart_count=$(docker inspect --format '{{.RestartCount}}' "$container_id")
+  if [[ "$status" != healthy && "$status" != running ]] || [[ $restart_count != "${restart_counts[$service]}" ]]; then
+    echo "Serviço $service não permaneceu estável: status=$status." >&2
     exit 1
   fi
 done
