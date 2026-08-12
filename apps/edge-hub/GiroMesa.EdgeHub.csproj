@@ -11,4 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
     <PackageReference Include="SQLite3MC.PCLRaw.bundle" Version="2.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\packages\domain\src\fixtures\sync-envelope-contract.json" LogicalName="GiroMesa.SyncEnvelopeContract.json" />
+  </ItemGroup>
 </Project>

@@ -18,7 +18,12 @@ import {
   type CancelItemInput,
   cancelItemSchema,
   type DiscountInput,
+  type DispatchAcknowledgementInput,
+  type DispatchReconcileInput,
   discountSchema,
+  dispatchAcknowledgementSchema,
+  dispatchReconcileSchema,
+  dispatchStateSchema,
   type KdsStateInput,
   kdsStateSchema,
   type ManagerPinInput,
@@ -154,6 +159,105 @@ export class PilotPosController {
       unitId,
       orderId,
       idempotencyKey,
+    );
+  }
+
+  @Get("dispatch")
+  listDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query("state", new ZodPipe(dispatchStateSchema.optional()))
+    state?: "pending" | "delivered" | "acked" | "canceled" | "dlq",
+  ) {
+    return this.pos.listDispatch(request.auth.identityId, organizationId, unitId, state);
+  }
+
+  @Post("orders/:orderId/stations/:stationId/dispatch")
+  ensureDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("orderId", ParseUUIDPipe) orderId: string,
+    @Param("stationId", ParseUUIDPipe) stationId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.ensureDispatchEffects(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      orderId,
+      stationId,
+      idempotencyKey,
+    );
+  }
+
+  @Post("dispatch/:effectId/reprint")
+  reprintDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("effectId", ParseUUIDPipe) effectId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.reprintDispatch(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      effectId,
+      idempotencyKey,
+    );
+  }
+
+  @Post("dispatch/:effectId/cancel")
+  cancelDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("effectId", ParseUUIDPipe) effectId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.cancelDispatch(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      effectId,
+      idempotencyKey,
+    );
+  }
+
+  @Post("dispatch/:effectId/ack")
+  acknowledgeDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("effectId", ParseUUIDPipe) effectId: string,
+    @Body(new ZodPipe(dispatchAcknowledgementSchema)) body: DispatchAcknowledgementInput,
+  ) {
+    return this.pos.ackDispatch(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      effectId,
+      body.acknowledgementKey,
+    );
+  }
+
+  @Post("dispatch/:effectId/reconcile")
+  reconcileDispatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("effectId", ParseUUIDPipe) effectId: string,
+    @Body(new ZodPipe(dispatchReconcileSchema)) body: DispatchReconcileInput,
+  ) {
+    return this.pos.reconcileDispatch(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      effectId,
+      body.expectedResourceVersion,
+      body.action,
     );
   }
 

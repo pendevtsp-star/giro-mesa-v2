@@ -304,7 +304,7 @@ it("persists an atomic tenant-isolated purchase, stock and payable flow", async 
 
     const inventory = await management.inventoryDashboard(identityA.id, organizationA.id, unitA.id);
     assert.equal(inventory.balances.length, 1);
-    assert.equal(inventory.balances[0]?.quantity, "10.000");
+    assert.equal(inventory.balances[0]?.quantity, "10.000000");
     assert.equal(inventory.balances[0]?.averageCostCents, 250);
     const finance = await management.financeDashboard(identityA.id, organizationA.id, unitA.id);
     assert.equal(finance.payables.length, 1);

@@ -1,19 +1,33 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 const id = z.string().uuid();
-const cents = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const cents = z.number().int().nonnegative().max(POSTGRES_INT4_MAX);
 const positiveCents = cents.positive();
 const name = z.string().trim().min(1).max(160);
 const quantity = z
   .union([z.string().trim(), z.number().finite()])
   .refine(
-    (value) => /^-?\d+(\.\d{1,3})?$/.test(String(value)),
-    "Use no máximo três casas decimais.",
+    (value) => /^-?\d+(\.\d{1,6})?$/.test(String(value)),
+    "Use no máximo seis casas decimais.",
   );
 const positiveQuantity = quantity.refine(
   (value) => Number(value) > 0,
   "A quantidade deve ser positiva.",
 );
+
+function quantityToMicro(value: string | number) {
+  const [whole, fraction = ""] = String(value).split(".");
+  return BigInt(whole ?? "0") * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+}
+const preciseQuantity = z
+  .union([z.string().trim(), z.number().finite()])
+  .transform((value) => String(value))
+  .refine((value) => /^\d+(\.\d{1,6})?$/.test(value) && Number(value) > 0, {
+    message: "Use até seis casas decimais e valor positivo.",
+  });
+const dimensionalUnit = z.enum(["mg", "g", "kg", "ml", "l", "unit", "dozen"]);
+const recipeYieldUnit = z.enum(["unit", "dozen"]);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const instant = z.string().datetime({ offset: true });
 
@@ -33,21 +47,31 @@ export const inventoryItemSchema = z.object({
   productId: id.optional(),
   name,
   sku: z.string().trim().min(1).max(80).optional(),
-  unit: z.string().trim().min(1).max(20),
+  unit: dimensionalUnit,
+  dimension: z.enum(["mass", "volume", "count"]).optional(),
   minimumQuantity: quantity.refine((value) => Number(value) >= 0).default("0"),
   allowNegative: z.boolean().default(false),
 });
 
 export const recipeConfigurationSchema = z.object({
   productId: id,
+  yieldQuantity: preciseQuantity.optional(),
+  yieldUnit: recipeYieldUnit.optional(),
   components: z
     .array(
-      z.object({
-        inventoryItemId: id,
-        locationId: id,
-        quantityMilli: z.number().int().positive().max(1_000_000_000),
-        lossBasisPoints: z.number().int().min(0).max(9_999).default(0),
-      }),
+      z
+        .object({
+          inventoryItemId: id,
+          locationId: id,
+          quantity: preciseQuantity.optional(),
+          unit: dimensionalUnit.optional(),
+          quantityMilli: z.number().int().positive().max(1_000_000_000).optional(),
+          lossBasisPoints: z.number().int().min(0).max(9_999).default(0),
+        })
+        .refine(
+          (component) => component.quantity !== undefined || component.quantityMilli !== undefined,
+          { message: "Informe quantity ou quantityMilli." },
+        ),
     )
     .min(1)
     .max(500),
@@ -71,14 +95,37 @@ export const inventoryEventSchema = z.object({
     .max(500),
 });
 
-export const purchaseOrderSchema = z.object({
-  supplierId: id,
-  expectedAt: instant.optional(),
-  items: z
-    .array(z.object({ inventoryItemId: id, quantity: positiveQuantity, unitCostCents: cents }))
-    .min(1)
-    .max(500),
-});
+export const purchaseOrderSchema = z
+  .object({
+    supplierId: id,
+    expectedAt: instant.optional(),
+    items: z
+      .array(z.object({ inventoryItemId: id, quantity: positiveQuantity, unitCostCents: cents }))
+      .min(1)
+      .max(500),
+  })
+  .superRefine((value, context) => {
+    let totalCents = 0n;
+    for (const [index, item] of value.items.entries()) {
+      const lineCents =
+        (quantityToMicro(item.quantity) * BigInt(item.unitCostCents) + 500_000n) / 1_000_000n;
+      totalCents += lineCents;
+      if (lineCents > BigInt(POSTGRES_INT4_MAX)) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", index, "quantity"],
+          message: "O total da linha excede o limite monetário permitido.",
+        });
+      }
+    }
+    if (totalCents > BigInt(POSTGRES_INT4_MAX)) {
+      context.addIssue({
+        code: "custom",
+        path: ["items"],
+        message: "O total do pedido excede o limite monetário permitido.",
+      });
+    }
+  });
 
 export const purchaseReceiptSchema = z.object({
   receivedAt: instant.optional(),

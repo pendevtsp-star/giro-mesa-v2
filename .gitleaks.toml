@@ -1,0 +1,9 @@
+title = "GiroMesa gitleaks policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known synthetic Stripe-shaped redaction fixture"
+regexTarget = "secret"
+regexes = ['''^sk_live_1234567890abcdef$''']

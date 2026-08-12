@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function MarketingOptOutPage() {
   const [token, setToken] = useState("");
@@ -21,7 +22,7 @@ export default function MarketingOptOutPage() {
       return;
     }
     try {
-      const response = await fetch(`${apiUrl}/v1/growth/opt-out`, {
+      const response = await siteFetch(`${apiUrl}/v1/growth/opt-out`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),

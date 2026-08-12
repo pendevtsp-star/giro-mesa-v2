@@ -11,6 +11,7 @@ export type ProfileId =
 
 export type Permission =
   | "dashboard.view"
+  | "onboarding.manage"
   | "salon.operate"
   | "counter.operate"
   | "catalog.manage"
@@ -19,6 +20,7 @@ export type Permission =
   | "inventory.manage"
   | "purchases.manage"
   | "finance.manage"
+  | "remuneration.manage"
   | "people.manage"
   | "delivery.operate"
   | "reservations.manage"
@@ -29,6 +31,7 @@ export type Permission =
 
 export type RouteId =
   | "dashboard"
+  | "onboarding"
   | "salon"
   | "counter"
   | "catalog"
@@ -37,6 +40,7 @@ export type RouteId =
   | "inventory"
   | "purchases"
   | "finance"
+  | "remuneration"
   | "people"
   | "delivery"
   | "reservations"
@@ -52,7 +56,6 @@ export interface Profile {
   role: string;
   description: string;
   permissions: Permission[];
-  pin: string;
 }
 
 export interface Organization {

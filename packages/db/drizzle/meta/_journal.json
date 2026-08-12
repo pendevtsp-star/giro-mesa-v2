@@ -64,6 +64,146 @@
       "when": 1786337359433,
       "tag": "0008_final-recipes-and-operations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786392589317,
+      "tag": "0009_tenant_rls_and_event_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786401912244,
+      "tag": "0010_event_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786409075144,
+      "tag": "0012_clear_unicorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786418717309,
+      "tag": "0013_email_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786430941766,
+      "tag": "0014_onboarding_provisioning",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786434665850,
+      "tag": "0015_onboarding_selection",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786440800000,
+      "tag": "0016_onboarding_owner_lock",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786450000000,
+      "tag": "0017_public_menu_branding",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786451000000,
+      "tag": "0018_operational_map",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786452000000,
+      "tag": "0019_dispatch_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786478400000,
+      "tag": "0020_financial_ledger_and_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786482000000,
+      "tag": "0021_inventory_returnables_incidents",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786485600000,
+      "tag": "0022_remuneration_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786489200000,
+      "tag": "0023_fiscal_documents",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786490000000,
+      "tag": "0024_platform_backoffice_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786491000000,
+      "tag": "0025_privacy_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786493658116,
+      "tag": "0026_doseclub_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786497000000,
+      "tag": "0027_doseclub_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786501200000,
+      "tag": "0028_privacy_domain_processors",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786503000000,
+      "tag": "0029_platform_incident_projection_actions",
+      "breakpoints": true
     }
   ]
 }

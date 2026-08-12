@@ -9,20 +9,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class ActivatePostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class ActivatePostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The planSlug property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody_planSlug? PlanSlug { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody"/> and sets the default values.
-        /// </summary>
-        public ActivatePostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -52,7 +43,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.Activate.ActivatePostRequestBody_planSlug>("planSlug", PlanSlug);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

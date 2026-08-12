@@ -111,6 +111,8 @@ export class OperationsService {
         metadata: { type: inserted.type, deviceId: inserted.deviceId },
       });
       await tx.insert(outboxEvents).values({
+        organizationId,
+        unitId,
         topic: "operational.command_accepted",
         aggregateType: "operational_command",
         aggregateId: inserted.id,
@@ -125,6 +127,7 @@ export class OperationsService {
       .from(operationalCommands)
       .where(
         and(
+          eq(operationalCommands.organizationId, organizationId),
           eq(operationalCommands.unitId, unitId),
           eq(operationalCommands.idempotencyKey, input.idempotencyKey),
         ),

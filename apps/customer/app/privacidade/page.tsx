@@ -1,7 +1,11 @@
+import { Icon } from "@giromesa/ui";
+
 export default function PrivacyPage() {
   return (
     <main className="privacy">
-      <a href="/m/demo">← Voltar ao cardápio</a>
+      <a href="/m/demo">
+        <Icon name="arrow-left" /> Voltar ao cardápio
+      </a>
       <h1>Privacidade no cardápio digital</h1>
       <p>
         O cardápio pode ser consultado sem criar conta. Pedidos e chamados só são confirmados após

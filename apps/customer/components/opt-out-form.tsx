@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { normalizeOptOutToken } from "../lib/public-contracts";
+import { customerFetch } from "../lib/pwa-fetch";
 
 export function OptOutForm({ initialToken }: { initialToken: string }) {
   const [token, setToken] = useState(initialToken);
@@ -24,7 +25,7 @@ export function OptOutForm({ initialToken }: { initialToken: string }) {
     setSubmitting(true);
     setMessage("");
     try {
-      const response = await fetch(`${apiUrl}/v1/growth/opt-out`, {
+      const response = await customerFetch(`${apiUrl}/v1/growth/opt-out`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: normalizedToken }),

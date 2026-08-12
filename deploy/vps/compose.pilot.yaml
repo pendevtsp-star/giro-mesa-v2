@@ -14,7 +14,7 @@ x-web-service: &web-service
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${GIROMESA_POSTGRES_IMAGE:?GIROMESA_POSTGRES_IMAGE digest is provided by compose.images.yaml}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-giromesa_v2}
       POSTGRES_USER: ${POSTGRES_USER:-giromesa}
@@ -60,9 +60,19 @@ services:
   worker:
     <<: *backend-service
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-worker:${GIROMESA_IMAGE_TAG:-pilot}
+    environment:
+      WORKER_HEARTBEAT_FILE: ${WORKER_HEARTBEAT_FILE:-/tmp/giromesa-worker-heartbeat}
+      WORKER_HEARTBEAT_MAX_AGE_MS: ${WORKER_HEARTBEAT_MAX_AGE_MS:-30000}
+      WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN: ${WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN:-false}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "apps/worker/dist/worker-healthcheck.js"]
+      interval: ${WORKER_HEARTBEAT_CHECK_INTERVAL:-10s}
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   site:
     <<: *web-service
@@ -106,7 +116,7 @@ services:
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-ops:${GIROMESA_IMAGE_TAG:-pilot}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3112:80"
+      - "127.0.0.1:3112:8080"
     networks:
       - giromesa-v2
 

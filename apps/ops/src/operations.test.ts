@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidPilotPayloadError,
+  parseDurableKds,
   parseKds,
   parsePilotCatalog,
   parsePilotFloor,
@@ -100,5 +101,52 @@ describe("contratos operacionais reais", () => {
     expect(() => parseKds({ tickets: [{ status: "inventado" }], items: [] })).toThrow(
       InvalidPilotPayloadError,
     );
+  });
+
+  it("associa cada efeito da inbox Edge a um ticket local visível", () => {
+    const kds = parseDurableKds({
+      snapshot: {
+        tickets: [
+          {
+            id: "ticket-1",
+            orderId: "order-1",
+            stationId: "station-1",
+            status: "pending",
+            createdAt: "2026-08-11T20:00:00.000Z",
+          },
+        ],
+        items: [],
+      },
+      deliveries: [
+        {
+          effectId: "effect-1",
+          deliveryKey: "delivery-1",
+          targetRef: "kds:cozinha",
+          operation: "dispatch",
+          payload: JSON.stringify({ orderId: "order-1", stationId: "station-1" }),
+          deliveredAt: "2026-08-11T20:00:01.000Z",
+        },
+      ],
+    });
+
+    expect(kds.tickets[0]?.deliveries).toEqual([
+      { effectId: "effect-1", deliveryKey: "delivery-1" },
+    ]);
+    expect(kds.deliveries).toHaveLength(1);
+    expect(() =>
+      parseDurableKds({
+        snapshot: { tickets: [], items: [] },
+        deliveries: [
+          {
+            effectId: "effect-unknown",
+            deliveryKey: "delivery-unknown",
+            targetRef: "kds:cozinha",
+            operation: "dispatch",
+            payload: JSON.stringify({ orderId: "order-x", stationId: "station-x" }),
+            deliveredAt: "2026-08-11T20:00:01.000Z",
+          },
+        ],
+      }),
+    ).toThrow(InvalidPilotPayloadError);
   });
 });

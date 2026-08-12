@@ -35,6 +35,56 @@ textarea:focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 3px;
 }
+.pwa-connectivity,
+.pwa-update {
+  position: fixed;
+  z-index: 180;
+  left: 50%;
+  bottom: 16px;
+  width: min(720px, calc(100% - 28px));
+  transform: translateX(-50%);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(13, 48, 40, 0.2);
+}
+.pwa-connectivity {
+  padding: 13px 16px;
+  background: #fff0e7;
+  color: #783619;
+}
+.pwa-update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--green-dark);
+  color: #fff;
+}
+.pwa-update > div {
+  display: grid;
+}
+.pwa-update span {
+  color: #d8e7e0;
+  font-size: 12px;
+}
+.pwa-update button {
+  min-height: 48px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--green-dark);
+  font-weight: 800;
+  cursor: pointer;
+}
+.pwa-update button:last-child {
+  background: transparent;
+  color: #fff;
+}
+.pwa-update button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -69,6 +119,8 @@ textarea:focus-visible {
   box-shadow: 0 0 70px rgba(14, 40, 31, 0.13);
 }
 .restaurant-header {
+  position: relative;
+  isolation: isolate;
   min-height: 126px;
   padding: 24px 22px;
   display: grid;
@@ -79,7 +131,27 @@ textarea:focus-visible {
   background:
     radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.26), transparent 32%), var(--green);
 }
+.restaurant-header.has-cover {
+  min-height: 190px;
+  align-items: end;
+}
+.restaurant-cover {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.restaurant-header.has-cover::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, rgba(8, 20, 17, 0.16), rgba(8, 20, 17, 0.88));
+}
 .restaurant-mark {
+  position: relative;
   width: 58px;
   height: 58px;
   display: grid;
@@ -90,6 +162,12 @@ textarea:focus-visible {
   font:
     italic 31px Georgia,
     serif;
+}
+.restaurant-mark img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 .restaurant-header p,
 .restaurant-header h1,
@@ -293,14 +371,32 @@ textarea:focus-visible {
   box-shadow: 0 10px 25px rgba(30, 49, 41, 0.1);
 }
 .food-visual {
+  position: relative;
   height: 150px;
   display: grid;
   place-items: center;
-  font-size: 64px;
+  color: color-mix(in srgb, var(--green) 84%, white);
   background:
     radial-gradient(circle at 45% 45%, #f9d7a4 0 18%, transparent 19%),
     linear-gradient(145deg, #e8decf, #c5d1bd);
-  text-shadow: 0 8px 15px rgba(60, 40, 20, 0.18);
+}
+.food-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.food-visual svg {
+  width: 58px;
+  height: 58px;
+}
+.food-visual .gm-icon {
+  width: 72px;
+  height: 72px;
+  color: var(--green);
+}
+.customer-visual-copy {
+  font-size: 42px;
+  line-height: 1;
 }
 .food-croquete,
 .food-steak {
@@ -372,13 +468,36 @@ textarea:focus-visible {
   filter: grayscale(0.7);
   opacity: 0.65;
 }
+.product-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.product-hero,
+.cart-visual {
+  position: relative;
+}
+.product-hero svg {
+  width: 76px;
+  height: 76px;
+}
+.cart-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cart-visual svg {
+  width: 28px;
+  height: 28px;
+}
 .empty-state {
   padding: 60px 20px;
   text-align: center;
   color: var(--muted);
 }
-.empty-state span {
-  font-size: 40px;
+.empty-state .gm-icon {
+  width: 40px;
+  height: 40px;
 }
 .empty-state h3 {
   color: var(--ink);
@@ -421,9 +540,11 @@ textarea:focus-visible {
   font-weight: 750;
   cursor: pointer;
 }
-.table-actions button span {
+.table-actions button .gm-icon {
   display: block;
-  font-size: 19px;
+  width: 21px;
+  height: 21px;
+  margin: 0 auto 4px;
 }
 .table-actions button:disabled {
   color: #7c8580;
@@ -499,7 +620,9 @@ textarea:focus-visible {
   font-size: 10px;
 }
 .service-card-action {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-top: 13px;
   color: var(--green);
   font-size: 11px;
@@ -526,11 +649,10 @@ textarea:focus-visible {
   color: var(--green);
   font-size: 14px;
 }
-.menu-footer b span {
+.menu-footer b > .gm-icon {
   width: 21px;
   height: 21px;
-  display: grid;
-  place-items: center;
+  padding: 3px;
   border-radius: 6px;
   background: var(--green);
   color: #dcf182;
@@ -627,6 +749,9 @@ textarea:focus-visible {
   font-weight: 750;
 }
 .preference-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--green);
   font-weight: 750;
 }
@@ -772,6 +897,11 @@ dialog::backdrop {
   font-size: 100px;
   background: linear-gradient(145deg, #e8decf, #c5d1bd);
 }
+.product-hero .gm-icon {
+  width: 108px;
+  height: 108px;
+  color: var(--green);
+}
 .product-hero > button {
   position: absolute;
   top: 15px;
@@ -890,6 +1020,10 @@ fieldset label input {
   font-size: 20px;
   cursor: pointer;
 }
+.quantity button .gm-icon {
+  width: 18px;
+  height: 18px;
+}
 .quantity output {
   min-width: 28px;
   text-align: center;
@@ -975,6 +1109,11 @@ fieldset label input {
   border-radius: 10px;
   background: var(--cream);
   font-size: 26px;
+}
+.cart-visual .gm-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
 }
 .cart-lines h3 {
   margin: 0;
@@ -1179,10 +1318,11 @@ fieldset label input {
   background: #f1f7f2;
   text-align: center;
 }
-.order-receipt > span {
-  display: inline-grid;
+.order-receipt-icon {
+  display: inline-block;
   width: 42px;
   height: 42px;
+  padding: 9px;
   place-items: center;
   border-radius: 50%;
   background: var(--green);
@@ -1385,6 +1525,51 @@ fieldset label input {
 .public-service-form > button:disabled {
   background: #a5aaa6;
   cursor: not-allowed;
+}
+.public-service-table-actions {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+.public-service-table-actions button {
+  background: var(--menu-accent, #136c52);
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: 750;
+  min-height: 48px;
+  padding: 0.75rem;
+}
+.public-service-table-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.public-service-partial {
+  background: #f4f7f5;
+  border: 1px solid #dce4df;
+  border-radius: 14px;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+.public-service-partial h3 {
+  margin: 0;
+}
+.public-service-partial > div {
+  align-items: center;
+  border-top: 1px solid #dce4df;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 0.65rem;
+}
+@media (max-width: 560px) {
+  .public-service-table-actions {
+    grid-template-columns: 1fr;
+  }
 }
 .public-service-dependencies {
   margin-top: 24px;

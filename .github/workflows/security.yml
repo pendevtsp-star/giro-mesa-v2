@@ -14,12 +14,74 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Scan repository for secrets
         run: >-
           docker run --rm
-          --volume "$PWD:/repo"
-          zricethezav/gitleaks:v8.28.0
-          detect --source=/repo --redact --no-banner
+          --volume "$PWD:/repo:ro"
+          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+          dir --redact --no-banner /repo
+      - name: Scan complete Git history for secrets
+        run: |
+          test "$(git rev-parse --is-inside-work-tree)" = true
+          test "$(git rev-list --all --count)" -gt 0
+          set +e
+          output=$(docker run --rm --volume "$PWD:/repo:ro" \
+            zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 \
+            git --log-opts=--all --redact --no-banner /repo 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -eq 0
+          ! grep -Eqi 'fatal:|not a git repository' <<<"$output"
+
+  dependencies-and-sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install exactly from lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Fail on high or critical dependency vulnerabilities
+        run: pnpm audit --audit-level=high
+      - name: Generate SPDX SBOM
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/repo:ro"
+          --volume "${{ runner.temp }}:/out"
+          anchore/syft:v1.38.2@sha256:63a159108794114992136692c92155c7694f259aca814a92c187a4e025754b00
+          scan dir:/repo -o spdx-json=/out/sbom.spdx.json
+      - name: Retain SBOM evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-spdx-${{ github.sha }}
+          path: ${{ runner.temp }}/sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+  container-definitions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Scan Dockerfiles and dependencies for high or critical findings
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/repo:ro"
+          aquasec/trivy:0.69.2@sha256:3d1f862cb6c4fe13c1506f96f816096030d8d5ccdb2380a3069f7bf07daa86aa
+          fs --quiet --exit-code 1 --severity HIGH,CRITICAL
+          --scanners vuln,misconfig /repo
+      - name: Verify local supply-chain release contract
+        run: node scripts/check-supply-chain.mjs

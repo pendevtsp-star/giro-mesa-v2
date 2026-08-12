@@ -2,8 +2,15 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Devices;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Incidents;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Media;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Payments;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.PublicMenus;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Salon;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -28,15 +35,50 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The fiscal property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The incidents property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Incidents.IncidentsRequestBuilder Incidents
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Incidents.IncidentsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The management property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder Management
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The media property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Media.MediaRequestBuilder Media
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Media.MediaRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The payments property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Payments.PaymentsRequestBuilder Payments
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Payments.PaymentsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The pilot property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.PilotRequestBuilder Pilot
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.PilotRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The publicMenus property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.PublicMenus.PublicMenusRequestBuilder PublicMenus
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.PublicMenus.PublicMenusRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The returnables property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.ReturnablesRequestBuilder Returnables
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Returnables.ReturnablesRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The salon property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Salon.SalonRequestBuilder Salon
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Salon.SalonRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.WithUnitItemRequestBuilder"/> and sets the default values.

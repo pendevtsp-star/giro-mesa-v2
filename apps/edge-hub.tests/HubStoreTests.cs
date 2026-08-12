@@ -43,7 +43,7 @@ public sealed class HubStoreTests : IAsyncLifetime
         var store = CreateStore();
         await store.InitializeAsync();
         var authenticator = new DeviceAuthenticator(
-            Options.Create(new HubOptions { DataDirectory = _directory, DatabaseKey = TestKey, EnrollmentCode = "654321" }),
+            Options.Create(new HubOptions { DataDirectory = _directory, DatabaseKey = TestKey, EnrollmentCode = "654321", RequireMutualTls = false }),
             store);
 
         var pairing = await authenticator.PairAsync(new PairDeviceRequest("terminal-1", "Caixa 01", "654321"));
@@ -85,6 +85,9 @@ public sealed class HubStoreTests : IAsyncLifetime
         await store.InitializeAsync();
         await store.SaveCloudCommandsAsync([command]);
         await store.SaveCloudCommandsAsync([command]);
+        Assert.Empty(await store.GetPendingCloudAcknowledgementsAsync(10));
+        Assert.Single(await store.GetPendingCloudCommandsAsync(10));
+        await store.MarkCloudCommandProcessedAsync(command.Id);
         Assert.Equal([command.Id], await store.GetPendingCloudAcknowledgementsAsync(10));
 
         SqliteConnection.ClearAllPools();

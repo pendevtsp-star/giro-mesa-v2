@@ -1,4 +1,4 @@
-import { Badge, Button, Card, EmptyState, Progress, VisuallyHidden } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon, Progress, VisuallyHidden } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ApiClientError,
@@ -47,6 +47,7 @@ import {
   RealMultiunitPage,
   RealReservationsPage,
 } from "./growth-pages";
+import { KdsBoard, type KdsBoardTicket } from "./kds-board";
 import {
   RealCashPage,
   RealDashboard,
@@ -55,16 +56,21 @@ import {
   RealPeoplePage,
   RealPurchasesPage,
 } from "./management";
+import { OnboardingPage } from "./onboarding";
 import {
   dispatchOperationalMutation,
   loadOperationalResource,
   type PilotDispatcher,
   type PilotLoader,
+  pendingKdsAcknowledgementCount,
   replayOperationalQueue,
 } from "./operational-dispatch";
 import { RealCatalogPage, RealCounterPage, RealKdsPage, RealSalonPage } from "./operations";
 import { RealPlatformPage } from "./platform";
+import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
+import { RemunerationPage } from "./remuneration";
+import { rolePresentation } from "./role-presentation";
 import { parseRoute, routeHref } from "./router";
 import {
   calculateCartTotal,
@@ -73,6 +79,8 @@ import {
   isValidTerminalPin,
   nextTicketStatus,
 } from "./rules";
+import { SalonMap, type SalonMapTable } from "./salon-map";
+import { UiIcon, type UiIconName } from "./ui-icon";
 
 type Session = {
   identityId: string;
@@ -105,29 +113,41 @@ const browserRuntime: DeviceContext = {
   platform: "web",
 };
 
-const navItems: { route: RouteId; label: string; icon: string }[] = [
-  { route: "dashboard", label: "Visão geral", icon: "⌂" },
-  { route: "salon", label: "Salão", icon: "◫" },
-  { route: "counter", label: "Balcão", icon: "＋" },
-  { route: "catalog", label: "Cardápio", icon: "▦" },
-  { route: "kds", label: "Produção", icon: "▤" },
-  { route: "cash", label: "Caixa", icon: "◉" },
-  { route: "inventory", label: "Estoque", icon: "◇" },
-  { route: "purchases", label: "Compras", icon: "▱" },
-  { route: "finance", label: "Financeiro", icon: "↗" },
-  { route: "people", label: "Pessoas", icon: "♙" },
-  { route: "delivery", label: "Delivery", icon: "▻" },
-  { route: "reservations", label: "Reservas e espera", icon: "◷" },
-  { route: "crm", label: "Clientes e campanhas", icon: "♡" },
-  { route: "multiunit", label: "Multiunidade", icon: "⌘" },
-  { route: "platform", label: "Plataforma", icon: "◎" },
-  { route: "alerts", label: "Alertas", icon: "!" },
+const SEAT_MARKERS = ["one", "two", "three", "four", "five", "six"] as const;
+
+const navItems: { route: RouteId; label: string; icon: UiIconName }[] = [
+  { route: "dashboard", label: "Visão geral", icon: "dashboard" },
+  { route: "onboarding", label: "Configurar operação", icon: "list" },
+  { route: "salon", label: "Salão", icon: "salon" },
+  { route: "counter", label: "Balcão", icon: "counter" },
+  { route: "catalog", label: "Cardápio", icon: "catalog" },
+  { route: "kds", label: "Produção", icon: "kds" },
+  { route: "cash", label: "Caixa", icon: "cash" },
+  { route: "inventory", label: "Estoque", icon: "inventory" },
+  { route: "purchases", label: "Compras", icon: "purchases" },
+  { route: "finance", label: "Financeiro", icon: "finance" },
+  { route: "remuneration", label: "Remuneração", icon: "cash" },
+  { route: "people", label: "Pessoas", icon: "people" },
+  { route: "delivery", label: "Delivery", icon: "delivery" },
+  { route: "reservations", label: "Reservas e espera", icon: "reservations" },
+  { route: "crm", label: "Clientes e campanhas", icon: "crm" },
+  { route: "multiunit", label: "Multiunidade", icon: "multiunit" },
+  { route: "platform", label: "Plataforma", icon: "platform" },
+  { route: "alerts", label: "Alertas", icon: "alert" },
 ];
 
 function rejectedEventCount(payload: unknown): number {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return 0;
   const events = (payload as Record<string, unknown>).rejectedEvents;
   return Array.isArray(events) ? events.length : 0;
+}
+
+export function clearSessionBeforeRemoteLogout(
+  clearLocalSession: () => void,
+  remoteLogout?: () => Promise<unknown>,
+) {
+  clearLocalSession();
+  if (remoteLogout) void remoteLogout().catch(() => undefined);
 }
 
 export function App() {
@@ -185,13 +205,15 @@ export function App() {
     else setScopeSource(toScopeSource(access));
   }
 
-  async function logout() {
-    try {
-      if (!session?.demo) await api.logout();
-    } finally {
-      setSession(null);
-      setScopeSource(null);
-    }
+  function logout() {
+    clearSessionBeforeRemoteLogout(
+      () => {
+        setSession(null);
+        setScopeSource(null);
+        void clearPwaRuntimeState();
+      },
+      session?.demo ? undefined : () => api.logout(),
+    );
   }
 
   if (booting) return <LoadingScreen />;
@@ -205,6 +227,7 @@ export function App() {
           source={scopeSource}
           onBack={() => setScopeSource(null)}
           onComplete={setSession}
+          onSourceChange={setScopeSource}
         />
       );
     }
@@ -283,7 +306,7 @@ function Brand() {
   return (
     <div className="brand" aria-label="GiroMesa" role="img">
       <span aria-hidden="true" className="brand__mark">
-        G
+        <UiIcon name="brand" />
       </span>
       <span>
         <strong>Giro</strong>Mesa
@@ -307,7 +330,7 @@ function BootstrapError({ message, onRetry }: { message: string; onRetry: () => 
     <main className="fatal-state">
       <Card>
         <span aria-hidden="true" className="action-icon action-icon--danger">
-          !
+          <UiIcon name="alert" />
         </span>
         <h1>Não foi possível iniciar o GiroMesa</h1>
         <p>{message}</p>
@@ -565,7 +588,7 @@ function LoginScreen({
                 : challengeToken
                   ? "Confirmar acesso"
                   : "Entrar no GiroMesa"}{" "}
-              <span aria-hidden="true">→</span>
+              <Icon name="arrow-right" />
             </Button>
             {!challengeToken && (
               <Button
@@ -592,10 +615,12 @@ function ScopeScreen({
   source,
   onBack,
   onComplete,
+  onSourceChange,
 }: {
   source: ScopeSource;
   onBack: () => void;
   onComplete: (session: Session) => void;
+  onSourceChange: (source: ScopeSource) => void;
 }) {
   const [organizationId, setOrganizationId] = useState(
     source.organizations[0]?.organization.id ?? "",
@@ -623,6 +648,16 @@ function ScopeScreen({
   useEffect(() => {
     setUnitId(firstAccessibleUnitId);
   }, [firstAccessibleUnitId]);
+
+  if (source.organizations.length === 0) {
+    return (
+      <FirstOrganizationSetup
+        identityName={source.identityName}
+        onBack={onBack}
+        onCreated={onSourceChange}
+      />
+    );
+  }
 
   return (
     <main className="scope-screen">
@@ -720,6 +755,121 @@ function ScopeScreen({
   );
 }
 
+function FirstOrganizationSetup({
+  identityName,
+  onBack,
+  onCreated,
+}: {
+  identityName: string;
+  onBack: () => void;
+  onCreated: (source: ScopeSource) => void;
+}) {
+  const [legalName, setLegalName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [document, setDocument] = useState("");
+  const [unitName, setUnitName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.createOrganization({
+        legalName,
+        tradeName,
+        document: document.replace(/\D/g, ""),
+        unitName,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
+      });
+      const access = await loadAuthenticatedAccess();
+      onCreated(toScopeSource(access));
+    } catch (caught) {
+      if (caught instanceof ApiClientError && caught.status === 401) onBack();
+      setError(
+        caught instanceof ApiClientError
+          ? caught.message
+          : "Não foi possível criar a organização e a unidade.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="scope-screen">
+      <div className="scope-screen__header">
+        <Brand />
+        <Button variant="ghost" onClick={onBack}>
+          Sair
+        </Button>
+      </div>
+      <Card className="scope-card scope-card--first-organization">
+        <Badge tone="success">Identidade verificada</Badge>
+        <h1>Prepare sua primeira unidade</h1>
+        <p className="muted">
+          Olá, {identityName}. A organização e a unidade serão criadas juntas no servidor; o trial
+          ainda não começa nesta etapa.
+        </p>
+        <form className="form-stack" onSubmit={submit}>
+          <label>
+            Razão social
+            <input
+              autoComplete="organization"
+              maxLength={160}
+              minLength={2}
+              onChange={(event) => setLegalName(event.target.value)}
+              required
+              value={legalName}
+            />
+          </label>
+          <label>
+            Nome do estabelecimento
+            <input
+              maxLength={120}
+              minLength={2}
+              onChange={(event) => setTradeName(event.target.value)}
+              required
+              value={tradeName}
+            />
+          </label>
+          <label>
+            CNPJ
+            <input
+              autoComplete="off"
+              inputMode="numeric"
+              maxLength={18}
+              onChange={(event) => setDocument(event.target.value)}
+              pattern="[0-9./-]*"
+              required
+              value={document}
+            />
+          </label>
+          <label>
+            Nome da primeira unidade
+            <input
+              maxLength={120}
+              minLength={2}
+              onChange={(event) => setUnitName(event.target.value)}
+              required
+              value={unitName}
+            />
+          </label>
+          {error && (
+            <p className="auth-message auth-message--error" role="alert">
+              {error}
+            </p>
+          )}
+          <Button disabled={submitting || document.replace(/\D/g, "").length !== 14} type="submit">
+            {submitting ? "Criando organização..." : "Criar organização e unidade"}
+          </Button>
+        </form>
+      </Card>
+    </main>
+  );
+}
+
 function Avatar({ profile }: { profile: Profile }) {
   return (
     <span className="avatar" aria-hidden="true">
@@ -765,7 +915,7 @@ function OperationalApp({
 
   useEffect(() => {
     try {
-      setQueuedCommands(queuedCommandCount());
+      setQueuedCommands(queuedCommandCount() + pendingKdsAcknowledgementCount());
       return connectShell(setRuntime);
     } catch {
       setRuntimeError(
@@ -796,7 +946,7 @@ function OperationalApp({
   }, [runtime.embedded, session.demo, session.platformAdmin]);
 
   useEffect(() => {
-    if (!canAccess(session.profile, route)) {
+    if (!canAccess(session.profile, route) && route !== "onboarding") {
       window.location.hash = routeHref(session.platformAdmin ? "platform" : "dashboard");
     }
     setNavOpen(false);
@@ -812,21 +962,26 @@ function OperationalApp({
   }, [session.demo, session.organizationId, session.platformAdmin, session.unitId]);
 
   useEffect(() => {
-    if (session.demo || session.platformAdmin || queuedCommands === 0) return undefined;
+    if (session.demo || session.platformAdmin || (!runtime.embedded && queuedCommands === 0))
+      return undefined;
     let cancelled = false;
     let replaying = false;
     const replay = async () => {
       if (replaying) return;
+      const pending = queuedCommandCount() + pendingKdsAcknowledgementCount();
+      if (pending === 0) return;
       replaying = true;
       setSyncState("syncing");
-      const remaining = await replayOperationalQueue(
-        {
-          organizationId: session.organizationId,
-          unitId: session.unitId,
-          actorId: session.identityId,
-        },
-        runtime,
-      );
+      const replay = () =>
+        replayOperationalQueue(
+          {
+            organizationId: session.organizationId,
+            unitId: session.unitId,
+            actorId: session.identityId,
+          },
+          runtime,
+        );
+      const remaining = runtime.embedded ? await withPwaMutation(replay) : await replay();
       replaying = false;
       if (cancelled) return;
       setQueuedCommands(remaining);
@@ -855,21 +1010,23 @@ function OperationalApp({
   const dispatchPilot = useCallback<PilotDispatcher>(
     async (type, payload, execute) => {
       try {
-        const result = await dispatchOperationalMutation({
-          scope: {
-            organizationId: session.organizationId,
-            unitId: session.unitId,
-            actorId: session.identityId,
-          },
-          runtime,
-          type,
-          payload,
-          execute,
-        });
+        const dispatch = () =>
+          dispatchOperationalMutation({
+            scope: {
+              organizationId: session.organizationId,
+              unitId: session.unitId,
+              actorId: session.identityId,
+            },
+            runtime,
+            type,
+            payload,
+            execute,
+          });
+        const result = runtime.embedded ? await withPwaMutation(dispatch) : await dispatch();
         setRuntimeError(null);
         return result;
       } catch (error) {
-        const count = queuedCommandCount();
+        const count = queuedCommandCount() + pendingKdsAcknowledgementCount();
         setQueuedCommands(count);
         if (count > 0) {
           setSyncState("offline");
@@ -900,11 +1057,8 @@ function OperationalApp({
         return;
       }
       if (runtime.embedded) {
-        const result = await sendShellCommand(
-          session.organizationId,
-          session.unitId,
-          session.identityId,
-          command,
+        const result = await withPwaMutation(() =>
+          sendShellCommand(session.organizationId, session.unitId, session.identityId, command),
         );
         if (!result?.success) {
           setQueuedCommands(enqueueCommand(command));
@@ -932,10 +1086,11 @@ function OperationalApp({
 
   const visibleNav = navItems.filter((item) => canAccess(session.profile, item.route));
   const page = pageMeta[route];
+  const presentation = rolePresentation(session.profile);
   const visibleAlertCount = session.demo ? 3 : reconciliationCount;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-profile={session.profile.id} data-route={route}>
       <a className="skip-link" href="#main-content">
         Ir para o conteúdo
       </a>
@@ -948,7 +1103,7 @@ function OperationalApp({
             onClick={() => setNavOpen(false)}
             type="button"
           >
-            ×
+            <UiIcon name="close" />
           </button>
         </div>
         <div className="unit-chip">
@@ -965,9 +1120,10 @@ function OperationalApp({
               className={route === item.route ? "active" : ""}
               href={routeHref(item.route)}
               key={item.route}
+              onClick={() => setNavOpen(false)}
             >
               <span aria-hidden="true" className="nav-icon">
-                {item.icon}
+                <UiIcon name={item.icon} />
               </span>
               {item.label}
               {item.route === "alerts" && visibleAlertCount > 0 && (
@@ -978,7 +1134,10 @@ function OperationalApp({
         </nav>
         <div className="sidebar__footer">
           <button className="support-link" onClick={() => setHelpOpen(true)} type="button">
-            <span aria-hidden="true">?</span> Central de ajuda
+            <span aria-hidden="true">
+              <UiIcon name="help" />
+            </span>{" "}
+            Central de ajuda
           </button>
           <small>GiroMesa Operação · {session.demo ? "demo local" : "ambiente seguro"}</small>
         </div>
@@ -1001,7 +1160,7 @@ function OperationalApp({
             onClick={() => setNavOpen(true)}
             type="button"
           >
-            ☰
+            <UiIcon name="menu" />
           </button>
           <div className="topbar__title">
             <span>{organization?.name}</span>
@@ -1039,7 +1198,8 @@ function OperationalApp({
               {session.demo && syncState === "syncing" && "Sincronizando…"}
             </button>
             <a aria-label="Ver alertas" className="alert-button" href={routeHref("alerts")}>
-              !{visibleAlertCount > 0 && <span>{visibleAlertCount}</span>}
+              <UiIcon name="alert" />
+              {visibleAlertCount > 0 && <span>{visibleAlertCount}</span>}
             </a>
             <div className="profile-menu">
               <button
@@ -1054,7 +1214,9 @@ function OperationalApp({
                   <strong>{session.profile.name}</strong>
                   <small>{session.profile.role}</small>
                 </span>
-                <span aria-hidden="true">⌄</span>
+                <span aria-hidden="true">
+                  <UiIcon name="chevron-down" />
+                </span>
               </button>
               {profileMenu && (
                 <div className="profile-popover">
@@ -1074,7 +1236,7 @@ function OperationalApp({
                       size="sm"
                       variant="secondary"
                     >
-                      Trocar colaborador por PIN
+                      {session.demo ? "Trocar perfil demonstrativo" : "Trocar colaborador"}
                     </Button>
                   )}
                   <Button onClick={onLogout} size="sm" variant="ghost">
@@ -1114,20 +1276,26 @@ function OperationalApp({
           <div className="runtime-error" role="alert">
             <strong>Atenção:</strong> {runtimeError}
             <button aria-label="Fechar aviso" onClick={() => setRuntimeError(null)} type="button">
-              ×
+              <UiIcon name="close" />
             </button>
           </div>
         )}
 
-        <main className="main-content" id="main-content">
+        <main className="main-content" data-density={presentation.density} id="main-content">
           <PageHeading title={page.title} description={page.description} />
+          {(route === "dashboard" || (route === "kds" && session.profile.id === "kitchen")) && (
+            <RoleContext currentRoute={route} profile={session.profile} />
+          )}
           <PageContent
             dispatchPilot={dispatchPilot}
             loadPilot={loadPilot}
             onCommand={recordLocalCommand}
+            onSessionChange={onSessionChange}
+            onUnauthorized={onLogout}
             profile={session.profile}
             route={route}
             refreshToken={scopeRevision}
+            runtime={runtime}
             session={session}
             setTables={setTables}
             setTickets={setTickets}
@@ -1139,6 +1307,7 @@ function OperationalApp({
       {pinOpen && (
         <PinDialog
           currentProfile={session.profile}
+          demo={session.demo}
           onClose={() => setPinOpen(false)}
           onSwitch={(profile) => {
             onSessionChange({ ...session, profile });
@@ -1156,6 +1325,10 @@ const pageMeta: Record<RouteId, { title: string; description: string }> = {
   dashboard: {
     title: "Visão geral",
     description: "O que precisa da sua atenção agora.",
+  },
+  onboarding: {
+    title: "Configurar operação",
+    description: "Do primeiro acesso a uma unidade verificável, sem iniciar o trial antes da hora.",
   },
   salon: {
     title: "Salão",
@@ -1185,6 +1358,10 @@ const pageMeta: Record<RouteId, { title: string; description: string }> = {
   finance: {
     title: "Financeiro",
     description: "Contas, conciliação e caixa projetado.",
+  },
+  remuneration: {
+    title: "Remuneração",
+    description: "Taxa de serviço, comissão e participação com memória e aprovação.",
   },
   people: {
     title: "Pessoas",
@@ -1227,11 +1404,51 @@ function PageHeading({ title, description }: { title: string; description: strin
   );
 }
 
+function RoleContext({ currentRoute, profile }: { currentRoute: RouteId; profile: Profile }) {
+  const presentation = rolePresentation(profile);
+  return (
+    <section
+      aria-label="Contexto do perfil"
+      className={`role-context role-context--${presentation.density}`}
+    >
+      <div className="role-context__identity">
+        <span aria-hidden="true" className="role-context__icon">
+          <UiIcon
+            name={
+              presentation.density === "production"
+                ? "kds"
+                : presentation.density === "transaction"
+                  ? "cash"
+                  : presentation.density === "service"
+                    ? "salon"
+                    : "dashboard"
+            }
+          />
+        </span>
+        <div>
+          <p>{presentation.label}</p>
+          <h2>{presentation.title}</h2>
+        </div>
+      </div>
+      <p className="role-context__summary">{presentation.summary}</p>
+      {currentRoute === presentation.primaryRoute ? (
+        <span className="role-context__current">Área principal</span>
+      ) : (
+        <a className="role-context__action" href={routeHref(presentation.primaryRoute)}>
+          {presentation.primaryAction}
+          <UiIcon name="arrow-right" />
+        </a>
+      )}
+    </section>
+  );
+}
+
 function PageContent({
   dispatchPilot,
   loadPilot,
   route,
   refreshToken,
+  runtime,
   session,
   profile,
   tables,
@@ -1239,11 +1456,14 @@ function PageContent({
   tickets,
   setTickets,
   onCommand,
+  onSessionChange,
+  onUnauthorized,
 }: {
   dispatchPilot: PilotDispatcher;
   loadPilot: PilotLoader;
   route: RouteId;
   refreshToken: number;
+  runtime: DeviceContext;
   session: Session;
   profile: Profile;
   tables: DiningTable[];
@@ -1251,6 +1471,8 @@ function PageContent({
   tickets: KitchenTicket[];
   setTickets: (tickets: KitchenTicket[]) => void;
   onCommand: CommandRecorder;
+  onSessionChange: (session: Session) => void;
+  onUnauthorized: () => void;
 }) {
   const managementScope = {
     organizationId: session.organizationId,
@@ -1261,6 +1483,7 @@ function PageContent({
   const pilotScope = {
     ...managementScope,
     membershipId: session.membershipId,
+    runtime,
     dispatch: dispatchPilot,
     load: loadPilot,
   };
@@ -1270,6 +1493,24 @@ function PageContent({
         <Dashboard profile={profile} tables={tables} tickets={tickets} />
       ) : (
         <RealDashboard scope={managementScope} />
+      );
+    case "onboarding":
+      return (
+        <OnboardingPage
+          onUnauthorized={onUnauthorized}
+          onUnitSelected={(selectedUnitId) => {
+            const selectedUnit = session.organization.units.find(
+              (unit) => unit.id === selectedUnitId,
+            );
+            if (selectedUnit) {
+              onSessionChange({ ...session, unit: selectedUnit, unitId: selectedUnit.id });
+            }
+          }}
+          organizationId={session.organizationId}
+          profileId={session.profile.id}
+          unitId={session.unitId}
+          units={session.organization.units}
+        />
       );
     case "salon":
       return session.demo ? (
@@ -1303,6 +1544,8 @@ function PageContent({
       return session.demo ? <DemoPurchasesPage /> : <RealPurchasesPage scope={managementScope} />;
     case "finance":
       return session.demo ? <FinancePage /> : <RealFinancePage scope={managementScope} />;
+    case "remuneration":
+      return <RemunerationPage demo={session.demo} scope={managementScope} />;
     case "people":
       return session.demo ? <DemoPeoplePage /> : <RealPeoplePage scope={managementScope} />;
     case "delivery":
@@ -1329,7 +1572,7 @@ function PageContent({
       return session.demo ? (
         <PlatformPage />
       ) : session.platformAdmin ? (
-        <RealPlatformPage refreshToken={refreshToken} />
+        <RealPlatformPage actorIdentityId={session.identityId} refreshToken={refreshToken} />
       ) : (
         <UnavailableRealPage title="Administração da plataforma" />
       );
@@ -1389,7 +1632,7 @@ function DemoFeaturePage({ title }: { title: string }) {
 function UnavailableRealPage({ title }: { title: string }) {
   return (
     <EmptyState
-      icon="◇"
+      icon={<UiIcon name="info" />}
       title={`${title} sem fonte autenticada`}
       description="Esta V2 não exibe fixtures em sessões reais. A tela será ativada quando houver um endpoint autenticado correspondente."
     />
@@ -1403,6 +1646,16 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Use os indicadores como atalhos para a área correspondente.",
       "Dados reais são atualizados por evento ou pela atualização periódica de segurança.",
     ],
+  },
+  onboarding: {
+    title: "Concluir a configuração operacional",
+    steps: [
+      "Siga os quatro blocos e use cada atalho para configurar o recurso na tela correta.",
+      "Retorne ao onboarding e atualize o status; somente o servidor confirma cada requisito.",
+      "Depois dos 12 requisitos, o proprietário confirma e inicia o trial uma única vez.",
+    ],
+    warning:
+      "KDS, impressão, QR e fiscal não ficam prontos sem evidência real ou dispensa permitida.",
   },
   salon: {
     title: "Atender uma mesa",
@@ -1452,6 +1705,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
   finance: {
     title: "Ler o financeiro",
     steps: ["Separe contas a pagar e receber.", "Conciliação exige fonte bancária homologada."],
+  },
+  remuneration: {
+    title: "Revisar remuneração",
+    steps: [
+      "Confirme a categoria e as fontes do cálculo.",
+      "Valores estimados exigem aprovação antes do fechamento.",
+      "Exporte CSV, PDF ou a versão de impressão somente após revisar a memória.",
+    ],
   },
   people: {
     title: "Acompanhar equipe",
@@ -1518,7 +1779,7 @@ function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => void })
             onClick={onClose}
             type="button"
           >
-            ×
+            <UiIcon name="close" />
           </button>
         </div>
         <p className="muted">
@@ -1555,6 +1816,11 @@ function Dashboard({
   const lateTicket = tickets.find(
     (ticket) => ticket.elapsedMinutes >= 20 && ticket.status !== "ready",
   );
+  const presentation = rolePresentation(profile);
+  const canHandleTable = Boolean(urgentTable && canAccess(profile, "salon"));
+  const canHandleTicket = Boolean(lateTicket && canAccess(profile, "kds"));
+  const priorityCount = Number(canHandleTable) + Number(canHandleTicket);
+  const showsSalesGoal = profile.id === "owner" || profile.id === "manager";
   return (
     <div className="dashboard-grid">
       <div className="metrics-grid">
@@ -1571,47 +1837,56 @@ function Dashboard({
       <Card className="attention-card">
         <div className="card-header">
           <div>
-            <p className="eyebrow">Prioridades</p>
-            <h2>Faça agora</h2>
+            <p className="eyebrow">{priorityCount > 0 ? "Prioridades" : "Fluxo principal"}</p>
+            <h2>{priorityCount > 0 ? "Faça agora" : "Próximo passo"}</h2>
           </div>
-          <Badge tone="danger">3 pendências</Badge>
+          {priorityCount > 0 && (
+            <Badge tone="danger">
+              {priorityCount} {priorityCount === 1 ? "pendência" : "pendências"}
+            </Badge>
+          )}
         </div>
         <div className="action-list">
-          {urgentTable && (
+          {urgentTable && canHandleTable && (
             <a className="action-link" href={routeHref("salon")}>
-              <span className="action-icon action-icon--danger">!</span>
+              <span className="action-icon action-icon--danger">
+                <UiIcon name="alert" />
+              </span>
               <span>
                 <strong>Atender chamado da {urgentTable.name}</strong>
                 <small>
                   Aberta há {urgentTable.openedMinutes} min · responsável {urgentTable.server}
                 </small>
               </span>
-              <span aria-hidden="true">→</span>
+              <UiIcon aria-hidden="true" name="arrow-right" />
             </a>
           )}
-          {lateTicket && (
+          {lateTicket && canHandleTicket && (
             <a className="action-link" href={routeHref("kds")}>
-              <span className="action-icon action-icon--warning">◷</span>
+              <span className="action-icon action-icon--warning">
+                <UiIcon name="clock" />
+              </span>
               <span>
                 <strong>Produção acima do tempo</strong>
                 <small>
                   {lateTicket.reference} · {lateTicket.elapsedMinutes} minutos
                 </small>
               </span>
-              <span aria-hidden="true">→</span>
+              <UiIcon aria-hidden="true" name="arrow-right" />
             </a>
           )}
-          <a
-            className="action-link"
-            href={routeHref(canAccess(profile, "inventory") ? "inventory" : "alerts")}
-          >
-            <span className="action-icon">◇</span>
-            <span>
-              <strong>Repor três insumos críticos</strong>
-              <small>Um item está zerado e afeta o cardápio</small>
-            </span>
-            <span aria-hidden="true">→</span>
-          </a>
+          {priorityCount === 0 && (
+            <a className="action-link" href={routeHref(presentation.primaryRoute)}>
+              <span className="action-icon">
+                <UiIcon name="dashboard" />
+              </span>
+              <span>
+                <strong>{presentation.primaryAction}</strong>
+                <small>{presentation.summary}</small>
+              </span>
+              <UiIcon aria-hidden="true" name="arrow-right" />
+            </a>
+          )}
         </div>
       </Card>
 
@@ -1651,37 +1926,39 @@ function Dashboard({
         </div>
       </Card>
 
-      <Card className="shift-card">
-        <div className="card-header">
-          <div>
-            <p className="eyebrow">Meta do turno</p>
-            <h2>Vendas</h2>
+      {showsSalesGoal && (
+        <Card className="shift-card">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Meta do turno</p>
+              <h2>Vendas</h2>
+            </div>
+            <strong>R$ 8.742</strong>
           </div>
-          <strong>R$ 8.742</strong>
-        </div>
-        <Progress label="R$ 8.742 de R$ 12.000" value={73} />
-        <div className="hour-bars" aria-label="Vendas por horário" role="img">
-          {[
-            { time: "18h", height: 18 },
-            { time: "19h", height: 31 },
-            { time: "20h", height: 46 },
-            { time: "21h", height: 64 },
-            { time: "22h", height: 84 },
-            { time: "23h", height: 72 },
-            { time: "00h", height: 48 },
-            { time: "01h", height: 28 },
-          ].map((item) => (
-            <span key={item.time} style={{ height: `${item.height}%` }}>
-              <VisuallyHidden>{item.time}</VisuallyHidden>
-            </span>
-          ))}
-        </div>
-        <div className="hour-labels">
-          <span>18h</span>
-          <span>22h</span>
-          <span>01h</span>
-        </div>
-      </Card>
+          <Progress label="R$ 8.742 de R$ 12.000" value={73} />
+          <div className="hour-bars" aria-label="Vendas por horário" role="img">
+            {[
+              { time: "18h", height: 18 },
+              { time: "19h", height: 31 },
+              { time: "20h", height: 46 },
+              { time: "21h", height: 64 },
+              { time: "22h", height: 84 },
+              { time: "23h", height: 72 },
+              { time: "00h", height: 48 },
+              { time: "01h", height: 28 },
+            ].map((item) => (
+              <span key={item.time} style={{ height: `${item.height}%` }}>
+                <VisuallyHidden>{item.time}</VisuallyHidden>
+              </span>
+            ))}
+          </div>
+          <div className="hour-labels">
+            <span>18h</span>
+            <span>22h</span>
+            <span>01h</span>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1706,9 +1983,7 @@ function SalonPage({
   setTables: (tables: DiningTable[]) => void;
   onCommand: CommandRecorder;
 }) {
-  const [area, setArea] = useState<DiningTable["area"] | "Todas">("Todas");
   const [selected, setSelected] = useState<DiningTable | null>(null);
-  const visible = tables.filter((table) => area === "Todas" || table.area === area);
 
   function occupy(table: DiningTable) {
     const updated = {
@@ -1723,104 +1998,76 @@ function SalonPage({
     onCommand("table.opened", { tableId: table.id });
   }
 
+  const statusByDemoStatus: Record<TableStatus, SalonMapTable["status"]> = {
+    free: "available",
+    occupied: "occupied",
+    attention: "attention",
+    closing: "paying",
+    reserved: "reserved",
+  };
+  const mapTables: SalonMapTable[] = tables.map((table, index) => ({
+    id: table.id,
+    label: table.name,
+    seats: table.seats,
+    status: statusByDemoStatus[table.status],
+    x: 70 + (index % 4) * 210,
+    y: 85 + Math.floor(index / 4) * 165,
+    width: 168,
+    height: 124,
+    areaId: table.area,
+    totalCents: table.totalCents,
+    elapsedMinutes: table.openedMinutes,
+    ownerName: table.server,
+  }));
+
   return (
-    <div className="salon-layout">
-      <section>
-        <div className="filters-row">
-          <fieldset className="segmented">
-            <legend className="gm-sr-only">Filtrar área</legend>
-            {(["Todas", "Salão principal", "Varanda", "Balcão"] as const).map((item) => (
-              <button
-                aria-pressed={area === item}
-                key={item}
-                onClick={() => setArea(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-          </fieldset>
-          <div className="legend">
-            <span className="dot dot--free" />
-            Livre <span className="dot dot--busy" />
-            Ocupada <span className="dot dot--attention" />
-            Atenção
-          </div>
-        </div>
-        <div className="table-grid">
-          {visible.map((table) => (
-            <button
-              className={`table-tile table-tile--${table.status} ${selected?.id === table.id ? "selected" : ""}`}
-              key={table.id}
-              onClick={() => setSelected(table)}
-              type="button"
-            >
-              <span className="table-tile__top">
-                <strong>{table.name}</strong>
-                <Badge tone={tableStatus[table.status].tone}>
-                  {tableStatus[table.status].label}
-                </Badge>
-              </span>
-              <span className="table-tile__seats" aria-label={`${table.seats} lugares`} role="img">
-                {"●".repeat(Math.min(table.seats, 6))}
-              </span>
-              {table.status === "free" || table.status === "reserved" ? (
-                <small>
-                  {table.seats} lugares · {table.area}
-                </small>
-              ) : (
-                <>
-                  <strong>{formatMoney(table.totalCents ?? 0)}</strong>
-                  <small>
-                    {table.server} · {table.openedMinutes} min
-                  </small>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-      </section>
-      <Card className="table-drawer">
-        {!selected ? (
-          <EmptyState
-            icon="◫"
-            title="Selecione uma mesa"
-            description="Veja a comanda, lance itens ou atenda chamados."
-          />
-        ) : (
-          <>
-            <div className="card-header">
-              <div>
-                <p className="eyebrow">{selected.area}</p>
-                <h2>{selected.name}</h2>
-              </div>
-              <Badge tone={tableStatus[selected.status].tone}>
-                {tableStatus[selected.status].label}
-              </Badge>
-            </div>
-            {selected.status === "free" ? (
-              <EmptyState
-                icon="＋"
-                title="Mesa disponível"
-                description={`${selected.seats} lugares prontos para atendimento.`}
-                action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
-              />
-            ) : selected.status === "reserved" ? (
-              <>
-                <div className="reservation-info">
-                  <span>Reserva</span>
-                  <strong>Camila · 20:30</strong>
-                  <small>2 pessoas · confirmação por telefone</small>
+    <SalonMap
+      tables={mapTables}
+      selectedTableId={selected?.id ?? null}
+      onSelect={(tableId) => setSelected(tables.find((table) => table.id === tableId) ?? null)}
+      details={
+        <Card className="table-drawer">
+          {!selected ? (
+            <EmptyState
+              icon={<UiIcon name="salon" />}
+              title="Selecione uma mesa"
+              description="Veja a comanda, lance itens ou atenda chamados."
+            />
+          ) : (
+            <>
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">{selected.area}</p>
+                  <h2>{selected.name}</h2>
                 </div>
-                <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
-              </>
-            ) : (
-              <TableTab table={selected} onCommand={onCommand} />
-            )}
-          </>
-        )}
-      </Card>
-    </div>
+                <Badge tone={tableStatus[selected.status].tone}>
+                  {tableStatus[selected.status].label}
+                </Badge>
+              </div>
+              {selected.status === "free" ? (
+                <EmptyState
+                  icon={<Icon name="plus" />}
+                  title="Mesa disponível"
+                  description={`${selected.seats} lugares prontos para atendimento.`}
+                  action={<Button onClick={() => occupy(selected)}>Abrir comanda</Button>}
+                />
+              ) : selected.status === "reserved" ? (
+                <>
+                  <div className="reservation-info">
+                    <span>Reserva</span>
+                    <strong>Camila · 20:30</strong>
+                    <small>2 pessoas · confirmação por telefone</small>
+                  </div>
+                  <Button onClick={() => occupy(selected)}>Confirmar chegada</Button>
+                </>
+              ) : (
+                <TableTab table={selected} onCommand={onCommand} />
+              )}
+            </>
+          )}
+        </Card>
+      }
+    />
   );
 }
 
@@ -1955,13 +2202,13 @@ function OrderWorkspace({
       <section className="catalog-panel">
         {compact && (
           <Button onClick={onBack} size="sm" variant="ghost">
-            ← Voltar para comanda
+            <Icon name="arrow-left" /> Voltar para comanda
           </Button>
         )}
         <div className="catalog-toolbar">
           <label className="search-field">
             <VisuallyHidden>Buscar produto</VisuallyHidden>
-            <span aria-hidden="true">⌕</span>
+            <Icon name="search" />
             <input
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar produto"
@@ -2028,7 +2275,7 @@ function OrderWorkspace({
         )}
         {!cart.length ? (
           <EmptyState
-            icon="＋"
+            icon={<UiIcon name="plus" />}
             title="Comanda vazia"
             description="Toque em um produto para começar o pedido."
           />
@@ -2051,7 +2298,7 @@ function OrderWorkspace({
                     onClick={() => changeQuantity(item.id, -1)}
                     type="button"
                   >
-                    −
+                    <Icon name="minus" />
                   </button>
                   <strong>{item.quantity}</strong>
                   <button
@@ -2059,7 +2306,7 @@ function OrderWorkspace({
                     onClick={() => changeQuantity(item.id, 1)}
                     type="button"
                   >
-                    +
+                    <Icon name="plus" />
                   </button>
                 </div>
                 <strong>
@@ -2121,7 +2368,7 @@ function ModifierDialog({
             <h2 id="modifier-title">{product.name}</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            ×
+            <UiIcon name="close" />
           </button>
         </div>
         <fieldset className="modifier-list">
@@ -2186,97 +2433,35 @@ function KdsPage({
   setTickets: (tickets: KitchenTicket[]) => void;
   onCommand: CommandRecorder;
 }) {
-  const [station, setStation] = useState<"Todas" | KitchenTicket["station"]>("Todas");
-  const visible = tickets.filter((ticket) => station === "Todas" || ticket.station === station);
-  function advance(ticket: KitchenTicket) {
-    setTickets(
-      tickets.map((item) =>
-        item.id === ticket.id ? { ...item, status: nextTicketStatus(item.status) } : item,
-      ),
-    );
-    onCommand("kds.ticket_advanced", {
-      ticketId: ticket.id,
-      status: nextTicketStatus(ticket.status),
-    });
-  }
-  const columns = ["new", "preparing", "ready"] as const;
+  const boardTickets: KdsBoardTicket[] = tickets.map((ticket) => ({
+    id: ticket.id,
+    reference: ticket.reference,
+    station: ticket.station,
+    status: ticket.status === "new" ? "pending" : ticket.status,
+    elapsedMinutes: ticket.elapsedMinutes,
+    priority: ticket.priority,
+    items: ticket.items.map((item, index) => ({ id: `${ticket.id}-${index}`, label: item })),
+  }));
   return (
-    <div>
-      <div className="filters-row">
-        <div className="segmented">
-          {(["Todas", "Cozinha", "Bar"] as const).map((item) => (
-            <button
-              aria-pressed={station === item}
-              key={item}
-              onClick={() => setStation(item)}
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="kds-clock">
-          <span className="dot dot--free" /> Turno 18:42 · média 17 min
-        </div>
-      </div>
-      <div className="kds-board">
-        {columns.map((status) => (
-          <section className={`kds-column kds-column--${status}`} key={status}>
-            <header>
-              <h2>
-                {status === "new" ? "Novos" : status === "preparing" ? "Em preparo" : "Prontos"}
-              </h2>
-              <Badge
-                tone={status === "new" ? "info" : status === "preparing" ? "warning" : "success"}
-              >
-                {visible.filter((item) => item.status === status).length}
-              </Badge>
-            </header>
-            <div>
-              {visible
-                .filter((item) => item.status === status)
-                .map((ticket) => (
-                  <Card
-                    className={`ticket ${ticket.elapsedMinutes >= 20 && status !== "ready" ? "ticket--late" : ""}`}
-                    key={ticket.id}
-                  >
-                    <div className="ticket__header">
-                      <span>
-                        <Badge tone={ticket.station === "Bar" ? "info" : "neutral"}>
-                          {ticket.station}
-                        </Badge>
-                        {ticket.priority && <Badge tone="danger">Prioridade</Badge>}
-                      </span>
-                      <strong>{ticket.elapsedMinutes} min</strong>
-                    </div>
-                    <h3>{ticket.reference}</h3>
-                    <ul>
-                      {ticket.items.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                    {status !== "ready" ? (
-                      <Button onClick={() => advance(ticket)}>
-                        {status === "new" ? "Iniciar preparo" : "Marcar pronto"}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          setTickets(tickets.filter((item) => item.id !== ticket.id));
-                          onCommand("kds.ticket_collected", { ticketId: ticket.id });
-                        }}
-                        variant="secondary"
-                      >
-                        Confirmar retirada
-                      </Button>
-                    )}
-                  </Card>
-                ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
+    <KdsBoard
+      deviceState={navigator.onLine ? "online" : "offline"}
+      onAdvance={(ticket, state) => {
+        if (state === "done") {
+          setTickets(tickets.filter((item) => item.id !== ticket.id));
+          onCommand("kds.ticket_collected", { ticketId: ticket.id });
+          return;
+        }
+        setTickets(
+          tickets.map((item) =>
+            item.id === ticket.id
+              ? { ...item, status: state === "preparing" ? "preparing" : "ready" }
+              : item,
+          ),
+        );
+        onCommand("kds.ticket_advanced", { ticketId: ticket.id, status: state });
+      }}
+      tickets={boardTickets}
+    />
   );
 }
 
@@ -2322,7 +2507,9 @@ function CashPage({ onCommand }: { onCommand: CommandRecorder }) {
               className={`cash-row ${received.includes(tab.id) ? "cash-row--done" : ""}`}
               key={tab.id}
             >
-              <span className="action-icon">◉</span>
+              <span className="action-icon">
+                <UiIcon name="cash" />
+              </span>
               <span>
                 <strong>{tab.reference}</strong>
                 <small>
@@ -2393,7 +2580,7 @@ function InventoryPage() {
           </div>
           <label className="search-field search-field--small">
             <VisuallyHidden>Buscar insumo</VisuallyHidden>
-            <span>⌕</span>
+            <Icon name="search" />
             <input
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar insumo"
@@ -2658,9 +2845,10 @@ function FinancePage() {
           </div>
           {entries.map((entry) => (
             <div className="finance-row" key={entry.name}>
-              <span className={`action-icon ${entry.value < 0 ? "action-icon--warning" : ""}`}>
-                {entry.value < 0 ? "↓" : "↑"}
-              </span>
+              <Icon
+                className={`action-icon ${entry.value < 0 ? "action-icon--warning" : ""}`}
+                name={entry.value < 0 ? "arrow-down" : "arrow-up"}
+              />
               <span>
                 <strong>{entry.name}</strong>
                 <small>
@@ -2719,7 +2907,9 @@ function DeliveryPage() {
   return (
     <div>
       <div className="channel-notice">
-        <span className="action-icon">i</span>
+        <span className="action-icon">
+          <UiIcon name="info" />
+        </span>
         <span>
           <strong>Modo demonstrativo</strong> Marketplaces e pagamento online só serão exibidos após
           credenciais e homologação.
@@ -2852,11 +3042,10 @@ function AlertsPage() {
             className={`alert-row ${resolved.includes(alert.id) ? "alert-row--resolved" : ""}`}
             key={alert.id}
           >
-            <span
+            <Icon
               className={`action-icon action-icon--${alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "info"}`}
-            >
-              {alert.severity === "info" ? "i" : "!"}
-            </span>
+              name={alert.severity === "info" ? "info" : "alert"}
+            />
             <span>
               <strong>{alert.title}</strong>
               <small>{resolved.includes(alert.id) ? "Resolvido nesta sessão" : alert.detail}</small>
@@ -2891,26 +3080,21 @@ function AlertsPage() {
 
 function PinDialog({
   currentProfile,
+  demo,
   onClose,
   onSwitch,
 }: {
   currentProfile: Profile;
+  demo: boolean;
   onClose: () => void;
   onSwitch: (profile: Profile) => void;
 }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
   const candidates = profiles.filter((profile) => profile.id !== "platform");
+  const [selectedId, setSelectedId] = useState(candidates[0]?.id ?? "owner");
   function submit() {
-    if (!isValidTerminalPin(pin)) {
-      setError("Informe os quatro dígitos do PIN.");
-      return;
-    }
-    const profile = candidates.find((item) => item.pin === pin);
-    if (!profile) {
-      setError("PIN demonstrativo não reconhecido.");
-      return;
-    }
+    if (!demo) return;
+    const profile = candidates.find((item) => item.id === selectedId);
+    if (!profile) return;
     onSwitch(profile);
   }
   return (
@@ -2927,7 +3111,7 @@ function PinDialog({
             <h2 id="pin-title">Trocar colaborador</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            ×
+            <UiIcon name="close" />
           </button>
         </div>
         <div className="scope-profile">
@@ -2937,35 +3121,30 @@ function PinDialog({
             <strong>{currentProfile.name}</strong>
           </span>
         </div>
-        <label className="pin-field">
-          PIN de 4 dígitos
-          <input
-            aria-describedby={error ? "pin-error" : undefined}
-            inputMode="numeric"
-            maxLength={4}
-            onChange={(event) => {
-              setPin(event.target.value.replace(/\D/g, ""));
-              setError("");
-            }}
-            onKeyDown={(event) => event.key === "Enter" && submit()}
-            type="password"
-            value={pin}
-          />
-        </label>
-        {error && (
-          <p className="field-error" id="pin-error" role="alert">
-            {error}
+        {demo ? (
+          <label className="pin-field">
+            Perfil demonstrativo
+            <select
+              onChange={(event) => setSelectedId(event.target.value as Profile["id"])}
+              value={selectedId}
+            >
+              {candidates.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.role} — {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="field-error" role="alert">
+            A troca de colaborador exige autenticação pela API e não está disponível localmente.
           </p>
         )}
-        <div className="demo-pin">
-          <strong>PINs da demonstração</strong>
-          <span>1024 proprietária · 2468 gerente · 1357 garçom · 9090 caixa</span>
-        </div>
         <div className="dialog-actions">
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button disabled={pin.length !== 4} onClick={submit}>
+          <Button disabled={!demo} onClick={submit}>
             Trocar acesso
           </Button>
         </div>

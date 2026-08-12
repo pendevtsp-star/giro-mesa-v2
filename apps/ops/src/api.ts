@@ -1,8 +1,59 @@
+import { createPwaFetch, type PwaMutationContext } from "@giromesa/ui/pwa-mutation";
 import type {
   ApiError,
+  ApiOperations,
   LoginInput,
+  OnboardingResponsePayload,
+  OnboardingSelectionResponsePayload,
   OperationalCommandInput,
+  ProvisioningStatusResponsePayload,
+  TrialActivationResponsePayload,
 } from "../../../packages/contracts/src/index";
+import {
+  onboardingResponseSchema,
+  onboardingSelectionResponseSchema,
+  provisioningStatusResponseSchema,
+  trialActivationResponseSchema,
+} from "../../../packages/contracts/src/index";
+
+export type CreateOrganizationInput =
+  ApiOperations["OrganizationsController_create[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingUpdateInput =
+  ApiOperations["OnboardingController_update[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionInput =
+  ApiOperations["OnboardingController_select[1]"]["requestBody"]["content"]["application/json"];
+export type TrialActivationInput =
+  ApiOperations["OnboardingController_activate[1]"]["requestBody"]["content"]["application/json"];
+export type OnboardingSelectionResponse = OnboardingSelectionResponsePayload;
+export type TrialActivationResponse = TrialActivationResponsePayload;
+export type ProvisioningStatus = ProvisioningStatusResponsePayload;
+export type ProvisioningSummary = OnboardingResponsePayload["provisioning"] extends infer Summary
+  ? Exclude<Summary, null>
+  : never;
+export type ProvisioningState = ProvisioningSummary["state"];
+export type OnboardingResponse = OnboardingResponsePayload;
+export type ChecklistItem = keyof OnboardingResponse["items"];
+export type OnboardingChecklistEvidence = OnboardingResponse["items"][ChecklistItem];
+export type ChecklistStatus = OnboardingChecklistEvidence["status"];
+export type ChecklistSource = OnboardingChecklistEvidence["source"];
+
+export interface CreatedOrganizationResponse {
+  organization: {
+    id: string;
+    legalName: string;
+    tradeName: string;
+    document: string;
+    billingState: string;
+  };
+  unit: { id: string; organizationId: string; name: string; timezone: string; active: boolean };
+}
+
+export interface OnboardingErrorDetails {
+  provisioningRunId?: string;
+  missingItems?: string[];
+  fieldErrors?: Record<string, string[]>;
+  formErrors?: string[];
+}
 
 export interface ApiHealth {
   status: "ok";
@@ -36,6 +87,7 @@ export class ApiClientError extends Error {
     readonly status: number,
     readonly code: string,
     readonly retryable: boolean,
+    readonly details?: OnboardingErrorDetails,
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -43,6 +95,7 @@ export class ApiClientError extends Error {
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replace(/\/$/, "");
+const pwaFetch = createPwaFetch();
 
 export function resolveSecurityUrl(
   rawSiteUrl = import.meta.env.VITE_SITE_URL ?? "http://localhost:3100",
@@ -59,20 +112,36 @@ export function resolveSecurityUrl(
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  mutationContext?: PwaMutationContext,
+): Promise<T> {
   const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), 8_000);
+  const externalSignal = init.signal;
+  let timedOut = false;
+  const relayAbort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener("abort", relayAbort, { once: true });
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 8_000);
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      credentials: "include",
-      signal: init.signal ?? controller.signal,
-      headers: {
-        accept: "application/json",
-        ...(init.body ? { "content-type": "application/json" } : {}),
-        ...init.headers,
+    const response = await pwaFetch(
+      `${baseUrl}${path}`,
+      {
+        ...init,
+        credentials: "include",
+        signal: controller.signal,
+        headers: {
+          accept: "application/json",
+          ...(init.body ? { "content-type": "application/json" } : {}),
+          ...init.headers,
+        },
       },
-    });
+      mutationContext,
+    );
     if (!response.ok) {
       const body = await safeJson<ApiError>(response);
       throw new ApiClientError(
@@ -80,13 +149,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         response.status,
         body?.code ?? "API_REQUEST_FAILED",
         response.status >= 500 || response.status === 429,
+        safeErrorDetails(body?.details),
       );
     }
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof ApiClientError) throw error;
-    const timedOut = error instanceof DOMException && error.name === "AbortError";
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError" &&
+      externalSignal?.aborted &&
+      !timedOut
+    ) {
+      throw error;
+    }
     throw new ApiClientError(
       timedOut ? "A API demorou mais que o esperado." : "Não foi possível alcançar a API.",
       0,
@@ -95,13 +172,72 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   } finally {
     globalThis.clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", relayAbort);
   }
+}
+
+function safeErrorDetails(value: unknown): OnboardingErrorDetails | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  const details: OnboardingErrorDetails = {};
+  if (typeof candidate.provisioningRunId === "string") {
+    details.provisioningRunId = candidate.provisioningRunId;
+  }
+  if (Array.isArray(candidate.missingItems)) {
+    details.missingItems = candidate.missingItems
+      .filter((item): item is string => typeof item === "string" && item.length <= 80)
+      .slice(0, 12);
+  }
+  if (candidate.fieldErrors && typeof candidate.fieldErrors === "object") {
+    details.fieldErrors = Object.fromEntries(
+      Object.entries(candidate.fieldErrors as Record<string, unknown>)
+        .slice(0, 20)
+        .flatMap(([key, messages]) =>
+          key.length <= 120 && Array.isArray(messages)
+            ? [
+                [
+                  key,
+                  messages
+                    .filter((message): message is string => typeof message === "string")
+                    .slice(0, 5)
+                    .map((message) => message.slice(0, 240)),
+                ],
+              ]
+            : [],
+        ),
+    );
+  }
+  if (Array.isArray(candidate.formErrors)) {
+    details.formErrors = candidate.formErrors
+      .filter((message): message is string => typeof message === "string")
+      .slice(0, 10)
+      .map((message) => message.slice(0, 240));
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
+function parseApiPayload<T>(
+  schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } },
+  value: unknown,
+  label: string,
+): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  throw new ApiClientError(
+    `A API retornou ${label} em formato inválido.`,
+    502,
+    "INVALID_API_RESPONSE",
+    false,
+  );
 }
 
 async function safeJson<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
-  } catch {
+  } catch (error) {
+    if ((error instanceof DOMException || error instanceof Error) && error.name === "AbortError") {
+      throw error;
+    }
     return null;
   }
 }
@@ -132,8 +268,21 @@ function pilotPath(organizationId: string, unitId: string, resource: string): st
   return `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/pilot/${resource}`;
 }
 
+function salonPath(organizationId: string, unitId: string, resource: string): string {
+  return `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/salon/${resource}`;
+}
+
 function growthPath(organizationId: string, resource: string): string {
   return `/v1/organizations/${encodeURIComponent(organizationId)}/growth/${resource}`;
+}
+
+function onboardingPath(organizationId: string, resource = ""): string {
+  const suffix = resource ? `/${resource}` : "";
+  return `/v1/organizations/${encodeURIComponent(organizationId)}/onboarding${suffix}`;
+}
+
+function platformTenantPath(organizationId: string, resource: string): string {
+  return `/v1/platform/tenants/${encodeURIComponent(organizationId)}/${resource}`;
 }
 
 async function idempotentRequest<T>(
@@ -181,11 +330,132 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
-  logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
+  logout: (mutationContext?: PwaMutationContext) =>
+    request<void>("/v1/auth/logout", { method: "POST" }, mutationContext),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
+  createOrganization: (body: CreateOrganizationInput) =>
+    request<CreatedOrganizationResponse>("/v1/organizations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  onboarding: {
+    get: async (organizationId: string, signal?: AbortSignal) =>
+      parseApiPayload(
+        onboardingResponseSchema,
+        await request<unknown>(onboardingPath(organizationId), { signal }),
+        "o onboarding",
+      ),
+    update: async (organizationId: string, body: OnboardingUpdateInput) =>
+      parseApiPayload(
+        onboardingResponseSchema,
+        await request<unknown>(onboardingPath(organizationId), {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }),
+        "o onboarding atualizado",
+      ),
+    select: async (organizationId: string, body: OnboardingSelectionInput) =>
+      parseApiPayload(
+        onboardingSelectionResponseSchema,
+        await request<unknown>(onboardingPath(organizationId, "selection"), {
+          method: "PUT",
+          body: JSON.stringify(body),
+        }),
+        "a seleção do onboarding",
+      ),
+    activate: (organizationId: string, body: TrialActivationInput, idempotencyKey: string) =>
+      request<unknown>(onboardingPath(organizationId, "activate"), {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(body),
+      }).then((value) =>
+        parseApiPayload(trialActivationResponseSchema, value, "a ativação do trial"),
+      ),
+    provisioning: async (organizationId: string, runId: string, signal?: AbortSignal) =>
+      parseApiPayload(
+        provisioningStatusResponseSchema,
+        await request<unknown>(
+          onboardingPath(organizationId, `provisioning/${encodeURIComponent(runId)}`),
+          { signal },
+        ),
+        "o status do provisionamento",
+      ),
+  },
   platform: {
-    overview: () => request<unknown>("/v1/platform/overview"),
+    overview: (signal?: AbortSignal) => request<unknown>("/v1/platform/overview", { signal }),
+    globalProjection: (
+      resource: "leads" | "support",
+      options: { cursor?: string; limit?: number; signal?: AbortSignal } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (options.cursor) query.set("cursor", options.cursor);
+      if (options.limit) query.set("limit", String(options.limit));
+      const suffix = query.size > 0 ? `?${query}` : "";
+      return request<unknown>(`/v1/platform/resources/${encodeURIComponent(resource)}${suffix}`, {
+        signal: options.signal,
+      });
+    },
+    context: (organizationId: string, unitId?: string, signal?: AbortSignal) =>
+      request<unknown>(
+        `${platformTenantPath(organizationId, "context")}${unitId ? `?unitId=${encodeURIComponent(unitId)}` : ""}`,
+        { signal },
+      ),
+    projection: (
+      organizationId: string,
+      resource: string,
+      options: { unitId?: string; cursor?: string; limit?: number; signal?: AbortSignal } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (options.unitId) query.set("unitId", options.unitId);
+      if (options.cursor) query.set("cursor", options.cursor);
+      if (options.limit) query.set("limit", String(options.limit));
+      const suffix = query.size > 0 ? `?${query}` : "";
+      return request<unknown>(
+        `${platformTenantPath(organizationId, `resources/${encodeURIComponent(resource)}`)}${suffix}`,
+        { signal: options.signal },
+      );
+    },
+    actions: (organizationId: string, signal?: AbortSignal) =>
+      request<unknown>(platformTenantPath(organizationId, "actions"), { signal }),
+    propose: (
+      organizationId: string,
+      body: unknown,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(platformTenantPath(organizationId, "actions"), {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(body),
+      }),
+    approve: (
+      organizationId: string,
+      proposalId: string,
+      expectedVersion: number,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(
+        platformTenantPath(organizationId, `actions/${encodeURIComponent(proposalId)}/approve`),
+        {
+          method: "POST",
+          headers: { "idempotency-key": idempotencyKey },
+          body: JSON.stringify({ expectedVersion }),
+        },
+      ),
+    reject: (
+      organizationId: string,
+      proposalId: string,
+      expectedVersion: number,
+      idempotencyKey: string = crypto.randomUUID(),
+    ) =>
+      request<unknown>(
+        platformTenantPath(organizationId, `actions/${encodeURIComponent(proposalId)}/reject`),
+        {
+          method: "POST",
+          headers: { "idempotency-key": idempotencyKey },
+          body: JSON.stringify({ expectedVersion }),
+        },
+      ),
   },
   management: {
     inventory: (organizationId: string, unitId: string) =>
@@ -211,6 +481,28 @@ export const api = {
       request<unknown>(managementPath(organizationId, unitId, "purchases")),
     finance: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "finance")),
+    remunerationPortfolio: (
+      organizationId: string,
+      unitId: string,
+      periodStart: string,
+      periodEnd: string,
+    ) =>
+      request<unknown>(
+        `${managementPath(organizationId, unitId, "remuneration/portfolio")}?periodStart=${encodeURIComponent(periodStart)}&periodEnd=${encodeURIComponent(periodEnd)}`,
+      ),
+    remunerationExport: (
+      organizationId: string,
+      unitId: string,
+      runId: string,
+      format: "csv" | "pdf" | "print",
+    ) =>
+      request<Record<string, unknown>>(
+        managementPath(
+          organizationId,
+          unitId,
+          `remuneration/runs/${encodeURIComponent(runId)}/export/${format}`,
+        ),
+      ),
     cashShifts: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "cash-shifts")),
     people: (organizationId: string, unitId: string) =>
@@ -417,6 +709,12 @@ export const api = {
         idempotencyKey,
       ),
   },
+  salon: {
+    map: (organizationId: string, unitId: string, roomId: string) =>
+      request<unknown>(
+        salonPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}/map`),
+      ),
+  },
   growth: {
     customers: (organizationId: string) =>
       request<unknown>(growthPath(organizationId, "customers")),
@@ -438,6 +736,46 @@ export const api = {
       ),
     multiunitSummary: (organizationId: string) =>
       request<unknown>(growthPath(organizationId, "multiunit/summary")),
+    doseClubOverview: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        `${growthPath(organizationId, "integrations/doseclub/overview")}?unitId=${encodeURIComponent(unitId)}`,
+      ),
+    startDoseClubRun: (organizationId: string, unitId: string, idempotencyKey?: string) =>
+      idempotentRequest<unknown>(
+        growthPath(organizationId, "integrations/doseclub/runs"),
+        "POST",
+        { unitId },
+        idempotencyKey,
+      ),
+    retryDoseClubRun: (
+      organizationId: string,
+      unitId: string,
+      runId: string,
+      expectedVersion: number,
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `integrations/doseclub/runs/${encodeURIComponent(runId)}/retry`),
+        {
+          method: "POST",
+          body: JSON.stringify({ unitId, expectedVersion }),
+        },
+      ),
+    recheckDoseClubFinding: (
+      organizationId: string,
+      unitId: string,
+      findingId: string,
+      expectedVersion: number,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        growthPath(
+          organizationId,
+          `integrations/doseclub/findings/${encodeURIComponent(findingId)}/recheck`,
+        ),
+        "POST",
+        { unitId, expectedVersion },
+        idempotencyKey,
+      ),
     transitionReservation: (
       organizationId: string,
       reservationId: string,

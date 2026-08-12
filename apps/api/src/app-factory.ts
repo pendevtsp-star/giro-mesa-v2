@@ -5,6 +5,7 @@ import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
+import { MAX_SYNC_HTTP_BODY_BYTES } from "@giromesa/domain";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
@@ -12,15 +13,22 @@ import { AppModule } from "./app.module.js";
 import { AuthService } from "./auth/auth.service.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
+import { addFinanceResponses } from "./common/finance-openapi.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
-import { requestRateLimit } from "./common/rate-limit.js";
+import {
+  DOSECLUB_KEY_RATE_LIMIT,
+  isSensitiveAuthRequest,
+  requestRateLimit,
+  requestRateLimitKey,
+} from "./common/rate-limit.js";
 import { MetricsService } from "./health/health.module.js";
+import { closePlatformProjectionSchemas } from "./platform/platform-projection.dto.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
 export async function createApplication() {
   const adapter = new FastifyAdapter({
     trustProxy: configuredTrustProxy(),
-    bodyLimit: 1_048_576,
+    bodyLimit: MAX_SYNC_HTTP_BODY_BYTES,
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     genReqId: (request: IncomingMessage) => {
       const supplied = request.headers["x-request-id"];
@@ -30,6 +38,12 @@ export async function createApplication() {
     },
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook("onRequest", async (request, reply) => {
+    if (isSensitiveAuthRequest(request.url) || request.url.includes("/privacy")) {
+      reply.header("Cache-Control", "no-store");
+    }
+  });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(rateLimit, {
@@ -38,11 +52,25 @@ export async function createApplication() {
       `${request.ip}:${requestRateLimit(request.method, request.url).bucket}`,
     timeWindow: "1 minute",
   });
+  fastify.addHook(
+    "onRequest",
+    fastify.rateLimit({
+      max: DOSECLUB_KEY_RATE_LIMIT,
+      timeWindow: "1 minute",
+      allowList: (request) =>
+        requestRateLimit(request.method, request.url).bucket !== "integration:doseclub",
+      keyGenerator: (request) =>
+        requestRateLimitKey({
+          method: request.method,
+          url: request.url,
+          ip: request.ip,
+          integrationKey: request.headers["x-giromesa-integration-key"],
+        }),
+    }),
+  );
   await app.register(websocket, { options: { maxPayload: 16_384 } });
-  app.enableShutdownHooks();
   app.enableCors(corsConfiguration());
 
-  const fastify = app.getHttpAdapter().getInstance();
   const metrics = app.get(MetricsService);
   const requestStartedAt = new WeakMap<object, bigint>();
   fastify.addHook("onRequest", async (request, reply) => {
@@ -72,6 +100,8 @@ export async function createApplication() {
       .build(),
   );
   addZodRequestBodies(app, document);
+  closePlatformProjectionSchemas(document.components?.schemas ?? {});
+  addFinanceResponses(document);
   fastify.get("/api/v1/openapi.json", async () => document);
   fastify.get("/openapi.json", async () => document);
 

@@ -15,15 +15,24 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
     private readonly FocusOptions _options = hubOptions.Value.Focus;
 
     public CapabilityState Capability => IsConfigured
-        ? new(true, "focus-nfe", $"Focus NFC-e configured for {NormalizedEnvironment}.")
-        : new(false, "focus-nfe", "Focus NFe requires an explicit environment and company token.");
+        ? new(
+            true,
+            "focus-nfe",
+            NormalizedEnvironment == "production"
+                ? "Focus NFC-e production adapter is explicitly marked homologated."
+                : "Focus NFC-e contract is configured for homologation; this is not production evidence.")
+        : new(
+            false,
+            "focus-nfe",
+            "Focus NFe requires credentials and production also requires explicit homologation evidence.");
 
     private string NormalizedEnvironment => _options.Environment.Trim().ToLowerInvariant();
 
     private bool IsConfigured =>
         _options.Enabled &&
         _options.Token is { Length: >= 12 } &&
-        (NormalizedEnvironment == "homologation" || NormalizedEnvironment == "production");
+        (NormalizedEnvironment == "homologation" ||
+         (NormalizedEnvironment == "production" && _options.Homologated));
 
     private Uri BaseAddress => NormalizedEnvironment == "production" ? ProductionBase : HomologationBase;
 

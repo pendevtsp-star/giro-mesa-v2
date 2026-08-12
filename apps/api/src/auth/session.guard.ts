@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
+import { DatabaseService } from "../database/database.module.js";
 import { type AuthContext, AuthService } from "./auth.service.js";
 import { SESSION_COOKIE_NAME } from "./session-cookie.js";
 
@@ -23,7 +24,10 @@ export function sessionToken(
 
 @Injectable()
 export class SessionGuard implements CanActivate {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly database: DatabaseService,
+  ) {}
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<
@@ -34,7 +38,9 @@ export class SessionGuard implements CanActivate {
     >();
     const token = sessionToken(request.headers.authorization, request.cookies);
     if (!token) throw new UnauthorizedException();
-    const auth = await this.authService.authenticate(token);
+    const auth = await this.database.withRoleContext("identity", null, () =>
+      this.authService.authenticate(token),
+    );
     if (!auth) throw new UnauthorizedException();
     request.auth = auth;
     return true;

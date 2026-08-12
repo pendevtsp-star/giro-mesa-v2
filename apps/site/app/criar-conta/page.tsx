@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { GoogleMark } from "../../components/google-mark";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function CreateAccountPage() {
   const [message, setMessage] = useState("");
@@ -42,9 +44,8 @@ export default function CreateAccountPage() {
       setMessage("A criação de conta ainda não está configurada neste ambiente.");
       return;
     }
-    const destination = returnTo
-      ? new URL(returnTo, window.location.origin).toString()
-      : resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
+    const destination =
+      returnTo ?? resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
     if (!destination) {
       setMessage("O destino seguro do aplicativo operacional ainda não está configurado.");
       return;
@@ -57,14 +58,24 @@ export default function CreateAccountPage() {
       termsAccepted: true,
     };
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/register`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/register`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Cadastro recusado");
-      window.location.assign(destination);
+      const result = (await response.json()) as {
+        email?: unknown;
+        verificationRequired?: unknown;
+      };
+      if (result.verificationRequired !== true || typeof result.email !== "string") {
+        throw new Error("Resposta de cadastro inválida");
+      }
+      window.sessionStorage.setItem("giromesa.pendingVerificationEmail", result.email);
+      const verification = new URL("/verificar-email", window.location.origin);
+      if (returnTo) verification.searchParams.set("returnTo", returnTo);
+      window.location.assign(verification.toString());
     } catch {
       setMessage("Não foi possível criar a conta. Revise os dados ou tente novamente mais tarde.");
     }
@@ -93,7 +104,7 @@ export default function CreateAccountPage() {
           onClick={startGoogleSignup}
           disabled={!termsAccepted}
         >
-          <span aria-hidden="true">G</span> Criar com Google
+          <GoogleMark /> Criar com Google
         </button>
         <div className="divider">
           <span>ou com e-mail</span>

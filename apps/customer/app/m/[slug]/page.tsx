@@ -25,5 +25,12 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ slu
       </main>
     );
   }
-  return <MenuExperience initialItems={menu.items} menuSlug={slug} demo={menu.source === "demo"} />;
+  return (
+    <MenuExperience
+      initialItems={menu.items}
+      branding={menu.branding}
+      menuSlug={slug}
+      demo={menu.source === "demo"}
+    />
+  );
 }

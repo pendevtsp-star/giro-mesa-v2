@@ -1,9 +1,18 @@
 import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import type { DeviceContext } from "./bridge";
 import type { ProfileId } from "./domain";
-import { type PilotDispatcher, type PilotLoader, pilotMutation } from "./operational-dispatch";
+import { KdsBoard, type KdsBoardTicket } from "./kds-board";
+import {
+  acknowledgeKdsDelivery,
+  type PilotDispatcher,
+  type PilotLoader,
+  pilotMutation,
+} from "./operational-dispatch";
 import { formatMoney } from "./rules";
+import { SalonMap, type SalonMapTable, type SalonTableStatus } from "./salon-map";
+import { UiIcon } from "./ui-icon";
 
 export interface PilotScope {
   organizationId: string;
@@ -11,6 +20,7 @@ export interface PilotScope {
   membershipId: string;
   profileId: ProfileId;
   refreshToken: number;
+  runtime: DeviceContext;
   dispatch: PilotDispatcher;
   load: PilotLoader;
 }
@@ -83,6 +93,23 @@ export interface PilotFloor {
   openTabs: PosTab[];
 }
 
+interface OperationalSalonMap {
+  state: "empty" | "ready";
+  allowedAreaIds: string[];
+  nodes: Array<{
+    tableId: string;
+    areaId: string | null;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  occupancies: Array<{
+    tableId: string;
+    state: "reserved" | "open" | "paying";
+  }>;
+}
+
 interface PosOrder {
   id: string;
   status: string;
@@ -113,11 +140,23 @@ interface KdsTicket {
   stationId: string;
   status: "pending" | "preparing" | "ready" | "done" | "canceled";
   createdAt: string | null;
+  deliveries: KdsDeliveryIdentity[];
+}
+
+interface KdsDeliveryIdentity {
+  effectId: string;
+  deliveryKey: string;
+}
+
+interface KdsDelivery extends KdsDeliveryIdentity {
+  orderId: string;
+  stationId: string;
 }
 
 export interface KdsData {
   tickets: KdsTicket[];
   items: Array<{ ticketId: string; item: PosItem }>;
+  deliveries: KdsDelivery[];
 }
 
 export class InvalidPilotPayloadError extends Error {
@@ -137,6 +176,11 @@ function record(value: unknown): Row {
 function records(value: unknown): Row[] {
   if (!Array.isArray(value)) throw new InvalidPilotPayloadError();
   return value.map(record);
+}
+
+function texts(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new InvalidPilotPayloadError();
+  return value.map(text);
 }
 
 function text(value: unknown): string {
@@ -259,6 +303,34 @@ export function parsePilotFloor(value: unknown): PilotFloor {
   };
 }
 
+export function parseOperationalSalonMap(value: unknown): OperationalSalonMap {
+  const payload = record(value);
+  const state = text(payload.state);
+  if (!(["empty", "ready"] as string[]).includes(state)) throw new InvalidPilotPayloadError();
+  return {
+    state: state as OperationalSalonMap["state"],
+    allowedAreaIds: texts(payload.allowedAreaIds ?? []),
+    nodes: records(payload.nodes).map((row) => ({
+      tableId: text(row.tableId),
+      areaId: optionalText(row.areaId),
+      x: number(row.x),
+      y: number(row.y),
+      width: number(row.width),
+      height: number(row.height),
+    })),
+    occupancies: records(payload.occupancies).map((row) => {
+      const occupancyState = text(row.state);
+      if (!(["reserved", "open", "paying"] as string[]).includes(occupancyState)) {
+        throw new InvalidPilotPayloadError();
+      }
+      return {
+        tableId: text(row.tableId),
+        state: occupancyState as OperationalSalonMap["occupancies"][number]["state"],
+      };
+    }),
+  };
+}
+
 export function parseTabs(value: unknown): PosTab[] {
   return records(value).map(parseTab);
 }
@@ -290,13 +362,52 @@ export function parseKds(value: unknown): KdsData {
         stationId: text(row.stationId),
         status: status as KdsTicket["status"],
         createdAt: optionalText(row.createdAt),
+        deliveries: [],
       };
     }),
     items: records(payload.items).map((row) => ({
       ticketId: text(row.ticketId),
       item: parseItem(record(row.item)),
     })),
+    deliveries: [],
   };
+}
+
+export function parseDurableKds(value: unknown): KdsData {
+  const payload = record(value);
+  const snapshot = parseKds(payload.snapshot);
+  const deliveries = records(payload.deliveries).map((row): KdsDelivery => {
+    const effectId = text(row.effectId);
+    const deliveryKey = text(row.deliveryKey);
+    text(row.targetRef);
+    text(row.operation);
+    text(row.deliveredAt);
+    let dispatchPayload: Row;
+    try {
+      dispatchPayload = record(JSON.parse(text(row.payload)));
+    } catch {
+      throw new InvalidPilotPayloadError();
+    }
+    return {
+      effectId,
+      deliveryKey,
+      orderId: text(dispatchPayload.orderId),
+      stationId: text(dispatchPayload.stationId),
+    };
+  });
+
+  for (const delivery of deliveries) {
+    const ticket = snapshot.tickets.find(
+      (candidate) =>
+        candidate.orderId === delivery.orderId && candidate.stationId === delivery.stationId,
+    );
+    if (!ticket) throw new InvalidPilotPayloadError();
+    ticket.deliveries.push({
+      effectId: delivery.effectId,
+      deliveryKey: delivery.deliveryKey,
+    });
+  }
+  return { ...snapshot, deliveries };
 }
 
 function useRemote<T>(
@@ -387,7 +498,7 @@ export function RealCatalogPage({ scope }: { scope: PilotScope }) {
       {(catalog) =>
         catalog.products.length === 0 ? (
           <EmptyState
-            icon="▦"
+            icon={<UiIcon name="catalog" />}
             title="Catálogo ainda não configurado"
             description="Cadastre produtos, preços e disponibilidade antes de lançar pedidos reais."
           />
@@ -443,17 +554,76 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
     () => scope.load("floor", undefined, () => api.pilot.floor(scope.organizationId, scope.unitId)),
     parsePilotFloor,
   );
+  return (
+    <RemoteGate remote={floor}>
+      {(data) => <RealSalonWorkspace data={data} floorRetry={floor.retry} scope={scope} />}
+    </RemoteGate>
+  );
+}
+
+function RealSalonWorkspace({
+  scope,
+  data,
+  floorRetry,
+}: {
+  scope: PilotScope;
+  data: PilotFloor;
+  floorRetry: () => void;
+}) {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [guests, setGuests] = useState(2);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const activeRoom = data.rooms.find((room) => room.active) ?? null;
+  const operationalMap = useRemote(
+    scope,
+    () =>
+      activeRoom
+        ? scope.load("floor", activeRoom.id, () =>
+            api.salon.map(scope.organizationId, scope.unitId, activeRoom.id),
+          )
+        : Promise.resolve({ state: "empty", allowedAreaIds: [], nodes: [], occupancies: [] }),
+    parseOperationalSalonMap,
+  );
   return (
-    <RemoteGate remote={floor}>
-      {(data) => {
+    <RemoteGate remote={operationalMap}>
+      {(map) => {
         const table = data.tables.find((item) => item.id === selectedTableId) ?? null;
         const tab = table
           ? (data.openTabs.find((item) => item.tableId === table.id) ?? null)
           : null;
+        const nodeByTable = new Map(map.nodes.map((node) => [node.tableId, node]));
+        const occupancyByTable = new Map(
+          map.occupancies.map((occupancy) => [occupancy.tableId, occupancy]),
+        );
+        const activeTables = data.tables.filter(
+          (item) => item.active && (!activeRoom || item.roomId === activeRoom.id),
+        );
+        const mapTables: SalonMapTable[] = activeTables.map((item, index) => {
+          const node = nodeByTable.get(item.id);
+          const occupancy = occupancyByTable.get(item.id);
+          const openTab = data.openTabs.find((candidate) => candidate.tableId === item.id);
+          const status: SalonTableStatus =
+            occupancy?.state === "paying"
+              ? "paying"
+              : occupancy?.state === "open"
+                ? "occupied"
+                : occupancy?.state === "reserved"
+                  ? "reserved"
+                  : item.status;
+          return {
+            id: item.id,
+            label: item.label,
+            seats: item.seats,
+            status,
+            x: node?.x ?? 80 + (index % 4) * 220,
+            y: node?.y ?? 90 + Math.floor(index / 4) * 175,
+            width: node?.width ?? 170,
+            height: node?.height ?? 126,
+            areaId: node?.areaId ?? null,
+            totalCents: openTab?.totalCents,
+          };
+        });
         async function openTab() {
           if (!table) return;
           setBusy(true);
@@ -468,7 +638,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               pilotMutation("open-tab", { body }),
               (key) => api.pilot.openTab(scope.organizationId, scope.unitId, body, key),
             );
-            floor.retry();
+            floorRetry();
+            operationalMap.retry();
           } catch (error) {
             setFeedback(
               error instanceof Error ? error.message : "Não foi possível abrir a comanda.",
@@ -478,54 +649,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
         return (
-          <div className="ops-layout">
-            <section className="ops-board">
-              <div className="ops-board__header">
-                <div>
-                  <p className="eyebrow">Mapa do salão</p>
-                  <h2>Mesas da unidade</h2>
-                </div>
-                <span className="muted">{data.openTabs.length} comanda(s) aberta(s)</span>
-              </div>
-              {data.tables.length === 0 ? (
+          <SalonMap
+            allowedAreaIds={map.allowedAreaIds}
+            connectionState={
+              typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "online"
+            }
+            onSelect={setSelectedTableId}
+            selectedTableId={selectedTableId}
+            tables={mapTables}
+            details={
+              !table ? (
                 <EmptyState
-                  icon="◫"
-                  title="Nenhuma mesa cadastrada"
-                  description="A estrutura do salão precisa ser configurada por um gerente."
-                />
-              ) : (
-                <div className="real-table-grid">
-                  {data.tables
-                    .filter((item) => item.active)
-                    .map((item) => {
-                      const open = data.openTabs.find((candidate) => candidate.tableId === item.id);
-                      return (
-                        <button
-                          aria-pressed={selectedTableId === item.id}
-                          className={`real-table real-table--${item.status}`}
-                          key={item.id}
-                          onClick={() => setSelectedTableId(item.id)}
-                          type="button"
-                        >
-                          <span>{item.label}</span>
-                          <small>{item.seats} lugares</small>
-                          <strong>
-                            {open
-                              ? formatMoney(open.totalCents)
-                              : item.status === "reserved"
-                                ? "Reservada"
-                                : "Livre"}
-                          </strong>
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
-            </section>
-            <aside className="ops-panel">
-              {!table ? (
-                <EmptyState
-                  icon="◫"
+                  icon={<UiIcon name="salon" />}
                   title="Selecione uma mesa"
                   description="Abra ou acompanhe a comanda sem sair do mapa."
                 />
@@ -535,7 +670,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   scope={scope}
                   tabId={tab.id}
                   floor={data}
-                  onChanged={floor.retry}
+                  onChanged={() => {
+                    floorRetry();
+                    operationalMap.retry();
+                  }}
                 />
               ) : (
                 <Card>
@@ -561,9 +699,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     {busy ? "Abrindo…" : "Abrir comanda"}
                   </Button>
                 </Card>
-              )}
-            </aside>
-          </div>
+              )
+            }
+          />
         );
       }}
     </RemoteGate>
@@ -674,7 +812,7 @@ export function RealCounterPage({ scope }: { scope: PilotScope }) {
                 />
               ) : (
                 <EmptyState
-                  icon="＋"
+                  icon={<UiIcon name="plus" />}
                   title="Selecione uma comanda"
                   description="Escolha uma comanda aberta ou crie uma nova."
                 />
@@ -932,7 +1070,7 @@ function TabWorkspace({
                             }
                             type="button"
                           >
-                            ×
+                            <UiIcon name="close" />
                           </button>
                         </div>
                       ))}
@@ -1377,31 +1515,31 @@ function TabWorkspace({
   );
 }
 
-const nextKdsState: Record<
-  KdsTicket["status"],
-  "preparing" | "ready" | "done" | "canceled" | null
-> = {
-  pending: "preparing",
-  preparing: "ready",
-  ready: "done",
-  done: null,
-  canceled: null,
-};
-
-const kdsActionLabel: Partial<Record<KdsTicket["status"], string>> = {
-  pending: "Iniciar preparo",
-  preparing: "Marcar pronto",
-  ready: "Concluir retirada",
-};
-
 export function RealKdsPage({ scope }: { scope: PilotScope }) {
   const remote = useRemote(
     scope,
     () => scope.load("kds", undefined, () => api.pilot.kds(scope.organizationId, scope.unitId)),
-    parseKds,
+    parseDurableKds,
   );
   const [busyId, setBusyId] = useState("");
   const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    if (remote.state.status !== "ready" || remote.state.data.deliveries.length === 0) return;
+    let active = true;
+    void Promise.allSettled(
+      remote.state.data.deliveries.map((delivery) =>
+        acknowledgeKdsDelivery(scope.runtime, delivery.effectId, delivery.deliveryKey),
+      ),
+    ).then((results) => {
+      if (!active) return;
+      if (results.some((result) => result.status === "rejected")) {
+        setFeedback("O ticket estÃ¡ visÃ­vel, mas o ACK ficou preservado para replay no Edge.");
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [remote.state, scope.runtime]);
   return (
     <RemoteGate remote={remote}>
       {(data) => {
@@ -1411,89 +1549,65 @@ export function RealKdsPage({ scope }: { scope: PilotScope }) {
         if (activeTickets.length === 0)
           return (
             <EmptyState
-              icon="✓"
+              icon={<UiIcon name="success" />}
               title="Produção em dia"
               description="Nenhum ticket ativo foi retornado pelo servidor."
             />
           );
+        const boardTickets: KdsBoardTicket[] = activeTickets.map((ticket) => {
+          const rows = data.items.filter((row) => row.ticketId === ticket.id);
+          const createdAt = ticket.createdAt ? new Date(ticket.createdAt).getTime() : Date.now();
+          return {
+            id: ticket.id,
+            reference: `Pedido ${ticket.orderId.slice(0, 6).toUpperCase()}`,
+            station: `Estação ${ticket.stationId.slice(0, 6).toUpperCase()}`,
+            status: ticket.status as KdsBoardTicket["status"],
+            elapsedMinutes: Math.max(0, Math.floor((Date.now() - createdAt) / 60_000)),
+            priority: rows.some(({ item }) => /alerg|urgente|prioridade/i.test(item.notes ?? "")),
+            items: rows.map(({ item }) => ({
+              id: item.id,
+              label: `${item.quantity}× ${item.productName}`,
+              notes: item.notes ?? undefined,
+            })),
+          };
+        });
         return (
           <div>
-            <div className="kds-summary">
-              <Badge tone="warning">
-                {activeTickets.filter((ticket) => ticket.status === "pending").length} aguardando
-              </Badge>
-              <Badge tone="info">
-                {activeTickets.filter((ticket) => ticket.status === "preparing").length} em preparo
-              </Badge>
-              <Badge tone="success">
-                {activeTickets.filter((ticket) => ticket.status === "ready").length} prontos
-              </Badge>
-            </div>
             {feedback && (
               <p className="field-error" role="status">
                 {feedback}
               </p>
             )}
-            <div className="real-kds-grid">
-              {activeTickets.map((ticket) => {
-                const items = data.items.filter((row) => row.ticketId === ticket.id);
-                const next = nextKdsState[ticket.status];
-                return (
-                  <Card className={`real-kds-card real-kds-card--${ticket.status}`} key={ticket.id}>
-                    <div className="section-title">
-                      <strong>Ticket {ticket.id.slice(0, 6)}</strong>
-                      <Badge tone={statusTone(ticket.status)}>{ticket.status}</Badge>
-                    </div>
-                    <small>Estação {ticket.stationId.slice(0, 6)}</small>
-                    <ul>
-                      {items.map(({ item }) => (
-                        <li key={item.id}>
-                          <strong>{item.quantity}×</strong> {item.productName}
-                          {item.notes && <small>{item.notes}</small>}
-                        </li>
-                      ))}
-                    </ul>
-                    {next && (
-                      <Button
-                        disabled={busyId === ticket.id}
-                        onClick={async () => {
-                          setBusyId(ticket.id);
-                          setFeedback("");
-                          try {
-                            await scope.dispatch(
-                              "pos.kds.transition_requested",
-                              pilotMutation("transition-kds", {
-                                ticketId: ticket.id,
-                                state: next,
-                              }),
-                              (key) =>
-                                api.pilot.transitionKds(
-                                  scope.organizationId,
-                                  scope.unitId,
-                                  ticket.id,
-                                  next,
-                                  key,
-                                ),
-                            );
-                            remote.retry();
-                          } catch (error) {
-                            setFeedback(
-                              error instanceof Error
-                                ? error.message
-                                : "A transição não foi confirmada.",
-                            );
-                          } finally {
-                            setBusyId("");
-                          }
-                        }}
-                      >
-                        {busyId === ticket.id ? "Confirmando…" : kdsActionLabel[ticket.status]}
-                      </Button>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
+            <KdsBoard
+              busyId={busyId}
+              deviceState={feedback ? "degraded" : navigator.onLine ? "online" : "offline"}
+              onAdvance={async (ticket, next) => {
+                setBusyId(ticket.id);
+                setFeedback("");
+                try {
+                  await scope.dispatch(
+                    "pos.kds.transition_requested",
+                    pilotMutation("transition-kds", { ticketId: ticket.id, state: next }),
+                    (key) =>
+                      api.pilot.transitionKds(
+                        scope.organizationId,
+                        scope.unitId,
+                        ticket.id,
+                        next,
+                        key,
+                      ),
+                  );
+                  remote.retry();
+                } catch (error) {
+                  setFeedback(
+                    error instanceof Error ? error.message : "A transição não foi confirmada.",
+                  );
+                } finally {
+                  setBusyId("");
+                }
+              }}
+              tickets={boardTickets}
+            />
           </div>
         );
       }}

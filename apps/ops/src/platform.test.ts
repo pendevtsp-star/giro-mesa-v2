@@ -1,31 +1,298 @@
 import { describe, expect, it } from "vitest";
-import { InvalidPlatformPayloadError, parsePlatformOverview } from "./platform";
+import { ApiClientError } from "./api";
+import {
+  actionPermission,
+  canApprovePlatformAction,
+  InvalidPlatformPayloadError,
+  LatestPlatformRequest,
+  parsePlatformActionPage,
+  parsePlatformOverview,
+  parsePlatformProjection,
+  parsePlatformTenantContext,
+  platformRecovery,
+  projectedIncidentActionContext,
+  projectedIncidentExpectedState,
+} from "./platform";
 
-describe("painel real da plataforma", () => {
-  it("valida contadores e filas comerciais persistidas", () => {
-    const overview = parsePlatformOverview({
-      counts: { organizations: 3, units: 5, activeTrials: 2 },
-      recentTrialApplications: [
-        {
-          id: "trial-1",
-          name: "Ana",
-          email: "ana@example.com",
-          phone: "31999999999",
-          businessName: "Bar da Ana",
-          planSlug: "pro",
-          createdAt: "2026-08-09T20:00:00.000Z",
-        },
+const organizationId = "a1111111-1111-4111-8111-111111111111";
+
+describe("backoffice seguro", () => {
+  it("deriva o estado de fechamento do incidente projetado sem presumir aprovação", () => {
+    const projection = parsePlatformProjection({
+      resource: "incidents",
+      availability: "available",
+      items: [
+        { id: "incident-approved", status: "approved" },
+        { id: "incident-rejected", status: "rejected" },
+        { id: "incident-review", status: "under_review" },
       ],
-      recentContacts: [],
-      recentOrganizations: [],
+      nextCursor: null,
     });
-    expect(overview.counts).toEqual({ organizations: 3, units: 5, activeTrials: 2 });
-    expect(overview.recentTrialApplications[0]?.businessName).toBe("Bar da Ana");
+
+    expect(projectedIncidentExpectedState("incident.close", "incident-approved", projection)).toBe(
+      "approved",
+    );
+    expect(projectedIncidentExpectedState("incident.close", "incident-rejected", projection)).toBe(
+      "rejected",
+    );
+    expect(
+      projectedIncidentExpectedState("incident.close", "incident-review", projection),
+    ).toBeNull();
+    expect(projectedIncidentExpectedState("incident.close", "unknown", projection)).toBeNull();
+    expect(actionPermission("incident.close")).toBe("platform.incident.transition");
   });
 
-  it("rejeita payload sem contadores", () => {
-    expect(() => parsePlatformOverview({ recentTrialApplications: [] })).toThrow(
-      InvalidPlatformPayloadError,
-    );
+  it("uses only projected incident actions and blocks the incident reporter", () => {
+    const projection = parsePlatformProjection({
+      resource: "incidents",
+      availability: "available",
+      items: [
+        {
+          id: "f1111111-1111-4111-8111-111111111111",
+          unitId: "b1111111-1111-4111-8111-111111111111",
+          status: "under_review",
+          reporterIdentityId: "c1111111-1111-4111-8111-111111111111",
+          availableActions: ["incident.approve", "incident.reject"],
+        },
+      ],
+      nextCursor: null,
+    });
+
+    expect(
+      projectedIncidentActionContext(
+        "incident.approve",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "c1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBeNull();
+    expect(
+      projectedIncidentActionContext(
+        "incident.reject",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toEqual({
+      expectedState: "under_review",
+      unitId: "b1111111-1111-4111-8111-111111111111",
+    });
+    expect(
+      projectedIncidentActionContext(
+        "incident.close",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBeNull();
+
+    expect(
+      canApprovePlatformAction(
+        {
+          id: "e1111111-1111-4111-8111-111111111111",
+          organizationId,
+          action: "incident.approve",
+          targetType: "incident",
+          targetId: "f1111111-1111-4111-8111-111111111111",
+          requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+          justification: "Independent review documented for the incident.",
+          payload: { expectedState: "under_review" },
+          status: "pending",
+          version: 1,
+          requestedAt: "2026-08-11T12:00:00.000Z",
+          expiresAt: "2026-08-11T12:15:00.000Z",
+        },
+        projection,
+        "c1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBe(false);
+    expect(
+      canApprovePlatformAction(
+        {
+          id: "e1111111-1111-4111-8111-111111111112",
+          organizationId,
+          action: "incident.approve",
+          targetType: "incident",
+          targetId: "f1111111-1111-4111-8111-999999999999",
+          requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+          justification: "Independent review documented for the incident.",
+          payload: { expectedState: "under_review" },
+          status: "pending",
+          version: 1,
+          requestedAt: "2026-08-11T12:00:00.000Z",
+          expiresAt: "2026-08-11T12:15:00.000Z",
+        },
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBe(false);
+  });
+
+  it("aborta a leitura anterior e aceita somente o epoch mais recente", () => {
+    const requests = new LatestPlatformRequest();
+    const first = requests.begin();
+    const second = requests.begin();
+
+    expect(first.signal.aborted).toBe(true);
+    expect(requests.isCurrent(first.epoch)).toBe(false);
+    expect(second.signal.aborted).toBe(false);
+    expect(requests.isCurrent(second.epoch)).toBe(true);
+
+    requests.invalidate();
+    expect(second.signal.aborted).toBe(true);
+    expect(requests.isCurrent(second.epoch)).toBe(false);
+  });
+
+  it("valida a visão agregada sem aceitar listas cross-tenant", () => {
+    expect(
+      parsePlatformOverview({
+        counts: { organizations: 3, active: 2, attention: 1 },
+        access: {
+          permissions: ["platform.read", "platform.action.propose"],
+          stepUp: false,
+          stepUpExpiresAt: null,
+        },
+      }),
+    ).toEqual({
+      counts: { organizations: 3, active: 2, attention: 1 },
+      access: {
+        permissions: ["platform.read", "platform.action.propose"],
+        stepUp: false,
+        stepUpExpiresAt: null,
+      },
+    });
+    expect(() =>
+      parsePlatformOverview({
+        counts: { organizations: 3, active: 2, attention: 1 },
+        access: { permissions: ["platform.read"], stepUp: false, stepUpExpiresAt: null },
+        organizations: [{ id: organizationId }],
+      }),
+    ).toThrow(InvalidPlatformPayloadError);
+  });
+
+  it("preserva tenant e unidade explícitos no contexto carregado", () => {
+    expect(
+      parsePlatformTenantContext({
+        organization: {
+          id: organizationId,
+          name: "Aurora Centro",
+          billingState: "active",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+        units: [
+          {
+            id: "b1111111-1111-4111-8111-111111111111",
+            name: "Matriz",
+            active: true,
+            timezone: "America/Sao_Paulo",
+          },
+        ],
+        selectedUnitId: null,
+      }).organization.name,
+    ).toBe("Aurora Centro");
+  });
+
+  it("mantém projection indisponível explícita e não fabrica itens", () => {
+    expect(
+      parsePlatformProjection({
+        resource: "incidents",
+        availability: "unavailable",
+        reasonCode: "INCIDENT_PROJECTION_NOT_WIRED",
+        items: [],
+        nextCursor: null,
+      }),
+    ).toEqual({
+      resource: "incidents",
+      availability: "unavailable",
+      reasonCode: "INCIDENT_PROJECTION_NOT_WIRED",
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it("aceita as filas globais mascaradas e as ações tenant-scoped de incidente", () => {
+    expect(
+      parsePlatformProjection({
+        resource: "leads",
+        availability: "available",
+        items: [
+          {
+            id: "e1111111-1111-4111-8111-111111111111",
+            displayName: "M***",
+            email: "m***@example.test",
+            phone: "**********5432",
+            businessName: "Bar Horizonte",
+            segment: "bar",
+            planSlug: "operacao",
+            submittedAt: "2026-08-11T12:00:00.000Z",
+            actionAvailability: "unavailable",
+            actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE",
+          },
+        ],
+        nextCursor: null,
+      }).resource,
+    ).toBe("leads");
+
+    expect(
+      parsePlatformActionPage({
+        items: [
+          {
+            id: "c1111111-1111-4111-8111-111111111111",
+            organizationId,
+            action: "incident.approve",
+            targetType: "incident",
+            targetId: "e1111111-1111-4111-8111-111111111111",
+            requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+            justification: "Revisão independente com fundamento operacional documentado.",
+            payload: {
+              expectedState: "under_review",
+              unitId: "b1111111-1111-4111-8111-111111111111",
+            },
+            status: "pending",
+            version: 1,
+            requestedAt: "2026-08-11T12:00:00.000Z",
+            expiresAt: "2026-08-11T12:15:00.000Z",
+          },
+        ],
+        nextCursor: null,
+      }).items[0],
+    ).toMatchObject({ action: "incident.approve", targetType: "incident" });
+  });
+
+  it("rejeita segredos e estados desconhecidos na fila dual-control", () => {
+    expect(() =>
+      parsePlatformActionPage({
+        items: [
+          {
+            id: "c1111111-1111-4111-8111-111111111111",
+            organizationId,
+            action: "tenant.suspend",
+            targetType: "organization",
+            targetId: organizationId,
+            requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+            justification: "Risco operacional confirmado e documentado.",
+            payload: { expectedState: "active", token: "must-not-render" },
+            status: "success",
+            version: 1,
+            requestedAt: "2026-08-11T12:00:00.000Z",
+            expiresAt: "2026-08-11T12:15:00.000Z",
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).toThrow(InvalidPlatformPayloadError);
+  });
+
+  it.each([
+    [401, "Autenticação reforçada necessária", "Concluir MFA e tentar novamente."],
+    [403, "Ação não autorizada", "Solicite a permissão explícita para esta operação."],
+    [409, "Estado alterado", "Atualize o contexto antes de repetir a decisão."],
+    [429, "Limite temporário", "Aguarde e tente novamente."],
+    [503, "Serviço indisponível", "Tente novamente; nenhum sucesso foi confirmado."],
+  ])("oferece recuperação específica para HTTP %s", (status, title, instruction) => {
+    expect(platformRecovery(new ApiClientError("Falha", status, "CODE", true))).toMatchObject({
+      title,
+      instruction,
+    });
   });
 });

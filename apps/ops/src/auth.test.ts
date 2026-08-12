@@ -104,4 +104,21 @@ describe("inicialização autenticada", () => {
     expect(access.platformAdmin).toBe(true);
     expect(access.organizations).toEqual([]);
   });
+
+  it("preserva primeiro acesso verificado sem organizacao para criacao real", () => {
+    const access = parseAuthenticatedAccess(
+      {
+        identity: {
+          id: "new-owner",
+          email: "novo@example.com",
+          displayName: "Novo Proprietario",
+        },
+        memberships: [],
+      },
+      [],
+    );
+
+    expect(access.platformAdmin).toBe(false);
+    expect(access.organizations).toEqual([]);
+  });
 });

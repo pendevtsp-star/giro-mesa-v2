@@ -2,7 +2,9 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Auth;
 using GiroMesa.ApiClient.V1.Growth;
+using GiroMesa.ApiClient.V1.Integrations;
 using GiroMesa.ApiClient.V1.Organizations;
+using GiroMesa.ApiClient.V1.PaymentProviderCallbacks;
 using GiroMesa.ApiClient.V1.Platform;
 using GiroMesa.ApiClient.V1.Public;
 using GiroMesa.ApiClient.V1.Sync;
@@ -30,10 +32,20 @@ namespace GiroMesa.ApiClient.V1
         {
             get => new global::GiroMesa.ApiClient.V1.Growth.GrowthRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The integrations property</summary>
+        public global::GiroMesa.ApiClient.V1.Integrations.IntegrationsRequestBuilder Integrations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Integrations.IntegrationsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The organizations property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.OrganizationsRequestBuilder Organizations
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.OrganizationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentProviderCallbacks property</summary>
+        public global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.PaymentProviderCallbacksRequestBuilder PaymentProviderCallbacks
+        {
+            get => new global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.PaymentProviderCallbacksRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The platform property</summary>
         public global::GiroMesa.ApiClient.V1.Platform.PlatformRequestBuilder Platform

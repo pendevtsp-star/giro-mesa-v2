@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { type ExecutionContext, UnauthorizedException } from "@nestjs/common";
+import type { DatabaseService } from "../database/database.module.js";
 import type { AuthService } from "./auth.service.js";
 import { SessionGuard, sessionToken } from "./session.guard.js";
 
@@ -10,6 +11,9 @@ const auth = {
   displayName: "Owner",
   sessionId: "session-id",
 };
+const database = {
+  withRoleContext: async (_role: string, _actor: string | null, work: () => unknown) => work(),
+} as unknown as DatabaseService;
 
 function contextFor(request: Record<string, unknown>) {
   return {
@@ -31,7 +35,7 @@ describe("SessionGuard", () => {
       cookies: Record<string, string>;
       auth?: typeof auth;
     } = { headers: {}, cookies: { giromesa_session: "cookie-token" } };
-    assert.equal(await new SessionGuard(service).canActivate(contextFor(request)), true);
+    assert.equal(await new SessionGuard(service, database).canActivate(contextFor(request)), true);
     assert.equal(received, "cookie-token");
     assert.deepEqual(request.auth, auth);
   });
@@ -45,7 +49,7 @@ describe("SessionGuard", () => {
     const service = { authenticate: async () => auth } as unknown as AuthService;
     await assert.rejects(
       () =>
-        new SessionGuard(service).canActivate(
+        new SessionGuard(service, database).canActivate(
           contextFor({ headers: { authorization: "Basic invalid" }, cookies: {} }),
         ),
       UnauthorizedException,

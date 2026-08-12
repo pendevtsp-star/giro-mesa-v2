@@ -1,8 +1,9 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
 import { formatMoney } from "./rules";
+import { UiIcon } from "./ui-icon";
 
 export interface ManagementScope {
   organizationId: string;
@@ -553,7 +554,11 @@ export function RealDashboard({ scope }: { scope: ManagementScope }) {
                 <p>{metric.label}</p>
                 <strong>{metric.value}</strong>
                 <small>{metric.detail}</small>
-                {metric.href && <a href={metric.href}>Abrir área →</a>}
+                {metric.href && (
+                  <a href={metric.href}>
+                    Abrir área <Icon name="arrow-right" />
+                  </a>
+                )}
               </Card>
             ))}
           </div>
@@ -561,7 +566,7 @@ export function RealDashboard({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Este perfil não possui indicadores gerenciais disponíveis no backend. Os módulos operacionais continuam acessíveis conforme as permissões."
-              icon="i"
+              icon={<UiIcon name="info" />}
               title="Sem indicadores gerenciais para este perfil"
             />
           </Card>
@@ -884,7 +889,7 @@ function RecipeManager({ scope, inventory }: { scope: ManagementScope; inventory
                     ) : (
                       <EmptyState
                         description="Selecione um produto, adicione os insumos consumidos e salve a primeira versão."
-                        icon="≡"
+                        icon={<UiIcon name="list" />}
                         title="Nenhuma ficha técnica ativa"
                       />
                     )}
@@ -928,7 +933,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               <Card>
                 <EmptyState
                   description="Cadastre locais e insumos para iniciar o controle desta unidade."
-                  icon="◇"
+                  icon={<UiIcon name="inventory" />}
                   title="Estoque ainda não configurado"
                 />
               </Card>
@@ -1091,7 +1096,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Nenhum pedido foi criado para esta unidade."
-              icon="＋"
+              icon={<UiIcon name="plus" />}
               title="Sem pedidos de compra"
             />
           </Card>
@@ -1141,11 +1146,10 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               {data.entries.length ? (
                 data.entries.map((entry) => (
                   <div className="finance-row" key={`${entry.direction}-${entry.id}`}>
-                    <span
+                    <Icon
                       className={`action-icon ${entry.direction === "payable" ? "action-icon--warning" : ""}`}
-                    >
-                      {entry.direction === "payable" ? "↓" : "↑"}
-                    </span>
+                      name={entry.direction === "payable" ? "arrow-down" : "arrow-up"}
+                    />
                     <span>
                       <strong>{entry.description}</strong>
                       <small>
@@ -1161,7 +1165,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               ) : (
                 <EmptyState
                   description="Não há contas a pagar ou receber nesta unidade."
-                  icon="$"
+                  icon={<UiIcon name="cash" />}
                   title="Financeiro sem lançamentos"
                 />
               )}
@@ -1347,7 +1351,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 {!data.timeEntries.some((entry) => !entry.clockedOutAt) && (
                   <EmptyState
                     description="Não há marcações de ponto abertas."
-                    icon="◷"
+                    icon={<UiIcon name="clock" />}
                     title="Nenhum turno em andamento"
                   />
                 )}
@@ -1358,7 +1362,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Cadastre pessoas para administrar escalas, ponto e comissões."
-              icon="＋"
+              icon={<UiIcon name="plus" />}
               title="Equipe ainda não cadastrada"
             />
           </Card>

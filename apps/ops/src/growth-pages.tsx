@@ -2,7 +2,9 @@ import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
+import { DoseClubIntegrationPanel } from "./doseclub-integration";
 import { formatMoney } from "./rules";
+import { UiIcon } from "./ui-icon";
 
 export interface GrowthScope {
   organizationId: string;
@@ -284,7 +286,7 @@ export function RealDeliveryPage({ scope }: { scope: GrowthScope }) {
         {(zones) =>
           zones.length === 0 ? (
             <EmptyState
-              icon="⌖"
+              icon={<UiIcon name="location" />}
               title="Nenhuma zona configurada"
               description="Defina zonas, taxa e pedido mínimo antes de ativar a entrega própria."
             />
@@ -362,7 +364,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="◷"
+                  icon={<UiIcon name="clock" />}
                   title="Sem reservas"
                   description="Nenhuma reserva persistida para esta unidade."
                 />
@@ -462,7 +464,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="◷"
+                  icon={<UiIcon name="clock" />}
                   title="Fila vazia"
                   description="Nenhum cliente aguarda mesa neste momento."
                 />
@@ -592,7 +594,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="♡"
+                  icon={<UiIcon name="crm" />}
                   title="Sem clientes"
                   description="O cadastro de clientes ainda não possui registros."
                 />
@@ -643,7 +645,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  icon="✉"
+                  icon={<UiIcon name="mail" />}
                   title="Sem campanhas"
                   description="Nenhuma campanha foi criada para esta organização."
                 />
@@ -677,6 +679,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           </RemoteGate>
         </Card>
       </div>
+      <DoseClubIntegrationPanel scope={scope} />
     </div>
   );
 }
@@ -699,7 +702,7 @@ export function RealMultiunitPage({ scope }: { scope: GrowthScope }) {
           </Card>
           {summary.units.length === 0 ? (
             <EmptyState
-              icon="⌘"
+              icon={<UiIcon name="multiunit" />}
               title="Sem unidades ativas"
               description="Nenhuma unidade foi retornada no consolidado."
             />

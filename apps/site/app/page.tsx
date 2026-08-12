@@ -1,6 +1,8 @@
+import { Icon } from "@giromesa/ui";
 import Image from "next/image";
 import Link from "next/link";
 import { formatBRL, getCommercialPlans } from "../lib/commercial";
+import { ProductCarousel } from "./components/product-carousel";
 
 const capabilities = [
   [
@@ -66,9 +68,6 @@ export default async function Home() {
         <div className="hero-glow" aria-hidden="true" />
         <div className="container hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">
-              <span /> Gestão operacional para food service
-            </p>
             <h1>
               O salão gira.
               <br />
@@ -80,7 +79,7 @@ export default async function Home() {
             </p>
             <div className="hero-actions">
               <Link className="button button-primary button-large" href="/teste-gratis">
-                Testar 14 dias grátis <span>→</span>
+                Testar 14 dias grátis <Icon name="arrow-right" />
               </Link>
               <a className="button button-outline button-large" href="#produto">
                 Ver demonstração
@@ -90,22 +89,7 @@ export default async function Home() {
               Sem cartão · ativação assistida · o período começa quando sua operação estiver pronta
             </p>
           </div>
-          <figure className="hero-product">
-            <div className="hero-product-frame">
-              <Image
-                alt="Dashboard demonstrativo do GiroMesa com alertas e indicadores da unidade"
-                height={1054}
-                priority
-                sizes="(max-width: 960px) calc(100vw - 40px), 56vw"
-                src="/images/product/dashboard.png"
-                width={1440}
-              />
-            </div>
-            <figcaption>
-              <span className="product-demo-badge">Ambiente demonstrativo</span>
-              Dashboard com visão operacional por perfil.
-            </figcaption>
-          </figure>
+          <ProductCarousel />
         </div>
         <div className="container segment-strip">
           <span>Uma base para diferentes operações</span>
@@ -120,7 +104,6 @@ export default async function Home() {
       <section className="section flow-section" id="produto">
         <div className="container">
           <div className="section-heading">
-            <p className="eyebrow">Uma só verdade operacional</p>
             <h2>
               Do pedido à decisão,
               <br />
@@ -246,7 +229,9 @@ export default async function Home() {
                 <p className="annual">Anual: {formatBRL(plan.annualPriceCents)}</p>
                 <ul>
                   {plan.features.map((feature) => (
-                    <li key={feature}>✓ {feature}</li>
+                    <li key={feature}>
+                      <Icon name="check" /> {feature}
+                    </li>
                   ))}
                 </ul>
                 <Link
@@ -273,12 +258,12 @@ export default async function Home() {
           </div>
           <div className="trust-cards">
             <article>
-              <span>◈</span>
+              <Icon name="shield" />
               <h3>Privacidade por projeto</h3>
               <p>Permissões, auditoria, retenção e exportação pensadas para a LGPD.</p>
             </article>
             <article>
-              <span>⌁</span>
+              <Icon name="layers" />
               <h3>Operação local planejada</h3>
               <p>
                 Hub por unidade para manter pedidos, KDS e impressão durante quedas de internet.
@@ -341,7 +326,7 @@ export default async function Home() {
           </h2>
           <div>
             <Link className="button button-light button-large" href="/teste-gratis">
-              Solicitar teste assistido →
+              Solicitar teste assistido <Icon name="arrow-right" />
             </Link>
             <Link className="button button-dark button-large" href="/contato">
               Falar com especialista

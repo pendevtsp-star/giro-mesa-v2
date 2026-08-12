@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module.js";
 import { OrganizationsModule } from "../organizations/organizations.module.js";
+import { DoseClubReconciliationController } from "./doseclub-reconciliation.controller.js";
+import { DoseClubReconciliationService } from "./doseclub-reconciliation.service.js";
 import {
   GrowthController,
   GrowthPublicApiController,
@@ -16,8 +18,9 @@ import { GrowthService } from "./growth.service.js";
     GrowthPublicController,
     GrowthPublicMenuController,
     GrowthPublicApiController,
+    DoseClubReconciliationController,
   ],
-  providers: [GrowthService],
+  providers: [GrowthService, DoseClubReconciliationService],
   exports: [GrowthService],
 })
 export class GrowthModule {}

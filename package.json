@@ -11,7 +11,14 @@
     "dev": "node --env-file-if-exists=.env node_modules/turbo/bin/turbo run dev --parallel",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "turbo run test && node --test scripts/check-production-baseline.test.mjs scripts/check-supply-chain.test.mjs scripts/backup-restore.test.mjs scripts/backup-restore.integration.test.mjs scripts/deploy-hardening.test.mjs scripts/backup-restore-linux.integration.test.mjs scripts/validate-recovery-workflow.test.mjs",
+    "test:production-baseline": "node --test scripts/check-production-baseline.test.mjs",
+    "test:supply-chain": "node --test scripts/check-supply-chain.test.mjs",
+    "test:disaster-recovery": "node --test scripts/backup-restore.test.mjs scripts/backup-restore.integration.test.mjs scripts/deploy-hardening.test.mjs scripts/backup-restore-linux.integration.test.mjs scripts/validate-recovery-workflow.test.mjs",
+    "test:load": "node --test load/*.test.mjs",
+    "test:load:smoke": "pnpm --filter @giromesa/api... build && node load/local-smoke.mjs",
+    "supply-chain:check": "node scripts/check-supply-chain.mjs",
+    "production:baseline": "node scripts/check-production-baseline.mjs",
     "test:e2e": "playwright test",
     "media:capture": "playwright test --config=playwright.media.config.ts",
     "integrations:check": "node --env-file-if-exists=.env scripts/check-integrations.mjs",
@@ -22,6 +29,25 @@
     "db:generate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:generate",
     "db:migrate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:migrate",
     "db:seed": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:seed"
+  },
+  "productionBaseline": {
+    "level": "software-ready",
+    "artifact": "git:0e4fd48dc0551950df84ef4ac6f06c15861f386b",
+    "migration": {
+      "id": "0029_platform_incident_projection_actions",
+      "status": "verified",
+      "evidence": "git:0e4fd48dc0551950df84ef4ac6f06c15861f386b"
+    },
+    "gateResults": {
+      "automated": {
+        "status": "passed",
+        "evidence": "git:0e4fd48dc0551950df84ef4ac6f06c15861f386b"
+      },
+      "security": {
+        "status": "passed",
+        "evidence": "git:0e4fd48dc0551950df84ef4ac6f06c15861f386b"
+      }
+    }
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",

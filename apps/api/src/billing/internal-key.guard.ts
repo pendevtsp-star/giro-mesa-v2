@@ -17,9 +17,10 @@ export class InternalKeyGuard implements CanActivate {
         code: "INTERNAL_API_DISABLED",
         message: "API interna desabilitada.",
       });
-    const supplied = context.switchToHttp().getRequest<FastifyRequest>().headers[
-      "x-internal-api-key"
-    ];
+    const request = context
+      .switchToHttp()
+      .getRequest<FastifyRequest & { internalDatabaseContext?: boolean }>();
+    const supplied = request.headers["x-internal-api-key"];
     if (typeof supplied !== "string") throw new UnauthorizedException();
     const expectedBuffer = Buffer.from(configured);
     const suppliedBuffer = Buffer.from(supplied);
@@ -28,6 +29,7 @@ export class InternalKeyGuard implements CanActivate {
       !timingSafeEqual(expectedBuffer, suppliedBuffer)
     )
       throw new UnauthorizedException();
+    request.internalDatabaseContext = true;
     return true;
   }
 }

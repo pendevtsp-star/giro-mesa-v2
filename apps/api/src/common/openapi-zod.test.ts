@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
-import { toOpenApiSchema } from "./openapi-zod.js";
+import { promoteOpenApiDefinitions, toOpenApiSchema } from "./openapi-zod.js";
 
 describe("Zod OpenAPI bridge", () => {
   it("preserves required request fields and validation bounds", () => {
@@ -34,5 +34,55 @@ describe("Zod OpenAPI bridge", () => {
       },
       metadata: { type: "object", additionalProperties: {} },
     });
+  });
+
+  it("promotes recursive definitions to resolvable OpenAPI components", () => {
+    type Expression =
+      | { type: "constant"; value: number }
+      | { type: "add" | "max"; operands: Expression[] };
+    const expression: z.ZodType<Expression> = z.lazy(() =>
+      z.discriminatedUnion("type", [
+        z.object({ type: z.literal("constant"), value: z.number().int() }).strict(),
+        z.object({ type: z.enum(["add", "max"]), operands: z.array(expression) }).strict(),
+      ]),
+    );
+    const converted = promoteOpenApiDefinitions(
+      toOpenApiSchema(z.object({ expression })),
+      "RulesController_create",
+    );
+
+    assert.equal("definitions" in converted.schema, false);
+    assert.equal("$defs" in converted.schema, false);
+    assert.deepEqual(converted.schema.properties, {
+      expression: { $ref: "#/components/schemas/RulesController_create_recursive" },
+    });
+    assert.deepEqual(
+      (
+        converted.components.RulesController_create_recursive as {
+          oneOf: Array<unknown>;
+        }
+      ).oneOf[1],
+      { $ref: "#/components/schemas/RulesController_create_recursive_add_max" },
+    );
+    assert.deepEqual(
+      (
+        converted.components.RulesController_create_recursive_add_max as {
+          properties?: { operands?: { items?: unknown } };
+        }
+      ).properties?.operands?.items,
+      { $ref: "#/components/schemas/RulesController_create_recursive" },
+    );
+    assert.deepEqual(
+      (converted.components.RulesController_create_recursive as { discriminator?: unknown })
+        .discriminator,
+      {
+        propertyName: "type",
+        mapping: {
+          constant: "#/components/schemas/RulesController_create_recursive_constant",
+          add: "#/components/schemas/RulesController_create_recursive_add_max",
+          max: "#/components/schemas/RulesController_create_recursive_add_max",
+        },
+      },
+    );
   });
 });

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GiroMesa.EdgeHub.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -126,6 +127,58 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
         Assert.Equal("preparing", snapshot.Kds.GetProperty("tickets")[0].GetProperty("status").GetString());
         Assert.Equal("preparing", detail.GetProperty("items")[0].GetProperty("status").GetString());
         Assert.Equal(3, (await restarted.GetPendingAsync(20)).Count);
+    }
+
+    [Fact]
+    public async Task PersistsDerivedV2ResourcesSequenceAndCapturedPriceReference()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        await store.SaveOperationalSnapshotAsync(V2Snapshot());
+        var open = Command(
+            "30000000-0000-4000-8000-000000000001",
+            "pos.tab.open_requested",
+            "open-tab",
+            new { body = new { tableId = TableId, guestCount = 2 } });
+        await store.AcceptCommandAsync(open);
+        var tip = Command(
+            "30000000-0000-4000-8000-000000000002",
+            "pos.tab.tip_requested",
+            "tip",
+            new { tabId = open.Id, tipCents = 100 });
+        await store.AcceptCommandAsync(tip);
+        var transfer = Command(
+            "30000000-0000-4000-8000-000000000003",
+            "pos.tab.transfer_requested",
+            "transfer-tab",
+            new { tabId = open.Id, body = new { tableId = TableTwoId, reason = "Mudança segura" } });
+        await store.AcceptCommandAsync(transfer);
+        var create = Command(
+            "30000000-0000-4000-8000-000000000004",
+            "pos.order.create_requested",
+            "create-order",
+            new
+            {
+                tabId = open.Id,
+                body = new
+                {
+                    items = new[]
+                    {
+                        new { productId = ProductId, quantity = 1, modifierOptionIds = Array.Empty<string>() },
+                    },
+                },
+            });
+        await store.AcceptCommandAsync(create);
+
+        var pending = await store.GetPendingAsync(20, includeSecrets: true);
+        Assert.All(pending, command => Assert.Equal(2, command.ProtocolVersion));
+        Assert.Equal<int?>([1, 2, 3, 4], pending.Select(command => command.AggregateSequence));
+        Assert.Equal(2, pending[0].ResourcePreconditions!.Count);
+        Assert.Equal(3, pending[2].ResourcePreconditions!.Count);
+        Assert.Single(pending[3].PriceReferences!);
+        Assert.Equal("server-issued-price-reference-0001", pending[3].PriceReferences![0].Token);
+        Assert.Equal("2026-08-10T12:00:00.000Z", pending[3].PriceReferences![0].PriceRevision);
+        Assert.Equal(3, pending[3].ResourcePreconditions!.Single().ResourceVersion);
     }
 
     [Fact]
@@ -427,6 +480,25 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
                 ? new object[] { new { membershipId = ManagerMembershipId, pinHash = ManagerPinHash } }
                 : Array.Empty<object>(),
         }));
+
+    private static OperationalSnapshot V2Snapshot()
+    {
+        var snapshot = Snapshot(withApprovals: true);
+        var root = JsonNode.Parse(JsonSerializer.Serialize(
+            snapshot,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)))!.AsObject();
+        foreach (var table in root["floor"]!["tables"]!.AsArray().OfType<JsonObject>())
+        {
+            table["occupancyEpoch"] = StableId(table["id"]!.GetValue<string>(), "table-epoch", "");
+            table["resourceVersion"] = 0;
+        }
+        root["catalog"]!["prices"]![0]!["priceReference"] =
+            "server-issued-price-reference-0001";
+        root["catalog"]!["prices"]![0]!["priceRevision"] = "2026-08-10T12:00:00.000Z";
+        return JsonSerializer.Deserialize<OperationalSnapshot>(
+            root.ToJsonString(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+    }
 
     private static OperationalSnapshot SnapshotWithModifier(
         string tabId,

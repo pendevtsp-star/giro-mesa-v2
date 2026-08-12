@@ -1,21 +1,31 @@
 "use client";
 
-import { type FormEvent, useRef, useState } from "react";
+import { Icon } from "@giromesa/ui";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { formatMoney } from "../lib/menu";
 import {
   isPublicSubmissionAccepted,
   type MutationAttempt,
+  type PublicTablePartial,
+  type PublicTableSession,
   readCouponValidation,
+  readTablePartial,
+  readTableSession,
   resolveMutationAttempt,
 } from "../lib/public-contracts";
+import { customerFetch } from "../lib/pwa-fetch";
 
 type MutationKind = "reservation" | "waitlist";
+type TableAction = "waiter" | "bill" | "partial";
 type Message = { tone: "success" | "warning"; text: string } | null;
 
 const policyVersion = "2026-08-public-services";
 
 export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string; demo: boolean }) {
   const [busy, setBusy] = useState<MutationKind | "coupon" | null>(null);
+  const [tableBusy, setTableBusy] = useState<TableAction | "session" | null>(null);
+  const [tableSession, setTableSession] = useState<PublicTableSession | null>(null);
+  const [partial, setPartial] = useState<PublicTablePartial | null>(null);
   const [message, setMessage] = useState<Message>(null);
   const attempts = useRef<Record<MutationKind, MutationAttempt | null>>({
     reservation: null,
@@ -24,6 +34,122 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
   const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
   const configured =
     !demo && Boolean(apiUrl) && process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
+  const canUse = (capability: PublicTableSession["capabilities"][number]) =>
+    demo || tableSession?.capabilities.includes(capability) === true;
+
+  useEffect(() => {
+    if (demo || !apiUrl || !configured) return;
+    const storageKey = `giromesa:table-session:${menuSlug}`;
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = readTableSession(JSON.parse(stored));
+        if (parsed && new Date(parsed.expiresAt) > new Date()) setTableSession(parsed);
+      } catch {
+        sessionStorage.removeItem(storageKey);
+      }
+    }
+    const qrToken = new URLSearchParams(window.location.search).get("qr");
+    if (!qrToken) return;
+    setTableBusy("session");
+    void fetch(`${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qrToken }),
+    })
+      .then(async (response) => {
+        const session = readTableSession(await response.json());
+        if (!response.ok || !session) throw new Error("Sessão recusada");
+        sessionStorage.setItem(storageKey, JSON.stringify(session));
+        setTableSession(session);
+        window.history.replaceState({}, "", window.location.pathname);
+      })
+      .catch(() =>
+        setMessage({ tone: "warning", text: "Este QR não corresponde a um atendimento aberto." }),
+      )
+      .finally(() => setTableBusy(null));
+  }, [apiUrl, configured, demo, menuSlug]);
+
+  async function requestTableService(kind: "waiter" | "bill") {
+    if (demo) {
+      setMessage({
+        tone: "success",
+        text:
+          kind === "waiter"
+            ? "Demonstração: chamado encaminhado à equipe."
+            : "Demonstração: pedido de conta encaminhado.",
+      });
+      return;
+    }
+    if (!apiUrl || !tableSession || tableBusy) return;
+    setTableBusy(kind);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-calls`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tableSession.token}`,
+            "X-Request-Nonce": crypto.randomUUID().replaceAll("-", ""),
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+          body: JSON.stringify({ kind }),
+        },
+      );
+      const payload = (await response.json()) as { call?: { state?: string } };
+      if (!response.ok || !payload.call?.state) throw new Error("Chamado recusado");
+      setMessage({
+        tone: "success",
+        text:
+          payload.call.state === "routed"
+            ? "Solicitação encaminhada à equipe da sua praça."
+            : "Solicitação recebida pela unidade.",
+      });
+    } catch {
+      setMessage({
+        tone: "warning",
+        text: "Não foi possível confirmar a solicitação. Leia o QR novamente se a mesa mudou.",
+      });
+    } finally {
+      setTableBusy(null);
+    }
+  }
+
+  async function loadPartial() {
+    if (demo) {
+      setPartial({
+        occupancyId: "demo",
+        tab: { id: "demo", totalCents: 13_670 },
+        items: [
+          {
+            id: "demo-item",
+            productName: "Consumo demonstrativo",
+            quantity: 2,
+            netCents: 13_670,
+            status: "served",
+          },
+        ],
+      });
+      return;
+    }
+    if (!apiUrl || !tableSession || tableBusy) return;
+    setTableBusy("partial");
+    try {
+      const response = await fetch(
+        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-partial`,
+        { headers: { Authorization: `Bearer ${tableSession.token}` } },
+      );
+      const value = readTablePartial(await response.json());
+      if (!response.ok || !value) throw new Error("Parcial inválida");
+      setPartial(value);
+    } catch {
+      setMessage({ tone: "warning", text: "A parcial atual não pôde ser comprovada." });
+    } finally {
+      setTableBusy(null);
+    }
+  }
 
   async function submitMutation(
     kind: MutationKind,
@@ -41,7 +167,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy(kind);
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/${path}`,
         {
           method: "POST",
@@ -129,7 +255,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
     setBusy("coupon");
     setMessage(null);
     try {
-      const response = await fetch(
+      const response = await customerFetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/coupons/validate`,
         {
           method: "POST",
@@ -164,7 +290,7 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
   return (
     <main className="public-service-page">
       <a className="preference-back" href={`/m/${menuSlug}`}>
-        ← Voltar ao cardápio
+        <Icon name="arrow-left" /> Voltar ao cardápio
       </a>
       <p className="preference-eyebrow">Serviços da unidade</p>
       <h1>Solicite sem perder o contexto.</h1>
@@ -191,6 +317,67 @@ export function PublicServicesExperience({ menuSlug, demo }: { menuSlug: string;
           {message.text}
         </div>
       )}
+
+      <section id="mesa" className="public-service-card" aria-labelledby="table-service-title">
+        <p className="preference-eyebrow">Mesa atual</p>
+        <h2 id="table-service-title">Atendimento e parcial</h2>
+        <p>
+          {demo || tableSession
+            ? "As ações ficam vinculadas somente ao atendimento aberto neste QR."
+            : tableBusy === "session"
+              ? "Validando o QR físico da mesa…"
+              : "Leia o QR físico da mesa para habilitar chamados e visualizar a parcial atual."}
+        </p>
+        <div className="public-service-table-actions">
+          {canUse("call_waiter") && (
+            <button
+              type="button"
+              disabled={tableBusy !== null}
+              onClick={() => void requestTableService("waiter")}
+            >
+              {tableBusy === "waiter" ? "Encaminhando…" : "Chamar garçom"}
+            </button>
+          )}
+          {canUse("request_bill") && (
+            <button
+              type="button"
+              disabled={tableBusy !== null}
+              onClick={() => void requestTableService("bill")}
+            >
+              {tableBusy === "bill" ? "Encaminhando…" : "Pedir a conta"}
+            </button>
+          )}
+          {canUse("view_partial") && (
+            <button type="button" disabled={tableBusy !== null} onClick={() => void loadPartial()}>
+              {tableBusy === "partial" ? "Atualizando…" : "Ver parcial"}
+            </button>
+          )}
+        </div>
+        {!demo && tableSession && tableSession.capabilities.length === 0 && (
+          <p role="status">A unidade não habilitou ações digitais para esta mesa.</p>
+        )}
+        {partial && (
+          <div className="public-service-partial" aria-live="polite">
+            <h3>Parcial deste atendimento</h3>
+            {partial.items.length ? (
+              partial.items.map((item) => (
+                <div key={item.id}>
+                  <span>
+                    {item.quantity}× {item.productName}
+                  </span>
+                  <strong>{formatMoney(item.netCents)}</strong>
+                </div>
+              ))
+            ) : (
+              <p>Nenhum item lançado até agora.</p>
+            )}
+            <div>
+              <span>Total atual</span>
+              <strong>{formatMoney(partial.tab.totalCents)}</strong>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section id="reserva" className="public-service-card" aria-labelledby="reservation-title">
         <p className="preference-eyebrow">Horário desejado</p>

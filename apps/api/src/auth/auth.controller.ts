@@ -5,8 +5,12 @@ import {
   loginRequestSchema,
   publicRegisterSchema,
   type RegisterRequestInput,
+  type RequestEmailVerificationInput,
   type RequestPasswordResetInput,
+  requestEmailVerificationSchema,
   requestPasswordResetSchema,
+  type VerifyEmailInput,
+  verifyEmailSchema,
 } from "@giromesa/contracts";
 import {
   Body,
@@ -21,8 +25,16 @@ import {
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
+import {
+  ApiAcceptedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiProperty,
+  getSchemaPath,
+} from "@nestjs/swagger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { AuthService } from "./auth.service.js";
 import {
   beginGoogleOAuth,
@@ -51,19 +63,134 @@ import {
   shortLivedAuthCookieOptions,
 } from "./session-cookie.js";
 
+class EmailVerificationAcceptedResponse {
+  @ApiProperty({ enum: [true] })
+  declare accepted: true;
+}
+
+class EmailVerificationIdentityResponse {
+  @ApiProperty({ format: "uuid" })
+  declare id: string;
+
+  @ApiProperty({ format: "email" })
+  declare email: string;
+
+  @ApiProperty()
+  declare displayName: string;
+}
+
+class EmailVerificationSessionResponse {
+  @ApiProperty({ enum: ["verified"] })
+  declare status: "verified";
+
+  @ApiProperty({ format: "date-time" })
+  declare expiresAt: string;
+
+  @ApiProperty({ type: () => EmailVerificationIdentityResponse })
+  declare identity: EmailVerificationIdentityResponse;
+}
+
+class EmailVerificationMfaResponse {
+  @ApiProperty({ enum: ["mfa_required"] })
+  declare status: "mfa_required";
+
+  @ApiProperty({ enum: [true] })
+  declare mfaRequired: true;
+
+  @ApiProperty({ minLength: 32, maxLength: 128 })
+  declare challengeToken: string;
+
+  @ApiProperty({ format: "date-time" })
+  declare expiresAt: string;
+}
+
+class EmailVerificationAlreadyVerifiedResponse {
+  @ApiProperty({ enum: ["already_verified"] })
+  declare status: "already_verified";
+}
+
+const emailVerificationResultSchema = {
+  oneOf: [
+    { $ref: getSchemaPath(EmailVerificationSessionResponse) },
+    { $ref: getSchemaPath(EmailVerificationMfaResponse) },
+    { $ref: getSchemaPath(EmailVerificationAlreadyVerifiedResponse) },
+  ],
+  discriminator: {
+    propertyName: "status",
+    mapping: {
+      verified: getSchemaPath(EmailVerificationSessionResponse),
+      mfa_required: getSchemaPath(EmailVerificationMfaResponse),
+      already_verified: getSchemaPath(EmailVerificationAlreadyVerifiedResponse),
+    },
+  },
+};
+
+@DatabaseContext("identity")
+@ApiExtraModels(
+  EmailVerificationAcceptedResponse,
+  EmailVerificationIdentityResponse,
+  EmailVerificationSessionResponse,
+  EmailVerificationMfaResponse,
+  EmailVerificationAlreadyVerifiedResponse,
+)
 @Controller(["api/v1/auth", "v1/auth", "public/v1/auth"])
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
-  async register(
-    @Body(new ZodPipe(publicRegisterSchema)) body: RegisterRequestInput,
+  async register(@Body(new ZodPipe(publicRegisterSchema)) body: RegisterRequestInput) {
+    return this.authService.register(body);
+  }
+
+  @HttpCode(202)
+  @ApiAcceptedResponse({
+    description: "Resposta pública uniforme; o envio pode ser silenciosamente suprimido.",
+    headers: {
+      "Retry-After": {
+        description: "Intervalo público uniforme antes de um novo pedido.",
+        schema: { type: "integer", example: 60 },
+      },
+      "Cache-Control": {
+        description: "Impede armazenamento da resposta de autenticação.",
+        schema: { type: "string", example: "no-store" },
+      },
+    },
+    type: EmailVerificationAcceptedResponse,
+  })
+  @Post("email-verification/request")
+  async requestEmailVerification(
+    @Body(new ZodPipe(requestEmailVerificationSchema)) body: RequestEmailVerificationInput,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = await this.authService.register(body);
-    reply.setCookie(SESSION_COOKIE_NAME, result.token, sessionCookieOptions(result.expiresAt));
-    const { token: _token, ...browserResult } = result;
-    return browserResult;
+    reply.header("Cache-Control", "no-store");
+    reply.header("Retry-After", "60");
+    return this.authService.requestEmailVerification(body);
+  }
+
+  @HttpCode(200)
+  @ApiOkResponse({
+    description: "Verificação concluída, já consumida ou aguardando segundo fator.",
+    headers: {
+      "Cache-Control": {
+        description: "Impede armazenamento da resposta de autenticação.",
+        schema: { type: "string", example: "no-store" },
+      },
+    },
+    schema: emailVerificationResultSchema,
+  })
+  @Post("email-verification/confirm")
+  async verifyEmail(
+    @Body(new ZodPipe(verifyEmailSchema)) body: VerifyEmailInput,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    reply.header("Cache-Control", "no-store");
+    const result = await this.authService.verifyEmail(body);
+    if (result.status === "verified") {
+      reply.setCookie(SESSION_COOKIE_NAME, result.token, sessionCookieOptions(result.expiresAt));
+      const { token: _token, ...browserResult } = result;
+      return browserResult;
+    }
+    return result;
   }
 
   @HttpCode(200)

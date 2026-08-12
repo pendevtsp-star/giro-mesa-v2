@@ -1,11 +1,82 @@
-import { createDatabase, type DatabaseConnection } from "@giromesa/db";
-import { Global, Injectable, Module, type OnModuleDestroy } from "@nestjs/common";
+import {
+  createDatabase,
+  currentTenantContext,
+  currentTenantDatabase,
+  type DatabaseConnection,
+  type DatabaseContextRole,
+  type TenantContext,
+  type TenantTransaction,
+  withDatabaseRoleContext,
+  withDoseClubContext,
+  withPlatformContext,
+  withPublicMenuContext,
+  withTenantContext,
+  withWorkerContext,
+} from "@giromesa/db";
+import { Global, Injectable, Module, type OnModuleDestroy, Optional } from "@nestjs/common";
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
-  private readonly connection: DatabaseConnection = createDatabase();
-  readonly db = this.connection.db;
-  readonly client = this.connection.client;
+  private readonly connection: DatabaseConnection;
+
+  constructor(@Optional() connection?: DatabaseConnection) {
+    this.connection = connection ?? createDatabase();
+  }
+
+  get db() {
+    return currentTenantDatabase() ?? this.connection.db;
+  }
+
+  get client() {
+    return this.connection.client;
+  }
+
+  get tenantContext() {
+    return currentTenantContext();
+  }
+
+  withTenantContext<T>(
+    context: Omit<TenantContext, "unitId" | "actorIdentityId"> & {
+      unitId?: string | null;
+      actorIdentityId?: string | null;
+    },
+    work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
+  ) {
+    return withTenantContext(this.connection, context, work);
+  }
+
+  withWorkerContext<T>(work: (database: TenantTransaction) => Promise<T> | T) {
+    return withWorkerContext(this.connection, work);
+  }
+
+  withRoleContext<T>(
+    role: DatabaseContextRole,
+    actorIdentityId: string | null,
+    work: (database: TenantTransaction) => Promise<T> | T,
+  ) {
+    return withDatabaseRoleContext(this.connection, role, actorIdentityId, work);
+  }
+
+  withPlatformContext<T>(
+    context: { actorIdentityId: string; sessionId: string; organizationId?: string | null },
+    work: (database: TenantTransaction) => Promise<T> | T,
+  ) {
+    return withPlatformContext(this.connection, context, work);
+  }
+
+  withPublicMenuContext<T>(
+    slug: string,
+    work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
+  ) {
+    return withPublicMenuContext(this.connection, slug, work);
+  }
+
+  withDoseClubContext<T>(
+    input: { keyHash: string; scope: "doseclub:read" | "doseclub:write"; branchId?: string | null },
+    work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
+  ) {
+    return withDoseClubContext(this.connection, input, work);
+  }
 
   async onModuleDestroy() {
     await this.client.end();

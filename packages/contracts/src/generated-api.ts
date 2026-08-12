@@ -4,103 +4,7 @@
  */
 
 export interface paths {
-  "/api/v1/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["HealthController_health[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["HealthController_health[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/metrics": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["MetricsController_metricsText[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/metrics": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["MetricsController_metricsText[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/public/commercial-catalog": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["CatalogController_catalog[0]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/public/v1/commercial-catalog": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["CatalogController_catalog[1]"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/public/trial-applications": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
@@ -109,14 +13,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[0]"];
+    post: operations["FiscalController_issue[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/trial-applications": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
@@ -125,14 +29,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[1]"];
+    post: operations["FiscalController_issue[1]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/contact": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
     parameters: {
       query?: never;
       header?: never;
@@ -141,14 +45,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[0]"];
+    post: operations["FiscalController_retry[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/contact": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/retry": {
     parameters: {
       query?: never;
       header?: never;
@@ -157,7 +61,39 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[1]"];
+    post: operations["FiscalController_retry[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancel[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancel[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -206,6 +142,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["AuthController_register[2]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/email-verification/request": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_requestEmailVerification[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/email-verification/request": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_requestEmailVerification[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/auth/email-verification/request": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_requestEmailVerification[2]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/email-verification/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_verifyEmail[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/email-verification/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_verifyEmail[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/auth/email-verification/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_verifyEmail[2]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1140,6 +1172,588 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_report[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_report[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_review[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_review[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_decide[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_decide[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_close[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IncidentsController_close[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IncidentsController_reportView[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/incidents/{incidentId}/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IncidentsController_reportView[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List GiroMesa branches enabled for DoseClub */
+    get: operations["DoseClubController_listBranches[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List GiroMesa branches enabled for DoseClub */
+    get: operations["DoseClubController_listBranches[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/products": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List active GiroMesa products */
+    get: operations["DoseClubController_listProducts[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/products": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List active GiroMesa products */
+    get: operations["DoseClubController_listProducts[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read mapped stock for a DoseClub branch */
+    get: operations["DoseClubController_stock[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read mapped stock for a DoseClub branch */
+    get: operations["DoseClubController_stock[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/sales": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_sale[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/sales": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_sale[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reservation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reservation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/dose-consumptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_consumption[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/dose-consumptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_consumption[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/dose-consumptions/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reversal[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/dose-consumptions/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reversal[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/onboarding": {
     parameters: {
       query?: never;
@@ -1172,6 +1786,38 @@ export interface paths {
     patch: operations["OnboardingController_update[1]"];
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/onboarding/selection": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["OnboardingController_select[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/onboarding/selection": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["OnboardingController_select[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/onboarding/activate": {
     parameters: {
       query?: never;
@@ -1198,6 +1844,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["OnboardingController_activate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/onboarding/provisioning/{runId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OnboardingController_provisioningStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/onboarding/provisioning/{runId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OnboardingController_provisioningStatus[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1364,6 +2042,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/public/menus/{slug}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_preview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_preview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/public/menus/{slug}/hub-status": {
     parameters: {
       query?: never;
@@ -1428,6 +2138,102 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/public/menus/{slug}/table-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableSession[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableSession[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/table-calls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableCall[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-calls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableCall[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/table-partial": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tablePartial[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-partial": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tablePartial[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/public/menus/{slug}/orders": {
     parameters: {
       query?: never;
@@ -1460,23 +2266,39 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/menus/{slug}/commands": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: operations["PublicMenuController_command[0]"];
+    get: operations["PublicMenuAdminController_tableCapabilities[0]"];
+    put: operations["PublicMenuAdminController_configureTableCapabilities[0]"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/menus/{slug}/commands": {
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/table-capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuAdminController_tableCapabilities[1]"];
+    put: operations["PublicMenuAdminController_configureTableCapabilities[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/tables/{tableId}/qr": {
     parameters: {
       query?: never;
       header?: never;
@@ -1485,7 +2307,215 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["PublicMenuController_command[1]"];
+    post: operations["PublicMenuAdminController_tableQr[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/tables/{tableId}/qr": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_tableQr[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/calls/{callId}/attend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_attendTableCall[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/calls/{callId}/attend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_attendTableCall[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PublicMenuAdminController_saveDraft[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PublicMenuAdminController_saveDraft[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_createPreview[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_createPreview[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_createVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_createVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/versions/{versionId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_publish[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}/versions/{versionId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuAdminController_publish[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuAdminController_menuForTenant[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/public-menus/{menuId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuAdminController_menuForTenant[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1518,6 +2548,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["SyncController_synchronize[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sync/dispatch-outcomes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_dispatchOutcomes[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sync/dispatch-outcomes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_dispatchOutcomes[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2036,6 +3098,198 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listDispatch[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listDispatch[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_ensureDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/stations/{stationId}/dispatch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_ensureDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reconcileDispatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/dispatch/{effectId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reconcileDispatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/transfer": {
     parameters: {
       query?: never;
@@ -2324,6 +3578,582 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/rooms/{roomId}/map": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SalonController_map[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/rooms/{roomId}/map": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SalonController_map[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/rooms/{roomId}/layouts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_createLayout[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/rooms/{roomId}/layouts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_createLayout[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/layouts/{layoutId}/nodes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_replaceNodes[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/layouts/{layoutId}/nodes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_replaceNodes[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/layouts/{layoutId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_publish[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/layouts/{layoutId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_publish[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/shifts/{shiftId}/areas/{areaId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_assignArea[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/shifts/{shiftId}/areas/{areaId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_assignArea[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/presence/{deviceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_renewPresence[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/presence/{deviceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["SalonController_renewPresence[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/presence/{deviceId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_ackPresence[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/presence/{deviceId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_ackPresence[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/exceptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SalonController_exceptions[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/exceptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SalonController_exceptions[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/salon/exceptions/{exceptionId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_acknowledgeException[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/salon/exceptions/{exceptionId}/ack": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SalonController_acknowledgeException[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_createAsset[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_createAsset[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_move[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/movements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_move[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/reconciliations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ReturnablesController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ReturnablesController_ledger[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/returnables/assets/{assetId}/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ReturnablesController_ledger[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_createIntent[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/intents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_createIntent[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_executeAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/intents/{intentId}/attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_executeAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_manualReview[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/payments/attempts/{attemptId}/manual-review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentsController_manualReview[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/payment-provider-callbacks/{adapter}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PaymentCallbacksController_callback[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/overview": {
     parameters: {
       query?: never;
@@ -2350,6 +4180,422 @@ export interface paths {
     get: operations["PlatformController_overview[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_context[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_projection[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_globalProjection[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_globalProjection[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[0]"];
+    put?: never;
+    post: operations["PlatformController_propose[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_actions[1]"];
+    put?: never;
+    post: operations["PlatformController_propose[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/actions/{proposalId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_reject[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_list[0]"];
+    put?: never;
+    post: operations["PrivacyController_create[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_list[1]"];
+    put?: never;
+    post: operations["PrivacyController_create[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_get[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PrivacyController_get[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/verify-subject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_verify[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/verify-subject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_verify[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_retry[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_retry[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_reject[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_reject[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/privacy/requests/{requestId}/export-download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_download[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/privacy/requests/{requestId}/export-download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PrivacyController_download[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3150,6 +5396,358 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createCommission[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_createRule[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_createRule[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_publishVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleSetId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_publishVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_simulate[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/rules/{ruleVersionId}/simulate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_simulate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_calculate[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_calculate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_approve[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_approve[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_close[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_close[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_adjustClosed[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/adjustments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["RemunerationController_adjustClosed[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_portfolio[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/portfolio": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_portfolio[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_exportRun[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/remuneration/runs/{runId}/export/{format}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["RemunerationController_exportRun[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/media/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["MediaAdminController_upload[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/media/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["MediaAdminController_upload[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/assets/{assetId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMediaController_asset[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/assets/{assetId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMediaController_asset[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -4340,10 +6938,1873 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get tenant-scoped DoseClub mapping and reconciliation status */
+    get: operations["DoseClubReconciliationController_overview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get tenant-scoped DoseClub mapping and reconciliation status */
+    get: operations["DoseClubReconciliationController_overview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create a local mapping using the POS product id as external id */
+    post: operations["DoseClubReconciliationController_createMapping[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create a local mapping using the POS product id as external id */
+    post: operations["DoseClubReconciliationController_createMapping[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings/{mappingId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update a mapping with optimistic concurrency */
+    patch: operations["DoseClubReconciliationController_updateMapping[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings/{mappingId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update a mapping with optimistic concurrency */
+    patch: operations["DoseClubReconciliationController_updateMapping[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Queue an idempotent local reconciliation scan */
+    post: operations["DoseClubReconciliationController_requestRun[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Queue an idempotent local reconciliation scan */
+    post: operations["DoseClubReconciliationController_requestRun[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/runs/{runId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Requeue a failed local scan using optimistic concurrency */
+    post: operations["DoseClubReconciliationController_retryRun[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/runs/{runId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Requeue a failed local scan using optimistic concurrency */
+    post: operations["DoseClubReconciliationController_retryRun[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/findings/{findingId}/recheck": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Queue a local recheck for a current finding */
+    post: operations["DoseClubReconciliationController_recheckFinding[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/doseclub/findings/{findingId}/recheck": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Queue a local recheck for a current finding */
+    post: operations["DoseClubReconciliationController_recheckFinding[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: never;
+  schemas: {
+    EmailVerificationAcceptedResponse: {
+      /** @enum {boolean} */
+      accepted: true;
+    };
+    EmailVerificationIdentityResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      displayName: string;
+    };
+    EmailVerificationSessionResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "verified";
+      /** Format: date-time */
+      expiresAt: string;
+      identity: components["schemas"]["EmailVerificationIdentityResponse"];
+    };
+    EmailVerificationMfaResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "mfa_required";
+      /** @enum {boolean} */
+      mfaRequired: true;
+      challengeToken: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
+    EmailVerificationAlreadyVerifiedResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      status: "already_verified";
+    };
+    DoseClubV1AcknowledgementDto: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      contractVersion: "v1";
+      externalClubId: string;
+      operationId?: string;
+      /** @enum {string} */
+      outcome: "accepted" | "duplicate";
+      /** @enum {string} */
+      status: "ok";
+    };
+    DoseClubV2AcknowledgementDto: {
+      /** Format: date-time */
+      acknowledgedAt: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      contractVersion: "v2";
+      externalClubId: string;
+      operationId: string;
+      /** @enum {string} */
+      outcome: "accepted" | "duplicate" | "reconciled";
+      /** Format: int32 */
+      version: number;
+    };
+    DoseClubBranchDto: {
+      id: string;
+      name: string;
+      /** Format: uuid */
+      unitId: string;
+    };
+    DoseClubBranchListDto: {
+      branches: components["schemas"]["DoseClubBranchDto"][];
+    };
+    DoseClubProductDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      sku: Record<string, never> | null;
+    };
+    DoseClubProductListDto: {
+      products: components["schemas"]["DoseClubProductDto"][];
+    };
+    DoseClubStockDto: {
+      branchId: string;
+      productId: string;
+      /** @example 1000.000000 */
+      quantity: string;
+      /** @enum {string} */
+      unit: "ml";
+    };
+    OnboardingEvidenceResponse: {
+      /** Format: uuid */
+      selectedUnitId?: string | null;
+      selectedUnitActive?: boolean;
+      /** Format: int32 */
+      activeMembersObserved?: number;
+      menuPublished?: boolean;
+      tablesConfigured?: boolean;
+      capabilitiesConfigured?: boolean;
+      serverTestPassed?: boolean;
+      configured?: boolean;
+      /** @enum {string|null} */
+      requestedMode?: "off" | "kds" | "print" | "both" | null;
+      kdsStationIds?: string[];
+      printerProfileIds?: string[];
+      configurationReference?: string | null;
+      /** Format: int32 */
+      catalogVersion?: number | null;
+      /** @enum {string|null} */
+      slug?: "operacao" | "crescimento" | "rede" | null;
+      note?: string;
+      /** @enum {string} */
+      choice?: "disabled" | "focus" | "external";
+      completed?: boolean;
+      /** @enum {string} */
+      reason?: "pilot_without_qr" | "external_qr" | "not_required" | "external_fiscal";
+      /** @enum {string} */
+      mode?: "off" | "kds" | "print" | "both";
+      legacyValue?: boolean;
+    };
+    OnboardingChecklistEvidenceResponse: {
+      /** @enum {string} */
+      status: "pending" | "in_progress" | "verified" | "blocked" | "not_applicable";
+      /** @enum {string} */
+      source: "system" | "actor_attestation" | "authorized_waiver" | "legacy_import";
+      evidenceReference: string | null;
+      evidence: components["schemas"]["OnboardingEvidenceResponse"];
+      /** Format: uuid */
+      actorIdentityId: string | null;
+      /** Format: date-time */
+      verifiedAt: string | null;
+      waiverReason: string | null;
+    };
+    OnboardingChecklistItemsResponse: {
+      business: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      unit: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      plan: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      fiscalChoice: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      catalog: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      tables: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      team: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      qr: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      production: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      cashier: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      training: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+      rehearsal: components["schemas"]["OnboardingChecklistEvidenceResponse"];
+    };
+    OnboardingPlanResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      slug: "operacao" | "crescimento" | "rede";
+      /** Format: int32 */
+      catalogVersion: number;
+      /** Format: int64 */
+      monthlyPriceCents: number;
+      /** Format: int64 */
+      annualPriceCents: number;
+      /** Format: int32 */
+      includedUnits: number;
+      entitlements: string[];
+    };
+    OnboardingSelectionResponse: {
+      /** Format: uuid */
+      selectedUnitId: string;
+      plan: components["schemas"]["OnboardingPlanResponse"];
+      /** Format: int32 */
+      revision: number;
+      /** Format: date-time */
+      selectedAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProvisioningSummaryResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      state:
+        | "requested"
+        | "validating"
+        | "provisioning"
+        | "activating"
+        | "publishing"
+        | "retryable_failed"
+        | "compensating"
+        | "compensated"
+        | "terminal_failed"
+        | "completed";
+      /** @enum {string} */
+      checkpoint:
+        | "requested"
+        | "validated"
+        | "internal_provisioned"
+        | "activation_committed"
+        | "published"
+        | "compensated";
+      /** Format: int32 */
+      attempts: number;
+      lastErrorCode: string | null;
+      /** Format: date-time */
+      nextRetryAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      failedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    OnboardingResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: date-time */
+      activatedAt: string | null;
+      items: components["schemas"]["OnboardingChecklistItemsResponse"];
+      ready: boolean;
+      missingItems: (
+        | "business"
+        | "unit"
+        | "plan"
+        | "fiscalChoice"
+        | "catalog"
+        | "tables"
+        | "team"
+        | "qr"
+        | "production"
+        | "cashier"
+        | "training"
+        | "rehearsal"
+      )[];
+      selection: components["schemas"]["OnboardingSelectionResponse"] | null;
+      provisioning: components["schemas"]["ProvisioningSummaryResponse"] | null;
+    };
+    OnboardingApiErrorDetails: {
+      /** Format: uuid */
+      provisioningRunId?: string;
+      missingItems?: (
+        | "business"
+        | "unit"
+        | "plan"
+        | "fiscalChoice"
+        | "catalog"
+        | "tables"
+        | "team"
+        | "qr"
+        | "production"
+        | "cashier"
+        | "training"
+        | "rehearsal"
+      )[];
+      fieldErrors?: {
+        [key: string]: string[];
+      };
+      formErrors?: string[];
+    };
+    OnboardingApiErrorResponse: {
+      /** Format: int32 */
+      statusCode: number;
+      code: string;
+      message: string;
+      details?: components["schemas"]["OnboardingApiErrorDetails"];
+    };
+    TrialActivationResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      commercialPlanId: string;
+      /** Format: uuid */
+      provisioningRunId: string;
+      /** Format: uuid */
+      subscriptionId: string;
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+      /** @enum {string} */
+      state: "completed";
+      entitlements: string[];
+    };
+    ProvisioningStepResponse: {
+      /** @enum {string} */
+      step: "validation" | "internal_provisioning" | "activation" | "publication" | "compensation";
+      /** @enum {string} */
+      status: "pending" | "in_progress" | "completed" | "failed" | "compensated";
+      /** Format: int32 */
+      attempts: number;
+      /** Format: date-time */
+      startedAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      compensatedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProvisioningStatusResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      state:
+        | "requested"
+        | "validating"
+        | "provisioning"
+        | "activating"
+        | "publishing"
+        | "retryable_failed"
+        | "compensating"
+        | "compensated"
+        | "terminal_failed"
+        | "completed";
+      /** @enum {string} */
+      checkpoint:
+        | "requested"
+        | "validated"
+        | "internal_provisioned"
+        | "activation_committed"
+        | "published"
+        | "compensated";
+      /** Format: int32 */
+      attempts: number;
+      lastErrorCode: string | null;
+      /** Format: date-time */
+      nextRetryAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      failedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      steps: components["schemas"]["ProvisioningStepResponse"][];
+    };
+    PlatformProjectionUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+      units: components["schemas"]["PlatformProjectionUnitResponse"][];
+    };
+    PlatformPlanProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      planId: string;
+      slug: string;
+      name: string;
+      selectionRevision: number;
+      /** Format: date-time */
+      selectedAt: string | null;
+    };
+    PlatformEntitlementProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      entitlement: string;
+      state: string;
+      /** Format: date-time */
+      activatedAt: string | null;
+      /** Format: date-time */
+      revokedAt: string | null;
+    };
+    PlatformUserRoleProjectionResponse: {
+      role: string;
+      /** Format: uuid */
+      unitId: string | null;
+    };
+    PlatformUserProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      identityId: string;
+      displayName: string;
+      email: string;
+      status: string;
+      roles: components["schemas"]["PlatformUserRoleProjectionResponse"][];
+    };
+    PlatformOnboardingChecklistProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "checklist";
+      item: string;
+      status: string;
+      source: string;
+      /** Format: date-time */
+      verifiedAt: string | null;
+    };
+    PlatformOnboardingProvisioningProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "provisioning";
+      /** Format: uuid */
+      id: string;
+      state: string;
+      checkpoint: string;
+      lastErrorCode: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformBillingProjectionItemResponse: {
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      planId: string;
+      cycle: string;
+      state: string;
+      /** Format: date-time */
+      currentPeriodEndsAt: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformIntegrationProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string | null;
+      provider: string;
+      status: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformAuditProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      action: string;
+      entityType: string;
+      entityId: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+    };
+    PlatformLeadProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      email: string;
+      phone: string;
+      businessName: string;
+      segment: string | null;
+      planSlug: string;
+      /** Format: date-time */
+      submittedAt: string;
+      /** @enum {string} */
+      actionAvailability: "unavailable";
+      /** @enum {string} */
+      actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE";
+    };
+    PlatformSupportProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      email: string;
+      phone: string;
+      /** Format: date-time */
+      submittedAt: string;
+      /** @enum {string} */
+      actionAvailability: "unavailable";
+      /** @enum {string} */
+      actionReasonCode: "SUPPORT_WORKFLOW_NOT_AVAILABLE";
+    };
+    PlatformIncidentProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      unitId: string;
+      incidentType: string;
+      /** @enum {string} */
+      status: "reported" | "under_review" | "approved" | "rejected" | "closed";
+      neutralSummary: string;
+      amountCents: number | null;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      availableActions: (
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close"
+      )[];
+    };
+    PlatformTenantProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "tenant";
+      items: components["schemas"]["PlatformTenantProjectionItemResponse"][];
+    };
+    PlatformPlanProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "plan";
+      items: components["schemas"]["PlatformPlanProjectionItemResponse"][];
+    };
+    PlatformEntitlementsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "entitlements";
+      items: components["schemas"]["PlatformEntitlementProjectionItemResponse"][];
+    };
+    PlatformUsersProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "users";
+      items: components["schemas"]["PlatformUserProjectionItemResponse"][];
+    };
+    PlatformOnboardingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "onboarding";
+      items: (
+        | components["schemas"]["PlatformOnboardingChecklistProjectionItemResponse"]
+        | components["schemas"]["PlatformOnboardingProvisioningProjectionItemResponse"]
+      )[];
+    };
+    PlatformBillingProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "billing";
+      items: components["schemas"]["PlatformBillingProjectionItemResponse"][];
+    };
+    PlatformIntegrationsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "integrations";
+      items: components["schemas"]["PlatformIntegrationProjectionItemResponse"][];
+    };
+    PlatformAuditProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "audit";
+      items: components["schemas"]["PlatformAuditProjectionItemResponse"][];
+    };
+    PlatformLeadsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "leads";
+      items: components["schemas"]["PlatformLeadProjectionItemResponse"][];
+    };
+    PlatformSupportProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "support";
+      items: components["schemas"]["PlatformSupportProjectionItemResponse"][];
+    };
+    PlatformIncidentsProjectionResponse: {
+      /** @enum {string} */
+      availability: "available" | "unavailable";
+      reasonCode?: string;
+      nextCursor: string | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      resource: "incidents";
+      items: components["schemas"]["PlatformIncidentProjectionItemResponse"][];
+    };
+    PlatformCountsResponse: {
+      organizations: number;
+      active: number;
+      attention: number;
+    };
+    PlatformAccessResponse: {
+      permissions: string[];
+      stepUp: boolean;
+      /** Format: date-time */
+      stepUpExpiresAt: string | null;
+    };
+    PlatformOverviewResponse: {
+      counts: components["schemas"]["PlatformCountsResponse"];
+      access: components["schemas"]["PlatformAccessResponse"];
+    };
+    PlatformOrganizationResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      billingState: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PlatformUnitResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      active: boolean;
+      timezone: string;
+    };
+    PlatformTenantContextResponse: {
+      organization: components["schemas"]["PlatformOrganizationResponse"];
+      units: components["schemas"]["PlatformUnitResponse"][];
+      /** Format: uuid */
+      selectedUnitId: string | null;
+    };
+    PlatformActionPayloadResponse: {
+      expectedState: string;
+      restoreTo?: string;
+      /** Format: uuid */
+      unitId?: string;
+    };
+    PlatformActionResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** @enum {string} */
+      action:
+        | "tenant.suspend"
+        | "tenant.restore"
+        | "membership.disable"
+        | "membership.restore"
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close";
+      /** @enum {string} */
+      targetType: "organization" | "membership" | "incident";
+      /** Format: uuid */
+      targetId: string;
+      /** Format: uuid */
+      requestedByIdentityId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+      /** @enum {string} */
+      status: "pending" | "approved" | "executed" | "rejected" | "expired" | "failed";
+      version: number;
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: uuid */
+      decidedByIdentityId?: string;
+      /** Format: date-time */
+      decidedAt?: string;
+      failureCode?: string;
+    };
+    PlatformActionPageResponse: {
+      items: components["schemas"]["PlatformActionResponse"][];
+      nextCursor: string | null;
+    };
+    PlatformProposalRequest: {
+      /** @enum {string} */
+      action:
+        | "tenant.suspend"
+        | "tenant.restore"
+        | "membership.disable"
+        | "membership.restore"
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close";
+      /** Format: uuid */
+      targetId: string;
+      justification: string;
+      payload: components["schemas"]["PlatformActionPayloadResponse"];
+    };
+    PlatformDecisionRequest: {
+      expectedVersion: number;
+    };
+    PrivacyStepResponse: {
+      /** @enum {string} */
+      domain:
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups";
+      mandatory: boolean;
+      /** @enum {string} */
+      status: "pending" | "processing" | "completed" | "blocked" | "failed";
+      reasonCode: Record<string, never> | null;
+      /** Format: int32 */
+      attempts: number;
+    };
+    PrivacyRequestStatusResponse: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      type: "access_export" | "correction" | "anonymization" | "deletion";
+      /** @enum {string} */
+      state:
+        | "verification_pending"
+        | "approval_pending"
+        | "processing"
+        | "partial"
+        | "completed"
+        | "rejected"
+        | "failed";
+      /** Format: int32 */
+      attempts: number;
+      lastErrorCode: Record<string, never> | null;
+      /** Format: date-time */
+      verifiedAt: string | null;
+      /** Format: date-time */
+      approvedAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      steps: components["schemas"]["PrivacyStepResponse"][];
+    };
+    PrivacyExportIdentityResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      displayName: string;
+      /** Format: date-time */
+      emailVerifiedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PrivacyExportMembershipResponse: {
+      /** Format: uuid */
+      membershipId: string;
+      /** Format: uuid */
+      organizationId: string;
+      status: string;
+      role: Record<string, never> | null;
+      /** Format: uuid */
+      unitId: Record<string, never> | null;
+    };
+    PrivacyExportDataResponse: {
+      identity: components["schemas"]["PrivacyExportIdentityResponse"];
+      organizationMemberships: components["schemas"]["PrivacyExportMembershipResponse"][];
+      operations: {
+        [key: string]: unknown;
+      };
+      management_finance: {
+        [key: string]: unknown;
+      };
+      growth_crm: {
+        [key: string]: unknown;
+      };
+      objects_media: {
+        [key: string]: unknown;
+      };
+      offline_edge: {
+        [key: string]: unknown;
+      };
+      backups: {
+        [key: string]: unknown;
+      };
+    };
+    PrivacyExportResponse: {
+      /**
+       * Format: int32
+       * @enum {integer}
+       */
+      schemaVersion: 1;
+      /** Format: uuid */
+      requestId: string;
+      /** Format: date-time */
+      generatedAt: string;
+      partial: boolean;
+      blockedDomains: (
+        | "identity"
+        | "organization_membership"
+        | "operations"
+        | "management_finance"
+        | "growth_crm"
+        | "objects_media"
+        | "offline_edge"
+        | "backups"
+      )[];
+      data: components["schemas"]["PrivacyExportDataResponse"];
+    };
+    DoseClubIntegrationDto: {
+      /** @enum {string} */
+      provider: "doseclub";
+      status: string;
+      /** Format: uuid */
+      unitId: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    DoseClubReconciliationRunDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string;
+      /** Format: date */
+      runDate: string;
+      /** @enum {string} */
+      trigger: "scheduled" | "manual" | "retry";
+      /** @enum {string} */
+      status: "pending" | "running" | "completed" | "failed";
+      findingCount: number;
+      failureCode: string | null;
+      version: number;
+      /** Format: date-time */
+      startedAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    DoseClubReconciliationSummaryDto: {
+      /** @enum {string} */
+      status: "not_scanned" | "healthy" | "attention" | "failed";
+      /** @enum {string} */
+      remoteHeartbeat: "partial";
+      lastRun: components["schemas"]["DoseClubReconciliationRunDto"] | null;
+      openFindingCount: number;
+    };
+    DoseClubMappingDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string;
+      externalProductId: string;
+      /** Format: uuid */
+      productId: string;
+      productName: string;
+      /** Format: uuid */
+      inventoryItemId: string;
+      inventoryItemName: string;
+      /** Format: uuid */
+      stockLocationId: string;
+      stockLocationName: string;
+      active: boolean;
+      version: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    DoseClubFindingDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      unitId: string;
+      /** @enum {string} */
+      kind:
+        | "missing_mapping"
+        | "inactive_mapping"
+        | "invalid_inventory_dimension"
+        | "invalid_inventory_unit"
+        | "state_version_gap"
+        | "missing_reconcile_heartbeat";
+      /** @enum {string} */
+      status: "open" | "resolved" | "superseded";
+      /** @enum {string} */
+      severity: "warning" | "critical";
+      entityType: string;
+      entityId: string;
+      summary: string;
+      evidence: {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      firstDetectedAt: string;
+      /** Format: date-time */
+      lastDetectedAt: string;
+      /** Format: date-time */
+      resolvedAt: string | null;
+      version: number;
+    };
+    DoseClubOverviewDto: {
+      integration: components["schemas"]["DoseClubIntegrationDto"] | null;
+      reconciliation: components["schemas"]["DoseClubReconciliationSummaryDto"];
+      mappings: components["schemas"]["DoseClubMappingDto"][];
+      findings: components["schemas"]["DoseClubFindingDto"][];
+      runs: components["schemas"]["DoseClubReconciliationRunDto"][];
+    };
+    RemunerationController_createRule_0__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_0__request_recursive_if"];
+    RemunerationController_createRule_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_0__request_recursive"][];
+    };
+    RemunerationController_createRule_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive:
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_createRule_1__request_recursive_if"];
+    RemunerationController_createRule_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_createRule_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_createRule_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_createRule_1__request_recursive"][];
+    };
+    RemunerationController_createRule_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_createRule_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_createRule_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_0__request_recursive_if"];
+    RemunerationController_publishVersion_0__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_0__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_0__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"][];
+    };
+    RemunerationController_publishVersion_0__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_0__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_0__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive:
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_constant"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_metric"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_add_min_max"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_subtract"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_basis_points"]
+      | components["schemas"]["RemunerationController_publishVersion_1__request_recursive_if"];
+    RemunerationController_publishVersion_1__request_recursive_constant: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "constant";
+      value: number;
+    };
+    RemunerationController_publishVersion_1__request_recursive_metric: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "metric";
+      /** @enum {string} */
+      metric:
+        | "grossSalesCents"
+        | "netSalesCents"
+        | "serviceChargeCents"
+        | "eligibleSalesCents"
+        | "profitCents"
+        | "hoursMinutes"
+        | "unitsSold";
+    };
+    RemunerationController_publishVersion_1__request_recursive_add_min_max: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "add" | "min" | "max";
+      operands: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"][];
+    };
+    RemunerationController_publishVersion_1__request_recursive_subtract: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "subtract";
+      left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
+    RemunerationController_publishVersion_1__request_recursive_basis_points: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "basis_points";
+      operand: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      basisPoints: number;
+      /** @enum {string} */
+      rounding: "down" | "up" | "half_up";
+    };
+    RemunerationController_publishVersion_1__request_recursive_if: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "if";
+      condition: {
+        /** @enum {string} */
+        operator: "gt" | "gte" | "lt" | "lte" | "eq";
+        left: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+        right: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      };
+      consequent: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+      alternate: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+    };
+    FiscalDocumentResponse: {
+      /** Format: uuid */
+      documentId: string;
+      saleReference: string;
+      status: string;
+      documentReference?: string | null;
+      lastErrorCode?: string | null;
+      /** Format: int32 */
+      attemptCount: number;
+      adapter: string;
+      adapterHomologated: boolean;
+      salePreserved: boolean;
+      idempotentReplay?: boolean;
+    };
+    IncidentResponse: {
+      /** Format: uuid */
+      incidentId: string;
+      incidentType: string;
+      status: string;
+      neutralSummary: string;
+      evidence: {
+        [key: string]: unknown;
+      }[];
+      /** Format: int32 */
+      amountCents: number | null;
+      /** @enum {boolean} */
+      payrollAction: false;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId?: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+    };
+    IncidentReportResponse: {
+      /** Format: uuid */
+      incidentId: string;
+      incidentType: string;
+      status: string;
+      neutralSummary: string;
+      evidence: {
+        [key: string]: unknown;
+      }[];
+      /** Format: int32 */
+      amountCents: number | null;
+      /** @enum {boolean} */
+      payrollAction: false;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId?: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+      events: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementCommandResponse: {
+      /** Format: uuid */
+      id?: string;
+      /** Format: uuid */
+      organizationId?: string;
+      /** Format: uuid */
+      unitId?: string;
+      status?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: uuid */
+      locationId?: string;
+      /** Format: uuid */
+      inventoryItemId?: string;
+      /** Format: uuid */
+      eventId?: string;
+      /** Format: uuid */
+      recipeVersionId?: string;
+      /** Format: uuid */
+      supplierId?: string;
+      /** Format: uuid */
+      purchaseOrderId?: string;
+      /** Format: uuid */
+      receiptId?: string;
+      /** Format: uuid */
+      payableId?: string;
+      /** Format: uuid */
+      paymentId?: string;
+      /** Format: uuid */
+      receivableId?: string;
+      /** Format: uuid */
+      cashShiftId?: string;
+      /** Format: uuid */
+      movementId?: string;
+      /** Format: uuid */
+      importId?: string;
+      /** Format: uuid */
+      personId?: string;
+      /** Format: uuid */
+      scheduleId?: string;
+      /** Format: uuid */
+      timeEntryId?: string;
+      /** Format: uuid */
+      commissionRuleId?: string;
+      /** Format: uuid */
+      commissionId?: string;
+      /** Format: int32 */
+      amountCents?: number;
+      /** Format: int32 */
+      totalCents?: number;
+      /** Format: int32 */
+      version?: number;
+      lines?: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay?: boolean;
+    } & {
+      [key: string]: unknown;
+    };
+    ManagementInventoryEventResponse: {
+      /** Format: uuid */
+      eventId: string;
+      lines: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementEntityListResponse: ({
+      /** Format: uuid */
+      id?: string;
+      /** Format: uuid */
+      organizationId?: string;
+      /** Format: uuid */
+      unitId?: string;
+      status?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: uuid */
+      locationId?: string;
+      /** Format: uuid */
+      inventoryItemId?: string;
+      /** Format: uuid */
+      eventId?: string;
+      /** Format: uuid */
+      recipeVersionId?: string;
+      /** Format: uuid */
+      supplierId?: string;
+      /** Format: uuid */
+      purchaseOrderId?: string;
+      /** Format: uuid */
+      receiptId?: string;
+      /** Format: uuid */
+      payableId?: string;
+      /** Format: uuid */
+      paymentId?: string;
+      /** Format: uuid */
+      receivableId?: string;
+      /** Format: uuid */
+      cashShiftId?: string;
+      /** Format: uuid */
+      movementId?: string;
+      /** Format: uuid */
+      importId?: string;
+      /** Format: uuid */
+      personId?: string;
+      /** Format: uuid */
+      scheduleId?: string;
+      /** Format: uuid */
+      timeEntryId?: string;
+      /** Format: uuid */
+      commissionRuleId?: string;
+      /** Format: uuid */
+      commissionId?: string;
+      /** Format: int32 */
+      amountCents?: number;
+      /** Format: int32 */
+      totalCents?: number;
+      /** Format: int32 */
+      version?: number;
+      lines?: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay?: boolean;
+    } & {
+      [key: string]: unknown;
+    })[];
+    ManagementInventoryDashboardResponse: {
+      locations: {
+        [key: string]: unknown;
+      }[];
+      items: {
+        [key: string]: unknown;
+      }[];
+      balances: {
+        [key: string]: unknown;
+      }[];
+      recentMovements: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementPurchasesResponse: {
+      orders: {
+        [key: string]: unknown;
+      }[];
+      items: {
+        [key: string]: unknown;
+      }[];
+      receipts: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementCashShiftsResponse: {
+      shifts: {
+        [key: string]: unknown;
+      }[];
+      movements: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementFinanceDashboardResponse: {
+      payables: {
+        [key: string]: unknown;
+      }[];
+      payablePayments: {
+        [key: string]: unknown;
+      }[];
+      receivables: {
+        [key: string]: unknown;
+      }[];
+      receivablePayments: {
+        [key: string]: unknown;
+      }[];
+      reconciliationImports: {
+        [key: string]: unknown;
+      }[];
+      reconciliationEntries: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementPeopleDashboardResponse: {
+      people: {
+        [key: string]: unknown;
+      }[];
+      schedules: {
+        [key: string]: unknown;
+      }[];
+      timeEntries: {
+        [key: string]: unknown;
+      }[];
+      commissionRules: {
+        [key: string]: unknown;
+      }[];
+      commissions: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementReportResponse: {
+      period: {
+        [key: string]: unknown;
+      };
+      cashFlow: {
+        [key: string]: unknown;
+      };
+      incomeStatement: {
+        [key: string]: unknown;
+      };
+    };
+    PaymentIntentResponse: {
+      /** Format: uuid */
+      intentId: string;
+      /** Format: int32 */
+      amountCents: number;
+      /** Format: int32 */
+      capturedCents: number;
+      status: string;
+      idempotentReplay: boolean;
+    };
+    PaymentAttemptResponse: {
+      /** Format: uuid */
+      attemptId: string;
+      /** Format: uuid */
+      intentId: string;
+      status: string;
+      intentStatus: string;
+      /** Format: int32 */
+      amountCents: number;
+      providerReference?: string | null;
+      reviewRequired: boolean;
+      nextAction: string;
+      idempotentReplay: boolean;
+    };
+    RemunerationRuleResponse: {
+      /** Format: uuid */
+      ruleSetId: string;
+      /** Format: uuid */
+      ruleVersionId: string;
+      /** Format: int32 */
+      version: number;
+      idempotentReplay: boolean;
+    };
+    RemunerationSimulationResponse: {
+      /** Format: int32 */
+      outputCents: number;
+      trace: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+    };
+    RemunerationRunResponse: {
+      /** Format: uuid */
+      runId: string;
+      kind: string;
+      /** Format: date */
+      periodStart: string;
+      /** Format: date */
+      periodEnd: string;
+      status: string;
+      /** Format: int32 */
+      outputCents: number;
+      memoryHash: string;
+      /** Format: uuid */
+      adjustmentOf?: string | null;
+      /** Format: date-time */
+      approvedAt?: string | null;
+      /** Format: date-time */
+      closedAt?: string | null;
+      idempotentReplay: boolean;
+      estimated: boolean;
+    };
+    RemunerationPortfolioResponse: {
+      /** Format: date */
+      periodStart: string;
+      /** Format: date */
+      periodEnd: string;
+      byKind: {
+        [key: string]: unknown;
+      };
+      disclaimer: string;
+    };
+    RemunerationExportResponse: {
+      contentType: string;
+      fileName: string | null;
+      body?: string;
+      bodyBase64?: string;
+    };
+    ReturnableAssetResponse: {
+      /** Format: uuid */
+      assetId: string;
+      sku: string;
+      name: string;
+      trackingMode: string;
+      /** Format: int32 */
+      depositCents: number;
+      serials: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay: boolean;
+    };
+    ReturnableMovementResponse: {
+      /** Format: uuid */
+      movementId: string;
+      /** Format: uuid */
+      assetId: string;
+      movementType: string;
+      /** Format: int32 */
+      quantity: number;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+    } & {
+      [key: string]: unknown;
+    };
+    ReturnableReconciliationResponse: {
+      /** Format: int32 */
+      expectedQuantity: number;
+      /** Format: int32 */
+      physicalQuantity: number;
+      /** Format: int32 */
+      adjustmentQuantity: number;
+      /** Format: uuid */
+      movementId: string | null;
+      movementIds: string[];
+      idempotentReplay?: boolean;
+    };
+    ReturnableLedgerResponse: components["schemas"]["ReturnableMovementResponse"][];
+  };
   responses: never;
   parameters: never;
   requestBodies: never;
@@ -4352,212 +8813,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  "HealthController_health[0]": {
+  "FiscalController_issue[0]": {
     parameters: {
       query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
+      header: {
+        "idempotency-key": string;
       };
-    };
-  };
-  "HealthController_health[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
       };
-    };
-  };
-  "MetricsController_metricsText[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "MetricsController_metricsText[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_contact[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          saleReference: string;
+          /** @enum {string} */
+          documentType: "nfce" | "nfe";
+          totalCents: number;
+          document: {
+            [key: string]: unknown;
+          };
         };
       };
     };
@@ -4566,26 +8843,34 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
-  "CatalogController_contact[1]": {
+  "FiscalController_issue[1]": {
     parameters: {
       query?: never;
-      header?: never;
-      path?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          saleReference: string;
+          /** @enum {string} */
+          documentType: "nfce" | "nfe";
+          totalCents: number;
+          document: {
+            [key: string]: unknown;
+          };
         };
       };
     };
@@ -4594,7 +8879,113 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
+      };
+    };
+  };
+  "FiscalController_retry[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
+      };
+    };
+  };
+  "FiscalController_retry[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
+      };
+    };
+  };
+  "FiscalController_cancel[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
+      };
+    };
+  };
+  "FiscalController_cancel[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -4676,6 +9067,192 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  "AuthController_requestEmailVerification[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: email */
+          email: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
+      202: {
+        headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
+      };
+    };
+  };
+  "AuthController_requestEmailVerification[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: email */
+          email: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
+      202: {
+        headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
+      };
+    };
+  };
+  "AuthController_requestEmailVerification[2]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: email */
+          email: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Resposta pública uniforme; o envio pode ser silenciosamente suprimido. */
+      202: {
+        headers: {
+          /** @description Intervalo público uniforme antes de um novo pedido. */
+          "Retry-After"?: number;
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EmailVerificationAcceptedResponse"];
+        };
+      };
+    };
+  };
+  "AuthController_verifyEmail[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          token: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
+      200: {
+        headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
+      };
+    };
+  };
+  "AuthController_verifyEmail[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          token: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
+      200: {
+        headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
+      };
+    };
+  };
+  "AuthController_verifyEmail[2]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          token: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Verificação concluída, já consumida ou aguardando segundo fator. */
+      200: {
+        headers: {
+          /** @description Impede armazenamento da resposta de autenticação. */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["EmailVerificationSessionResponse"]
+            | components["schemas"]["EmailVerificationMfaResponse"]
+            | components["schemas"]["EmailVerificationAlreadyVerifiedResponse"];
+        };
       };
     };
   };
@@ -5995,6 +10572,1586 @@ export interface operations {
       };
     };
   };
+  "HealthController_health[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "HealthController_health[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "IncidentsController_report[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_report[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_review[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_review[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_decide[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_decide[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_close[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_close[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          neutralNote: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_reportView[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentReportResponse"];
+        };
+      };
+    };
+  };
+  "IncidentsController_reportView[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          incidentType: string;
+          neutralSummary: string;
+          /** @default [] */
+          evidence?: {
+            /** @enum {string} */
+            kind: "document" | "photo" | "note" | "reference";
+            reference: string;
+            checksum?: string;
+          }[];
+          amountCents?: number;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IncidentReportResponse"];
+        };
+      };
+    };
+  };
+  "DoseClubController_listBranches[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubBranchListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listBranches[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubBranchListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listProducts[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubProductListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listProducts[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubProductListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_stock[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubStockDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_stock[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubStockDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_sale[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "sale";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {number} */
+          version?: 1;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          externalOfferId: string;
+          externalCustomerId?: string;
+          /** @enum {string} */
+          saleType: "individual" | "combo_pool";
+          productId?: string;
+          eligibleProductIds?: string[];
+          quantityBottles: number;
+          totalDoses?: number;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_sale[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "sale";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {number} */
+          version?: 1;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          externalOfferId: string;
+          externalCustomerId?: string;
+          /** @enum {string} */
+          saleType: "individual" | "combo_pool";
+          productId?: string;
+          eligibleProductIds?: string[];
+          quantityBottles: number;
+          totalDoses?: number;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reservation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reservation";
+          productId: string;
+          doses: number;
+          employeeRef?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reservation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reservation";
+          productId: string;
+          doses: number;
+          employeeRef?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_consumption[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "consumption";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          employeeRef?: string;
+          orderId?: string;
+          externalOfferId?: string;
+          /** @enum {string} */
+          offerType?: "individual" | "combo_pool";
+          externalConsumptionId?: string;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_consumption[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "consumption";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          employeeRef?: string;
+          orderId?: string;
+          externalOfferId?: string;
+          /** @enum {string} */
+          offerType?: "individual" | "combo_pool";
+          externalConsumptionId?: string;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reversal[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "reversal";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          originalOperationId?: string;
+          externalConsumptionId?: string;
+          externalReversalId?: string;
+          originalIdempotencyKey?: string;
+          doseMl?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reversal[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "reversal";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          originalOperationId?: string;
+          externalConsumptionId?: string;
+          externalReversalId?: string;
+          originalIdempotencyKey?: string;
+          doseMl?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reconcile";
+          productId: string;
+          expectedRemainingDoses: number;
+          expectedReservedDoses: number;
+          localVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reconcile";
+          productId: string;
+          expectedRemainingDoses: number;
+          expectedReservedDoses: number;
+          localVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "OnboardingController_get[0]": {
     parameters: {
       query?: never;
@@ -6010,7 +12167,57 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6026,7 +12233,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          checklist: {
+          checklist?: {
             business?: boolean;
             unit?: boolean;
             catalog?: boolean;
@@ -6037,6 +12244,275 @@ export interface operations {
             training?: boolean;
             rehearsal?: boolean;
           };
+          items?: {
+            business?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            unit?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            plan?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            fiscalChoice?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    choice: "disabled" | "focus" | "external";
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "external_fiscal" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            catalog?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            tables?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            team?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            qr?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "pilot_without_qr" | "external_qr" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            production?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    mode: "off";
+                  };
+                };
+            cashier?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            training?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+            rehearsal?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+          };
         };
       };
     };
@@ -6045,7 +12521,65 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6064,7 +12598,57 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6080,7 +12664,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          checklist: {
+          checklist?: {
             business?: boolean;
             unit?: boolean;
             catalog?: boolean;
@@ -6091,6 +12675,275 @@ export interface operations {
             training?: boolean;
             rehearsal?: boolean;
           };
+          items?: {
+            business?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            unit?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            plan?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            fiscalChoice?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    choice: "disabled" | "focus" | "external";
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "external_fiscal" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            catalog?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            tables?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            team?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            qr?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "not_applicable";
+                  evidenceReference?: string;
+                  evidence?: {
+                    /** @enum {string} */
+                    reason: "pilot_without_qr" | "external_qr" | "not_required";
+                  };
+                  waiverReason: string;
+                };
+            production?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence:
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "kds";
+                        kdsStationIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "print";
+                        printerProfileIds: string[];
+                      }
+                    | {
+                        configurationReference?: string;
+                        /** @enum {string} */
+                        mode: "both";
+                        kdsStationIds: string[];
+                        printerProfileIds: string[];
+                      };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {string} */
+                    mode: "off";
+                  };
+                };
+            cashier?: {
+              /** @enum {string} */
+              status: "pending" | "in_progress" | "blocked";
+              evidenceReference?: string;
+              evidence?: {
+                note?: string;
+              };
+            };
+            training?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+            rehearsal?:
+              | {
+                  /** @enum {string} */
+                  status: "pending";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "in_progress";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "blocked";
+                  evidenceReference?: string;
+                  evidence?: {
+                    note?: string;
+                  };
+                }
+              | {
+                  /** @enum {string} */
+                  status: "verified";
+                  evidenceReference: string;
+                  evidence: {
+                    /** @enum {boolean} */
+                    completed: true;
+                  };
+                };
+          };
         };
       };
     };
@@ -6099,14 +12952,251 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["OnboardingResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_select[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          planSlug: "operacao" | "crescimento" | "rede";
+          /** Format: uuid */
+          selectedUnitId: string;
+          /** @default false */
+          reselect?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSelectionResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_select[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          planSlug: "operacao" | "crescimento" | "rede";
+          /** Format: uuid */
+          selectedUnitId: string;
+          /** @default false */
+          reselect?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSelectionResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
   "OnboardingController_activate[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        /** @description Chave opaca, estável por tentativa de ativação (8 a 160 caracteres). */
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
       };
@@ -6116,7 +13206,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          planSlug: "operacao" | "crescimento" | "rede";
+          planSlug?: "operacao" | "crescimento" | "rede";
         };
       };
     };
@@ -6125,14 +13215,75 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["TrialActivationResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
   "OnboardingController_activate[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        /** @description Chave opaca, estável por tentativa de ativação (8 a 160 caracteres). */
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
       };
@@ -6142,7 +13293,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          planSlug: "operacao" | "crescimento" | "rede";
+          planSlug?: "operacao" | "crescimento" | "rede";
         };
       };
     };
@@ -6151,7 +13302,205 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["TrialActivationResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_provisioningStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProvisioningStatusResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+    };
+  };
+  "OnboardingController_provisioningStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProvisioningStatusResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingApiErrorResponse"];
+        };
       };
     };
   };
@@ -6409,6 +13758,48 @@ export interface operations {
       };
     };
   };
+  "PublicMenuController_preview[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-preview-token": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_preview[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-preview-token": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PublicMenuController_hubStatus[0]": {
     parameters: {
       query?: never;
@@ -6470,6 +13861,158 @@ export interface operations {
     parameters: {
       query?: never;
       header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tableSession[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          qrToken: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tableSession[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          qrToken: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tableCall[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+        "X-Request-Nonce": string;
+        Authorization: string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "waiter" | "bill";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tableCall[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+        "X-Request-Nonce": string;
+        Authorization: string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "waiter" | "bill";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tablePartial[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        Authorization: string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuController_tablePartial[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        Authorization: string;
+      };
       path: {
         slug: string;
       };
@@ -6591,24 +14134,163 @@ export interface operations {
       };
     };
   };
-  "PublicMenuController_command[0]": {
+  "PublicMenuAdminController_tableCapabilities[0]": {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        slug: string;
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_configureTableCapabilities[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
       };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
-          };
+          callWaiterEnabled: boolean;
+          requestBillEnabled: boolean;
+          viewPartialEnabled: boolean;
+          expectedResourceVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_tableCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_configureTableCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          callWaiterEnabled: boolean;
+          requestBillEnabled: boolean;
+          viewPartialEnabled: boolean;
+          expectedResourceVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_tableQr[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_tableQr[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_attendTableCall[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
         };
       };
     };
@@ -6621,29 +14303,346 @@ export interface operations {
       };
     };
   };
-  "PublicMenuController_command[1]": {
+  "PublicMenuAdminController_attendTableCall[1]": {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        slug: string;
+        organizationId: string;
+        unitId: string;
+        callId: string;
       };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
-          };
+          expectedVersion: number;
         };
       };
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_saveDraft[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          branding: {
+            name: string;
+            description: string;
+            primaryColor: string;
+            surfaceColor: string;
+            textColor: string;
+            logoAssetId: string | null;
+            coverAssetId: string | null;
+          };
+          items: {
+            id: string;
+            category: string;
+            name: string;
+            description: string;
+            priceCents: number;
+            available: boolean;
+            imageAssetId: string | null;
+            tags?: string[];
+            modifierGroups?: {
+              id: string;
+              name: string;
+              required: boolean;
+              maxSelections: number;
+              options: {
+                id: string;
+                name: string;
+                priceCents: number;
+              }[];
+            }[];
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_saveDraft[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          branding: {
+            name: string;
+            description: string;
+            primaryColor: string;
+            surfaceColor: string;
+            textColor: string;
+            logoAssetId: string | null;
+            coverAssetId: string | null;
+          };
+          items: {
+            id: string;
+            category: string;
+            name: string;
+            description: string;
+            priceCents: number;
+            available: boolean;
+            imageAssetId: string | null;
+            tags?: string[];
+            modifierGroups?: {
+              id: string;
+              name: string;
+              required: boolean;
+              maxSelections: number;
+              options: {
+                id: string;
+                name: string;
+                priceCents: number;
+              }[];
+            }[];
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_createPreview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_createPreview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_createVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_createVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_publish[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedPublishEpoch: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_publish[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedPublishEpoch: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_menuForTenant[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMenuAdminController_menuForTenant[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        menuId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -6660,42 +14659,247 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
+        "application/json":
+          | {
+              /** @enum {number} */
+              protocolVersion: 1;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                id: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                version: number;
+              }[];
+            }
+          | {
+              /** @enum {number} */
+              protocolVersion: 2;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                commandId: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                aggregate: {
+                  type: string;
+                  id: string;
+                };
+                occupancyEpoch: string;
+                resourceVersion: number;
+                aggregateSequence: number;
+                /** @default [] */
+                resourcePreconditions?: {
+                  type: string;
+                  id: string;
+                  occupancyEpoch: string;
+                  resourceVersion: number;
+                }[];
+                /** @default [] */
+                priceReferences?: {
+                  kind: string;
+                  entityId: string;
+                  priceRevision: string;
+                  token: string;
+                }[];
+              }[];
             };
-            version: number;
-            /** Format: date-time */
-            occurredAt: string;
-          }[];
-        };
       };
     };
     responses: {
+      /** @description Authoritative sync outcomes, pending cloud commands and operational snapshot. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            acceptedEventIds: string[];
+            rejectedEvents: {
+              /** Format: uuid */
+              id: string;
+              code: string;
+            }[];
+            eventResults: {
+              /** Format: uuid */
+              id: string;
+              replayed: boolean;
+              result: {
+                status: string;
+                code?: string;
+              } & {
+                [key: string]: unknown;
+              };
+            }[];
+            commands: {
+              /** Format: uuid */
+              id: string;
+              type: string;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              expiresAt: string;
+            }[];
+            snapshot: {
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: date-time */
+              capturedAt: string;
+              approvals: {
+                /** Format: date-time */
+                validUntil: string;
+                actors: {
+                  [key: string]: unknown;
+                }[];
+                managers: {
+                  [key: string]: unknown;
+                }[];
+              };
+              catalog: {
+                categories: {
+                  [key: string]: unknown;
+                }[];
+                products: {
+                  [key: string]: unknown;
+                }[];
+                modifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                modifierOptions: {
+                  [key: string]: unknown;
+                }[];
+                productModifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                prices: {
+                  [key: string]: unknown;
+                }[];
+                availability: {
+                  [key: string]: unknown;
+                }[];
+                productStations: {
+                  [key: string]: unknown;
+                }[];
+              };
+              floor: {
+                rooms: {
+                  [key: string]: unknown;
+                }[];
+                tables: {
+                  [key: string]: unknown;
+                }[];
+                openTabs: {
+                  [key: string]: unknown;
+                }[];
+              };
+              tabs: {
+                [key: string]: unknown;
+              }[];
+              tabDetails: {
+                [key: string]: {
+                  [key: string]: unknown;
+                };
+              };
+              kds: {
+                tickets: {
+                  [key: string]: unknown;
+                }[];
+                items: {
+                  [key: string]: unknown;
+                }[];
+              };
+            };
+            /** Format: date-time */
+            serverTime: string;
+          };
+        };
+      };
+      /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
+      };
+      /** @description Structured sync validation problem with the same fail-closed scope contract as HTTP 400. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
       };
     };
   };
@@ -6708,30 +14912,269 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
+        "application/json":
+          | {
+              /** @enum {number} */
+              protocolVersion: 1;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                id: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                version: number;
+              }[];
+            }
+          | {
+              /** @enum {number} */
+              protocolVersion: 2;
+              hubVersion: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: unknown;
+              };
+              /** @default [] */
+              acknowledgedCommandIds?: string[];
+              /** @default [] */
+              events?: {
+                commandId: string;
+                actorId: string;
+                deviceId: string;
+                idempotencyKey: string;
+                type: string;
+                payload: {
+                  [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                aggregate: {
+                  type: string;
+                  id: string;
+                };
+                occupancyEpoch: string;
+                resourceVersion: number;
+                aggregateSequence: number;
+                /** @default [] */
+                resourcePreconditions?: {
+                  type: string;
+                  id: string;
+                  occupancyEpoch: string;
+                  resourceVersion: number;
+                }[];
+                /** @default [] */
+                priceReferences?: {
+                  kind: string;
+                  entityId: string;
+                  priceRevision: string;
+                  token: string;
+                }[];
+              }[];
             };
-            version: number;
+      };
+    };
+    responses: {
+      /** @description Authoritative sync outcomes, pending cloud commands and operational snapshot. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            acceptedEventIds: string[];
+            rejectedEvents: {
+              /** Format: uuid */
+              id: string;
+              code: string;
+            }[];
+            eventResults: {
+              /** Format: uuid */
+              id: string;
+              replayed: boolean;
+              result: {
+                status: string;
+                code?: string;
+              } & {
+                [key: string]: unknown;
+              };
+            }[];
+            commands: {
+              /** Format: uuid */
+              id: string;
+              type: string;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              expiresAt: string;
+            }[];
+            snapshot: {
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: date-time */
+              capturedAt: string;
+              approvals: {
+                /** Format: date-time */
+                validUntil: string;
+                actors: {
+                  [key: string]: unknown;
+                }[];
+                managers: {
+                  [key: string]: unknown;
+                }[];
+              };
+              catalog: {
+                categories: {
+                  [key: string]: unknown;
+                }[];
+                products: {
+                  [key: string]: unknown;
+                }[];
+                modifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                modifierOptions: {
+                  [key: string]: unknown;
+                }[];
+                productModifierGroups: {
+                  [key: string]: unknown;
+                }[];
+                prices: {
+                  [key: string]: unknown;
+                }[];
+                availability: {
+                  [key: string]: unknown;
+                }[];
+                productStations: {
+                  [key: string]: unknown;
+                }[];
+              };
+              floor: {
+                rooms: {
+                  [key: string]: unknown;
+                }[];
+                tables: {
+                  [key: string]: unknown;
+                }[];
+                openTabs: {
+                  [key: string]: unknown;
+                }[];
+              };
+              tabs: {
+                [key: string]: unknown;
+              }[];
+              tabDetails: {
+                [key: string]: {
+                  [key: string]: unknown;
+                };
+              };
+              kds: {
+                tickets: {
+                  [key: string]: unknown;
+                }[];
+                items: {
+                  [key: string]: unknown;
+                }[];
+              };
+            };
+            /** Format: date-time */
+            serverTime: string;
+          };
+        };
+      };
+      /** @description Validation problem. Only SYNC_EVENT_SCHEMA_INVALID/event permits event isolation; batch and ack scopes apply to the whole request section. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
+      };
+      /** @description Structured sync validation problem with the same fail-closed scope contract as HTTP 400. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @enum {string} */
+                code: "SYNC_EVENT_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "event";
+                eventIndexes: number[];
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_BATCH_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "batch";
+              }
+            | {
+                /** @enum {string} */
+                code: "SYNC_ACK_SCHEMA_INVALID";
+                /** @enum {string} */
+                scope: "ack";
+              };
+        };
+      };
+    };
+  };
+  "SyncController_dispatchOutcomes[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        Authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          outcomes: {
+            id: string;
+            effectId: string;
+            deliveryKey: string;
+            /** @enum {string} */
+            state: "delivered" | "acked" | "failed" | "canceled" | "dlq";
+            error?: string | null;
             /** Format: date-time */
             occurredAt: string;
           }[];
@@ -6739,6 +15182,42 @@ export interface operations {
       };
     };
     responses: {
+      /** @description Idempotent dispatch outcomes accepted from the authenticated Hub. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SyncController_dispatchOutcomes[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        Authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          outcomes: {
+            id: string;
+            effectId: string;
+            deliveryKey: string;
+            /** @enum {string} */
+            state: "delivered" | "acked" | "failed" | "canceled" | "dlq";
+            error?: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      /** @description Idempotent dispatch outcomes accepted from the authenticated Hub. */
       200: {
         headers: {
           [name: string]: unknown;
@@ -7675,6 +16154,324 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_listDispatch[0]": {
+    parameters: {
+      query: {
+        state: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_listDispatch[1]": {
+    parameters: {
+      query: {
+        state: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_ensureDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_ensureDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_cancelDispatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_cancelDispatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeDispatch[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgementKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeDispatch[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgementKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reconcileDispatch[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedResourceVersion: number;
+          /** @enum {string} */
+          action: "retry" | "cancel";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reconcileDispatch[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        effectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedResourceVersion: number;
+          /** @enum {string} */
+          action: "retry" | "cancel";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotPosController_transfer[0]": {
     parameters: {
       query?: never;
@@ -8227,6 +17024,1116 @@ export interface operations {
       };
     };
   };
+  "SalonController_map[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_map[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_createLayout[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_createLayout[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_replaceNodes[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        layoutId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          nodes: {
+            /** Format: uuid */
+            tableId: string;
+            areaId: string | null;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            rotation: number;
+            zIndex: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_replaceNodes[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        layoutId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          nodes: {
+            /** Format: uuid */
+            tableId: string;
+            areaId: string | null;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            rotation: number;
+            zIndex: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_publish[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        layoutId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_publish[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        layoutId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_assignArea[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        areaId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          primaryIdentityId: string;
+          supportIdentityId: string | null;
+          /** @enum {string} */
+          fallbackRole: "manager" | "cashier";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_assignArea[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        areaId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          primaryIdentityId: string;
+          supportIdentityId: string | null;
+          /** @enum {string} */
+          fallbackRole: "manager" | "cashier";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_renewPresence[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        deviceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          current: {
+            /** Format: uuid */
+            leaseEpoch: string;
+            resourceVersion: number;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_renewPresence[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        deviceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          current: {
+            /** Format: uuid */
+            leaseEpoch: string;
+            resourceVersion: number;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_ackPresence[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        deviceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          leaseEpoch: string;
+          resourceVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_ackPresence[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        deviceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          leaseEpoch: string;
+          resourceVersion: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_exceptions[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_exceptions[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_acknowledgeException[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        exceptionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SalonController_acknowledgeException[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        exceptionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ReturnablesController_createAsset[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sku: string;
+          name: string;
+          /** @enum {string} */
+          trackingMode: "aggregate" | "serialized";
+          depositCents?: number;
+          /** @default [] */
+          serialNumbers?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableAssetResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_createAsset[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sku: string;
+          name: string;
+          /** @enum {string} */
+          trackingMode: "aggregate" | "serialized";
+          depositCents?: number;
+          /** @default [] */
+          serialNumbers?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableAssetResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_move[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          /** Format: uuid */
+          serialId?: string;
+          /** @enum {string} */
+          movementType:
+            | "receive"
+            | "circulate"
+            | "return_empty"
+            | "send_supplier"
+            | "receive_supplier"
+            | "broken"
+            | "lost";
+          quantity: number;
+          fromCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          toCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          supplierReference?: string;
+          lotReference?: string;
+          reason?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableMovementResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_move[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          /** Format: uuid */
+          serialId?: string;
+          /** @enum {string} */
+          movementType:
+            | "receive"
+            | "circulate"
+            | "return_empty"
+            | "send_supplier"
+            | "receive_supplier"
+            | "broken"
+            | "lost";
+          quantity: number;
+          fromCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          toCustody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          supplierReference?: string;
+          lotReference?: string;
+          reason?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableMovementResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          custody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
+          /** Format: date-time */
+          occurredAt: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableReconciliationResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          assetId: string;
+          custody: {
+            /** @enum {string} */
+            type: "supplier" | "location" | "table" | "waiter" | "shift" | "reconciliation";
+            id: string;
+          };
+          physicalQuantity?: number;
+          physicalSerialIds?: string[];
+          /** Format: date-time */
+          occurredAt: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableReconciliationResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_ledger[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableLedgerResponse"];
+        };
+      };
+    };
+  };
+  "ReturnablesController_ledger[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReturnableLedgerResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_createIntent[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sourceType: string;
+          sourceId: string;
+          amountCents: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentIntentResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_createIntent[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          sourceType: string;
+          sourceId: string;
+          amountCents: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentIntentResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_executeAttempt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        intentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "credit" | "debit" | "pix";
+          /** Format: uuid */
+          terminalId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_executeAttempt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        intentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "credit" | "debit" | "pix";
+          /** Format: uuid */
+          terminalId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_manualReview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "authorized" | "declined";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentsController_manualReview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "authorized" | "declined";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
+  "PaymentCallbacksController_callback[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        adapter: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          attemptId: string;
+          providerEventId: string;
+          /** @enum {string} */
+          status: "authorized" | "declined" | "unknown";
+          providerReference?: string;
+          amountCents?: number;
+          safePayload?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
+      };
+    };
+  };
   "PlatformController_overview[0]": {
     parameters: {
       query?: never;
@@ -8240,7 +18147,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
       };
     };
   };
@@ -8257,7 +18166,811 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PlatformOverviewResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_context[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformTenantContextResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_projection[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformTenantProjectionResponse"]
+            | components["schemas"]["PlatformPlanProjectionResponse"]
+            | components["schemas"]["PlatformEntitlementsProjectionResponse"]
+            | components["schemas"]["PlatformUsersProjectionResponse"]
+            | components["schemas"]["PlatformOnboardingProjectionResponse"]
+            | components["schemas"]["PlatformBillingProjectionResponse"]
+            | components["schemas"]["PlatformIntegrationsProjectionResponse"]
+            | components["schemas"]["PlatformAuditProjectionResponse"]
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"]
+            | components["schemas"]["PlatformIncidentsProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_globalProjection[0]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_globalProjection[1]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[0]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_actions[1]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionPageResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_propose[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformProposalRequest"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_approve[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_reject[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PlatformDecisionRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlatformActionResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_list[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
+      };
+    };
+  };
+  "PrivacyController_create[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "access_export";
+            }
+          | {
+              /** @enum {string} */
+              type: "correction";
+              corrections: {
+                displayName: string;
+              };
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "anonymization";
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "deletion";
+              reason: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_list[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"][];
+        };
+      };
+    };
+  };
+  "PrivacyController_create[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "access_export";
+            }
+          | {
+              /** @enum {string} */
+              type: "correction";
+              corrections: {
+                displayName: string;
+              };
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "anonymization";
+              reason: string;
+            }
+          | {
+              /** @enum {string} */
+              type: "deletion";
+              reason: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_get[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_get[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_verify[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_verify[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_approve[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_approve[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_retry[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_retry[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_reject[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_reject[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyRequestStatusResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_download[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
+        };
+      };
+    };
+  };
+  "PrivacyController_download[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PrivacyExportResponse"];
+        };
       };
     };
   };
@@ -8277,7 +18990,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryDashboardResponse"];
+        };
       };
     };
   };
@@ -8297,7 +19012,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryDashboardResponse"];
+        };
       };
     };
   };
@@ -8324,7 +19041,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8351,7 +19070,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8372,7 +19093,10 @@ export interface operations {
           productId?: string;
           name: string;
           sku?: string;
-          unit: string;
+          /** @enum {string} */
+          unit: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          /** @enum {string} */
+          dimension?: "mass" | "volume" | "count";
           /** @default 0 */
           minimumQuantity?: string | number;
           /** @default false */
@@ -8385,7 +19109,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8406,7 +19132,10 @@ export interface operations {
           productId?: string;
           name: string;
           sku?: string;
-          unit: string;
+          /** @enum {string} */
+          unit: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          /** @enum {string} */
+          dimension?: "mass" | "volume" | "count";
           /** @default 0 */
           minimumQuantity?: string | number;
           /** @default false */
@@ -8419,7 +19148,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8458,7 +19189,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryEventResponse"];
+        };
       };
     };
   };
@@ -8497,7 +19230,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryEventResponse"];
+        };
       };
     };
   };
@@ -8517,7 +19252,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -8538,12 +19275,18 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId: string;
+          yieldQuantity?: string | number;
+          /** @enum {string} */
+          yieldUnit?: "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
             /** Format: uuid */
             locationId: string;
-            quantityMilli: number;
+            quantity?: string | number;
+            /** @enum {string} */
+            unit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+            quantityMilli?: number;
             /** @default 0 */
             lossBasisPoints?: number;
           }[];
@@ -8555,7 +19298,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8575,7 +19320,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -8596,12 +19343,18 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId: string;
+          yieldQuantity?: string | number;
+          /** @enum {string} */
+          yieldUnit?: "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
             /** Format: uuid */
             locationId: string;
-            quantityMilli: number;
+            quantity?: string | number;
+            /** @enum {string} */
+            unit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+            quantityMilli?: number;
             /** @default 0 */
             lossBasisPoints?: number;
           }[];
@@ -8613,7 +19366,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8633,7 +19388,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -8664,7 +19421,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8684,7 +19443,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -8715,7 +19476,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8735,7 +19498,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPurchasesResponse"];
+        };
       };
     };
   };
@@ -8772,7 +19537,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8792,7 +19559,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPurchasesResponse"];
+        };
       };
     };
   };
@@ -8829,7 +19598,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8852,7 +19623,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8875,7 +19648,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8914,7 +19689,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8953,7 +19730,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -8973,7 +19752,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementFinanceDashboardResponse"];
+        };
       };
     };
   };
@@ -8993,7 +19774,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementFinanceDashboardResponse"];
+        };
       };
     };
   };
@@ -9026,7 +19809,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9059,7 +19844,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9092,7 +19879,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9125,7 +19914,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9166,7 +19957,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9207,7 +20000,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9242,7 +20037,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9277,7 +20074,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9297,7 +20096,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCashShiftsResponse"];
+        };
       };
     };
   };
@@ -9325,7 +20126,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9345,7 +20148,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCashShiftsResponse"];
+        };
       };
     };
   };
@@ -9373,7 +20178,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9407,7 +20214,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9441,7 +20250,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9471,7 +20282,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9501,7 +20314,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9545,7 +20360,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9589,7 +20406,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9609,7 +20428,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportResponse"];
+        };
       };
     };
   };
@@ -9629,7 +20450,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportResponse"];
+        };
       };
     };
   };
@@ -9649,7 +20472,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPeopleDashboardResponse"];
+        };
       };
     };
   };
@@ -9681,7 +20506,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9701,7 +20528,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPeopleDashboardResponse"];
+        };
       };
     };
   };
@@ -9733,7 +20562,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9767,7 +20598,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9801,7 +20634,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9839,7 +20674,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9877,7 +20714,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9907,7 +20746,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9937,7 +20778,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -9970,7 +20813,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -10003,7 +20848,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -10038,7 +20885,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -10070,6 +20919,678 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_createRule[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          name: string;
+          expression: components["schemas"]["RemunerationController_createRule_0__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_createRule[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          name: string;
+          expression: components["schemas"]["RemunerationController_createRule_1__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_publishVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleSetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expression: components["schemas"]["RemunerationController_publishVersion_0__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_publishVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleSetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expression: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
+          /** Format: date-time */
+          effectiveFrom: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_simulate[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleVersionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationSimulationResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_simulate[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        ruleVersionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationSimulationResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_calculate[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          periodStart: string;
+          periodEnd: string;
+          /** Format: uuid */
+          ruleVersionId: string;
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+          sourceReferences: string[];
+          recipients: {
+            reference: string;
+            label: string;
+            basisPoints: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_calculate[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "service" | "commission" | "profit_sharing";
+          periodStart: string;
+          periodEnd: string;
+          /** Format: uuid */
+          ruleVersionId: string;
+          metrics: {
+            grossSalesCents: number;
+            netSalesCents: number;
+            serviceChargeCents: number;
+            eligibleSalesCents: number;
+            profitCents: number;
+            hoursMinutes: number;
+            unitsSold: number;
+          };
+          sourceReferences: string[];
+          recipients: {
+            reference: string;
+            label: string;
+            basisPoints: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_approve[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_approve[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_close[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_close[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_adjustClosed[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          reason: string;
+          sourceReferences: string[];
+          recipient: {
+            reference: string;
+            label: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_adjustClosed[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          reason: string;
+          sourceReferences: string[];
+          recipient: {
+            reference: string;
+            label: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_portfolio[0]": {
+    parameters: {
+      query: {
+        periodStart: string;
+        periodEnd: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationPortfolioResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_portfolio[1]": {
+    parameters: {
+      query: {
+        periodStart: string;
+        periodEnd: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationPortfolioResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_exportRun[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+        format: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationExportResponse"];
+        };
+      };
+    };
+  };
+  "RemunerationController_exportRun[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        runId: string;
+        format: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemunerationExportResponse"];
+        };
+      };
+    };
+  };
+  "MediaAdminController_upload[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "logo" | "cover" | "product";
+          /** @enum {string} */
+          declaredMimeType: "image/png" | "image/jpeg" | "image/webp";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MediaAdminController_upload[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          kind: "logo" | "cover" | "product";
+          /** @enum {string} */
+          declaredMimeType: "image/png" | "image/jpeg" | "image/webp";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMediaController_asset[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMediaController_asset[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -12470,6 +23991,710 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_overview[0]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubOverviewDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_overview[1]": {
+    parameters: {
+      query: {
+        unitId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubOverviewDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_createMapping[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          stockLocationId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubMappingDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Mapping already exists */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_createMapping[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          stockLocationId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubMappingDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Mapping already exists */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_updateMapping[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        mappingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          stockLocationId: string;
+          active: boolean;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubMappingDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Mapping version conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_updateMapping[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        mappingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          stockLocationId: string;
+          active: boolean;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubMappingDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Mapping version conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_requestRun[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Idempotency conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_requestRun[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Idempotency conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_retryRun[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Run state or version conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_retryRun[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Run state or version conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_recheckFinding[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        findingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Finding not found in the tenant unit */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Finding state, version or idempotency conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubReconciliationController_recheckFinding[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        findingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          expectedVersion: number;
+        };
+      };
+    };
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubReconciliationRunDto"];
+        };
+      };
+      /** @description Invalid route or request contract */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authenticated session required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Owner or manager role required */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Finding not found in the tenant unit */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Finding state, version or idempotency conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

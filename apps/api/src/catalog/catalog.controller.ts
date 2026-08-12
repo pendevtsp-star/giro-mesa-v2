@@ -6,8 +6,10 @@ import {
 } from "@giromesa/contracts";
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import { CatalogService } from "./catalog.service.js";
 
+@DatabaseContext("public")
 @Controller(["api/v1/public", "public/v1"])
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}

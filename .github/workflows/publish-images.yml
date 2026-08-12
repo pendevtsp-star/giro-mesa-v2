@@ -4,22 +4,27 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
-  group: publish-pilot-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: publish-pilot-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
   publish:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -40,16 +45,30 @@ jobs:
             app: ops
             dockerfile: Dockerfile.ops
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: image=moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Bind signing workflow to main release commit
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_SHA" = "$SOURCE_SHA"
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -68,6 +87,342 @@ jobs:
             VITE_DEMO_MODE=false
           tags: |
             ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:pilot
-            ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha || github.sha }}
+            ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          provenance: mode=max
+          sbom: true
+      - name: Sign published image digest with GitHub OIDC
+        env:
+          IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+        run: >-
+          cosign sign --yes
+          -a role=target
+          -a sourceCommit=${{ github.event.workflow_run.head_sha }}
+          -a authorizedByMain=${{ github.event.workflow_run.head_sha }}
+          "$IMAGE"
+      - name: Create immutable digest fragment
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          SERVICE: ${{ matrix.service }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          mkdir -p release-fragment
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          digest = os.environ["DIGEST"]
+          service = os.environ["SERVICE"]
+          source = os.environ["SOURCE_SHA"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest): raise SystemExit("invalid digest")
+          if not re.fullmatch(r"[0-9a-f]{40}", source): raise SystemExit("invalid source SHA")
+          if service not in {"site", "customer", "api", "worker", "ops"}: raise SystemExit("invalid service")
+          value = {"service": service, "digest": digest, "sourceCommit": source, "role": "target"}
+          pathlib.Path(f"release-fragment/{service}.json").write_text(
+              json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"
+          )
+          PY
+      - name: Retain digest fragment for aggregation
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-digest-${{ matrix.service }}-${{ github.event.workflow_run.head_sha }}
+          path: release-fragment/${{ matrix.service }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  release-manifest:
+    needs: publish
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Bind manifest file hashes to the exact release tree
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Download all immutable digest fragments
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: image-digest-*-${{ github.event.workflow_run.head_sha }}
+          path: release-fragments
+          merge-multiple: true
+      - name: Aggregate and validate release manifest
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re
+          expected = {"site", "customer", "api", "worker", "ops"}
+          source = os.environ["SOURCE_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", source): raise SystemExit("invalid source SHA")
+          entries = []
+          for path in sorted(pathlib.Path("release-fragments").glob("*.json")):
+              value = json.loads(path.read_text(encoding="utf-8"))
+              if set(value) != {"service", "digest", "sourceCommit", "role"} or value["role"] != "target": raise SystemExit("invalid fragment keys")
+              if value["sourceCommit"] != source: raise SystemExit("mixed source commits")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", value["digest"]): raise SystemExit("invalid digest")
+              entries.append(value)
+          if len(entries) != 5 or {entry["service"] for entry in entries} != expected:
+              raise SystemExit("release requires exactly five unique services")
+          images = [
+              f"ghcr.io/pendevtsp-star/giro-mesa-v2-{entry['service']}@{entry['digest']}"
+              for entry in sorted(entries, key=lambda item: item["service"])
+          ]
+          manifest = {"schemaVersion": 1, "role": "target", "sourceCommit": source, "authorizedByMain": source, "workflow": "publish-images.yml", "images": images}
+          critical=["deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"]
+          critical += sorted(str(path) for path in pathlib.Path("packages/db/drizzle").glob("[0-9][0-9][0-9][0-9]_*.sql"))
+          manifest["releaseFiles"]={name:"sha256:"+hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in critical}
+          target = pathlib.Path(f"giromesa-image-attestation-{source}.json")
+          target.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+          pathlib.Path(f"{target}.sha256").write_text(f"{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n", encoding="ascii")
+          PY
+      - name: Install Cosign for manifest signature
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Sign release manifest with GitHub OIDC
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          cosign sign-blob --yes
+          --bundle "giromesa-image-attestation-${SOURCE_SHA}.json.bundle"
+          "giromesa-image-attestation-${SOURCE_SHA}.json"
+      - name: Retain signed release manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}
+          path: |
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json.bundle
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+  authorize-recovery:
+    needs: release-manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      enabled: ${{ steps.authorize.outputs.enabled }}
+      recovery_sha: ${{ steps.authorize.outputs.recovery_sha }}
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - id: authorize
+        env:
+          AUTHORIZATION_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,subprocess
+          matrix=json.loads(pathlib.Path("deploy/vps/recovery-compatibility.json").read_text(encoding="utf-8"))
+          transitions=matrix.get("transitions",[])
+          output=pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          if not transitions:
+              output.write_text("enabled=false\nrecovery_sha=0000000000000000000000000000000000000000\n",encoding="utf-8")
+              raise SystemExit(0)
+          if len(transitions)!=1: raise SystemExit("exactly one recovery authorization is allowed")
+          item=transitions[0]; artifact=item.get("recoveryArtifact","")
+          if not re.fullmatch(r"git:[0-9a-f]{40}",artifact): raise SystemExit("invalid recovery artifact")
+          recovery_sha=artifact.removeprefix("git:")
+          evidence=item.get("evidence",{}); relative=evidence.get("path","")
+          if not re.fullmatch(r"docs/evidence/recovery/[A-Za-z0-9_.-]+\.json",relative): raise SystemExit("invalid evidence path")
+          path=pathlib.Path(relative); actual="sha256:"+hashlib.sha256(path.read_bytes()).hexdigest()
+          if actual!=evidence.get("sha256"): raise SystemExit("recovery evidence hash mismatch")
+          value=json.loads(path.read_text(encoding="utf-8"))
+          if value.get("recoveryArtifact")!=artifact or value.get("postgresMajors")!=[16,17] or value.get("targetMigration")!="0029_platform_incident_projection_actions" or value.get("testedUpgrade") is not True: raise SystemExit("recovery evidence incomplete")
+          subprocess.run(["git","cat-file","-e",f"{recovery_sha}^{{commit}}"],check=True)
+          output.write_text(f"enabled=true\nrecovery_sha={recovery_sha}\n",encoding="utf-8")
+          PY
+
+  publish-recovery:
+    needs: [authorize-recovery, validate-recovery]
+    if: needs.authorize-recovery.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: site, app: site, dockerfile: Dockerfile }
+          - { service: customer, app: customer, dockerfile: Dockerfile }
+          - { service: api, app: api, dockerfile: Dockerfile }
+          - { service: worker, app: worker, dockerfile: Dockerfile }
+          - { service: ops, app: ops, dockerfile: Dockerfile.ops }
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: image=moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: APP=${{ matrix.app }}
+          tags: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:recovery-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Sign authorized recovery digest from main trust root
+        env:
+          IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+        run: >-
+          cosign sign --yes
+          -a role=recovery
+          -a sourceCommit=${{ needs.authorize-recovery.outputs.recovery_sha }}
+          -a authorizedByMain=${{ github.event.workflow_run.head_sha }}
+          "$IMAGE"
+      - name: Emit recovery fragment
+        env:
+          AUTHORIZATION_SHA: ${{ github.event.workflow_run.head_sha }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          mkdir fragment
+          python3 - <<'PY'
+          import json,os,pathlib,re
+          value={key:os.environ[key] for key in ("AUTHORIZATION_SHA","DIGEST","RECOVERY_SHA","SERVICE")}
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}",value["DIGEST"]): raise SystemExit("invalid digest")
+          pathlib.Path(f"fragment/{value['SERVICE']}.json").write_text(json.dumps(value,sort_keys=True,separators=(",",":"))+"\n",encoding="utf-8")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: recovery-digest-${{ matrix.service }}-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: fragment/${{ matrix.service }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  validate-recovery:
+    needs: authorize-recovery
+    if: needs.authorize-recovery.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted validator from the authorizing main release
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Bind the validator to the authorizing main commit
+        env:
+          AUTHORIZATION_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: test "$(git rev-parse HEAD)" = "$AUTHORIZATION_SHA"
+      - name: Check out the exact recovery candidate without credentials
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: candidate
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: candidate/pnpm-lock.yaml
+      - name: Reprove the authorized recovery with the shared unprivileged gate
+        run: >-
+          ./scripts/validate-recovery-candidate.sh
+          --candidate-directory candidate
+          --recovery-sha "${{ needs.authorize-recovery.outputs.recovery_sha }}"
+          --output-directory evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: recovery-validation-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: |
+            evidence/recovery-validation.json
+            evidence/recovery-validation.json.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+  recovery-manifest:
+    needs: [authorize-recovery, publish-recovery, validate-recovery]
+    if: needs.authorize-recovery.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: recovery-digest-*-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: fragments
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: recovery-validation-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: validation
+      - name: Aggregate authorized recovery manifest
+        env:
+          AUTHORIZATION_SHA: ${{ github.event.workflow_run.head_sha }}
+          RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re
+          entries=[json.loads(path.read_text()) for path in pathlib.Path("fragments").glob("*.json")]
+          expected={"site","customer","api","worker","ops"}; source=os.environ["RECOVERY_SHA"]; auth=os.environ["AUTHORIZATION_SHA"]
+          if len(entries)!=5 or {item["SERVICE"] for item in entries}!=expected or any(item["RECOVERY_SHA"]!=source or item["AUTHORIZATION_SHA"]!=auth for item in entries): raise SystemExit("invalid recovery fragments")
+          images=[f"ghcr.io/pendevtsp-star/giro-mesa-v2-{item['SERVICE']}@{item['DIGEST']}" for item in sorted(entries,key=lambda item:item["SERVICE"])]
+          validation=pathlib.Path("validation/recovery-validation.json"); validation_hash="sha256:"+hashlib.sha256(validation.read_bytes()).hexdigest()
+          critical=["deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"]
+          critical += sorted(str(path) for path in pathlib.Path("packages/db/drizzle").glob("[0-9][0-9][0-9][0-9]_*.sql"))
+          release_files={name:"sha256:"+hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in critical}
+          evidence_name=f"giromesa-recovery-validation-{source}.json"
+          evidence_target=pathlib.Path(evidence_name)
+          evidence_target.write_bytes(validation.read_bytes())
+          target=pathlib.Path(f"giromesa-image-attestation-{source}.json")
+          target.write_text(json.dumps({"schemaVersion":1,"role":"recovery","sourceCommit":source,"authorizedByMain":auth,"workflow":"publish-images.yml","validationEvidenceFile":evidence_name,"validationEvidenceSha256":validation_hash,"releaseFiles":release_files,"images":images},sort_keys=True,separators=(",",":"))+"\n")
+          pathlib.Path(f"{target}.sha256").write_text(f"{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n")
+          PY
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Sign authorized recovery manifest
+        env:
+          RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+        run: cosign sign-blob --yes --bundle "giromesa-image-attestation-${RECOVERY_SHA}.json.bundle" "giromesa-image-attestation-${RECOVERY_SHA}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-recovery-attestation-${{ needs.authorize-recovery.outputs.recovery_sha }}
+          path: |
+            giromesa-image-attestation-${{ needs.authorize-recovery.outputs.recovery_sha }}.json*
+            giromesa-recovery-validation-${{ needs.authorize-recovery.outputs.recovery_sha }}.json
+          if-no-files-found: error
+          retention-days: 90

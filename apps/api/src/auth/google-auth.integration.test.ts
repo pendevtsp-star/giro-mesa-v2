@@ -13,6 +13,10 @@ it("links verified Google subjects without duplicating identities", async (conte
     return;
   }
   process.env.DATABASE_URL = databaseUrl;
+  const previousEmailProvider = process.env.EMAIL_PROVIDER_ENABLED;
+  const previousOutboxKey = process.env.OUTBOX_ENCRYPTION_KEY;
+  process.env.EMAIL_PROVIDER_ENABLED = "true";
+  process.env.OUTBOX_ENCRYPTION_KEY = randomBytes(32).toString("base64");
   const database = new DatabaseService();
   const createdIdentityIds: string[] = [];
   try {
@@ -51,25 +55,75 @@ it("links verified Google subjects without duplicating identities", async (conte
       displayName: "Local Owner",
       password: "a-secure-local-password",
     });
-    createdIdentityIds.push(local.identity.id);
+    assert.equal(local.verificationRequired, true);
+    const [localIdentity] = await database.db
+      .select()
+      .from(identities)
+      .where(eq(identities.email, local.email));
+    assert.ok(localIdentity);
+    createdIdentityIds.push(localIdentity.id);
     const linkedLocal = await auth.authenticateGoogle(
       {
         subject: `local-subject-${suffix}`,
-        email: local.identity.email,
+        email: local.email,
         displayName: "Local Owner",
       },
       "login",
     );
-    assert.equal("token" in linkedLocal && linkedLocal.identity.id, local.identity.id);
+    assert.equal("token" in linkedLocal && linkedLocal.identity.id, localIdentity.id);
     assert.equal(
       (
         await database.db
           .select()
           .from(passwordCredentials)
-          .where(eq(passwordCredentials.identityId, local.identity.id))
+          .where(eq(passwordCredentials.identityId, localIdentity.id))
+      ).length,
+      0,
+    );
+    await assert.rejects(
+      auth.login({
+        email: local.email,
+        password: "a-secure-local-password",
+        trustedDevice: false,
+      }),
+      (error: unknown) => JSON.stringify(error).includes("INVALID_CREDENTIALS"),
+    );
+
+    const verifiedLocal = await auth.register({
+      email: `verified-local-${suffix}@example.test`,
+      displayName: "Verified Local Owner",
+      password: "verified-local-password",
+    });
+    const [verifiedLocalIdentity] = await database.db
+      .update(identities)
+      .set({ emailVerifiedAt: new Date() })
+      .where(eq(identities.email, verifiedLocal.email))
+      .returning();
+    assert.ok(verifiedLocalIdentity);
+    createdIdentityIds.push(verifiedLocalIdentity.id);
+    await auth.authenticateGoogle(
+      {
+        subject: `verified-local-subject-${suffix}`,
+        email: verifiedLocal.email,
+        displayName: "Verified Local Owner",
+      },
+      "login",
+    );
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(passwordCredentials)
+          .where(eq(passwordCredentials.identityId, verifiedLocalIdentity.id))
       ).length,
       1,
     );
+    const verifiedLocalLogin = await auth.login({
+      email: verifiedLocal.email,
+      password: "verified-local-password",
+      trustedDevice: false,
+    });
+    assert.equal("token" in verifiedLocalLogin, true);
 
     await assert.rejects(
       auth.authenticateGoogle(
@@ -91,11 +145,15 @@ it("links verified Google subjects without duplicating identities", async (conte
       .select({ id: authSessions.id })
       .from(authSessions)
       .where(inArray(authSessions.identityId, createdIdentityIds));
-    assert.equal(sessions.length, 4);
+    assert.equal(sessions.length, 5);
   } finally {
     if (createdIdentityIds.length > 0) {
       await database.db.delete(identities).where(inArray(identities.id, createdIdentityIds));
     }
     await database.onModuleDestroy();
+    if (previousEmailProvider === undefined) delete process.env.EMAIL_PROVIDER_ENABLED;
+    else process.env.EMAIL_PROVIDER_ENABLED = previousEmailProvider;
+    if (previousOutboxKey === undefined) delete process.env.OUTBOX_ENCRYPTION_KEY;
+    else process.env.OUTBOX_ENCRYPTION_KEY = previousOutboxKey;
   }
 });

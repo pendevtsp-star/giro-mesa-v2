@@ -9,6 +9,7 @@ import {
   readMfaStatus,
   readRecoveryCodes,
 } from "../../lib/mfa";
+import { siteFetch } from "../../lib/pwa-fetch";
 
 export default function SecurityPage() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -47,7 +48,7 @@ export default function SecurityPage() {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/mfa/setup`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/mfa/setup`, {
         method: "POST",
         credentials: "include",
       });
@@ -70,7 +71,7 @@ export default function SecurityPage() {
     const code = String(new FormData(form).get("code") ?? "").trim();
     setBusy(true);
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/mfa/setup/confirm`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/mfa/setup/confirm`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -98,7 +99,7 @@ export default function SecurityPage() {
     const proof = String(new FormData(form).get("mfaProof") ?? "");
     setBusy(true);
     try {
-      const response = await fetch(`${apiUrl}/v1/auth/mfa/disable`, {
+      const response = await siteFetch(`${apiUrl}/v1/auth/mfa/disable`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
