@@ -60,25 +60,28 @@ fi
 compose_file=$target_release/deploy/vps/compose.pilot.yaml
 export GIROMESA_IMAGE_TAG="$target_sha"
 compose=(docker compose --env-file "$env_file" -f "$compose_file")
-previous_link="$root/.current-before-rollback-$$"
-ln -s "$current_release" "$previous_link"
-cleanup() { rm -f -- "$previous_link"; }
-trap cleanup EXIT
+restore_previous_release() {
+  ln -sfn "$current_release" "$root/.current-next"
+  mv -Tf "$root/.current-next" "$current_link"
+  export GIROMESA_IMAGE_TAG="$current_sha"
+  docker compose --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" up -d --remove-orphans
+}
 
 ln -sfn "$target_release" "$root/.current-next"
 mv -Tf "$root/.current-next" "$current_link"
 if ! "${compose[@]}" up -d --remove-orphans; then
-  ln -sfn "$current_release" "$root/.current-next"
-  mv -Tf "$root/.current-next" "$current_link"
+  if ! restore_previous_release; then
+    echo "ROLLBACK_RECOVERY_FAILED: current link restored but previous containers need manual recovery" >&2
+  fi
   echo "ROLLBACK_APPLICATION_START_FAILED" >&2
   exit 1
 fi
 
 for endpoint in http://127.0.0.1:3210/health http://127.0.0.1:3110/ http://127.0.0.1:3111/ http://127.0.0.1:3112/health; do
   if ! curl --fail --silent --show-error "$endpoint" >/dev/null; then
-    ln -sfn "$current_release" "$root/.current-next"
-    mv -Tf "$root/.current-next" "$current_link"
-    docker compose --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" up -d --remove-orphans
+    if ! restore_previous_release; then
+      echo "ROLLBACK_RECOVERY_FAILED: current link restored but previous containers need manual recovery" >&2
+    fi
     echo "ROLLBACK_APPLICATION_SMOKE_FAILED" >&2
     exit 1
   fi

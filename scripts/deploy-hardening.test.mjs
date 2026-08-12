@@ -232,11 +232,15 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /git:\$current_sha|git:\$target_sha/);
   assert.match(rollback, /rollback-app\.json/);
   assert.doesNotMatch(rollback, /pg_restore|psql|database\.dump|restore-drill/);
+  assert.match(rollback, /restore_previous_release/);
+  assert.match(rollback, /GIROMESA_IMAGE_TAG="\$current_sha"/);
 });
 
 test("deploy health gate includes the asynchronous worker", () => {
   const deploy = readFileSync(deployScript, "utf8");
   assert.match(deploy, /for service in api worker site customer ops/);
+  assert.match(deploy, /RestartCount/);
+  assert.match(deploy, /GIROMESA_STABILITY_SECONDS/);
 });
 
 test("pre-migration backup binds the migration actually applied in the source database", () => {
