@@ -6,6 +6,7 @@ import {
   type PlatformActionSnapshot,
   parsePlatformActionInput,
   platformActionFromAuditEvents,
+  platformActionTargetType,
 } from "./platform-actions.js";
 
 const pending: PlatformActionSnapshot = {
@@ -32,6 +33,56 @@ describe("platform action contract", () => {
           targetId: pending.organizationId,
           justification: pending.justification,
           payload: { expectedState: "active", apiKey: "should-never-be-accepted" },
+        }),
+      /INVALID_PLATFORM_ACTION/,
+    );
+  });
+
+  it("accepts only explicit incident transitions with tenant-scoped unit context", () => {
+    const incidentId = "018f47a0-37f2-7d15-8c08-2b71d8415f55";
+    const unitId = "018f47a0-37f2-7d15-8c08-2b71d8415f66";
+    const review = parsePlatformActionInput({
+      action: "incident.review",
+      targetId: incidentId,
+      justification: pending.justification,
+      payload: { expectedState: "reported", unitId },
+    });
+    assert.equal(platformActionTargetType(review.action), "incident");
+    assert.deepEqual(review.payload, { expectedState: "reported", unitId });
+
+    for (const request of [
+      { action: "incident.approve", expectedState: "under_review" },
+      { action: "incident.reject", expectedState: "under_review" },
+      { action: "incident.close", expectedState: "approved" },
+      { action: "incident.close", expectedState: "rejected" },
+    ] as const) {
+      assert.doesNotThrow(() =>
+        parsePlatformActionInput({
+          action: request.action,
+          targetId: incidentId,
+          justification: pending.justification,
+          payload: { expectedState: request.expectedState, unitId },
+        }),
+      );
+    }
+
+    assert.throws(
+      () =>
+        parsePlatformActionInput({
+          action: "incident.approve",
+          targetId: incidentId,
+          justification: pending.justification,
+          payload: { expectedState: "reported", unitId },
+        }),
+      /INVALID_PLATFORM_ACTION/,
+    );
+    assert.throws(
+      () =>
+        parsePlatformActionInput({
+          action: "incident.review",
+          targetId: incidentId,
+          justification: pending.justification,
+          payload: { expectedState: "reported" },
         }),
       /INVALID_PLATFORM_ACTION/,
     );

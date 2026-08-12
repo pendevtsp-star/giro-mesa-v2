@@ -44,9 +44,7 @@ export function platformHttpException(error: unknown): HttpException {
   if (error instanceof HttpException) return error;
   const code = error instanceof Error ? error.message : "";
   if (!(code in platformErrorStatus))
-    return new ServiceUnavailableException(
-      response(503, "PLATFORM_OPERATION_FAILED"),
-    );
+    return new ServiceUnavailableException(response(503, "PLATFORM_OPERATION_FAILED"));
   const typedCode = code as PlatformDomainErrorCode;
   const status = platformErrorStatus[typedCode];
   if (status === 400) return new BadRequestException(response(status, typedCode));

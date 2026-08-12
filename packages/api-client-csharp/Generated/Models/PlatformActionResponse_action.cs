@@ -24,5 +24,21 @@ namespace GiroMesa.ApiClient.Models
         #pragma warning disable CS1591
         MembershipRestore,
         #pragma warning restore CS1591
+        [EnumMember(Value = "incident.review")]
+        #pragma warning disable CS1591
+        IncidentReview,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "incident.approve")]
+        #pragma warning disable CS1591
+        IncidentApprove,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "incident.reject")]
+        #pragma warning disable CS1591
+        IncidentReject,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "incident.close")]
+        #pragma warning disable CS1591
+        IncidentClose,
+        #pragma warning restore CS1591
     }
 }

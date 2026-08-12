@@ -4250,6 +4250,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/platform/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_globalProjection[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/resources/{resource}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_globalProjection[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/tenants/{organizationId}/actions": {
     parameters: {
       query?: never;
@@ -7573,9 +7605,61 @@ export interface components {
       /** Format: date-time */
       occurredAt: string;
     };
-    PlatformUnavailableProjectionItemResponse: {
-      /** @enum {boolean} */
-      unavailable: true;
+    PlatformLeadProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      email: string;
+      phone: string;
+      businessName: string;
+      segment: string | null;
+      planSlug: string;
+      /** Format: date-time */
+      submittedAt: string;
+      /** @enum {string} */
+      actionAvailability: "unavailable";
+      /** @enum {string} */
+      actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE";
+    };
+    PlatformSupportProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      email: string;
+      phone: string;
+      /** Format: date-time */
+      submittedAt: string;
+      /** @enum {string} */
+      actionAvailability: "unavailable";
+      /** @enum {string} */
+      actionReasonCode: "SUPPORT_WORKFLOW_NOT_AVAILABLE";
+    };
+    PlatformIncidentProjectionItemResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      organizationId: string;
+      /** Format: uuid */
+      unitId: string;
+      incidentType: string;
+      /** @enum {string} */
+      status: "reported" | "under_review" | "approved" | "rejected" | "closed";
+      neutralSummary: string;
+      amountCents: number | null;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      availableActions: (
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close"
+      )[];
     };
     PlatformTenantProjectionResponse: {
       /** @enum {string} */
@@ -7686,7 +7770,7 @@ export interface components {
        * @enum {string}
        */
       resource: "leads";
-      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+      items: components["schemas"]["PlatformLeadProjectionItemResponse"][];
     };
     PlatformSupportProjectionResponse: {
       /** @enum {string} */
@@ -7698,7 +7782,7 @@ export interface components {
        * @enum {string}
        */
       resource: "support";
-      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+      items: components["schemas"]["PlatformSupportProjectionItemResponse"][];
     };
     PlatformIncidentsProjectionResponse: {
       /** @enum {string} */
@@ -7710,7 +7794,7 @@ export interface components {
        * @enum {string}
        */
       resource: "incidents";
-      items: components["schemas"]["PlatformUnavailableProjectionItemResponse"][];
+      items: components["schemas"]["PlatformIncidentProjectionItemResponse"][];
     };
     PlatformCountsResponse: {
       organizations: number;
@@ -7751,6 +7835,8 @@ export interface components {
     PlatformActionPayloadResponse: {
       expectedState: string;
       restoreTo?: string;
+      /** Format: uuid */
+      unitId?: string;
     };
     PlatformActionResponse: {
       /** Format: uuid */
@@ -7758,9 +7844,17 @@ export interface components {
       /** Format: uuid */
       organizationId: string;
       /** @enum {string} */
-      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      action:
+        | "tenant.suspend"
+        | "tenant.restore"
+        | "membership.disable"
+        | "membership.restore"
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close";
       /** @enum {string} */
-      targetType: "organization" | "membership";
+      targetType: "organization" | "membership" | "incident";
       /** Format: uuid */
       targetId: string;
       /** Format: uuid */
@@ -7786,7 +7880,15 @@ export interface components {
     };
     PlatformProposalRequest: {
       /** @enum {string} */
-      action: "tenant.suspend" | "tenant.restore" | "membership.disable" | "membership.restore";
+      action:
+        | "tenant.suspend"
+        | "tenant.restore"
+        | "membership.disable"
+        | "membership.restore"
+        | "incident.review"
+        | "incident.approve"
+        | "incident.reject"
+        | "incident.close";
       /** Format: uuid */
       targetId: string;
       justification: string;
@@ -18186,6 +18288,58 @@ export interface operations {
             | components["schemas"]["PlatformLeadsProjectionResponse"]
             | components["schemas"]["PlatformSupportProjectionResponse"]
             | components["schemas"]["PlatformIncidentsProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_globalProjection[0]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"];
+        };
+      };
+    };
+  };
+  "PlatformController_globalProjection[1]": {
+    parameters: {
+      query: {
+        limit: string;
+        cursor: string;
+      };
+      header?: never;
+      path: {
+        resource: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["PlatformLeadsProjectionResponse"]
+            | components["schemas"]["PlatformSupportProjectionResponse"];
         };
       };
     };

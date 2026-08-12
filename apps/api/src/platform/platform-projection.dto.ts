@@ -99,8 +99,51 @@ export class PlatformAuditProjectionItemResponse {
   @ApiProperty({ format: "date-time" }) declare occurredAt: string;
 }
 
-export class PlatformUnavailableProjectionItemResponse {
-  @ApiProperty({ enum: [true] }) declare unavailable: true;
+export class PlatformLeadProjectionItemResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty() declare displayName: string;
+  @ApiProperty() declare email: string;
+  @ApiProperty() declare phone: string;
+  @ApiProperty() declare businessName: string;
+  @ApiProperty({ type: String, nullable: true }) declare segment: string | null;
+  @ApiProperty() declare planSlug: string;
+  @ApiProperty({ format: "date-time" }) declare submittedAt: string;
+  @ApiProperty({ enum: ["unavailable"] }) declare actionAvailability: "unavailable";
+  @ApiProperty({ enum: ["LEAD_WORKFLOW_NOT_AVAILABLE"] })
+  declare actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE";
+}
+
+export class PlatformSupportProjectionItemResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty() declare displayName: string;
+  @ApiProperty() declare email: string;
+  @ApiProperty() declare phone: string;
+  @ApiProperty({ format: "date-time" }) declare submittedAt: string;
+  @ApiProperty({ enum: ["unavailable"] }) declare actionAvailability: "unavailable";
+  @ApiProperty({ enum: ["SUPPORT_WORKFLOW_NOT_AVAILABLE"] })
+  declare actionReasonCode: "SUPPORT_WORKFLOW_NOT_AVAILABLE";
+}
+
+export class PlatformIncidentProjectionItemResponse {
+  @ApiProperty({ format: "uuid" }) declare id: string;
+  @ApiProperty({ format: "uuid" }) declare organizationId: string;
+  @ApiProperty({ format: "uuid" }) declare unitId: string;
+  @ApiProperty() declare incidentType: string;
+  @ApiProperty({ enum: ["reported", "under_review", "approved", "rejected", "closed"] })
+  declare status: string;
+  @ApiProperty() declare neutralSummary: string;
+  @ApiProperty({ type: "integer", minimum: 0, maximum: 2_147_483_647, nullable: true })
+  declare amountCents: number | null;
+  @ApiProperty({ format: "uuid" }) declare reporterIdentityId: string;
+  @ApiProperty({ type: String, format: "uuid", nullable: true })
+  declare approverIdentityId: string | null;
+  @ApiProperty({ format: "date-time" }) declare occurredAt: string;
+  @ApiProperty({ format: "date-time" }) declare updatedAt: string;
+  @ApiProperty({
+    type: [String],
+    enum: ["incident.review", "incident.approve", "incident.reject", "incident.close"],
+  })
+  declare availableActions: string[];
 }
 
 class PlatformProjectionEnvelopeResponse {
@@ -178,20 +221,20 @@ export class PlatformAuditProjectionResponse extends PlatformProjectionEnvelopeR
 
 export class PlatformLeadsProjectionResponse extends PlatformProjectionEnvelopeResponse {
   @ApiProperty({ enum: ["leads"] }) declare resource: "leads";
-  @ApiProperty({ type: () => [PlatformUnavailableProjectionItemResponse], maxItems: 0 })
-  declare items: PlatformUnavailableProjectionItemResponse[];
+  @ApiProperty({ type: () => [PlatformLeadProjectionItemResponse] })
+  declare items: PlatformLeadProjectionItemResponse[];
 }
 
 export class PlatformSupportProjectionResponse extends PlatformProjectionEnvelopeResponse {
   @ApiProperty({ enum: ["support"] }) declare resource: "support";
-  @ApiProperty({ type: () => [PlatformUnavailableProjectionItemResponse], maxItems: 0 })
-  declare items: PlatformUnavailableProjectionItemResponse[];
+  @ApiProperty({ type: () => [PlatformSupportProjectionItemResponse] })
+  declare items: PlatformSupportProjectionItemResponse[];
 }
 
 export class PlatformIncidentsProjectionResponse extends PlatformProjectionEnvelopeResponse {
   @ApiProperty({ enum: ["incidents"] }) declare resource: "incidents";
-  @ApiProperty({ type: () => [PlatformUnavailableProjectionItemResponse], maxItems: 0 })
-  declare items: PlatformUnavailableProjectionItemResponse[];
+  @ApiProperty({ type: () => [PlatformIncidentProjectionItemResponse] })
+  declare items: PlatformIncidentProjectionItemResponse[];
 }
 
 export const platformProjectionModels = [
@@ -206,7 +249,9 @@ export const platformProjectionModels = [
   PlatformBillingProjectionItemResponse,
   PlatformIntegrationProjectionItemResponse,
   PlatformAuditProjectionItemResponse,
-  PlatformUnavailableProjectionItemResponse,
+  PlatformLeadProjectionItemResponse,
+  PlatformSupportProjectionItemResponse,
+  PlatformIncidentProjectionItemResponse,
   PlatformTenantProjectionResponse,
   PlatformPlanProjectionResponse,
   PlatformEntitlementsProjectionResponse,
@@ -244,6 +289,19 @@ export const platformProjectionResponseSchema = {
         getSchemaPath(model),
       ]),
     ),
+  },
+};
+
+export const platformGlobalProjectionResponseSchema = {
+  oneOf: [PlatformLeadsProjectionResponse, PlatformSupportProjectionResponse].map((model) => ({
+    $ref: getSchemaPath(model),
+  })),
+  discriminator: {
+    propertyName: "resource",
+    mapping: {
+      leads: getSchemaPath(PlatformLeadsProjectionResponse),
+      support: getSchemaPath(PlatformSupportProjectionResponse),
+    },
   },
 };
 

@@ -17,10 +17,10 @@ namespace GiroMesa.ApiClient.Models
         /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public List<global::GiroMesa.ApiClient.Models.PlatformUnavailableProjectionItemResponse>? Items { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionItemResponse>? Items { get; set; }
 #nullable restore
 #else
-        public List<global::GiroMesa.ApiClient.Models.PlatformUnavailableProjectionItemResponse> Items { get; set; }
+        public List<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionItemResponse> Items { get; set; }
 #endif
         /// <summary>The nextCursor property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -59,7 +59,7 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "availability", n => { Availability = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionResponse_availability>(); } },
-                { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformUnavailableProjectionItemResponse>(global::GiroMesa.ApiClient.Models.PlatformUnavailableProjectionItemResponse.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionItemResponse>(global::GiroMesa.ApiClient.Models.PlatformSupportProjectionItemResponse.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "nextCursor", n => { NextCursor = n.GetStringValue(); } },
                 { "reasonCode", n => { ReasonCode = n.GetStringValue(); } },
                 { "resource", n => { Resource = n.GetEnumValue<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionResponse_resource>(); } },
@@ -73,7 +73,7 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionResponse_availability>("availability", Availability);
-            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformUnavailableProjectionItemResponse>("items", Items);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionItemResponse>("items", Items);
             writer.WriteStringValue("nextCursor", NextCursor);
             writer.WriteStringValue("reasonCode", ReasonCode);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.PlatformSupportProjectionResponse_resource>("resource", Resource);

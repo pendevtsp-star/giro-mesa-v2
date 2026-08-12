@@ -197,6 +197,13 @@
       "when": 1786501200000,
       "tag": "0028_privacy_domain_processors",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786503000000,
+      "tag": "0029_platform_incident_projection_actions",
+      "breakpoints": true
     }
   ]
 }

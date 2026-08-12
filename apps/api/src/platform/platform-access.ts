@@ -20,6 +20,7 @@ export const platformPermissions = [
   "platform.tenant.restore",
   "platform.membership.disable",
   "platform.membership.restore",
+  "platform.incident.transition",
 ] as const;
 
 export type PlatformPermission = (typeof platformPermissions)[number];
@@ -27,7 +28,11 @@ export type PlatformActionName =
   | "tenant.suspend"
   | "tenant.restore"
   | "membership.disable"
-  | "membership.restore";
+  | "membership.restore"
+  | "incident.review"
+  | "incident.approve"
+  | "incident.reject"
+  | "incident.close";
 export type PlatformActionCommand = "propose" | "approve" | "reject";
 
 export interface PlatformAccess {
@@ -76,6 +81,10 @@ const actionPermission: Record<PlatformActionName, PlatformPermission> = {
   "tenant.restore": "platform.tenant.restore",
   "membership.disable": "platform.membership.disable",
   "membership.restore": "platform.membership.restore",
+  "incident.review": "platform.incident.transition",
+  "incident.approve": "platform.incident.transition",
+  "incident.reject": "platform.incident.transition",
+  "incident.close": "platform.incident.transition",
 };
 
 export function canPlatformMutate(

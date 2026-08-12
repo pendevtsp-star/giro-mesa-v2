@@ -45,9 +45,9 @@ before(async () => {
     "platform.action.approve",
     "platform.action.reject",
     "platform.tenant.suspend",
-      "platform.tenant.restore",
-      "platform.membership.disable",
-      "platform.membership.restore",
+    "platform.tenant.restore",
+    "platform.membership.disable",
+    "platform.membership.restore",
   ].join("|");
   process.env.PLATFORM_ADMIN_GRANTS = `${emailA}=${grants};${emailB}=${grants}`;
   await connection.client`
@@ -187,13 +187,7 @@ describe("platform actions in PostgreSQL", () => {
     );
     assert.equal(executed.status, "executed");
     await assert.rejects(
-      service.reject(
-        approver,
-        organizationB,
-        proposal.id,
-        "decision-command-0001",
-        1,
-      ),
+      service.reject(approver, organizationB, proposal.id, "decision-command-0001", 1),
       /PLATFORM_IDEMPOTENCY_CONFLICT/,
     );
   });

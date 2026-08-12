@@ -94,7 +94,10 @@ describe("platform generated projection contract", () => {
   it("generates concrete TypeScript and C# item models instead of empty records", async () => {
     const typescript = await readFile(tsClientUrl, "utf8");
     assert.match(typescript, /PlatformTenantProjectionItemResponse/);
-    assert.doesNotMatch(typescript, /PlatformProjectionResponse[\s\S]{0,1200}Record<string, never>\[\]/);
+    assert.doesNotMatch(
+      typescript,
+      /PlatformProjectionResponse[\s\S]{0,1200}Record<string, never>\[\]/,
+    );
 
     const tenant = await readFile(
       new URL("PlatformTenantProjectionItemResponse.cs", csharpModelsRoot),
@@ -103,5 +106,70 @@ describe("platform generated projection contract", () => {
     assert.match(tenant, /public Guid\? OrganizationId/);
     assert.match(tenant, /public string\? BillingState/);
     assert.doesNotMatch(tenant, /class PlatformProjectionResponse_items/);
+  });
+
+  it("publishes global lead/support queues and concrete incident actions on both aliases", async () => {
+    const document = object(JSON.parse(await readFile(openApiUrl, "utf8")));
+    for (const prefix of ["/api/v1", "/v1"]) {
+      const globalSchema = object(
+        property(
+          document,
+          "paths",
+          `${prefix}/platform/resources/{resource}`,
+          "get",
+          "responses",
+          "200",
+          "content",
+          "application/json",
+          "schema",
+        ),
+      );
+      assert.deepEqual(globalSchema.oneOf, [
+        { $ref: "#/components/schemas/PlatformLeadsProjectionResponse" },
+        { $ref: "#/components/schemas/PlatformSupportProjectionResponse" },
+      ]);
+    }
+
+    for (const [responseName, itemName] of [
+      ["PlatformLeadsProjectionResponse", "PlatformLeadProjectionItemResponse"],
+      ["PlatformSupportProjectionResponse", "PlatformSupportProjectionItemResponse"],
+      ["PlatformIncidentsProjectionResponse", "PlatformIncidentProjectionItemResponse"],
+    ] as const) {
+      assert.equal(
+        property(
+          document,
+          "components",
+          "schemas",
+          responseName,
+          "properties",
+          "items",
+          "items",
+          "$ref",
+        ),
+        `#/components/schemas/${itemName}`,
+      );
+    }
+
+    const incidentItem = object(
+      property(document, "components", "schemas", "PlatformIncidentProjectionItemResponse"),
+    );
+    assert.equal(incidentItem.additionalProperties, false);
+    assert.equal("evidence" in object(incidentItem.properties), false);
+    assert.equal("requestHash" in object(incidentItem.properties), false);
+
+    const typescript = await readFile(tsClientUrl, "utf8");
+    assert.match(typescript, /PlatformLeadProjectionItemResponse/);
+    assert.match(typescript, /PlatformSupportProjectionItemResponse/);
+    assert.match(typescript, /PlatformIncidentProjectionItemResponse/);
+    for (const model of [
+      "PlatformLeadProjectionItemResponse.cs",
+      "PlatformSupportProjectionItemResponse.cs",
+      "PlatformIncidentProjectionItemResponse.cs",
+    ]) {
+      assert.match(
+        await readFile(new URL(model, csharpModelsRoot), "utf8"),
+        /public (?:partial )?class/,
+      );
+    }
   });
 });

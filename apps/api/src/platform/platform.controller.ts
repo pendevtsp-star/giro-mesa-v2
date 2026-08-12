@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -25,6 +27,7 @@ import { PlatformAdminGuard } from "./platform.guard.js";
 import { PlatformService } from "./platform.service.js";
 import { PlatformExceptionFilter } from "./platform-exception.filter.js";
 import {
+  platformGlobalProjectionResponseSchema,
   platformProjectionModels,
   platformProjectionResponseSchema,
 } from "./platform-projection.dto.js";
@@ -34,6 +37,10 @@ const platformActions = [
   "tenant.restore",
   "membership.disable",
   "membership.restore",
+  "incident.review",
+  "incident.approve",
+  "incident.reject",
+  "incident.close",
 ] as const;
 
 class PlatformCountsResponse {
@@ -80,13 +87,14 @@ class PlatformTenantContextResponse {
 class PlatformActionPayloadResponse {
   @ApiProperty() declare expectedState: string;
   @ApiProperty({ required: false }) declare restoreTo?: string;
+  @ApiProperty({ required: false, format: "uuid" }) declare unitId?: string;
 }
 
 class PlatformActionResponse {
   @ApiProperty({ format: "uuid" }) declare id: string;
   @ApiProperty({ format: "uuid" }) declare organizationId: string;
   @ApiProperty({ enum: platformActions }) declare action: string;
-  @ApiProperty({ enum: ["organization", "membership"] }) declare targetType: string;
+  @ApiProperty({ enum: ["organization", "membership", "incident"] }) declare targetType: string;
   @ApiProperty({ format: "uuid" }) declare targetId: string;
   @ApiProperty({ format: "uuid" }) declare requestedByIdentityId: string;
   @ApiProperty({ minLength: 20, maxLength: 500 }) declare justification: string;
@@ -160,6 +168,20 @@ export class PlatformController {
     });
   }
 
+  @Get("resources/:resource")
+  @ApiOkResponse({ schema: platformGlobalProjectionResponseSchema })
+  globalProjection(
+    @Req() request: AuthenticatedRequest,
+    @Param("resource") resource: string,
+    @Query("limit") rawLimit?: string,
+    @Query("cursor") cursor?: string,
+  ) {
+    return this.platform.globalProjection(request.auth, resource, {
+      limit: this.limit(rawLimit),
+      cursor,
+    });
+  }
+
   @Get("tenants/:organizationId/actions")
   @ApiOkResponse({ type: PlatformActionPageResponse })
   actions(
@@ -188,6 +210,7 @@ export class PlatformController {
   }
 
   @Post("tenants/:organizationId/actions/:proposalId/approve")
+  @HttpCode(HttpStatus.OK)
   @ApiHeader({ name: "idempotency-key", required: true })
   @ApiBody({ type: PlatformDecisionRequest })
   @ApiOkResponse({ type: PlatformActionResponse })
@@ -208,6 +231,7 @@ export class PlatformController {
   }
 
   @Post("tenants/:organizationId/actions/:proposalId/reject")
+  @HttpCode(HttpStatus.OK)
   @ApiHeader({ name: "idempotency-key", required: true })
   @ApiBody({ type: PlatformDecisionRequest })
   @ApiOkResponse({ type: PlatformActionResponse })

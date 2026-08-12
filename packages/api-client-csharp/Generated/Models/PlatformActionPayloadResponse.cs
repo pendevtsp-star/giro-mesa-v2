@@ -30,6 +30,8 @@ namespace GiroMesa.ApiClient.Models
 #else
         public string RestoreTo { get; set; }
 #endif
+        /// <summary>The unitId property</summary>
+        public Guid? UnitId { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.PlatformActionPayloadResponse"/> and sets the default values.
         /// </summary>
@@ -57,6 +59,7 @@ namespace GiroMesa.ApiClient.Models
             {
                 { "expectedState", n => { ExpectedState = n.GetStringValue(); } },
                 { "restoreTo", n => { RestoreTo = n.GetStringValue(); } },
+                { "unitId", n => { UnitId = n.GetGuidValue(); } },
             };
         }
         /// <summary>
@@ -68,6 +71,7 @@ namespace GiroMesa.ApiClient.Models
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("expectedState", ExpectedState);
             writer.WriteStringValue("restoreTo", RestoreTo);
+            writer.WriteGuidValue("unitId", UnitId);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

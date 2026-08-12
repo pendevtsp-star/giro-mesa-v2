@@ -21607,6 +21607,126 @@
         ]
       }
     },
+    "/api/v1/platform/resources/{resource}": {
+      "get": {
+        "operationId": "PlatformController_globalProjection[0]",
+        "parameters": [
+          {
+            "name": "resource",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PlatformLeadsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformSupportProjectionResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "resource",
+                    "mapping": {
+                      "leads": "#/components/schemas/PlatformLeadsProjectionResponse",
+                      "support": "#/components/schemas/PlatformSupportProjectionResponse"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/resources/{resource}": {
+      "get": {
+        "operationId": "PlatformController_globalProjection[1]",
+        "parameters": [
+          {
+            "name": "resource",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PlatformLeadsProjectionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlatformSupportProjectionResponse"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "resource",
+                    "mapping": {
+                      "leads": "#/components/schemas/PlatformLeadsProjectionResponse",
+                      "support": "#/components/schemas/PlatformSupportProjectionResponse"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
     "/api/v1/platform/tenants/{organizationId}/actions": {
       "get": {
         "operationId": "PlatformController_actions[0]",
@@ -36671,18 +36791,187 @@
         ],
         "additionalProperties": false
       },
-      "PlatformUnavailableProjectionItemResponse": {
+      "PlatformLeadProjectionItemResponse": {
         "type": "object",
         "properties": {
-          "unavailable": {
-            "type": "boolean",
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "businessName": {
+            "type": "string"
+          },
+          "segment": {
+            "type": "string",
+            "nullable": true
+          },
+          "planSlug": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actionAvailability": {
+            "type": "string",
             "enum": [
-              true
+              "unavailable"
+            ]
+          },
+          "actionReasonCode": {
+            "type": "string",
+            "enum": [
+              "LEAD_WORKFLOW_NOT_AVAILABLE"
             ]
           }
         },
         "required": [
-          "unavailable"
+          "id",
+          "displayName",
+          "email",
+          "phone",
+          "businessName",
+          "segment",
+          "planSlug",
+          "submittedAt",
+          "actionAvailability",
+          "actionReasonCode"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformSupportProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actionAvailability": {
+            "type": "string",
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "actionReasonCode": {
+            "type": "string",
+            "enum": [
+              "SUPPORT_WORKFLOW_NOT_AVAILABLE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "email",
+          "phone",
+          "submittedAt",
+          "actionAvailability",
+          "actionReasonCode"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformIncidentProjectionItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "under_review",
+              "approved",
+              "rejected",
+              "closed"
+            ]
+          },
+          "neutralSummary": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "reporterIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approverIdentityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "incident.review",
+                "incident.approve",
+                "incident.reject",
+                "incident.close"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "unitId",
+          "incidentType",
+          "status",
+          "neutralSummary",
+          "amountCents",
+          "reporterIdentityId",
+          "approverIdentityId",
+          "occurredAt",
+          "updatedAt",
+          "availableActions"
         ],
         "additionalProperties": false
       },
@@ -37028,10 +37317,9 @@
             ]
           },
           "items": {
-            "maxItems": 0,
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+              "$ref": "#/components/schemas/PlatformLeadProjectionItemResponse"
             }
           }
         },
@@ -37067,10 +37355,9 @@
             ]
           },
           "items": {
-            "maxItems": 0,
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+              "$ref": "#/components/schemas/PlatformSupportProjectionItemResponse"
             }
           }
         },
@@ -37106,10 +37393,9 @@
             ]
           },
           "items": {
-            "maxItems": 0,
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PlatformUnavailableProjectionItemResponse"
+              "$ref": "#/components/schemas/PlatformIncidentProjectionItemResponse"
             }
           }
         },
@@ -37263,6 +37549,10 @@
           },
           "restoreTo": {
             "type": "string"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -37286,14 +37576,19 @@
               "tenant.suspend",
               "tenant.restore",
               "membership.disable",
-              "membership.restore"
+              "membership.restore",
+              "incident.review",
+              "incident.approve",
+              "incident.reject",
+              "incident.close"
             ]
           },
           "targetType": {
             "type": "string",
             "enum": [
               "organization",
-              "membership"
+              "membership",
+              "incident"
             ]
           },
           "targetId": {
@@ -37390,7 +37685,11 @@
               "tenant.suspend",
               "tenant.restore",
               "membership.disable",
-              "membership.restore"
+              "membership.restore",
+              "incident.review",
+              "incident.approve",
+              "incident.reject",
+              "incident.close"
             ]
           },
           "targetId": {

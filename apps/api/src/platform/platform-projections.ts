@@ -33,6 +33,111 @@ export function maskPlatformEmail(email: string, canReadPii: boolean) {
   return `${email[0]}***${email.slice(separator)}`;
 }
 
+function maskPlatformName(name: string, canReadPii: boolean) {
+  if (canReadPii) return name;
+  const normalized = name.trim();
+  return normalized.length > 0 ? `${normalized[0]}***` : "redacted";
+}
+
+function maskPlatformPhone(phone: string, canReadPii: boolean) {
+  if (canReadPii) return phone;
+  return phone.length > 4 ? `${"*".repeat(phone.length - 4)}${phone.slice(-4)}` : "redacted";
+}
+
+export function sanitizePlatformLead(
+  input: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    businessName: string;
+    segment: string | null;
+    planSlug: string;
+    consentedAt: Date;
+    createdAt: Date;
+  },
+  canReadPii: boolean,
+) {
+  return {
+    id: input.id,
+    displayName: maskPlatformName(input.name, canReadPii),
+    email: maskPlatformEmail(input.email, canReadPii),
+    phone: maskPlatformPhone(input.phone, canReadPii),
+    businessName: input.businessName,
+    segment: input.segment,
+    planSlug: input.planSlug,
+    submittedAt: input.createdAt.toISOString(),
+    actionAvailability: "unavailable" as const,
+    actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE" as const,
+  };
+}
+
+export function sanitizePlatformSupportRequest(
+  input: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    message?: string;
+    consentedAt: Date;
+    createdAt: Date;
+  },
+  canReadPii: boolean,
+) {
+  return {
+    id: input.id,
+    displayName: maskPlatformName(input.name, canReadPii),
+    email: maskPlatformEmail(input.email, canReadPii),
+    phone: maskPlatformPhone(input.phone, canReadPii),
+    submittedAt: input.createdAt.toISOString(),
+    actionAvailability: "unavailable" as const,
+    actionReasonCode: "SUPPORT_WORKFLOW_NOT_AVAILABLE" as const,
+  };
+}
+
+type PlatformIncidentStatus = "reported" | "under_review" | "approved" | "rejected" | "closed";
+
+const incidentActions: Record<PlatformIncidentStatus, string[]> = {
+  reported: ["incident.review"],
+  under_review: ["incident.approve", "incident.reject"],
+  approved: ["incident.close"],
+  rejected: ["incident.close"],
+  closed: [],
+};
+
+export function sanitizePlatformIncident(input: {
+  id: string;
+  organizationId: string;
+  unitId: string;
+  incidentType: string;
+  status: PlatformIncidentStatus;
+  neutralSummary: string;
+  evidence?: Record<string, unknown>[];
+  amountCents: number | null;
+  payrollAction?: boolean;
+  idempotencyKey?: string;
+  requestHash?: string;
+  reporterIdentityId: string;
+  approverIdentityId: string | null;
+  occurredAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: input.id,
+    organizationId: input.organizationId,
+    unitId: input.unitId,
+    incidentType: input.incidentType,
+    status: input.status,
+    neutralSummary: input.neutralSummary,
+    amountCents: input.amountCents,
+    reporterIdentityId: input.reporterIdentityId,
+    approverIdentityId: input.approverIdentityId,
+    occurredAt: input.occurredAt.toISOString(),
+    updatedAt: input.updatedAt.toISOString(),
+    availableActions: incidentActions[input.status],
+  };
+}
+
 function encodeCursor(offset: number) {
   return Buffer.from(JSON.stringify({ offset }), "utf8").toString("base64url");
 }

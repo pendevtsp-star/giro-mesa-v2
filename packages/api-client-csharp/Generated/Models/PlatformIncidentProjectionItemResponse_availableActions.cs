@@ -5,20 +5,24 @@ namespace GiroMesa.ApiClient.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public enum PlatformActionResponse_targetType
+    public enum PlatformIncidentProjectionItemResponse_availableActions
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "organization")]
+        [EnumMember(Value = "incident.review")]
         #pragma warning disable CS1591
-        Organization,
+        IncidentReview,
         #pragma warning restore CS1591
-        [EnumMember(Value = "membership")]
+        [EnumMember(Value = "incident.approve")]
         #pragma warning disable CS1591
-        Membership,
+        IncidentApprove,
         #pragma warning restore CS1591
-        [EnumMember(Value = "incident")]
+        [EnumMember(Value = "incident.reject")]
         #pragma warning disable CS1591
-        Incident,
+        IncidentReject,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "incident.close")]
+        #pragma warning disable CS1591
+        IncidentClose,
         #pragma warning restore CS1591
     }
 }

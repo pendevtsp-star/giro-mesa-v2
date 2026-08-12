@@ -48,6 +48,38 @@ const inputSchema = z.discriminatedUnion("action", [
       payload: z.object({ expectedState: z.literal("disabled") }).strict(),
     })
     .strict(),
+  z
+    .object({
+      action: z.literal("incident.review"),
+      targetId: uuid,
+      justification,
+      payload: z.object({ expectedState: z.literal("reported"), unitId: uuid }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("incident.approve"),
+      targetId: uuid,
+      justification,
+      payload: z.object({ expectedState: z.literal("under_review"), unitId: uuid }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("incident.reject"),
+      targetId: uuid,
+      justification,
+      payload: z.object({ expectedState: z.literal("under_review"), unitId: uuid }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("incident.close"),
+      targetId: uuid,
+      justification,
+      payload: z.object({ expectedState: z.enum(["approved", "rejected"]), unitId: uuid }).strict(),
+    })
+    .strict(),
 ]);
 
 export type PlatformActionInput = z.infer<typeof inputSchema>;
@@ -63,7 +95,7 @@ export interface PlatformActionSnapshot {
   id: string;
   organizationId: string;
   action: PlatformActionName;
-  targetType: "organization" | "membership";
+  targetType: "organization" | "membership" | "incident";
   targetId: string;
   requestedByIdentityId: string;
   justification: string;
@@ -104,7 +136,9 @@ export function decisionRequestFingerprint(input: {
 }
 
 export function platformActionTargetType(action: PlatformActionName) {
-  return action.startsWith("tenant.") ? ("organization" as const) : ("membership" as const);
+  if (action.startsWith("tenant.")) return "organization" as const;
+  if (action.startsWith("incident.")) return "incident" as const;
+  return "membership" as const;
 }
 
 export function assertPlatformActionTransition(
@@ -187,8 +221,7 @@ export function platformActionFromAuditEvents(
     const status = requiredString(transition.metadata, "status") as PlatformActionStatus;
     if (!(["approved", "executed", "rejected", "expired", "failed"] as string[]).includes(status))
       throw new Error("INVALID_ACTION_LEDGER");
-    if (transition.action !== `platform.action.${status}`)
-      throw new Error("INVALID_ACTION_LEDGER");
+    if (transition.action !== `platform.action.${status}`) throw new Error("INVALID_ACTION_LEDGER");
     const actorIdentityId = transition.actorIdentityId ?? undefined;
     if (status === "approved") {
       if (

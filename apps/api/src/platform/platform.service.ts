@@ -2,8 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   auditEvents,
   commercialPlans,
+  contactRequests,
   growthIntegrations,
   identities,
+  managementIncidents,
   memberships,
   onboardingChecklistItems,
   onboardingRecords,
@@ -13,6 +15,7 @@ import {
   subscriptionEntitlements,
   subscriptions,
   type TenantTransaction,
+  trialApplications,
   units,
 } from "@giromesa/db";
 import {
@@ -52,7 +55,10 @@ import {
   type PlatformResource,
   paginatePlatformItems,
   sanitizePlatformAuditItem,
+  sanitizePlatformIncident,
   sanitizePlatformIntegration,
+  sanitizePlatformLead,
+  sanitizePlatformSupportRequest,
   unavailablePlatformProjection,
 } from "./platform-projections.js";
 
@@ -71,6 +77,16 @@ const platformResources = new Set<PlatformResource>([
   "incidents",
   "audit",
 ]);
+const globalPlatformResources = new Set<PlatformResource>(["leads", "support"]);
+
+function isIncidentAction(action: PlatformActionName) {
+  return (
+    action === "incident.review" ||
+    action === "incident.approve" ||
+    action === "incident.reject" ||
+    action === "incident.close"
+  );
+}
 
 type ActionEvent = {
   action: string;
@@ -87,7 +103,11 @@ export class PlatformService {
     const access = this.assertRead(auth);
     const [counts, stepUp] = await Promise.all([
       this.database.db.execute(
-        sql<{ organizations: number; active: number; attention: number }>`select * from public.giromesa_platform_overview()`,
+        sql<{
+          organizations: number;
+          active: number;
+          attention: number;
+        }>`select * from public.giromesa_platform_overview()`,
       ),
       this.recentStepUp(auth),
     ]);
@@ -124,12 +144,8 @@ export class PlatformService {
     const limit = options.limit ?? 25;
     await this.requireTenantContext(this.database.db, organizationId, options.unitId);
 
-    if (resource === "leads")
-      return unavailablePlatformProjection(resource, "LEAD_TENANT_LINK_NOT_AVAILABLE");
-    if (resource === "support")
-      return unavailablePlatformProjection(resource, "SUPPORT_TENANT_ADAPTER_NOT_WIRED");
-    if (resource === "incidents")
-      return unavailablePlatformProjection(resource, "INCIDENT_PROJECTION_NOT_WIRED");
+    if (resource === "leads" || resource === "support")
+      return unavailablePlatformProjection(resource, "PLATFORM_RESOURCE_GLOBAL_ONLY");
 
     const items = await this.projectAvailableResource(
       organizationId,
@@ -138,6 +154,59 @@ export class PlatformService {
       access,
     );
     const page = paginatePlatformItems(items, limit, options.cursor);
+    return { resource, availability: "available", ...page };
+  }
+
+  async globalProjection(
+    auth: AuthContext,
+    resourceInput: string,
+    options: { limit?: number; cursor?: string },
+  ): Promise<PlatformProjectionPage> {
+    const access = this.assertRead(auth);
+    if (!globalPlatformResources.has(resourceInput as PlatformResource))
+      throw new BadRequestException("INVALID_GLOBAL_PLATFORM_RESOURCE");
+    const resource = resourceInput as "leads" | "support";
+    const canReadPii = access.permissions.includes("platform.pii.read");
+    if (resource === "leads") {
+      const rows = await this.database.db
+        .select({
+          id: trialApplications.id,
+          name: trialApplications.name,
+          email: trialApplications.email,
+          phone: trialApplications.phone,
+          businessName: trialApplications.businessName,
+          segment: trialApplications.segment,
+          planSlug: trialApplications.planSlug,
+          consentedAt: trialApplications.consentedAt,
+          createdAt: trialApplications.createdAt,
+        })
+        .from(trialApplications)
+        .orderBy(desc(trialApplications.createdAt), desc(trialApplications.id))
+        .limit(500);
+      const page = paginatePlatformItems(
+        rows.map((row) => sanitizePlatformLead(row, canReadPii)),
+        options.limit ?? 25,
+        options.cursor,
+      );
+      return { resource, availability: "available", ...page };
+    }
+    const rows = await this.database.db
+      .select({
+        id: contactRequests.id,
+        name: contactRequests.name,
+        email: contactRequests.email,
+        phone: contactRequests.phone,
+        consentedAt: contactRequests.consentedAt,
+        createdAt: contactRequests.createdAt,
+      })
+      .from(contactRequests)
+      .orderBy(desc(contactRequests.createdAt), desc(contactRequests.id))
+      .limit(500);
+    const page = paginatePlatformItems(
+      rows.map((row) => sanitizePlatformSupportRequest(row, canReadPii)),
+      options.limit ?? 25,
+      options.cursor,
+    );
     return { resource, availability: "available", ...page };
   }
 
@@ -447,7 +516,7 @@ export class PlatformService {
   private async projectAvailableResource(
     organizationId: string,
     unitId: string | undefined,
-    resource: Exclude<PlatformResource, "leads" | "support" | "incidents">,
+    resource: Exclude<PlatformResource, "leads" | "support">,
     access: PlatformAccess,
   ): Promise<Record<string, unknown>[]> {
     if (resource === "tenant") {
@@ -589,6 +658,34 @@ export class PlatformService {
         );
       return rows.map(sanitizePlatformIntegration);
     }
+    if (resource === "incidents") {
+      const rows = await this.database.db
+        .select({
+          id: managementIncidents.id,
+          organizationId: managementIncidents.organizationId,
+          unitId: managementIncidents.unitId,
+          incidentType: managementIncidents.incidentType,
+          status: managementIncidents.status,
+          neutralSummary: managementIncidents.neutralSummary,
+          amountCents: managementIncidents.amountCents,
+          reporterIdentityId: managementIncidents.reporterIdentityId,
+          approverIdentityId: managementIncidents.approverIdentityId,
+          occurredAt: managementIncidents.occurredAt,
+          updatedAt: managementIncidents.updatedAt,
+        })
+        .from(managementIncidents)
+        .where(
+          unitId
+            ? and(
+                eq(managementIncidents.organizationId, organizationId),
+                eq(managementIncidents.unitId, unitId),
+              )
+            : eq(managementIncidents.organizationId, organizationId),
+        )
+        .orderBy(desc(managementIncidents.occurredAt), desc(managementIncidents.id))
+        .limit(500);
+      return rows.map(sanitizePlatformIncident);
+    }
     const rows = await this.database.db
       .select({
         id: auditEvents.id,
@@ -627,7 +724,36 @@ export class PlatformService {
       if (!row) throw new ConflictException("PLATFORM_ACTION_PRECONDITION_FAILED");
       return;
     }
-    const expectedState = input.payload.expectedState;
+    if (isIncidentAction(input.action)) {
+      const incidentInput = input as Extract<
+        PlatformActionInput,
+        { action: "incident.review" | "incident.approve" | "incident.reject" | "incident.close" }
+      >;
+      await this.requireTenantContext(tx, organizationId, incidentInput.payload.unitId);
+      const [incident] = await tx
+        .select({
+          status: managementIncidents.status,
+          reporterIdentityId: managementIncidents.reporterIdentityId,
+        })
+        .from(managementIncidents)
+        .where(
+          and(
+            eq(managementIncidents.organizationId, organizationId),
+            eq(managementIncidents.unitId, incidentInput.payload.unitId),
+            eq(managementIncidents.id, incidentInput.targetId),
+            eq(managementIncidents.status, incidentInput.payload.expectedState),
+          ),
+        );
+      if (!incident) throw new ConflictException("PLATFORM_ACTION_PRECONDITION_FAILED");
+      if (
+        (incidentInput.action === "incident.approve" ||
+          incidentInput.action === "incident.reject") &&
+        incident.reporterIdentityId === actorIdentityId
+      )
+        throw new ConflictException("INCIDENT_INDEPENDENT_ACTOR_REQUIRED");
+      return;
+    }
+    const expectedState = input.payload.expectedState as "active" | "disabled";
     const [membership] = await tx
       .select({ identityId: memberships.identityId, status: memberships.status })
       .from(memberships)
@@ -681,10 +807,69 @@ export class PlatformService {
       return { before: { state: expected }, after: { state: updated.state } };
     }
 
-    await this.lock(
-      tx,
-      `platform:organization:${snapshot.organizationId}:membership-owners`,
-    );
+    if (snapshot.action.startsWith("incident.")) {
+      const expected = snapshot.payload.expectedState as
+        | "reported"
+        | "under_review"
+        | "approved"
+        | "rejected";
+      const next =
+        snapshot.action === "incident.review"
+          ? "under_review"
+          : snapshot.action === "incident.approve"
+            ? "approved"
+            : snapshot.action === "incident.reject"
+              ? "rejected"
+              : "closed";
+      const requestHash = createHash("sha256")
+        .update(
+          JSON.stringify({
+            proposalId: snapshot.id,
+            organizationId: snapshot.organizationId,
+            unitId: snapshot.payload.unitId,
+            incidentId: snapshot.targetId,
+            expected,
+            next,
+            justification: snapshot.justification,
+          }),
+        )
+        .digest("hex");
+      let result: Awaited<ReturnType<TenantTransaction["execute"]>>;
+      try {
+        result = await tx.execute(
+          sql<{ status: string; approverIdentityId: string | null }>`
+            select status, approver_identity_id as "approverIdentityId"
+            from public.giromesa_platform_transition_incident(
+              ${snapshot.organizationId}::uuid,
+              ${snapshot.payload.unitId}::uuid,
+              ${snapshot.targetId}::uuid,
+              ${next}::text,
+              ${snapshot.justification}::text,
+              ${`platform-incident:${snapshot.id}`}::text,
+              ${requestHash}::text,
+              ${actorIdentityId}::uuid
+            )
+          `,
+        );
+      } catch (error) {
+        const databaseCode =
+          (error as { code?: unknown }).code ??
+          (error as { cause?: { code?: unknown } }).cause?.code;
+        if (databaseCode === "23505" || databaseCode === "23514" || databaseCode === "P0002")
+          throw new ConflictException("PLATFORM_ACTION_PRECONDITION_FAILED");
+        if (databaseCode === "42501") throw new ForbiddenException("INCIDENT_TRANSITION_FORBIDDEN");
+        throw error;
+      }
+      const [updated] = [...result];
+      if (!updated || updated.status !== next)
+        throw new ConflictException("PLATFORM_ACTION_PRECONDITION_FAILED");
+      return {
+        before: { state: expected },
+        after: { state: updated.status, approverIdentityId: updated.approverIdentityId },
+      };
+    }
+
+    await this.lock(tx, `platform:organization:${snapshot.organizationId}:membership-owners`);
     const [target] = await tx
       .select({ identityId: memberships.identityId, status: memberships.status })
       .from(memberships)
