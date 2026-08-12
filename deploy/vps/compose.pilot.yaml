@@ -106,7 +106,7 @@ services:
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-ops:${GIROMESA_IMAGE_TAG:-pilot}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3112:80"
+      - "127.0.0.1:3112:8080"
     networks:
       - giromesa-v2
 
