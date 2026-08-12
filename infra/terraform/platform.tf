@@ -27,6 +27,17 @@ resource "aws_s3_bucket" "objects" {
   bucket_prefix = "giromesa-${var.environment}-objects-"
 }
 
+resource "aws_kms_key" "objects" {
+  description             = "GiroMesa ${var.environment} object storage encryption"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_alias" "objects" {
+  name          = "alias/giromesa-${var.environment}-objects"
+  target_key_id = aws_kms_key.objects.key_id
+}
+
 resource "aws_s3_bucket_versioning" "objects" {
   bucket = aws_s3_bucket.objects.id
   versioning_configuration {
@@ -38,8 +49,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "objects" {
   bucket = aws_s3_bucket.objects.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      kms_master_key_id = aws_kms_key.objects.arn
+      sse_algorithm     = "aws:kms"
     }
+    bucket_key_enabled = true
   }
 }
 

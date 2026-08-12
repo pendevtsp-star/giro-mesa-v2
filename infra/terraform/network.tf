@@ -17,7 +17,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 }
 
 resource "aws_subnet" "private" {
@@ -77,23 +77,20 @@ resource "aws_security_group" "database" {
     security_groups = [aws_security_group.application.id]
   }
 
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
+# Provider endpoints use rotating public addresses; egress remains limited to TLS port 443.
+#trivy:ignore:AVD-AWS-0104
 resource "aws_security_group" "application" {
   name_prefix = "giromesa-${var.environment}-app-"
   description = "Application tasks."
   vpc_id      = aws_vpc.main.id
 
   egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
+    description = "Outbound HTTPS to configured payment, fiscal, email and identity providers."
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
