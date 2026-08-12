@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ContactRequestInput, TrialApplicationRequestInput } from "@giromesa/contracts";
 import {
   commercialCatalogVersions,
@@ -56,11 +57,17 @@ export class CatalogService {
 
   async createTrialApplication(input: TrialApplicationRequestInput) {
     const { name, email, phone, businessName, segment, planSlug } = input;
-    const [application] = await this.database.db
-      .insert(trialApplications)
-      .values({ name, email, phone, businessName, segment, planSlug, consentedAt: new Date() })
-      .returning({ id: trialApplications.id, createdAt: trialApplications.createdAt });
-    if (!application) throw new Error("Trial application was not created");
+    const application = { id: randomUUID(), createdAt: new Date() };
+    await this.database.db.insert(trialApplications).values({
+      ...application,
+      name,
+      email,
+      phone,
+      businessName,
+      segment,
+      planSlug,
+      consentedAt: new Date(),
+    });
     await this.database.db.insert(outboxEvents).values({
       topic: "trial.application_created",
       aggregateType: "trial_application",
@@ -71,17 +78,15 @@ export class CatalogService {
   }
 
   async createContactRequest(input: ContactRequestInput) {
-    const [contact] = await this.database.db
-      .insert(contactRequests)
-      .values({
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        message: input.message,
-        consentedAt: new Date(),
-      })
-      .returning({ id: contactRequests.id, createdAt: contactRequests.createdAt });
-    if (!contact) throw new Error("Contact request was not created");
+    const contact = { id: randomUUID(), createdAt: new Date() };
+    await this.database.db.insert(contactRequests).values({
+      ...contact,
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      message: input.message,
+      consentedAt: new Date(),
+    });
     await this.database.db.insert(outboxEvents).values({
       topic: "contact.request_created",
       aggregateType: "contact_request",
