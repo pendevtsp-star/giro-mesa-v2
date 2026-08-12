@@ -329,16 +329,21 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Check out the trusted validator from the authorizing main release
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Bind the validator to the authorizing main commit
+        env:
+          AUTHORIZATION_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: test "$(git rev-parse HEAD)" = "$AUTHORIZATION_SHA"
+      - name: Check out the exact recovery candidate without credentials
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
           ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
-      - name: Reject secrets in the exact recovery checkout
-        run: >-
-          docker run --rm
-          --volume "$PWD:/repo:ro"
-          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
-          dir --redact --no-banner /repo
+          path: candidate
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 11.7.0
@@ -346,84 +351,19 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Reprove recovery migrations on PostgreSQL 16 and 17
-        env:
-          RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
-        run: |
-          set -Eeuo pipefail
-          for major in 16 17; do
-            name="giromesa-recovery-pg${major}"
-            if [ "$major" = 16 ]; then image="postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777"; else image="postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193"; fi
-            docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres -p "127.0.0.1:54${major}:5432" "$image"
-            trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
-            for _ in $(seq 1 60); do docker exec "$name" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
-            docker exec "$name" pg_isready -U postgres >/dev/null
-            docker exec "$name" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
-              "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$;"
-            ROLLBACK_0029_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54${major}/postgres" pnpm --filter @giromesa/db test
-            docker rm -f "$name" >/dev/null
-            trap - EXIT
-          done
-          mkdir evidence
-          python3 - <<'PY'
-          import json,os,pathlib
-          value={"schemaVersion":1,"role":"recovery","recoveryArtifact":"git:"+os.environ["RECOVERY_SHA"],"postgresMajors":[16,17],"schemaLevels":[26,27,28,29],"targetMigration":"0029_platform_incident_projection_actions","testedUpgrade":True,"result":"passed"}
-          pathlib.Path("evidence/recovery-validation.json").write_text(json.dumps(value,sort_keys=True,separators=(",",":"))+"\n")
-          PY
-      - name: Reprove recovery API and worker runtime on PostgreSQL 17
-        env:
-          RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
-        run: |
-          set -Eeuo pipefail
-          network="giromesa-recovery-${RECOVERY_SHA}"
-          postgres="giromesa-recovery-runtime-pg"
-          api="giromesa-recovery-runtime-api"
-          worker="giromesa-recovery-runtime-worker"
-          cleanup() { docker rm -f "$api" "$worker" "$postgres" >/dev/null 2>&1 || true; docker network rm "$network" >/dev/null 2>&1 || true; rm -f /tmp/giromesa-recovery-runtime.env; }
-          trap cleanup EXIT
-          docker network create "$network"
-          docker run -d --name "$postgres" --network "$network" --network-alias postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=giromesa -e POSTGRES_DB=giromesa_v2 postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
-          for _ in $(seq 1 60); do docker exec "$postgres" pg_isready -U giromesa -d giromesa_v2 >/dev/null 2>&1 && break; sleep 1; done
-          docker exec "$postgres" pg_isready -U giromesa -d giromesa_v2 >/dev/null
-          docker build --build-arg APP=api -t "giromesa-recovery-api:${RECOVERY_SHA}" -f Dockerfile .
-          docker build --build-arg APP=worker -t "giromesa-recovery-worker:${RECOVERY_SHA}" -f Dockerfile .
-          python3 - <<'PY'
-          import base64, json, pathlib
-          key=base64.b64encode(bytes(range(32))).decode()
-          values={
-            "NODE_ENV":"production","DATABASE_URL":"postgresql://giromesa:postgres@postgres:5432/giromesa_v2",
-            "SESSION_SECRET":"recovery-runtime-session-secret-32-bytes-minimum","CORS_ORIGINS":"http://127.0.0.1",
-            "COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION":"v1","COMMAND_FINGERPRINT_KEYS":json.dumps({"v1":key},separators=(",",":")),
-            "PRIVACY_EXPORT_ENCRYPTION_KEY":key,"PUBLIC_TABLE_SESSION_SIGNING_KEY":key,
-            "PLATFORM_ADMIN_EMAILS":"recovery-runtime@invalid.local","PLATFORM_ADMIN_GRANTS":"platform.read",
-            "EMAIL_PROVIDER_ENABLED":"false","DOSECLUB_PROVIDER_ENABLED":"false","WORKER_HEARTBEAT_FILE":"/tmp/giromesa-worker-heartbeat",
-          }
-          pathlib.Path("/tmp/giromesa-recovery-runtime.env").write_text("".join(f"{k}={v}\n" for k,v in values.items()),encoding="utf-8")
-          PY
-          docker run --rm --network "$network" --env-file /tmp/giromesa-recovery-runtime.env "giromesa-recovery-api:${RECOVERY_SHA}" pnpm db:migrate
-          docker run -d --name "$api" --network "$network" --env-file /tmp/giromesa-recovery-runtime.env -e HOST=0.0.0.0 -e PORT=3200 "giromesa-recovery-api:${RECOVERY_SHA}"
-          docker run -d --name "$worker" --network "$network" --env-file /tmp/giromesa-recovery-runtime.env "giromesa-recovery-worker:${RECOVERY_SHA}"
-          for _ in $(seq 1 60); do docker exec "$api" node -e "fetch('http://127.0.0.1:3200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 && break; sleep 2; done
-          docker exec "$api" node -e "fetch('http://127.0.0.1:3200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-          before=$(docker inspect --format '{{.RestartCount}}' "$worker"); sleep 15; test "$before" = "$(docker inspect --format '{{.RestartCount}}' "$worker")"
-          test "$(docker inspect --format '{{.State.Status}}' "$worker")" = running
-          probe=$(docker exec "$postgres" psql -U giromesa -d giromesa_v2 -Atc "WITH inserted AS (INSERT INTO outbox_events(topic,aggregate_type,aggregate_id,payload) VALUES ('system.worker_probe','system','recovery-ci','{}'::jsonb) RETURNING id) SELECT id FROM inserted")
-          for _ in $(seq 1 30); do processed=$(docker exec "$postgres" psql -U giromesa -d giromesa_v2 -Atc "SELECT processed_at IS NOT NULL FROM outbox_events WHERE id='$probe'::uuid"); test "$processed" = t && break; sleep 1; done
-          test "$processed" = t
-          docker exec "$postgres" psql -U giromesa -d giromesa_v2 -c "DELETE FROM outbox_events WHERE id='$probe'::uuid" >/dev/null
-          cleanup
-          trap - EXIT
-          python3 - <<'PY'
-          import json,pathlib
-          path=pathlib.Path("evidence/recovery-validation.json"); value=json.loads(path.read_text())
-          value["runtime"]={"postgresMajor":17,"schemaLevel":29,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
-          path.write_text(json.dumps(value,sort_keys=True,separators=(",",":"))+"\n")
-          PY
+          cache-dependency-path: candidate/pnpm-lock.yaml
+      - name: Reprove the authorized recovery with the shared unprivileged gate
+        run: >-
+          ./scripts/validate-recovery-candidate.sh
+          --candidate-directory candidate
+          --recovery-sha "${{ needs.authorize-recovery.outputs.recovery_sha }}"
+          --output-directory evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: recovery-validation-${{ needs.authorize-recovery.outputs.recovery_sha }}
-          path: evidence/recovery-validation.json
+          path: |
+            evidence/recovery-validation.json
+            evidence/recovery-validation.json.sha256
           if-no-files-found: error
           retention-days: 90
 
