@@ -98,8 +98,14 @@ trap cleanup EXIT
 
 wait_for_postgres() {
   local container="$1" user="$2" database="$3"
+  local consecutive=0
   for _ in $(seq 1 90); do
-    if docker exec "$container" pg_isready -U "$user" -d "$database" >/dev/null 2>&1; then return 0; fi
+    if docker exec "$container" psql -U "$user" -d "$database" -Atqc "SELECT 1" >/dev/null 2>&1; then
+      consecutive=$((consecutive + 1))
+      if ((consecutive >= 3)); then return 0; fi
+    else
+      consecutive=0
+    fi
     sleep 1
   done
   printf 'RECOVERY_POSTGRES_NOT_READY:%s\n' "$container" >&2
