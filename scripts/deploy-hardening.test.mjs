@@ -475,6 +475,15 @@ test("private repository publishes keyless Sigstore signatures for every image d
   }
 });
 
+test("recovery validation provisions the historical migration owner before database tests", () => {
+  const publish = readFileSync(join(root, ".github", "workflows", "publish-images.yml"), "utf8");
+  assert.match(
+    publish,
+    /create role giromesa nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls/i,
+  );
+  assert.match(publish, /ROLLBACK_0029_DATABASE_URL=/);
+});
+
 test("trusted entrypoint sanitizes privileged execution and serializes release operations", () => {
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");
   assert.match(entrypoint, /^#!\/bin\/bash/);
