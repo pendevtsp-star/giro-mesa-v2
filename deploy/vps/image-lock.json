@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "images": {
+    "postgres": {
+      "reference": "postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193",
+      "upstreamRepository": "docker.io/library/postgres",
+      "upstreamTag": "17-alpine",
+      "provenance": "Docker Official Image multi-platform index locked by digest"
+    }
+  }
+}

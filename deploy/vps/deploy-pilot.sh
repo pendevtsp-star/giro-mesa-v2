@@ -29,7 +29,7 @@ provenance_script="$release_dir/deploy/vps/verify-image-provenance.sh"
 for file in "$compose_file" "$images_file" "$observability_file" "$backup_script" "$ensure_runtime_env" "$provenance_script"; do
   if [[ ! -f $file ]]; then echo "DEPLOY_FILE_REQUIRED:$file" >&2; exit 1; fi
 done
-for tool in docker python3 tar sha256sum curl readlink; do
+for tool in docker python3 tar sha256sum curl readlink gh; do
   if ! command -v "$tool" >/dev/null 2>&1; then echo "DEPLOY_TOOL_REQUIRED:$tool" >&2; exit 1; fi
 done
 
