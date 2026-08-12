@@ -40,6 +40,7 @@ async function installPlatformFixture(
         "platform.action.approve",
         "platform.action.reject",
         "platform.tenant.suspend",
+        "platform.incident.transition",
       ]
     : ["platform.read"];
   let sequence = 1;
@@ -115,17 +116,88 @@ async function installPlatformFixture(
       });
       return;
     }
+    if (path === "/v1/platform/resources/leads") {
+      await route.fulfill({
+        json: {
+          resource: "leads",
+          availability: "available",
+          items: [
+            {
+              id: "f1111111-1111-4111-8111-111111111111",
+              displayName: "M***",
+              email: "m***@example.test",
+              phone: "**********5432",
+              businessName: "Bar Horizonte",
+              segment: "bar",
+              planSlug: "operacao",
+              submittedAt: now,
+              actionAvailability: "unavailable",
+              actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE",
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+      return;
+    }
+    if (path === "/v1/platform/resources/support") {
+      await route.fulfill({
+        json: {
+          resource: "support",
+          availability: "available",
+          items: [
+            {
+              id: "f1111111-1111-4111-8111-111111111112",
+              displayName: "R***",
+              email: "r***@example.test",
+              phone: "**********4321",
+              submittedAt: now,
+              actionAvailability: "unavailable",
+              actionReasonCode: "SUPPORT_WORKFLOW_NOT_AVAILABLE",
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+      return;
+    }
     if (path.includes(`/v1/platform/tenants/${organizationId}/resources/`)) {
       const resource = decodeURIComponent(path.split("/").at(-1) ?? "");
       const delay = options.projectionDelays?.[resource] ?? 0;
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
-      if (["incidents", "leads", "support"].includes(resource)) {
+      if (["leads", "support"].includes(resource)) {
         await route.fulfill({
           json: {
             resource,
             availability: "unavailable",
             reasonCode: `${resource.toUpperCase()}_PROJECTION_NOT_WIRED`,
             items: [],
+            nextCursor: null,
+          },
+        });
+        return;
+      }
+      if (resource === "incidents") {
+        await route.fulfill({
+          json: {
+            resource,
+            availability: "available",
+            items: [
+              {
+                id: "f1111111-1111-4111-8111-111111111113",
+                organizationId,
+                unitId,
+                incidentType: "inventory_variance",
+                status: "under_review",
+                neutralSummary: "Diferença neutra confirmada na contagem.",
+                amountCents: 1290,
+                reporterIdentityId: otherIdentityId,
+                approverIdentityId: null,
+                occurredAt: now,
+                updatedAt: now,
+                availableActions: ["incident.approve", "incident.reject"],
+              },
+            ],
             nextCursor: null,
           },
         });
@@ -262,8 +334,12 @@ test("mantém contexto permanente, indisponibilidade verdadeira e leitura acess�
   await page.keyboard.press("Home");
   await expect(tenantTab).toBeFocused();
   await page.getByRole("tab", { name: "Incidentes" }).click();
-  await expect(page.getByText("Fonte ainda não conectada nesta base")).toBeVisible();
-  await expect(page.getByText("Nenhum dado ou sucesso foi simulado.")).toBeVisible();
+  await expect(page.getByText("Diferença neutra confirmada na contagem.")).toBeVisible();
+  await page.getByRole("tab", { name: "Leads" }).click();
+  await expect(page.getByText("Bar Horizonte")).toBeVisible();
+  await expect(page.getByText("LEAD_WORKFLOW_NOT_AVAILABLE")).toBeVisible();
+  await page.getByRole("tab", { name: "Suporte" }).click();
+  await expect(page.getByText("SUPPORT_WORKFLOW_NOT_AVAILABLE")).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).include(".app-shell").analyze();
   expect(accessibility.violations).toEqual([]);

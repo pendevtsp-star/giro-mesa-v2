@@ -166,7 +166,9 @@ describe("fronteira HTTP do backoffice", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ id: "proposal-1" }, { status: 200 }))
-      .mockResolvedValueOnce(Response.json({ id: "proposal-1", status: "executed" }, { status: 200 }));
+      .mockResolvedValueOnce(
+        Response.json({ id: "proposal-1", status: "executed" }, { status: 200 }),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     await api.platform.propose(
@@ -192,5 +194,22 @@ describe("fronteira HTTP do backoffice", () => {
       headers: { "idempotency-key": "approval-key-0001" },
       body: JSON.stringify({ expectedVersion: 1 }),
     });
+  });
+
+  it("consulta filas comerciais globais sem fabricar um tenant", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        resource: "leads",
+        availability: "available",
+        items: [],
+        nextCursor: null,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.platform.globalProjection("leads", { limit: 25 });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/platform/resources/leads?limit=25");
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("tenants");
   });
 });

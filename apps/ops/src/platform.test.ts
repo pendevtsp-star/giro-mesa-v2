@@ -95,6 +95,55 @@ describe("backoffice seguro", () => {
     });
   });
 
+  it("aceita as filas globais mascaradas e as ações tenant-scoped de incidente", () => {
+    expect(
+      parsePlatformProjection({
+        resource: "leads",
+        availability: "available",
+        items: [
+          {
+            id: "e1111111-1111-4111-8111-111111111111",
+            displayName: "M***",
+            email: "m***@example.test",
+            phone: "**********5432",
+            businessName: "Bar Horizonte",
+            segment: "bar",
+            planSlug: "operacao",
+            submittedAt: "2026-08-11T12:00:00.000Z",
+            actionAvailability: "unavailable",
+            actionReasonCode: "LEAD_WORKFLOW_NOT_AVAILABLE",
+          },
+        ],
+        nextCursor: null,
+      }).resource,
+    ).toBe("leads");
+
+    expect(
+      parsePlatformActionPage({
+        items: [
+          {
+            id: "c1111111-1111-4111-8111-111111111111",
+            organizationId,
+            action: "incident.approve",
+            targetType: "incident",
+            targetId: "e1111111-1111-4111-8111-111111111111",
+            requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+            justification: "Revisão independente com fundamento operacional documentado.",
+            payload: {
+              expectedState: "under_review",
+              unitId: "b1111111-1111-4111-8111-111111111111",
+            },
+            status: "pending",
+            version: 1,
+            requestedAt: "2026-08-11T12:00:00.000Z",
+            expiresAt: "2026-08-11T12:15:00.000Z",
+          },
+        ],
+        nextCursor: null,
+      }).items[0],
+    ).toMatchObject({ action: "incident.approve", targetType: "incident" });
+  });
+
   it("rejeita segredos e estados desconhecidos na fila dual-control", () => {
     expect(() =>
       parsePlatformActionPage({

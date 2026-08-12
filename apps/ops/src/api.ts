@@ -384,6 +384,18 @@ export const api = {
   },
   platform: {
     overview: (signal?: AbortSignal) => request<unknown>("/v1/platform/overview", { signal }),
+    globalProjection: (
+      resource: "leads" | "support",
+      options: { cursor?: string; limit?: number; signal?: AbortSignal } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (options.cursor) query.set("cursor", options.cursor);
+      if (options.limit) query.set("limit", String(options.limit));
+      const suffix = query.size > 0 ? `?${query}` : "";
+      return request<unknown>(`/v1/platform/resources/${encodeURIComponent(resource)}${suffix}`, {
+        signal: options.signal,
+      });
+    },
     context: (organizationId: string, unitId?: string, signal?: AbortSignal) =>
       request<unknown>(
         `${platformTenantPath(organizationId, "context")}${unitId ? `?unitId=${encodeURIComponent(unitId)}` : ""}`,
@@ -423,10 +435,7 @@ export const api = {
       idempotencyKey: string = crypto.randomUUID(),
     ) =>
       request<unknown>(
-        platformTenantPath(
-          organizationId,
-          `actions/${encodeURIComponent(proposalId)}/approve`,
-        ),
+        platformTenantPath(organizationId, `actions/${encodeURIComponent(proposalId)}/approve`),
         {
           method: "POST",
           headers: { "idempotency-key": idempotencyKey },
@@ -440,10 +449,7 @@ export const api = {
       idempotencyKey: string = crypto.randomUUID(),
     ) =>
       request<unknown>(
-        platformTenantPath(
-          organizationId,
-          `actions/${encodeURIComponent(proposalId)}/reject`,
-        ),
+        platformTenantPath(organizationId, `actions/${encodeURIComponent(proposalId)}/reject`),
         {
           method: "POST",
           headers: { "idempotency-key": idempotencyKey },

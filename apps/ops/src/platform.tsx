@@ -30,6 +30,7 @@ const resources = [
   "support",
 ] as const;
 type PlatformResource = (typeof resources)[number];
+const globalResources = new Set<PlatformResource>(["leads", "support"]);
 
 const resourceLabels: Record<PlatformResource, string> = {
   tenant: "Tenant",
@@ -55,6 +56,7 @@ const knownPermissions = new Set([
   "platform.tenant.restore",
   "platform.membership.disable",
   "platform.membership.restore",
+  "platform.incident.transition",
 ]);
 
 export interface PlatformOverview {
@@ -80,14 +82,18 @@ type PlatformActionName =
   | "tenant.suspend"
   | "tenant.restore"
   | "membership.disable"
-  | "membership.restore";
+  | "membership.restore"
+  | "incident.review"
+  | "incident.approve"
+  | "incident.reject"
+  | "incident.close";
 type PlatformActionStatus = "pending" | "approved" | "executed" | "rejected" | "expired" | "failed";
 
 interface PlatformAction {
   id: string;
   organizationId: string;
   action: PlatformActionName;
-  targetType: "organization" | "membership";
+  targetType: "organization" | "membership" | "incident";
   targetId: string;
   requestedByIdentityId: string;
   justification: string;
@@ -264,11 +270,16 @@ export function parsePlatformProjection(value: unknown): PlatformProjection {
 
 function parseActionPayload(action: PlatformActionName, value: unknown) {
   const payload = record(value);
-  const allowed = action === "tenant.restore" ? ["expectedState", "restoreTo"] : ["expectedState"];
+  const allowed = action.startsWith("incident.")
+    ? ["expectedState", "unitId"]
+    : action === "tenant.restore"
+      ? ["expectedState", "restoreTo"]
+      : ["expectedState"];
   if (Object.keys(payload).some((key) => !allowed.includes(key)))
     throw new InvalidPlatformPayloadError();
   const result: Record<string, string> = { expectedState: text(payload.expectedState) };
   if (action === "tenant.restore") result.restoreTo = text(payload.restoreTo);
+  if (action.startsWith("incident.")) result.unitId = text(payload.unitId);
   return result;
 }
 
@@ -279,6 +290,10 @@ export function parsePlatformActionPage(value: unknown): PlatformActionPage {
     "tenant.restore",
     "membership.disable",
     "membership.restore",
+    "incident.review",
+    "incident.approve",
+    "incident.reject",
+    "incident.close",
   ];
   const allowedStatuses: PlatformActionStatus[] = [
     "pending",
@@ -312,7 +327,7 @@ export function parsePlatformActionPage(value: unknown): PlatformActionPage {
     if (
       !allowedActions.includes(action) ||
       !allowedStatuses.includes(status) ||
-      !["organization", "membership"].includes(targetType)
+      !["organization", "membership", "incident"].includes(targetType)
     )
       throw new InvalidPlatformPayloadError();
     return {
@@ -385,6 +400,10 @@ function actionLabel(action: PlatformActionName) {
     "tenant.restore": "Restaurar tenant",
     "membership.disable": "Desativar usuário",
     "membership.restore": "Restaurar usuário",
+    "incident.review": "Iniciar revisão do incidente",
+    "incident.approve": "Aprovar incidente",
+    "incident.reject": "Rejeitar incidente",
+    "incident.close": "Encerrar incidente",
   }[action];
 }
 
@@ -422,6 +441,35 @@ function safeColumns(resource: PlatformResource, row: Row): Array<[string, unkno
     billing: ["state", "cycle", "currentPeriodEndsAt", "updatedAt"],
     integrations: ["provider", "status", "unitId", "updatedAt"],
     audit: ["action", "entityType", "entityId", "occurredAt"],
+    leads: [
+      "displayName",
+      "email",
+      "phone",
+      "businessName",
+      "segment",
+      "planSlug",
+      "submittedAt",
+      "actionAvailability",
+      "actionReasonCode",
+    ],
+    support: [
+      "displayName",
+      "email",
+      "phone",
+      "submittedAt",
+      "actionAvailability",
+      "actionReasonCode",
+    ],
+    incidents: [
+      "incidentType",
+      "status",
+      "neutralSummary",
+      "amountCents",
+      "reporterIdentityId",
+      "approverIdentityId",
+      "occurredAt",
+      "updatedAt",
+    ],
   };
   return (columns[resource] ?? []).flatMap<[string, unknown]>((key) =>
     row[key] === undefined ? [] : [[key, row[key]]],
@@ -567,12 +615,17 @@ export function RealPlatformPage({
       if (scope !== tenantScopeEpoch.current) return Promise.resolve();
       const request = projectionRequests.current.begin();
       setProjection({ status: "loading" });
-      return api.platform
-        .projection(organizationId, resource, {
-          unitId: selectedUnitId || undefined,
-          limit: 50,
-          signal: request.signal,
-        })
+      const load = globalResources.has(resource)
+        ? api.platform.globalProjection(resource as "leads" | "support", {
+            limit: 50,
+            signal: request.signal,
+          })
+        : api.platform.projection(organizationId, resource, {
+            unitId: selectedUnitId || undefined,
+            limit: 50,
+            signal: request.signal,
+          });
+      return load
         .then(parsePlatformProjection)
         .then((data) => {
           if (
@@ -633,6 +686,7 @@ export function RealPlatformPage({
   const activeOverview = overview.status === "ready" ? overview.data : null;
   const permissions = activeOverview?.access.permissions ?? [];
   const needsMembershipTarget = action.startsWith("membership.");
+  const needsIncidentTarget = action.startsWith("incident.");
   const expectedState =
     action === "tenant.suspend"
       ? activeContext?.organization.billingState
@@ -640,7 +694,13 @@ export function RealPlatformPage({
         ? action.startsWith("tenant.")
           ? "suspended"
           : "disabled"
-        : "active";
+        : action === "incident.review"
+          ? "reported"
+          : action === "incident.approve" || action === "incident.reject"
+            ? "under_review"
+            : action === "incident.close"
+              ? "approved"
+              : "active";
   const canPropose =
     Boolean(activeContext) &&
     activeOverview?.access.stepUp === true &&
@@ -648,7 +708,8 @@ export function RealPlatformPage({
     permissions.includes(actionPermission(action)) &&
     justification.trim().length >= 20 &&
     confirmed &&
-    (!needsMembershipTarget || targetId.trim().length > 0);
+    (!needsMembershipTarget || targetId.trim().length > 0) &&
+    (!needsIncidentTarget || (targetId.trim().length > 0 && unitId.length > 0));
 
   const impact = useMemo(() => {
     if (action === "tenant.suspend")
@@ -657,6 +718,12 @@ export function RealPlatformPage({
       return `Restaura o tenant para o estado ${restoreTo}; o estado atual deve continuar suspenso.`;
     if (action === "membership.disable")
       return "Desativa o acesso da membership; o último owner ativo permanece protegido.";
+    if (action === "incident.review")
+      return "Move o incidente informado para revisão, mantendo o registro auditável e sem efeito salarial.";
+    if (action === "incident.approve" || action === "incident.reject")
+      return "Registra uma decisão independente sobre o incidente, sem desconto automático ou alteração de folha.";
+    if (action === "incident.close")
+      return "Encerra um incidente já decidido; o histórico permanece imutável e consultável.";
     return "Restaura a membership desativada para o estado ativo.";
   }, [action, restoreTo]);
 
@@ -668,13 +735,19 @@ export function RealPlatformPage({
     setMutating(true);
     setMutationError(null);
     try {
-      const payload =
-        action === "tenant.restore" ? { expectedState: "suspended", restoreTo } : { expectedState };
+      const payload = action.startsWith("incident.")
+        ? { expectedState, unitId }
+        : action === "tenant.restore"
+          ? { expectedState: "suspended", restoreTo }
+          : { expectedState };
       await api.platform.propose(
         organizationId,
         {
           action,
-          targetId: needsMembershipTarget ? targetId.trim() : activeContext.organization.id,
+          targetId:
+            needsMembershipTarget || needsIncidentTarget
+              ? targetId.trim()
+              : activeContext.organization.id,
           justification: justification.trim(),
           payload,
         },
@@ -939,14 +1012,22 @@ export function RealPlatformPage({
                     <option value="tenant.restore">Restaurar tenant</option>
                     <option value="membership.disable">Desativar usuário</option>
                     <option value="membership.restore">Restaurar usuário</option>
+                    <option value="incident.review">Iniciar revisão do incidente</option>
+                    <option value="incident.approve">Aprovar incidente</option>
+                    <option value="incident.reject">Rejeitar incidente</option>
+                    <option value="incident.close">Encerrar incidente</option>
                   </select>
                 </label>
                 <label>
                   Alvo
                   <input
-                    disabled={!needsMembershipTarget}
+                    disabled={!needsMembershipTarget && !needsIncidentTarget}
                     onChange={(event) => setTargetId(event.target.value)}
-                    value={needsMembershipTarget ? targetId : activeContext.organization.id}
+                    value={
+                      needsMembershipTarget || needsIncidentTarget
+                        ? targetId
+                        : activeContext.organization.id
+                    }
                   />
                 </label>
                 {action === "tenant.restore" && (
