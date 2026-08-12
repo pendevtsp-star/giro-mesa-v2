@@ -1,28 +1,151 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
+
+for tool in basename mktemp chmod rm python3 id; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "IMAGE_PROVENANCE_TOOL_REQUIRED:$tool" >&2; exit 1; }
+done
 
 attestation=${GIROMESA_IMAGE_ATTESTATION_FILE:-}
 if [[ -z $attestation || ! -f $attestation || -L $attestation ]]; then
   echo "IMAGE_PROVENANCE_ATTESTATION_REQUIRED" >&2
   exit 1
 fi
-for tool in gh docker python3; do
+provenance_role=${GIROMESA_PROVENANCE_ROLE:-target}
+case "$provenance_role" in
+  target)
+    workflow_identity="https://github.com/pendevtsp-star/giro-mesa-v2/.github/workflows/publish-images.yml@refs/heads/main"
+    workflow_trigger=workflow_run
+    ;;
+  recovery)
+    workflow_identity="https://github.com/pendevtsp-star/giro-mesa-v2/.github/workflows/ci.yml@refs/heads/release/rollback-0029"
+    workflow_trigger=push
+    ;;
+  *) echo "IMAGE_PROVENANCE_ROLE_INVALID" >&2; exit 1 ;;
+esac
+attestation_bundle=${GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE:-${attestation}.bundle}
+if [[ ! -f $attestation_bundle || -L $attestation_bundle ]]; then
+  echo "IMAGE_PROVENANCE_ATTESTATION_BUNDLE_REQUIRED" >&2
+  exit 1
+fi
+attestation_checksum=${GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE:-${attestation}.sha256}
+if [[ ! -f $attestation_checksum || -L $attestation_checksum ]]; then
+  echo "IMAGE_PROVENANCE_ATTESTATION_CHECKSUM_REQUIRED" >&2
+  exit 1
+fi
+attestation_original_name=$(basename "$attestation")
+attestation_stage=$(mktemp -d)
+chmod 700 "$attestation_stage"
+cleanup_attestation_stage() { rm -rf -- "$attestation_stage"; }
+trap cleanup_attestation_stage EXIT
+python3 - "$attestation" "$attestation_stage/attestation.json" \
+  "$attestation_bundle" "$attestation_stage/attestation.bundle" \
+  "$attestation_checksum" "$attestation_stage/attestation.sha256" <<'PY'
+import os, shutil, stat, sys
+for source_name, target_name in zip(sys.argv[1::2], sys.argv[2::2], strict=True):
+    source_fd = os.open(source_name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        source_stat = os.fstat(source_fd)
+        if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_size <= 0:
+            raise SystemExit("IMAGE_PROVENANCE_ATTESTATION_SOURCE_INVALID")
+        target_fd = os.open(target_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(os.dup(source_fd), "rb") as source, os.fdopen(os.dup(target_fd), "wb") as target:
+                shutil.copyfileobj(source, target)
+                target.flush()
+                os.fsync(target.fileno())
+        finally:
+            os.close(target_fd)
+    finally:
+        os.close(source_fd)
+PY
+attestation="$attestation_stage/attestation.json"
+attestation_bundle="$attestation_stage/attestation.bundle"
+attestation_checksum="$attestation_stage/attestation.sha256"
+if [[ ! -s $attestation || ! -s $attestation_bundle || ! -s $attestation_checksum ]]; then
+  echo "IMAGE_PROVENANCE_ATTESTATION_EMPTY" >&2
+  exit 1
+fi
+for tool in docker python3 stat realpath; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "IMAGE_PROVENANCE_TOOL_REQUIRED:$tool" >&2
     exit 1
   fi
 done
+docker buildx version >/dev/null 2>&1 || { echo "IMAGE_PROVENANCE_BUILDX_REQUIRED" >&2; exit 1; }
 lock_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/image-lock.json"
-if [[ ! -f $lock_file || -L $lock_file ]]; then
+attestation_validator="$(dirname "$lock_file")/validate-buildkit-attestations.py"
+if [[ ! -f $lock_file || -L $lock_file || ! -f $attestation_validator || -L $attestation_validator ]]; then
   echo "IMAGE_PROVENANCE_LOCK_REQUIRED" >&2
   exit 1
 fi
+docker_config_directory=${GIROMESA_DOCKER_CONFIG_DIRECTORY:-}
+if [[ -z $docker_config_directory || ! -d $docker_config_directory || -L $docker_config_directory || ! -f $docker_config_directory/config.json || -L $docker_config_directory/config.json ]]; then
+  echo "IMAGE_PROVENANCE_DOCKER_CONFIG_REQUIRED" >&2
+  exit 1
+fi
+config_dir_mode=$(stat -c '%a' "$docker_config_directory")
+config_file_mode=$(stat -c '%a' "$docker_config_directory/config.json")
+operator_uid=$(id -u); operator_gid=$(id -g)
+config_dir_uid=$(stat -c '%u' "$docker_config_directory")
+config_file_uid=$(stat -c '%u' "$docker_config_directory/config.json")
+if [[ $config_dir_mode != 700 || $config_file_mode != 600 || $config_dir_uid != "$operator_uid" || $config_file_uid != "$operator_uid" ]]; then
+  echo "IMAGE_PROVENANCE_DOCKER_CONFIG_PERMISSIONS_INVALID" >&2
+  exit 1
+fi
+export DOCKER_CONFIG=$docker_config_directory
+python3 - "$docker_config_directory/config.json" <<'PY'
+import json, pathlib, sys
+try:
+    value = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+    auths = value.get("auths")
+    valid = (
+        isinstance(auths, dict) and set(auths) == {"ghcr.io"}
+        and isinstance(auths["ghcr.io"], dict) and bool(auths["ghcr.io"].get("auth"))
+        and "credsStore" not in value and "credHelpers" not in value
+    )
+except Exception:
+    valid = False
+if not valid: raise SystemExit("IMAGE_PROVENANCE_DEDICATED_GHCR_CONFIG_INVALID")
+PY
+cosign_image=$(python3 - "$lock_file" <<'PY'
+import json, re, sys
+value = json.load(open(sys.argv[1], encoding="utf-8"))["images"]["cosign"]
+reference = value.get("reference", "")
+if not re.fullmatch(r"ghcr\.io/sigstore/cosign/cosign@sha256:[0-9a-f]{64}", reference): raise SystemExit(1)
+print(reference, end="")
+PY
+)
 
-python3 - "$attestation" "$lock_file" "${GIROMESA_RELEASE_ARTIFACT_SHA:-}" "${GIROMESA_POSTGRES_IMAGE:-}" \
+attestation_path=$(realpath "$attestation")
+attestation_bundle_path=$(realpath "$attestation_bundle")
+python3 - "$attestation_path" "$attestation_checksum" "$attestation_original_name" <<'PY'
+import hashlib, pathlib, re, sys
+artifact, checksum_path = map(pathlib.Path, sys.argv[1:3])
+expected_name = sys.argv[3]
+value = checksum_path.read_text(encoding="ascii")
+match = re.fullmatch(r"([0-9a-f]{64})  ([^/\\\r\n]+)\n?", value)
+if not match or match.group(2) != expected_name or hashlib.sha256(artifact.read_bytes()).hexdigest() != match.group(1):
+    raise SystemExit("IMAGE_PROVENANCE_ATTESTATION_CHECKSUM_INVALID")
+PY
+docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m --user "$operator_uid:$operator_gid" \
+  --volume "$attestation_path:/release/attestation.json:ro" \
+  --volume "$attestation_bundle_path:/release/attestation.bundle:ro" \
+  --volume "$docker_config_directory:/cosign-home/.docker:ro" \
+  --env HOME=/tmp/cosign-home --env DOCKER_CONFIG=/cosign-home/.docker "$cosign_image" verify-blob \
+  --bundle /release/attestation.bundle \
+  --certificate-identity "$workflow_identity" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  --certificate-github-workflow-repository "pendevtsp-star/giro-mesa-v2" \
+  --certificate-github-workflow-sha "$GIROMESA_RELEASE_ARTIFACT_SHA" \
+  --certificate-github-workflow-trigger "$workflow_trigger" \
+  /release/attestation.json >/dev/null
+
+python3 - "$attestation" "$lock_file" "${GIROMESA_RELEASE_ARTIFACT_SHA:-}" "${GIROMESA_POSTGRES_IMAGE:-}" "$provenance_role" \
   "${GIROMESA_API_IMAGE:-}" "${GIROMESA_WORKER_IMAGE:-}" "${GIROMESA_SITE_IMAGE:-}" \
   "${GIROMESA_CUSTOMER_IMAGE:-}" "${GIROMESA_OPS_IMAGE:-}" <<'PY'
 import json, pathlib, re, sys
-path, lock_path, artifact, postgres, *images = sys.argv[1:]
+path, lock_path, artifact, postgres, role, *images = sys.argv[1:]
 digest = re.compile(r"^ghcr\.io/pendevtsp-star/giro-mesa-v2-(?:api|worker|site|customer|ops)@sha256:[0-9a-f]{64}$")
 try:
     value = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
@@ -36,7 +159,7 @@ try:
         and postgres_lock.get("upstreamRepository") == "docker.io/library/postgres"
         and postgres_lock.get("upstreamTag") == "17-alpine"
         and value.get("sourceCommit") == artifact
-        and value.get("workflow") == "publish-images.yml"
+        and value.get("workflow") == {"target":"publish-images.yml", "recovery":"ci.yml"}.get(role)
         and sorted(value.get("images", [])) == sorted(images)
         and len(images) == 5
         and len(set(images)) == 5
@@ -50,12 +173,25 @@ if not valid:
 PY
 docker image inspect "$GIROMESA_POSTGRES_IMAGE" --format '{{json .RepoDigests}}' >/dev/null
 
+image_index=0
 for image in "$GIROMESA_API_IMAGE" "$GIROMESA_WORKER_IMAGE" "$GIROMESA_SITE_IMAGE" "$GIROMESA_CUSTOMER_IMAGE" "$GIROMESA_OPS_IMAGE"; do
-  docker image inspect "$image" --format '{{json .RepoDigests}}' >/dev/null
-  gh attestation verify "oci://$image" \
-    --repo pendevtsp-star/giro-mesa-v2 \
-    --signer-workflow pendevtsp-star/giro-mesa-v2/.github/workflows/publish-images.yml \
-    --source-digest "$GIROMESA_RELEASE_ARTIFACT_SHA" \
-    --deny-self-hosted-runners >/dev/null
+  if [[ ${GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE:-true} == true ]]; then
+    docker image inspect "$image" --format '{{json .RepoDigests}}' >/dev/null
+  fi
+  docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m --user "$operator_uid:$operator_gid" --volume "$docker_config_directory:/cosign-home/.docker:ro" \
+    --env HOME=/tmp/cosign-home --env DOCKER_CONFIG=/cosign-home/.docker "$cosign_image" verify \
+    --certificate-identity "$workflow_identity" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    --certificate-github-workflow-repository "pendevtsp-star/giro-mesa-v2" \
+    --certificate-github-workflow-sha "$GIROMESA_RELEASE_ARTIFACT_SHA" \
+    --certificate-github-workflow-trigger "$workflow_trigger" \
+    "$image" >/dev/null
+  provenance_file="$attestation_stage/provenance-$image_index.json"
+  sbom_file="$attestation_stage/sbom-$image_index.json"
+  docker buildx imagetools inspect "$image" --format '{{json .Provenance}}' >"$provenance_file"
+  docker buildx imagetools inspect "$image" --format '{{json .SBOM}}' >"$sbom_file"
+  chmod 600 "$provenance_file" "$sbom_file"
+  python3 "$attestation_validator" "$provenance_file" "$sbom_file"
+  image_index=$((image_index + 1))
 done
 echo "Proveniência criptográfica e digests de imagens validados sem exibir credenciais."

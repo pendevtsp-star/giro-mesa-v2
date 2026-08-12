@@ -50,14 +50,28 @@ export function validateWorkflowBuildArgs(workflow) {
   return errors;
 }
 
+export function validateWorkflowActionPins(workflow) {
+  const errors = [];
+  for (const line of workflow.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:-\s+)?uses:\s*([^\s#]+)(?:\s+#.*)?$/);
+    if (match && !/@[0-9a-f]{40}$/.test(match[1])) {
+      errors.push(`workflow action must use an immutable commit SHA: ${match[1]}`);
+    }
+  }
+  return errors;
+}
+
 export function validateSupplyChain() {
   const errors = [];
+  const ci = read(".github/workflows/ci.yml");
   const security = read(".github/workflows/security.yml");
   const dockerfile = read("Dockerfile");
   const opsDockerfile = read("Dockerfile.ops");
   const publish = read(".github/workflows/publish-images.yml");
   const nginx = read("deploy/vps/ops-nginx.conf");
   const runbook = read("docs/runbooks/vulnerability-response.md");
+  const imageLock = JSON.parse(read("deploy/vps/image-lock.json"));
+  const terraformNetwork = read("infra/terraform/network.tf");
   const workflows = readdirSync(resolve(root, ".github/workflows"))
     .filter((file) => /\.ya?ml$/i.test(file))
     .map((file) => read(`.github/workflows/${file}`));
@@ -71,6 +85,12 @@ export function validateSupplyChain() {
   requireText(security, /gitleaks/i, "security workflow must scan for secrets", errors);
   requireText(
     security,
+    /gitleaks[\s\S]*dir --redact --no-banner \/repo/,
+    "secret scan must inspect the build directory fail-closed",
+    errors,
+  );
+  requireText(
+    security,
     /pnpm audit --audit-level=high/,
     "security workflow must fail SCA at high severity",
     errors,
@@ -82,8 +102,62 @@ export function validateSupplyChain() {
   }
   requireText(
     security,
-    /actions\/upload-artifact@v4/,
+    /actions\/upload-artifact@[0-9a-f]{40}/,
     "security workflow must retain SBOM evidence",
+    errors,
+  );
+  requireText(
+    ci,
+    /gitleaks:v8\.28\.0@sha256:[0-9a-f]{64}/,
+    "CI must gate publication on a pinned secret scan",
+    errors,
+  );
+  requireText(
+    ci,
+    /gitleaks[\s\S]*dir --redact --no-banner \/repo/,
+    "CI secret gate must inspect the build directory fail-closed",
+    errors,
+  );
+  requireText(
+    ci,
+    /trivy:0\.69\.2@sha256:[0-9a-f]{64}/,
+    "CI must gate publication on a pinned container scan",
+    errors,
+  );
+  requireText(
+    ci,
+    /node scripts\/check-supply-chain\.mjs/,
+    "CI must validate the release supply-chain contract",
+    errors,
+  );
+  requireText(
+    ci,
+    /branches: \[main, release\/rollback-0029\]/,
+    "CI must gate the exact recovery branch",
+    errors,
+  );
+  requireText(
+    ci,
+    /recovery-publish:[\s\S]*needs: \[typescript, dotnet, terraform, release-security\]/,
+    "recovery publication must depend on every CI gate",
+    errors,
+  );
+  requireText(
+    ci,
+    /github\.ref == 'refs\/heads\/release\/rollback-0029'/,
+    "recovery publication must be branch exact",
+    errors,
+  );
+  requireText(
+    ci,
+    /cosign sign --yes "\$IMAGE"/,
+    "recovery images must use keyless Cosign signatures",
+    errors,
+  );
+  requireText(
+    ci,
+    /cosign sign-blob --yes/,
+    "recovery manifest must use a keyless Cosign signature",
     errors,
   );
   requireText(
@@ -92,24 +166,77 @@ export function validateSupplyChain() {
     "image publication must request OIDC for provenance",
     errors,
   );
-  requireText(
-    publish,
-    /attestations:\s*write/,
-    "image publication must request attestation permission",
-    errors,
-  );
   requireText(publish, /provenance:\s*mode=max/, "image builds must emit provenance", errors);
   requireText(publish, /sbom:\s*true/, "image builds must emit an SBOM", errors);
   requireText(
     publish,
-    /actions\/attest-build-provenance@v3/,
-    "image publication must attest the built digest",
+    /cosign sign --yes "\$IMAGE"/,
+    "image publication must sign the built digest with Cosign",
     errors,
   );
+  requireText(
+    publish,
+    /cosign sign-blob --yes/,
+    "release manifest must be signed with Cosign",
+    errors,
+  );
+  requireText(
+    publish,
+    /giromesa-image-attestation-\$\{SOURCE_SHA\}\.json\.bundle/,
+    "release manifest must retain a verification bundle",
+    errors,
+  );
+  requireText(
+    publish,
+    /workflow_run\.event == 'push'/,
+    "privileged publication must require a push CI event",
+    errors,
+  );
+  requireText(
+    publish,
+    /workflow_run\.head_repository\.full_name == github\.repository/,
+    "privileged publication must require the trusted repository",
+    errors,
+  );
+  requireText(
+    publish,
+    /workflow_run\.head_sha == github\.sha/,
+    "privileged publication must bind the completed CI SHA",
+    errors,
+  );
+  requireText(
+    publish,
+    /driver-opts:\s*image=moby\/buildkit@sha256:[0-9a-f]{64}/,
+    "BuildKit executor must be locked by digest",
+    errors,
+  );
+  requireText(
+    publish,
+    /actions\/download-artifact@[0-9a-f]{40}/,
+    "publication must aggregate immutable image digest fragments",
+    errors,
+  );
+  if (/attestations:\s*write|actions\/attest-build-provenance@/.test(publish)) {
+    errors.push(
+      "private-repository publication must not depend on unavailable GitHub attestations",
+    );
+  }
   requireText(dockerfile, /^USER node$/m, "application image must run as node", errors);
   requireText(
+    dockerfile,
+    /^# syntax=docker\/dockerfile:1@sha256:[0-9a-f]{64}$/m,
+    "application Dockerfile frontend must be locked by digest",
+    errors,
+  );
+  requireText(
+    dockerfile,
+    /^FROM node:24\.18\.0-bookworm-slim@sha256:[0-9a-f]{64}$/m,
+    "application base image must be locked by digest",
+    errors,
+  );
+  requireText(
     opsDockerfile,
-    /nginxinc\/nginx-unprivileged/,
+    /nginxinc\/nginx-unprivileged:1\.29-alpine@sha256:[0-9a-f]{64}/,
     "operations image must use the unprivileged nginx image",
     errors,
   );
@@ -133,6 +260,21 @@ export function validateSupplyChain() {
     errors,
   );
   requireText(runbook, /SBOM/, "runbook must describe SBOM evidence", errors);
+  requireText(
+    terraformNetwork,
+    /resource "aws_vpc_security_group_egress_rule" "application_https"/,
+    "application HTTPS egress must use a standalone security-group rule",
+    errors,
+  );
+  const applicationSecurityGroup = terraformNetwork.match(
+    /resource "aws_security_group" "application" \{([\s\S]*?)\n\}/,
+  );
+  if (
+    !applicationSecurityGroup ||
+    /^\s*(?:ingress|egress)\s*\{/m.test(applicationSecurityGroup[1])
+  ) {
+    errors.push("application security group must not mix inline and standalone rules");
+  }
   requireText(runbook, /CRITICAL.*24 horas/s, "runbook must define a critical maximum SLA", errors);
   requireText(runbook, /HIGH.*7 dias/s, "runbook must define a high maximum SLA", errors);
   requireText(runbook, /MEDIUM.*30 dias/s, "runbook must define a medium maximum SLA", errors);
@@ -147,7 +289,38 @@ export function validateSupplyChain() {
   if (/ARG\s+.*(SECRET|TOKEN|PASSWORD|PRIVATE_KEY)/i.test(`${dockerfile}\n${opsDockerfile}`)) {
     errors.push("container build arguments must not accept secrets");
   }
-  for (const workflow of workflows) errors.push(...validateWorkflowBuildArgs(workflow));
+  const lockedReferences = [
+    [
+      "buildkit",
+      "moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
+    ],
+    [
+      "dockerfileFrontend",
+      "docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32",
+    ],
+    [
+      "node",
+      "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
+    ],
+    [
+      "nginxUnprivileged",
+      "nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6",
+    ],
+  ];
+  for (const [name, reference] of lockedReferences) {
+    if (imageLock.images?.[name]?.reference !== reference)
+      errors.push(`${name} image lock must match the reviewed digest`);
+  }
+  for (const workflow of workflows) {
+    errors.push(...validateWorkflowBuildArgs(workflow));
+    errors.push(...validateWorkflowActionPins(workflow));
+    for (const line of workflow.split(/\r?\n/)) {
+      const match = line.match(/^\s*(?:-\s+)?uses:\s*([^\s#]+)(?:\s+#.*)?$/);
+      if (match && !/@[0-9a-f]{40}$/.test(match[1])) {
+        errors.push(`workflow action must use an immutable commit SHA: ${match[1]}`);
+      }
+    }
+  }
   return errors;
 }
 

@@ -27,7 +27,7 @@ provenance_script="$target_release/deploy/vps/verify-image-provenance.sh"
 for file in "$compose_file" "$images_file" "$observability_file" "$matrix_file" "$provenance_script" "$env_file"; do
   [[ -f $file ]] || { echo "ROLLBACK_FILE_REQUIRED:$file" >&2; exit 1; }
 done
-for tool in docker python3 curl readlink gh; do
+for tool in docker python3 curl readlink; do
   command -v "$tool" >/dev/null 2>&1 || { echo "ROLLBACK_TOOL_REQUIRED:$tool" >&2; exit 1; }
 done
 read_env_key() {
@@ -69,13 +69,16 @@ if not entries: raise SystemExit(1)
 print(entries[-1]["tag"], end="")
 PY
 )
-python3 - "$matrix_file" "$applied_migration" "$target_migration" <<'PY'
+python3 - "$matrix_file" "$applied_migration" "$target_migration" "$target_sha" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
-valid = value.get("schemaVersion") == 1 and any(
+valid = value.get("schemaVersion") == 2 and value.get("requiredAppliedMigration") == "0029_platform_incident_projection_actions" and any(
     item.get("appliedMigration") == sys.argv[2]
     and item.get("targetReleaseMigration") == sys.argv[3]
-    and isinstance(item.get("evidence"), str) and item["evidence"]
+    and item.get("targetArtifact") == f"git:{sys.argv[4]}"
+    and isinstance(item.get("evidence"), dict)
+    and __import__("re").fullmatch(r"https://github\.com/pendevtsp-star/giro-mesa-v2/actions/runs/[0-9]+", item["evidence"].get("workflowRun", ""))
+    and __import__("re").fullmatch(r"sha256:[0-9a-f]{64}", item["evidence"].get("testReportDigest", ""))
     for item in value.get("transitions", [])
 )
 if not valid:
@@ -86,6 +89,10 @@ PY
 attestation=${ROLLBACK_TARGET_IMAGE_ATTESTATION_FILE:-}
 current_attestation=${ROLLBACK_CURRENT_IMAGE_ATTESTATION_FILE:-}
 [[ -f $attestation && ! -L $attestation && -f $current_attestation && ! -L $current_attestation ]] || { echo "ROLLBACK_IMAGE_ATTESTATION_REQUIRED" >&2; exit 1; }
+target_attestation_bundle=${ROLLBACK_TARGET_IMAGE_ATTESTATION_BUNDLE_FILE:-${attestation}.bundle}
+target_attestation_checksum=${ROLLBACK_TARGET_IMAGE_ATTESTATION_CHECKSUM_FILE:-${attestation}.sha256}
+current_attestation_bundle=${ROLLBACK_CURRENT_IMAGE_ATTESTATION_BUNDLE_FILE:-${current_attestation}.bundle}
+current_attestation_checksum=${ROLLBACK_CURRENT_IMAGE_ATTESTATION_CHECKSUM_FILE:-${current_attestation}.sha256}
 mapfile -t image_values < <(python3 - "$attestation" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -95,30 +102,52 @@ PY
 )
 for index in "${!image_values[@]}"; do image_values[index]=${image_values[index]%$'\r'}; done
 export GIROMESA_RELEASE_ARTIFACT_SHA="$target_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$attestation"
+export GIROMESA_PROVENANCE_ROLE=${ROLLBACK_TARGET_PROVENANCE_ROLE:-recovery}
+export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
 export GIROMESA_API_IMAGE=${image_values[0]} GIROMESA_WORKER_IMAGE=${image_values[1]}
 export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_values[3]}
 export GIROMESA_OPS_IMAGE=${image_values[4]}
 export GIROMESA_POSTGRES_IMAGE=postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+export DOCKER_CONFIG=${GIROMESA_DOCKER_CONFIG_DIRECTORY:?GIROMESA_DOCKER_CONFIG_DIRECTORY_REQUIRED}
 compose=(docker compose --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
+"${compose[@]}" config --quiet
+GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
+"${compose[@]}" pull
 "$provenance_script"
 
-restore_previous_release() {
-  trap - EXIT
-  ln -sfn "$current_release" "$root/.current-next"
-  mv -Tf "$root/.current-next" "$root/current"
-  mapfile -t current_images < <(python3 - "$current_attestation" <<'PY'
+mapfile -t current_images < <(python3 - "$current_attestation" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
 by_service = {image.rsplit("-", 1)[-1].split("@", 1)[0]: image for image in value.get("images", [])}
 for name in ("api", "worker", "site", "customer", "ops"): print(by_service.get(name, ""))
 PY
-  )
-  for index in "${!current_images[@]}"; do current_images[index]=${current_images[index]%$'\r'}; done
+)
+for index in "${!current_images[@]}"; do current_images[index]=${current_images[index]%$'\r'}; done
+export GIROMESA_RELEASE_ARTIFACT_SHA="$current_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$current_attestation"
+export GIROMESA_PROVENANCE_ROLE=target
+export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$current_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$current_attestation_checksum
+export GIROMESA_API_IMAGE=${current_images[0]} GIROMESA_WORKER_IMAGE=${current_images[1]}
+export GIROMESA_SITE_IMAGE=${current_images[2]} GIROMESA_CUSTOMER_IMAGE=${current_images[3]}
+export GIROMESA_OPS_IMAGE=${current_images[4]}
+GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
+export GIROMESA_RELEASE_ARTIFACT_SHA="$target_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$attestation"
+export GIROMESA_PROVENANCE_ROLE=${ROLLBACK_TARGET_PROVENANCE_ROLE:-recovery}
+export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
+export GIROMESA_API_IMAGE=${image_values[0]} GIROMESA_WORKER_IMAGE=${image_values[1]}
+export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_values[3]}
+export GIROMESA_OPS_IMAGE=${image_values[4]}
+
+restore_previous_release() {
+  trap - EXIT
+  ln -sfn "$current_release" "$root/.current-next"
+  mv -Tf "$root/.current-next" "$root/current"
   export GIROMESA_RELEASE_ARTIFACT_SHA="$current_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$current_attestation"
+  export GIROMESA_PROVENANCE_ROLE=target
+  export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$current_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$current_attestation_checksum
   export GIROMESA_API_IMAGE=${current_images[0]} GIROMESA_WORKER_IMAGE=${current_images[1]}
   export GIROMESA_SITE_IMAGE=${current_images[2]} GIROMESA_CUSTOMER_IMAGE=${current_images[3]}
   export GIROMESA_OPS_IMAGE=${current_images[4]}
-  "$current_release/deploy/vps/verify-image-provenance.sh"
+  "$provenance_script"
   docker compose --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" \
     -f "$current_release/deploy/vps/compose.images.yaml" -f "$current_release/deploy/vps/compose.observability.yaml" \
     up -d --remove-orphans

@@ -46,6 +46,7 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
   const objectSource = join(directory, "objects-source");
   const objectRestore = join(directory, "objects-restored");
   const configSource = join(directory, "configuration.age");
+  const runtimeEnv = join(directory, ".env");
   const configRestore = join(directory, "config-restored");
   const smokeSql = join(directory, "smoke.sql");
   const artifact = `git:${"a".repeat(40)}`;
@@ -57,6 +58,7 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
     mkdirSync(join(objectSource, "menus"), { recursive: true });
     writeFileSync(join(objectSource, "menus", "cover.txt"), "cover-asset-v2\n");
     writeFileSync(configSource, Buffer.from([0, 255, 19, 71, 105, 114, 111]));
+    writeFileSync(runtimeEnv, "POSTGRES_DB=giromesa\nSECRET=bound-only-by-hmac\n");
     writeFileSync(
       smokeSql,
       "DO $$ BEGIN IF (SELECT count(*) FROM dr_probe WHERE payload = 'linux-ok') <> 1 THEN RAISE EXCEPTION 'DR_PROBE_MISSING'; END IF; END $$;",
@@ -121,10 +123,10 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "0029_platform_incident_projection_actions",
         "--object-directory",
         path(objectSource),
-        "--encrypted-config-archive",
-        path(configSource),
+        "--runtime-env-file",
+        path(runtimeEnv),
       ],
-      { env },
+      { env: { ...env, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -144,6 +146,8 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "giromesa",
         "--expected-artifact",
         artifact,
+        "--expected-source-migration-id",
+        "0029_platform_incident_projection_actions",
         "--expected-target-artifact",
         targetArtifact,
         "--expected-target-migration-id",
@@ -155,7 +159,7 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "--smoke-sql-file",
         path(smokeSql),
       ],
-      { env },
+      { env: { ...env, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -179,8 +183,8 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
       "cover-asset-v2\n",
     );
     assert.deepEqual(
-      readFileSync(join(configRestore, "configuration.age")),
-      readFileSync(configSource),
+      readFileSync(join(configRestore, "runtime.env.restored")),
+      readFileSync(runtimeEnv),
     );
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
     assert.equal(evidence.artifact, artifact);

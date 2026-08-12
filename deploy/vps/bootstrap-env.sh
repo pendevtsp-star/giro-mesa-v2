@@ -106,6 +106,7 @@ command_fingerprint_key=$(openssl rand -base64 32)
 privacy_export_key=$(openssl rand -base64 32)
 table_session_key=$(openssl rand -base64 32)
 backup_manifest_key=$(openssl rand -base64 32)
+backup_config_key=$(openssl rand -base64 32)
 
 mkdir -p "$(dirname "$target")"
 umask 077
@@ -158,6 +159,7 @@ write_key COMMAND_FINGERPRINT_KEYS "{\"v1\":\"${command_fingerprint_key}\"}"
 write_key PRIVACY_EXPORT_ENCRYPTION_KEY "$privacy_export_key"
 write_key PUBLIC_TABLE_SESSION_SIGNING_KEY "$table_session_key"
 write_key GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64 "$backup_manifest_key"
+write_key GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64 "$backup_config_key"
 write_key DOSECLUB_PROVIDER_ENABLED false
 write_key ASAAS_API_URL https://api-sandbox.asaas.com/v3
 write_key ASAAS_API_KEY ""

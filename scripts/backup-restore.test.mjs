@@ -26,7 +26,11 @@ function powershell(script, args, env = {}) {
   return spawnSync("powershell", ["-NoProfile", "-File", script, ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: {
+      ...process.env,
+      GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+      ...env,
+    },
   });
 }
 
@@ -160,6 +164,13 @@ function writeSignedBackup(directory, { objectArchive } = {}) {
       completedAt: "2026-08-12T12:00:01.0000000+00:00",
       durationSeconds: 1,
       declaredRpoMinutes: 5,
+      coverage: {
+        mode: "embedded",
+        database: true,
+        objects: true,
+        encryptedConfiguration: true,
+      },
+      runtimeConfigurationHmacSha256: "0".repeat(64),
       files,
     }),
     "utf8",
@@ -226,7 +237,7 @@ test("backup rejects a reparse point used as the encrypted configuration archive
     );
 
     assert.notEqual(result.status, 0);
-    assert.match(output(result), /CONFIG_ARCHIVE_REPARSE_POINT_FORBIDDEN/);
+    assert.match(output(result), /BACKUP_PREBUILT_CONFIG_FORBIDDEN/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

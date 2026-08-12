@@ -20,7 +20,9 @@ const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
 const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
 const imageProvenance = join(root, "deploy", "vps", "verify-image-provenance.sh");
 const imageLock = join(root, "deploy", "vps", "image-lock.json");
+const buildkitValidator = join(root, "deploy", "vps", "validate-buildkit-attestations.py");
 const compatibilityMatrix = join(root, "deploy", "vps", "rollback-compatibility.json");
+const recoveryMatrix = join(root, "deploy", "vps", "recovery-compatibility.json");
 
 function posix(path) {
   return path.replaceAll("\\", "/");
@@ -99,6 +101,8 @@ test("Linux restore rejects a forged manifest before Docker", () => {
         "giromesa",
         "--expected-artifact",
         `git:${"1".repeat(40)}`,
+        "--expected-source-migration-id",
+        "0029_platform_incident_projection_actions",
       ],
       { GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: Buffer.alloc(32, 9).toString("base64") },
     );
@@ -121,6 +125,13 @@ test("Linux restore rejects signed path traversal before Docker", () => {
         backupId: "traversal",
         artifact: `git:${"1".repeat(40)}`,
         migrationId: "0029_platform_incident_projection_actions",
+        coverage: {
+          mode: "embedded",
+          database: true,
+          objects: true,
+          encryptedConfiguration: true,
+        },
+        runtimeConfigurationHmacSha256: "0".repeat(64),
         sourceDatabaseContainer: "source-container",
         databaseName: "giromesa",
         declaredRpoMinutes: 5,
@@ -148,6 +159,8 @@ test("Linux restore rejects signed path traversal before Docker", () => {
         "giromesa",
         "--expected-artifact",
         `git:${"1".repeat(40)}`,
+        "--expected-source-migration-id",
+        "0029_platform_incident_projection_actions",
       ],
       { GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: key.toString("base64") },
     );
@@ -279,9 +292,10 @@ test("deploy invokes the complete backup before migration and never snapshots cl
   assert.ok(postgresUpCall > backupCall, "backup must finish before updating PostgreSQL");
   assert.doesNotMatch(deploy, /(?:cp|tar|gzip)[^\n]*(?:env_file|\.env)/i);
   assert.match(deploy, /GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64/);
-  assert.match(deploy, /ensure-runtime-env\.sh/);
-  assert.match(deploy, /BACKUP_COVERAGE_ATTESTATION_REQUIRED/);
-  assert.match(deploy, /--external-coverage-attestation/);
+  assert.match(deploy, /BACKUP_COMPLETE_COVERAGE_REQUIRED/);
+  assert.doesNotMatch(deploy, /external-coverage-attestation|GIROMESA_BACKUP_COVERAGE_ATTESTATION/);
+  assert.match(deploy, /--runtime-env-file\s+"\$env_file"/);
+  assert.doesNotMatch(deploy, /"\$ensure_runtime_env"/);
   assert.match(deploy, /for service in api worker/);
   assert.match(deploy, /docker stop --timeout/);
 });
@@ -315,19 +329,12 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /compose\.observability\.yaml/);
   assert.match(rollback, /system\.worker_probe/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
-  assert.equal(matrix.schemaVersion, 1);
-  assert.ok(
-    matrix.transitions.some(
-      (entry) =>
-        entry.appliedMigration === "0029_platform_incident_projection_actions" &&
-        entry.targetReleaseMigration === "0029_platform_incident_projection_actions",
-    ),
-  );
-  assert.ok(
-    !matrix.transitions.some(
-      (entry) => entry.targetReleaseMigration === "0026_pilot_operational_foundation",
-    ),
-  );
+  assert.equal(matrix.schemaVersion, 2);
+  assert.equal(matrix.requiredAppliedMigration, "0029_platform_incident_projection_actions");
+  assert.deepEqual(matrix.transitions, []);
+  assert.match(rollback, /targetArtifact/);
+  assert.match(rollback, /testReportDigest/);
+  assert.match(rollback, /actions\/runs/);
 });
 
 test("deploy health gate includes the asynchronous worker", () => {
@@ -344,7 +351,15 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /--source-migration-id\s+"\$source_migration_id"/);
   assert.match(deploy, /--target-migration-id\s+"\$target_migration_id"/);
   assert.match(deploy, /--source-artifact\s+"\$source_artifact"/);
+  assert.match(deploy, /--source-component-image/);
+  assert.match(deploy, /\.RepoDigests/);
   assert.match(deploy, /--target-artifact\s+"\$target_artifact"/);
+  assert.match(deploy, /recovery-compatibility\.json/);
+  assert.match(deploy, /testedUpgrade/);
+  assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
+  const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
+  assert.equal(recovery.targetMigration, "0029_platform_incident_projection_actions");
+  assert.deepEqual(recovery.transitions, []);
 });
 
 test("deployment and rollback compose contracts always include observability and digest images", () => {
@@ -365,10 +380,94 @@ test("deployment and rollback compose contracts always include observability and
   const lock = JSON.parse(readFileSync(imageLock, "utf8"));
   assert.match(lock.images.postgres.reference, /^postgres@sha256:[0-9a-f]{64}$/);
   assert.equal(lock.images.postgres.upstreamRepository, "docker.io/library/postgres");
-  assert.match(provenance, /gh attestation verify/);
-  assert.match(provenance, /--signer-workflow/);
-  assert.match(provenance, /--source-digest/);
-  assert.match(provenance, /--deny-self-hosted-runners/);
+  assert.match(
+    lock.images.cosign.reference,
+    /^ghcr\.io\/sigstore\/cosign\/cosign@sha256:[0-9a-f]{64}$/,
+  );
+  assert.match(provenance, /"\$cosign_image" verify/);
+  assert.match(provenance, /verify-blob/);
+  assert.match(provenance, /ATTESTATION_BUNDLE_REQUIRED/);
+  assert.match(provenance, /ATTESTATION_CHECKSUM_REQUIRED/);
+  assert.match(provenance, /--certificate-identity/);
+  assert.match(provenance, /publish-images\.yml@refs\/heads\/main/);
+  assert.match(provenance, /--certificate-oidc-issuer/);
+  assert.match(provenance, /--certificate-github-workflow-repository/);
+  assert.match(provenance, /--certificate-github-workflow-sha/);
+  assert.match(provenance, /docker buildx imagetools inspect/);
+  assert.match(provenance, /json \.Provenance/);
+  assert.match(provenance, /json \.SBOM/);
+  assert.doesNotMatch(provenance, /verify-attestation/);
+  assert.match(provenance, /config_dir_mode != 700/);
+  assert.match(provenance, /--read-only --cap-drop ALL --security-opt no-new-privileges/);
+  assert.match(provenance, /--env HOME=\/tmp\/cosign-home/);
+  assert.doesNotMatch(provenance, /gh attestation/);
+});
+
+test("private repository publishes keyless Sigstore signatures for every image digest", () => {
+  const workflow = readFileSync(join(root, ".github", "workflows", "publish-images.yml"), "utf8");
+  const provenance = readFileSync(imageProvenance, "utf8");
+  assert.match(workflow, /sigstore\/cosign-installer/);
+  assert.match(workflow, /cosign sign --yes/);
+  assert.match(workflow, /cosign sign-blob --yes/);
+  assert.match(workflow, /release-manifest:/);
+  assert.match(workflow, /actions\/download-artifact@[0-9a-f]{40}/);
+  assert.match(workflow, /giromesa-image-attestation-\$\{SOURCE_SHA\}\.json\.bundle/);
+  assert.match(workflow, /@\$\{\{ steps\.build\.outputs\.digest \}\}/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /provenance: mode=max/);
+  assert.match(workflow, /sbom: true/);
+  assert.doesNotMatch(workflow, /attest-build-provenance/);
+  assert.doesNotMatch(workflow, /attestations: write/);
+  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.doesNotMatch(workflow, /workflow_dispatch/);
+  assert.match(workflow, /test "\$GITHUB_SHA" = "\$SOURCE_SHA"/);
+  assert.match(workflow, /workflow_run\.event == 'push'/);
+  assert.match(workflow, /head_repository\.full_name == github\.repository/);
+  assert.match(workflow, /head_sha == github\.sha/);
+  assert.doesNotMatch(workflow, /head_sha \|\| github\.sha/);
+  assert.match(workflow, /cosign-release: v3\.0\.2/);
+  assert.match(provenance, /workflow_trigger=workflow_run/);
+  assert.match(provenance, /--certificate-github-workflow-trigger "\$workflow_trigger"/);
+  assert.match(provenance, /ci\.yml@refs\/heads\/release\/rollback-0029/);
+  assert.match(provenance, /workflow_trigger=push/);
+  for (const line of workflow.match(/^\s*uses:\s*.+$/gm) ?? []) {
+    assert.match(line, /@[0-9a-f]{40}(?:\s+#\s+v[^\s]+)?$/);
+  }
+});
+
+test("BuildKit attestation validation accepts single and multi-platform structural views", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-buildkit-attestation-"));
+  const provenanceFile = join(directory, "provenance.json");
+  const sbomFile = join(directory, "sbom.json");
+  const slsa = {
+    builder: { id: "https://github.com/docker/build-push-action" },
+    buildType: "https://mobyproject.org/buildkit@v1",
+    materials: [],
+    metadata: { buildStartedOn: "2026-08-12T00:00:00Z" },
+  };
+  const spdx = {
+    SPDXID: "SPDXRef-DOCUMENT",
+    spdxVersion: "SPDX-2.3",
+    packages: [{ name: "large-fixture", comment: "x".repeat(300_000) }],
+  };
+  try {
+    writeFileSync(provenanceFile, JSON.stringify({ SLSA: slsa }));
+    writeFileSync(sbomFile, JSON.stringify({ SPDX: spdx }));
+    assert.equal(spawnSync("python", [buildkitValidator, provenanceFile, sbomFile]).status, 0);
+    writeFileSync(
+      provenanceFile,
+      JSON.stringify({ "linux/amd64": { SLSA: slsa }, "linux/arm64": { SLSA: slsa } }),
+    );
+    writeFileSync(
+      sbomFile,
+      JSON.stringify({ "linux/amd64": { SPDX: spdx }, "linux/arm64": { SPDX: spdx } }),
+    );
+    assert.equal(spawnSync("python", [buildkitValidator, provenanceFile, sbomFile]).status, 0);
+    writeFileSync(provenanceFile, JSON.stringify({ SLSA: {} }));
+    assert.notEqual(spawnSync("python", [buildkitValidator, provenanceFile, sbomFile]).status, 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("release paths are canonical releases SHA directories", () => {

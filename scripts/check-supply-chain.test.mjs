@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateSupplyChain, validateWorkflowBuildArgs } from "./check-supply-chain.mjs";
+import {
+  validateSupplyChain,
+  validateWorkflowActionPins,
+  validateWorkflowBuildArgs,
+} from "./check-supply-chain.mjs";
 
 test("supply-chain configuration meets the local release contract", () => {
   assert.deepEqual(validateSupplyChain(), []);
+});
+
+test("rejects movable GitHub Action references", () => {
+  assert.deepEqual(validateWorkflowActionPins("steps:\n  - uses: actions/checkout@v4\n"), [
+    "workflow action must use an immutable commit SHA: actions/checkout@v4",
+  ]);
+  assert.deepEqual(
+    validateWorkflowActionPins(
+      "steps:\n  - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0\n",
+    ),
+    [],
+  );
 });
 
 const dockerBuildWorkflow = (buildArgs) => `

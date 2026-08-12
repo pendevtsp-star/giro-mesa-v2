@@ -4,24 +4,27 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
-  id-token: write
-  attestations: write
 
 concurrency:
-  group: publish-pilot-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: publish-pilot-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
   publish:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -42,17 +45,29 @@ jobs:
             app: ops
             dockerfile: Dockerfile.ops
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: image=moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Bind signing workflow to main release commit
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_SHA" = "$SOURCE_SHA"
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -71,15 +86,108 @@ jobs:
             VITE_DEMO_MODE=false
           tags: |
             ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:pilot
-            ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha || github.sha }}
+            ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           provenance: mode=max
           sbom: true
-      - name: Attest published image provenance
-        if: github.event.repository.visibility == 'public'
-        uses: actions/attest-build-provenance@v3
+      - name: Sign published image digest with GitHub OIDC
+        env:
+          IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+      - name: Create immutable digest fragment
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          SERVICE: ${{ matrix.service }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          mkdir -p release-fragment
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          digest = os.environ["DIGEST"]
+          service = os.environ["SERVICE"]
+          source = os.environ["SOURCE_SHA"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest): raise SystemExit("invalid digest")
+          if not re.fullmatch(r"[0-9a-f]{40}", source): raise SystemExit("invalid source SHA")
+          if service not in {"site", "customer", "api", "worker", "ops"}: raise SystemExit("invalid service")
+          value = {"service": service, "digest": digest, "sourceCommit": source}
+          pathlib.Path(f"release-fragment/{service}.json").write_text(
+              json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"
+          )
+          PY
+      - name: Retain digest fragment for aggregation
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          subject-name: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          name: image-digest-${{ matrix.service }}-${{ github.event.workflow_run.head_sha }}
+          path: release-fragment/${{ matrix.service }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  release-manifest:
+    needs: publish
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Download all immutable digest fragments
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: image-digest-*-${{ github.event.workflow_run.head_sha }}
+          path: release-fragments
+          merge-multiple: true
+      - name: Aggregate and validate release manifest
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re
+          expected = {"site", "customer", "api", "worker", "ops"}
+          source = os.environ["SOURCE_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", source): raise SystemExit("invalid source SHA")
+          entries = []
+          for path in sorted(pathlib.Path("release-fragments").glob("*.json")):
+              value = json.loads(path.read_text(encoding="utf-8"))
+              if set(value) != {"service", "digest", "sourceCommit"}: raise SystemExit("invalid fragment keys")
+              if value["sourceCommit"] != source: raise SystemExit("mixed source commits")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", value["digest"]): raise SystemExit("invalid digest")
+              entries.append(value)
+          if len(entries) != 5 or {entry["service"] for entry in entries} != expected:
+              raise SystemExit("release requires exactly five unique services")
+          images = [
+              f"ghcr.io/pendevtsp-star/giro-mesa-v2-{entry['service']}@{entry['digest']}"
+              for entry in sorted(entries, key=lambda item: item["service"])
+          ]
+          manifest = {"schemaVersion": 1, "sourceCommit": source, "workflow": "publish-images.yml", "images": images}
+          target = pathlib.Path(f"giromesa-image-attestation-{source}.json")
+          target.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+          pathlib.Path(f"{target}.sha256").write_text(f"{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n", encoding="ascii")
+          PY
+      - name: Install Cosign for manifest signature
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Sign release manifest with GitHub OIDC
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          cosign sign-blob --yes
+          --bundle "giromesa-image-attestation-${SOURCE_SHA}.json.bundle"
+          "giromesa-image-attestation-${SOURCE_SHA}.json"
+      - name: Retain signed release manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}
+          path: |
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json.bundle
+            giromesa-image-attestation-${{ github.event.workflow_run.head_sha }}.json.sha256
+          if-no-files-found: error
+          retention-days: 90

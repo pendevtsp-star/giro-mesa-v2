@@ -6,6 +6,36 @@
       "upstreamRepository": "docker.io/library/postgres",
       "upstreamTag": "17-alpine",
       "provenance": "Docker Official Image multi-platform index locked by digest"
+    },
+    "cosign": {
+      "reference": "ghcr.io/sigstore/cosign/cosign@sha256:b29487e48205d875c324c79583e2806d9d269c0fa299e0861bbec023d8430c8b",
+      "upstreamRepository": "ghcr.io/sigstore/cosign/cosign",
+      "upstreamTag": "v3.0.2",
+      "provenance": "Sigstore Cosign official multi-platform index locked by digest"
+    },
+    "buildkit": {
+      "reference": "moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
+      "upstreamRepository": "docker.io/moby/buildkit",
+      "upstreamTag": "buildx-stable-1",
+      "provenance": "BuildKit executor index resolved and locked by digest"
+    },
+    "dockerfileFrontend": {
+      "reference": "docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32",
+      "upstreamRepository": "docker.io/docker/dockerfile",
+      "upstreamTag": "1",
+      "provenance": "Dockerfile frontend index resolved and locked by digest"
+    },
+    "node": {
+      "reference": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
+      "upstreamRepository": "docker.io/library/node",
+      "upstreamTag": "24.18.0-bookworm-slim",
+      "provenance": "Node official image index resolved and locked by digest"
+    },
+    "nginxUnprivileged": {
+      "reference": "nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6",
+      "upstreamRepository": "docker.io/nginxinc/nginx-unprivileged",
+      "upstreamTag": "1.29-alpine",
+      "provenance": "Unprivileged Nginx index resolved and locked by digest"
     }
   }
 }

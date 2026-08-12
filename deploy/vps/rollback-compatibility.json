@@ -1,15 +1,5 @@
 {
-  "schemaVersion": 1,
-  "transitions": [
-    {
-      "appliedMigration": "0028_privacy_domain_processors",
-      "targetReleaseMigration": "0028_privacy_domain_processors",
-      "evidence": "same-schema application rollback; target release journal and signed OCI provenance are verified at runtime"
-    },
-    {
-      "appliedMigration": "0029_platform_incident_projection_actions",
-      "targetReleaseMigration": "0029_platform_incident_projection_actions",
-      "evidence": "same-schema application rollback; target release journal and signed OCI provenance are verified at runtime"
-    }
-  ]
+  "schemaVersion": 2,
+  "requiredAppliedMigration": "0029_platform_incident_projection_actions",
+  "transitions": []
 }

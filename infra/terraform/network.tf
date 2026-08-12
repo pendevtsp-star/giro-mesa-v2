@@ -71,20 +71,21 @@ resource "aws_security_group" "database" {
   vpc_id      = aws_vpc.main.id
 }
 
-# Provider endpoints use rotating public addresses; egress remains limited to TLS port 443.
-#trivy:ignore:AVD-AWS-0104
 resource "aws_security_group" "application" {
   name_prefix = "giromesa-${var.environment}-app-"
   description = "Application tasks."
   vpc_id      = aws_vpc.main.id
+}
 
-  egress {
-    description = "Outbound HTTPS to configured payment, fiscal, email and identity providers."
-    protocol    = "tcp"
-    from_port   = 443
-    to_port     = 443
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+# Provider endpoints use rotating public addresses; egress remains limited to TLS port 443.
+#trivy:ignore:AVD-AWS-0104
+resource "aws_vpc_security_group_egress_rule" "application_https" {
+  security_group_id = aws_security_group.application.id
+  description       = "Outbound HTTPS to configured payment, fiscal, email and identity providers."
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "database_from_application" {

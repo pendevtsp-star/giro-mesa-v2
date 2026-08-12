@@ -9,9 +9,9 @@ source_artifact=""
 source_migration_id=""
 target_artifact=""
 target_migration_id=""
+source_component_images=()
 object_directory=""
-encrypted_config_archive=""
-external_coverage_attestation=""
+runtime_env_file=""
 max_rpo_minutes=5
 
 while (($#)); do
@@ -26,9 +26,10 @@ while (($#)); do
     --source-migration-id) source_migration_id=${2-}; shift 2 ;;
     --target-artifact) target_artifact=${2-}; shift 2 ;;
     --target-migration-id) target_migration_id=${2-}; shift 2 ;;
+    --source-component-image) source_component_images+=("${2-}"); shift 2 ;;
     --object-directory) object_directory=${2-}; shift 2 ;;
-    --encrypted-config-archive) encrypted_config_archive=${2-}; shift 2 ;;
-    --external-coverage-attestation) external_coverage_attestation=${2-}; shift 2 ;;
+    --encrypted-config-archive) echo "BACKUP_PREBUILT_CONFIG_FORBIDDEN" >&2; exit 1 ;;
+    --runtime-env-file) runtime_env_file=${2-}; shift 2 ;;
     --max-rpo-minutes) max_rpo_minutes=${2-}; shift 2 ;;
     *) echo "BACKUP_ARGUMENT_INVALID" >&2; exit 1 ;;
   esac
@@ -47,12 +48,19 @@ if [[ ! $database_container =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] ||
   echo "BACKUP_DATABASE_IDENTIFIER_INVALID" >&2
   exit 1
 fi
-if [[ ! $source_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $source_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
+if [[ ! $source_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $source_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]] && [[ ! $source_artifact =~ ^runtime-set:sha256:[0-9a-f]{64}$ ]]; then
   echo "BACKUP_ARTIFACT_NOT_IMMUTABLE" >&2
   exit 1
 fi
 if [[ ! $target_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $target_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
   echo "BACKUP_ARTIFACT_NOT_IMMUTABLE" >&2
+  exit 1
+fi
+for image in "${source_component_images[@]}"; do
+  [[ $image =~ ^ghcr\.io/pendevtsp-star/giro-mesa-v2-(api|worker)@sha256:[0-9a-f]{64}$ ]] || { echo "BACKUP_SOURCE_COMPONENT_NOT_IMMUTABLE" >&2; exit 1; }
+done
+if ((${#source_component_images[@]} != 0 && ${#source_component_images[@]} != 2)); then
+  echo "BACKUP_SOURCE_COMPONENTS_INCOMPLETE" >&2
   exit 1
 fi
 if [[ ! $source_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]] || [[ ! $target_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
@@ -81,42 +89,28 @@ PY
 then
   exit 1
 fi
-coverage_mode=embedded
-if [[ -z $object_directory || -z $encrypted_config_archive ]]; then
-  coverage_mode=external_attestation
-  if [[ -z $external_coverage_attestation || ! -f $external_coverage_attestation || -L $external_coverage_attestation ]]; then
-    echo "BACKUP_COVERAGE_ATTESTATION_REQUIRED" >&2
-    exit 1
-  fi
-  if ! python3 - "$external_coverage_attestation" "$source_artifact" "$source_migration_id" <<'PY'
-import datetime, json, pathlib, re, sys
-path, artifact, migration = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-try:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    expires = datetime.datetime.fromisoformat(value["expiresAt"].replace("Z", "+00:00"))
-    valid = (
-        value.get("schemaVersion") == 1
-        and value.get("sourceArtifact") == artifact
-        and value.get("sourceMigrationId") == migration
-        and value.get("objects") == "externally_protected"
-        and value.get("encryptedConfiguration") == "externally_protected"
-        and re.fullmatch(r"sha256:[0-9a-f]{64}", value.get("evidenceDigest", ""))
-        and expires > datetime.datetime.now(datetime.timezone.utc)
-    )
-except Exception:
-    valid = False
-if not valid:
-    print("BACKUP_COVERAGE_ATTESTATION_INVALID", file=sys.stderr)
-    raise SystemExit(1)
+if [[ -z $object_directory || -z $runtime_env_file ]]; then
+  echo "BACKUP_COMPLETE_COVERAGE_REQUIRED" >&2
+  exit 1
+fi
+if ! python3 - <<'PY'
+import base64, os, sys
+try: value = base64.b64decode(os.environ.get("GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64", ""), validate=True)
+except Exception: value = b""
+if len(value) != 32:
+    print("BACKUP_CONFIG_ENCRYPTION_KEY_INVALID", file=sys.stderr); raise SystemExit(1)
 PY
-  then exit 1; fi
+then exit 1; fi
+if [[ ! -f $runtime_env_file || -L $runtime_env_file ]]; then
+  echo "BACKUP_RUNTIME_ENV_INVALID" >&2
+  exit 1
 fi
 if [[ ! $max_rpo_minutes =~ ^[1-5]$ ]]; then
   echo "BACKUP_RPO_INVALID" >&2
   exit 1
 fi
 
-for tool in docker tar sha256sum; do
+for tool in docker tar sha256sum openssl; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "BACKUP_TOOL_REQUIRED:$tool" >&2
     exit 1
@@ -139,16 +133,6 @@ PY
   then
     exit 1
   fi
-fi
-if [[ -n $encrypted_config_archive ]]; then
-  if [[ ! -f $encrypted_config_archive || -L $encrypted_config_archive ]]; then
-    echo "CONFIG_ARCHIVE_INVALID" >&2
-    exit 1
-  fi
-  case "$encrypted_config_archive" in
-    *.age|*.gpg|*.enc) ;;
-    *) echo "CONFIG_ARCHIVE_MUST_BE_ENCRYPTED" >&2; exit 1 ;;
-  esac
 fi
 
 started_epoch=$(date +%s)
@@ -194,10 +178,10 @@ if [[ -n $object_directory ]]; then
     exit 1
   fi
 fi
-if [[ -n $encrypted_config_archive ]]; then
-  extension=.${encrypted_config_archive##*.}
-  cp -- "$encrypted_config_archive" "$backup_directory/configuration$extension"
-fi
+openssl enc -aes-256-cbc -pbkdf2 -md sha256 -salt \
+  -in "$runtime_env_file" -out "$backup_directory/configuration.enc" \
+  -pass env:GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
+[[ -s $backup_directory/configuration.enc ]] || { echo "BACKUP_CONFIG_ENCRYPTION_FAILED" >&2; exit 1; }
 
 finished_epoch=$(date +%s)
 duration_seconds=$((finished_epoch - started_epoch))
@@ -207,14 +191,15 @@ if ((duration_seconds > max_rpo_minutes * 60)); then
 fi
 completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+source_components_json=$(printf '%s\n' "${source_component_images[@]}" | python3 -c 'import json,sys; print(json.dumps([line.rstrip("\n") for line in sys.stdin if line.rstrip("\n")]))')
 python3 - "$backup_directory" "$backup_id" "$source_artifact" "$source_migration_id" "$target_artifact" "$target_migration_id" \
   "$database_container" "$database_name" "$started_at" "$completed_at" \
-  "$duration_seconds" "$max_rpo_minutes" "$coverage_mode" "$external_coverage_attestation" <<'PY'
+  "$duration_seconds" "$max_rpo_minutes" "$runtime_env_file" "$source_components_json" <<'PY'
 import base64, hashlib, hmac, json, os, pathlib, sys
 (
     root_raw, backup_id, source_artifact, source_migration_id, target_artifact,
     target_migration_id, source_container, database_name, created_at, completed_at,
-    duration, rpo, coverage_mode, coverage_attestation,
+    duration, rpo, runtime_env_file, source_components_json,
 ) = sys.argv[1:]
 root = pathlib.Path(root_raw)
 kind_by_name = {
@@ -236,10 +221,11 @@ payload = {
     "artifact": source_artifact,
     "migrationId": source_migration_id,
     "sourceArtifact": source_artifact,
+    "sourceComponentImages": json.loads(source_components_json),
     "sourceMigrationId": source_migration_id,
     "targetArtifact": target_artifact,
     "targetMigrationId": target_migration_id,
-    "coverage": {"mode": coverage_mode},
+    "coverage": {"mode": "embedded", "database": True, "objects": True, "encryptedConfiguration": True},
     "sourceDatabaseContainer": source_container,
     "databaseName": database_name,
     "createdAt": created_at,
@@ -248,11 +234,11 @@ payload = {
     "declaredRpoMinutes": int(rpo),
     "files": files,
 }
-if coverage_attestation:
-    raw = pathlib.Path(coverage_attestation).read_bytes()
-    payload["coverage"]["attestationSha256"] = hashlib.sha256(raw).hexdigest()
-payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
 key = base64.b64decode(os.environ["GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64"], validate=True)
+payload["runtimeConfigurationHmacSha256"] = hmac.new(
+    key, pathlib.Path(runtime_env_file).read_bytes(), hashlib.sha256
+).hexdigest()
+payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
 manifest = {
     "schemaVersion": 1,
     "signedPayloadBase64": base64.b64encode(payload_bytes).decode(),
