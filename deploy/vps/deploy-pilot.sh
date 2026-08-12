@@ -58,9 +58,7 @@ fi
 artifact="git:$artifact_sha"
 export GIROMESA_IMAGE_TAG="$artifact_sha"
 
-migration_id=${GIROMESA_MIGRATION_ID:-}
-if [[ -z "$migration_id" ]]; then
-  migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" <<'PY'
+target_migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
 entries = value.get("entries", [])
@@ -68,9 +66,12 @@ if not entries or not isinstance(entries[-1].get("tag"), str):
     raise SystemExit(1)
 print(entries[-1]["tag"], end="")
 PY
-  )
+)
+if [[ -n ${GIROMESA_MIGRATION_ID:-} && $GIROMESA_MIGRATION_ID != "$target_migration_id" ]]; then
+  echo "GIROMESA_MIGRATION_ID diverge da última migration versionada." >&2
+  exit 1
 fi
-if [[ ! $migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
+if [[ ! $target_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
   echo "GIROMESA_MIGRATION_ID inválido ou migration journal ausente." >&2
   exit 1
 fi
@@ -98,6 +99,31 @@ fi
 
 postgres_user=$(read_env_key POSTGRES_USER)
 postgres_database=$(read_env_key POSTGRES_DB)
+migration_table_exists=$(docker exec "$postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" \
+  --set ON_ERROR_STOP=1 --tuples-only --no-align --command "SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL")
+migration_table_exists=${migration_table_exists//$'\r'/}
+migration_table_exists=${migration_table_exists//$'\n'/}
+if [[ $migration_table_exists == t ]]; then
+  applied_migration_at=$(docker exec "$postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" \
+    --set ON_ERROR_STOP=1 --tuples-only --no-align --command "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1")
+  applied_migration_at=${applied_migration_at//$'\r'/}
+  applied_migration_at=${applied_migration_at//$'\n'/}
+  source_migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" "$applied_migration_at" <<'PY'
+import json, sys
+entries = json.load(open(sys.argv[1], encoding="utf-8")).get("entries", [])
+matches = [entry.get("tag") for entry in entries if str(entry.get("when")) == sys.argv[2]]
+if len(matches) != 1 or not isinstance(matches[0], str):
+    raise SystemExit(1)
+print(matches[0], end="")
+PY
+  )
+else
+  source_migration_id=0000_unmigrated
+fi
+if [[ ! $source_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
+  echo "Migration aplicada no banco não corresponde ao journal da release; deploy abortado." >&2
+  exit 1
+fi
 export GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64
 GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64=$(read_env_key GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64)
 backup_arguments=(
@@ -106,7 +132,7 @@ backup_arguments=(
   --database-user "$postgres_user"
   --output-directory "$backup_dir"
   --artifact "$artifact"
-  --migration-id "$migration_id"
+  --migration-id "$source_migration_id"
 )
 if [[ -n ${GIROMESA_OBJECT_DIRECTORY:-} ]]; then
   backup_arguments+=(--object-directory "$GIROMESA_OBJECT_DIRECTORY")

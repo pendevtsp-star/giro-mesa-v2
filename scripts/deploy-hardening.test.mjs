@@ -238,3 +238,11 @@ test("deploy health gate includes the asynchronous worker", () => {
   const deploy = readFileSync(deployScript, "utf8");
   assert.match(deploy, /for service in api worker site customer ops/);
 });
+
+test("pre-migration backup binds the migration actually applied in the source database", () => {
+  const deploy = readFileSync(deployScript, "utf8");
+  assert.match(deploy, /drizzle\.__drizzle_migrations/);
+  assert.match(deploy, /source_migration_id/);
+  assert.match(deploy, /--migration-id\s+"\$source_migration_id"/);
+  assert.doesNotMatch(deploy, /--migration-id\s+"\$migration_id"/);
+});

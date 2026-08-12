@@ -37,7 +37,7 @@ O teste Docker Linux é opt-in para não iniciar containers por acidente: `DISAS
 
 ## Pré-deploy e rollback da aplicação
 
-`deploy/vps/deploy-pilot.sh` executa `ensure-runtime-env.sh`, valida ferramentas, deriva o SHA imutável e a última migration do journal e conclui `backup-production.sh` antes de iniciar qualquer migration. Falta de chave HMAC, grants administrativos revisados ou manifesto aborta o deploy. Objetos e configuração já criptografada podem ser incluídos por `GIROMESA_OBJECT_DIRECTORY` e `GIROMESA_ENCRYPTED_CONFIG_ARCHIVE`; nenhum snapshot novo do `.env` em claro é permitido.
+`deploy/vps/deploy-pilot.sh` executa `ensure-runtime-env.sh`, valida ferramentas, deriva o SHA imutável, confere a migration alvo do journal e vincula o backup à migration que está realmente aplicada no banco de origem. Só depois conclui `backup-production.sh` e inicia migrations. Falta de chave HMAC, grants administrativos revisados, correspondência no journal ou manifesto aborta o deploy. Objetos e configuração já criptografada podem ser incluídos por `GIROMESA_OBJECT_DIRECTORY` e `GIROMESA_ENCRYPTED_CONFIG_ARCHIVE`; nenhum snapshot novo do `.env` em claro é permitido.
 
 `deploy/vps/rollback-app.sh` troca somente a release da aplicação por SHA completo já instalado. Ele exige que operador declare migrations atual e alvo iguais, registra `rollback-app.json`, executa smoke e nunca chama restauração do banco. Schema divergente bloqueia esse rollback e exige plano de recuperação específico revisado.
 
