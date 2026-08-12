@@ -6,6 +6,7 @@ target_database_container=""
 database_name=""
 database_user=""
 expected_artifact=""
+expected_source_migration_id=""
 expected_target_artifact=""
 expected_target_migration_id=""
 restore_object_directory=""
@@ -20,6 +21,7 @@ while (($#)); do
     --database-name) database_name=${2-}; shift 2 ;;
     --database-user) database_user=${2-}; shift 2 ;;
     --expected-artifact) expected_artifact=${2-}; shift 2 ;;
+    --expected-source-migration-id) expected_source_migration_id=${2-}; shift 2 ;;
     --expected-target-artifact) expected_target_artifact=${2-}; shift 2 ;;
     --expected-target-migration-id) expected_target_migration_id=${2-}; shift 2 ;;
     --restore-object-directory) restore_object_directory=${2-}; shift 2 ;;
@@ -31,7 +33,7 @@ while (($#)); do
 done
 expected_target_artifact=${expected_target_artifact:-$expected_artifact}
 
-for required in backup_directory target_database_container database_name database_user expected_artifact; do
+for required in backup_directory target_database_container database_name database_user expected_artifact expected_source_migration_id; do
   if [[ -z ${!required} ]]; then
     echo "RESTORE_ARGUMENT_REQUIRED:$required" >&2
     exit 1
@@ -51,7 +53,7 @@ if [[ ! $max_rto_minutes =~ ^([1-9]|[12][0-9]|30)$ ]]; then
   echo "RESTORE_RTO_INVALID" >&2
   exit 1
 fi
-for tool in python3 docker tar; do
+for tool in python3 docker tar openssl; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "RESTORE_TOOL_REQUIRED:$tool" >&2
     exit 1
@@ -88,7 +90,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! python3 - "$backup_directory" "$stage" "$expected_artifact" "$expected_target_artifact" "$expected_target_migration_id" "$target_database_container" <<'PY'
+if ! python3 - "$backup_directory" "$stage" "$expected_artifact" "$expected_source_migration_id" "$expected_target_artifact" "$expected_target_migration_id" "$target_database_container" <<'PY'
 import base64, hashlib, hmac, json, os, pathlib, shutil, sys, tarfile
 
 root_input = pathlib.Path(sys.argv[1])
@@ -98,9 +100,10 @@ if root_input.is_symlink():
 root = root_input.resolve()
 stage = pathlib.Path(sys.argv[2]).resolve()
 expected_artifact = sys.argv[3]
-expected_target_artifact = sys.argv[4]
-expected_target_migration = sys.argv[5]
-target_container = sys.argv[6]
+expected_source_migration = sys.argv[4]
+expected_target_artifact = sys.argv[5]
+expected_target_migration = sys.argv[6]
+target_container = sys.argv[7]
 
 def fail(code):
     print(code, file=sys.stderr)
@@ -130,8 +133,15 @@ except Exception:
     fail("MANIFEST_PAYLOAD_INVALID")
 if manifest.get("schemaVersion") != 1 or payload.get("schemaVersion") != 1:
     fail("BACKUP_SCHEMA_UNSUPPORTED")
+if payload.get("coverage") != {"mode": "embedded", "database": True, "objects": True, "encryptedConfiguration": True}:
+    fail("BACKUP_COMPLETE_COVERAGE_REQUIRED")
+runtime_config_hmac = payload.get("runtimeConfigurationHmacSha256")
+if not isinstance(runtime_config_hmac, str) or not __import__("re").fullmatch(r"[0-9a-f]{64}", runtime_config_hmac):
+    fail("BACKUP_RUNTIME_CONFIGURATION_BINDING_INVALID")
 if payload.get("sourceArtifact", payload.get("artifact")) != expected_artifact:
     fail("BACKUP_ARTIFACT_MISMATCH")
+if payload.get("sourceMigrationId", payload.get("migrationId")) != expected_source_migration:
+    fail("BACKUP_SOURCE_MIGRATION_MISMATCH")
 if payload.get("targetArtifact", payload.get("artifact")) != expected_target_artifact:
     fail("BACKUP_TARGET_ARTIFACT_MISMATCH")
 if expected_target_migration and payload.get("targetMigrationId", payload.get("migrationId")) != expected_target_migration:
@@ -202,6 +212,7 @@ plan = {
     "sourceDatabaseContainer": source,
     "hasObjects": archive.exists(),
     "configName": next((name for name in ("configuration.age", "configuration.gpg", "configuration.enc") if (stage / name).exists()), ""),
+    "runtimeConfigurationHmacSha256": runtime_config_hmac,
 }
 (stage / "plan.json").write_text(json.dumps(plan), encoding="utf-8")
 PY
@@ -212,7 +223,7 @@ fi
 mapfile -t plan < <(python3 - "$stage/plan.json" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
-for key in ("backupId", "sourceArtifact", "sourceMigrationId", "targetArtifact", "targetMigrationId", "sourceDatabaseContainer", "hasObjects", "configName"):
+for key in ("backupId", "sourceArtifact", "sourceMigrationId", "targetArtifact", "targetMigrationId", "sourceDatabaseContainer", "hasObjects", "configName", "runtimeConfigurationHmacSha256"):
     print(value.get(key, ""))
 PY
 )
@@ -224,6 +235,7 @@ target_artifact=${plan[3]}
 target_migration_id=${plan[4]}
 has_objects=${plan[6]}
 config_name=${plan[7]}
+runtime_configuration_hmac=${plan[8]}
 
 if [[ $has_objects == True ]]; then
   if [[ -z $restore_object_directory ]]; then
@@ -245,12 +257,42 @@ if [[ -n $config_name ]]; then
     exit 1
   fi
 fi
+if [[ $config_name != configuration.enc ]]; then
+  echo "BACKUP_CONFIG_FORMAT_UNSUPPORTED" >&2
+  exit 1
+fi
+if ! python3 - <<'PY'
+import base64, os, sys
+try: value = base64.b64decode(os.environ.get("GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64", ""), validate=True)
+except Exception: value = b""
+if len(value) != 32: print("BACKUP_CONFIG_ENCRYPTION_KEY_INVALID", file=sys.stderr); raise SystemExit(1)
+PY
+then exit 1; fi
+runtime_config_stage="$stage/runtime.env.restored"
+openssl enc -d -aes-256-cbc -pbkdf2 -md sha256 -in "$stage/$config_name" -out "$runtime_config_stage" \
+  -pass env:GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
+chmod 600 "$runtime_config_stage"
+python3 - "$runtime_config_stage" "$runtime_configuration_hmac" <<'PY'
+import base64, hashlib, hmac, os, pathlib, re, sys
+path, expected = pathlib.Path(sys.argv[1]), sys.argv[2]
+raw = path.read_bytes()
+key = base64.b64decode(os.environ["GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64"], validate=True)
+actual = hmac.new(key, raw, hashlib.sha256).hexdigest()
+if not hmac.compare_digest(actual, expected): raise SystemExit("BACKUP_RUNTIME_CONFIGURATION_MISMATCH")
+seen = set()
+for line in raw.decode("utf-8").splitlines():
+    if not line or line.lstrip().startswith("#"): continue
+    match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", line)
+    if not match or match.group(1) in seen: raise SystemExit("BACKUP_RUNTIME_CONFIGURATION_INVALID")
+    seen.add(match.group(1))
+PY
 evidence_path="$backup_directory/restore-evidence.json"
 if [[ -e $evidence_path || -L $evidence_path ]]; then
   echo "RESTORE_EVIDENCE_ALREADY_EXISTS" >&2
   exit 1
 fi
 smoke_sha=""
+staged_smoke_sql=""
 if [[ -n $smoke_sql_file ]]; then
   smoke_size=$(wc -c < "$smoke_sql_file")
   if ((smoke_size < 1 || smoke_size > 65536)); then
@@ -262,6 +304,15 @@ import hashlib, sys
 print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest(), end="")
 PY
 )
+  staged_smoke_sql="$stage/smoke.sql"
+  python3 - "$smoke_sql_file" "$staged_smoke_sql" "$smoke_sha" <<'PY'
+import hashlib, hmac, pathlib, shutil, sys
+source, destination, expected = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+if source.is_symlink() or not source.is_file(): raise SystemExit("RESTORE_SMOKE_SQL_INVALID")
+shutil.copyfile(source, destination)
+actual = hashlib.sha256(destination.read_bytes()).hexdigest()
+if not hmac.compare_digest(actual, expected): raise SystemExit("RESTORE_SMOKE_SQL_CHANGED")
+PY
 fi
 
 docker_touched=1
@@ -290,7 +341,7 @@ else:
 PY
 fi
 if [[ -n $config_name ]]; then
-  python3 - "$stage/$config_name" "$restore_encrypted_config_directory" "$config_name" <<'PY'
+  python3 - "$runtime_config_stage" "$restore_encrypted_config_directory" "runtime.env.restored" <<'PY'
 import hashlib, hmac, os, pathlib, shutil, sys, tempfile
 source, destination, name = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 parent = destination.parent
@@ -316,8 +367,13 @@ except BaseException:
     raise
 PY
 fi
-if [[ -n $smoke_sql_file ]]; then
-  docker cp "$smoke_sql_file" "$target_database_container:$container_smoke"
+if [[ -n $staged_smoke_sql ]]; then
+  python3 - "$staged_smoke_sql" "$smoke_sha" <<'PY'
+import hashlib, hmac, sys
+actual = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+if not hmac.compare_digest(actual, sys.argv[2]): raise SystemExit("RESTORE_STAGED_SMOKE_SQL_CHANGED")
+PY
+  docker cp "$staged_smoke_sql" "$target_database_container:$container_smoke"
   docker exec "$target_database_container" psql --username "$database_user" --dbname "$database_name" \
     --set ON_ERROR_STOP=1 --file "$container_smoke"
 fi

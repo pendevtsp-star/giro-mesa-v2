@@ -125,6 +125,7 @@ for name, exact in (
     ("PRIVACY_EXPORT_ENCRYPTION_KEY", True),
     ("PUBLIC_TABLE_SESSION_SIGNING_KEY", False),
     ("GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64", False),
+    ("GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64", True),
 ):
     value = values.get(name)
     if value is None:

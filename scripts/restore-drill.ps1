@@ -100,6 +100,14 @@ function Get-Sha256Hex {
   finally { $sha.Dispose(); $stream.Dispose() }
 }
 
+function Get-OpenSslExecutable {
+  $command = Get-Command openssl -ErrorAction SilentlyContinue
+  if ($null -ne $command) { return $command.Source }
+  $bundled = 'C:\Program Files\Git\mingw64\bin\openssl.exe'
+  if (Test-Path -LiteralPath $bundled -PathType Leaf) { return $bundled }
+  throw 'RESTORE_TOOL_REQUIRED:openssl'
+}
+
 function Read-SafeUtf8Text {
   param([Parameter(Mandatory = $true)][string]$Path)
   [void](Assert-NoReparsePath -Path $Path)
@@ -354,6 +362,8 @@ try {
 
   try { $payload = ([Text.UTF8Encoding]::new($false)).GetString($payloadBytes) | ConvertFrom-Json } catch { throw 'MANIFEST_PAYLOAD_INVALID' }
   if ([int]$manifest.schemaVersion -ne 2 -or [int]$payload.schemaVersion -ne 2) { throw 'BACKUP_SCHEMA_UNSUPPORTED' }
+  if ([string]$payload.coverage.mode -ne 'embedded' -or -not [bool]$payload.coverage.database -or -not [bool]$payload.coverage.objects -or -not [bool]$payload.coverage.encryptedConfiguration) { throw 'BACKUP_COMPLETE_COVERAGE_REQUIRED' }
+  if ([string]$payload.runtimeConfigurationHmacSha256 -notmatch '^[0-9a-f]{64}$') { throw 'BACKUP_RUNTIME_CONFIGURATION_BINDING_INVALID' }
   if ([string]$payload.sourceArtifact -ne $ExpectedSourceArtifact) { throw 'BACKUP_SOURCE_ARTIFACT_MISMATCH' }
   if ([string]$payload.sourceMigrationId -ne $ExpectedSourceMigrationId) { throw 'BACKUP_SOURCE_MIGRATION_MISMATCH' }
   if ([string]$payload.targetArtifact -ne $ExpectedTargetArtifact) { throw 'BACKUP_TARGET_ARTIFACT_MISMATCH' }
@@ -406,6 +416,25 @@ try {
     if ([string]::IsNullOrWhiteSpace($RestoreEncryptedConfigDirectory)) { throw 'RESTORE_CONFIG_DIRECTORY_REQUIRED' }
     $restoreConfigPath = Assert-SafeRestoreDirectory -Path $RestoreEncryptedConfigDirectory -NotEmptyError 'RESTORE_CONFIG_TARGET_NOT_EMPTY'
   }
+  if ($null -eq $encryptedConfig -or $encryptedConfig.Name -ne 'configuration.enc') { throw 'BACKUP_CONFIG_FORMAT_UNSUPPORTED' }
+  try { $configKey = [Convert]::FromBase64String([Environment]::GetEnvironmentVariable('GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64')) }
+  catch { throw 'BACKUP_CONFIG_ENCRYPTION_KEY_INVALID' }
+  if ($configKey.Length -ne 32) { throw 'BACKUP_CONFIG_ENCRYPTION_KEY_INVALID' }
+  [Array]::Clear($configKey, 0, $configKey.Length)
+  $restoredRuntimeEnv = Join-Path $stage 'runtime.env.restored'
+  & (Get-OpenSslExecutable) enc -d -aes-256-cbc -pbkdf2 -md sha256 -in $encryptedConfig.FullName -out $restoredRuntimeEnv -pass env:GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
+  if ($LASTEXITCODE -ne 0) { throw 'BACKUP_CONFIG_DECRYPTION_FAILED' }
+  $runtimeBytes = [IO.File]::ReadAllBytes($restoredRuntimeEnv)
+  $runtimeHmac = [Security.Cryptography.HMACSHA256]::new($manifestKey)
+  try { $runtimeDigest = ($runtimeHmac.ComputeHash($runtimeBytes) | ForEach-Object { $_.ToString('x2') }) -join '' }
+  finally { $runtimeHmac.Dispose(); [Array]::Clear($runtimeBytes, 0, $runtimeBytes.Length) }
+  if ($runtimeDigest -ne [string]$payload.runtimeConfigurationHmacSha256) { throw 'BACKUP_RUNTIME_CONFIGURATION_MISMATCH' }
+  $seenEnvKeys = @{}
+  foreach ($line in [IO.File]::ReadAllLines($restoredRuntimeEnv)) {
+    if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) { continue }
+    if ($line -notmatch '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$' -or $seenEnvKeys.ContainsKey($Matches[1])) { throw 'BACKUP_RUNTIME_CONFIGURATION_INVALID' }
+    $seenEnvKeys[$Matches[1]] = $true
+  }
 
   $stagedSmokeSql = $null
   $smokeSqlSha256 = $null
@@ -432,7 +461,7 @@ try {
   }
   if ($null -ne $encryptedConfig) {
     [void](Assert-SafeRestoreDirectory -Path $restoreConfigPath -NotEmptyError 'RESTORE_CONFIG_TARGET_NOT_EMPTY')
-    Copy-StagedConfig -Source $encryptedConfig.FullName -DestinationDirectory $restoreConfigPath
+    Copy-StagedConfig -Source $restoredRuntimeEnv -DestinationDirectory $restoreConfigPath
   }
   if ($null -ne $stagedSmokeSql) {
     Invoke-CheckedDocker -Arguments @('cp', $stagedSmokeSql, "${TargetDatabaseContainer}:${containerSmoke}")

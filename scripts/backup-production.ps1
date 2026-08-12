@@ -23,6 +23,7 @@ param(
   [string]$TargetMigrationId,
   [string]$ObjectDirectory,
   [string]$EncryptedConfigArchive,
+  [string]$RuntimeEnvFile,
   [ValidateRange(1, 5)]
   [int]$MaxRpoMinutes = 5
 )
@@ -235,9 +236,34 @@ if ($hasObjectInput) {
   $objectState = @(Get-ObjectTreeState -Root $ObjectDirectory)
   $objectStateJson = Convert-ObjectTreeStateToJson -Entries $objectState
 }
-if (-not [string]::IsNullOrWhiteSpace($EncryptedConfigArchive)) {
-  $configState = Get-SafeConfigState -Path $EncryptedConfigArchive
+if (-not [string]::IsNullOrWhiteSpace($EncryptedConfigArchive)) { throw 'BACKUP_PREBUILT_CONFIG_FORBIDDEN' }
+$runtimeEnvPath = $null
+$runtimeEnvState = $null
+if (-not [string]::IsNullOrWhiteSpace($RuntimeEnvFile)) {
+  $runtimeEnvPath = Assert-NoReparsePath -Path $RuntimeEnvFile -ErrorCode 'BACKUP_RUNTIME_ENV_REPARSE_POINT_FORBIDDEN'
+  $runtimeEnvItem = Get-Item -LiteralPath $runtimeEnvPath -Force
+  if ($runtimeEnvItem.PSIsContainer -or $runtimeEnvItem.Length -lt 1) { throw 'BACKUP_RUNTIME_ENV_INVALID' }
+  $runtimeEnvState = [pscustomobject]@{ Length = [long]$runtimeEnvItem.Length; LastWriteTicks = $runtimeEnvItem.LastWriteTimeUtc.Ticks; Sha256 = Get-Sha256Hex -Path $runtimeEnvPath }
 }
+
+function Get-OpenSslExecutable {
+  $command = Get-Command openssl -ErrorAction SilentlyContinue
+  if ($null -ne $command) { return $command.Source }
+  $bundled = 'C:\Program Files\Git\mingw64\bin\openssl.exe'
+  if (Test-Path -LiteralPath $bundled -PathType Leaf) { return $bundled }
+  throw 'BACKUP_TOOL_REQUIRED:openssl'
+}
+
+function Protect-RuntimeConfiguration {
+  param([string]$Source, [string]$Destination)
+  & (Get-OpenSslExecutable) enc -aes-256-cbc -pbkdf2 -md sha256 -salt -in $Source -out $Destination -pass env:GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
+  if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Destination)) { throw 'BACKUP_CONFIG_ENCRYPTION_FAILED' }
+}
+try { $decodedConfigKey = [Convert]::FromBase64String([Environment]::GetEnvironmentVariable('GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64')) }
+catch { throw 'BACKUP_CONFIG_ENCRYPTION_KEY_INVALID' }
+if ($decodedConfigKey.Length -ne 32) { throw 'BACKUP_CONFIG_ENCRYPTION_KEY_INVALID' }
+[Array]::Clear($decodedConfigKey, 0, $decodedConfigKey.Length)
+if (-not $hasObjectInput -or $null -eq $runtimeEnvState) { throw 'BACKUP_COMPLETE_COVERAGE_REQUIRED' }
 
 $root = [IO.Path]::GetFullPath($OutputDirectory)
 [IO.Directory]::CreateDirectory($root) | Out-Null
@@ -264,13 +290,7 @@ try {
       throw 'BACKUP_OBJECT_TREE_CHANGED'
     }
   }
-  if ($null -ne $configState) {
-    $currentConfig = Get-SafeConfigState -Path $EncryptedConfigArchive
-    if ($currentConfig.Length -ne $configState.Length -or $currentConfig.LastWriteTicks -ne $configState.LastWriteTicks -or $currentConfig.Sha256 -ne $configState.Sha256) {
-      throw 'CONFIG_ARCHIVE_CHANGED'
-    }
-    Copy-SafeConfigFile -State $configState -Destination (Join-Path $backupDirectory ("configuration" + $configState.Extension))
-  }
+  Protect-RuntimeConfiguration -Source $runtimeEnvPath -Destination (Join-Path $backupDirectory 'configuration.enc')
 
   $files = [System.Collections.ArrayList]::new()
   Add-BackupFile -Files $files -Root $backupDirectory -Path $databaseDump -Kind 'postgresql'
@@ -290,7 +310,15 @@ try {
     sourceDatabaseContainer = $DatabaseContainer; databaseName = $DatabaseName
     createdAt = $startedAt.ToString('o'); completedAt = $finishedAt.ToString('o')
     durationSeconds = [int]$durationSeconds; declaredRpoMinutes = $MaxRpoMinutes; files = @($files)
+    coverage = [ordered]@{ mode = 'embedded'; database = $true; objects = $true; encryptedConfiguration = $true }
   }
+  $currentRuntimeEnv = Get-Item -LiteralPath (Assert-NoReparsePath -Path $runtimeEnvPath -ErrorCode 'BACKUP_RUNTIME_ENV_REPARSE_POINT_FORBIDDEN') -Force
+  $currentRuntimeSha = Get-Sha256Hex -Path $runtimeEnvPath
+  if ($currentRuntimeEnv.Length -ne $runtimeEnvState.Length -or $currentRuntimeEnv.LastWriteTimeUtc.Ticks -ne $runtimeEnvState.LastWriteTicks -or $currentRuntimeSha -ne $runtimeEnvState.Sha256) { throw 'BACKUP_RUNTIME_ENV_CHANGED' }
+  $runtimeBytes = [IO.File]::ReadAllBytes($runtimeEnvPath)
+  $runtimeHmac = [Security.Cryptography.HMACSHA256]::new($manifestKey)
+  try { $payload.runtimeConfigurationHmacSha256 = ($runtimeHmac.ComputeHash($runtimeBytes) | ForEach-Object { $_.ToString('x2') }) -join '' }
+  finally { $runtimeHmac.Dispose(); [Array]::Clear($runtimeBytes, 0, $runtimeBytes.Length) }
   $payloadJson = $payload | ConvertTo-Json -Depth 8 -Compress
   $utf8 = [Text.UTF8Encoding]::new($false)
   $payloadBytes = $utf8.GetBytes($payloadJson)

@@ -17,7 +17,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 }
 
 resource "aws_subnet" "private" {
@@ -69,31 +69,39 @@ resource "aws_security_group" "database" {
   name_prefix = "giromesa-${var.environment}-db-"
   description = "PostgreSQL access from application tasks only."
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    protocol        = "tcp"
-    from_port       = 5432
-    to_port         = 5432
-    security_groups = [aws_security_group.application.id]
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
 resource "aws_security_group" "application" {
   name_prefix = "giromesa-${var.environment}-app-"
   description = "Application tasks."
   vpc_id      = aws_vpc.main.id
+}
 
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+# Provider endpoints use rotating public addresses; egress remains limited to TLS port 443.
+#trivy:ignore:AVD-AWS-0104
+resource "aws_vpc_security_group_egress_rule" "application_https" {
+  security_group_id = aws_security_group.application.id
+  description       = "Outbound HTTPS to configured payment, fiscal, email and identity providers."
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "database_from_application" {
+  security_group_id            = aws_security_group.database.id
+  referenced_security_group_id = aws_security_group.application.id
+  description                  = "PostgreSQL from GiroMesa application tasks."
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+
+resource "aws_vpc_security_group_egress_rule" "application_to_database" {
+  security_group_id            = aws_security_group.application.id
+  referenced_security_group_id = aws_security_group.database.id
+  description                  = "PostgreSQL to the GiroMesa database security group."
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
 }

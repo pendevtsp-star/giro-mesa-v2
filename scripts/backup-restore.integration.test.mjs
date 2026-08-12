@@ -55,6 +55,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
   const objectSource = join(directory, "objects-source");
   const objectRestore = join(directory, "objects-restored");
   const configSource = join(directory, "configuration.enc");
+  const runtimeEnv = join(directory, ".env");
   const configRestore = join(directory, "config-restored");
   const smokeSql = join(directory, "smoke.sql");
   const sourceArtifact = `git:${"a".repeat(40)}`;
@@ -69,6 +70,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
     writeFileSync(join(objectSource, "menus", "cover.txt"), "cover-asset-v1\n");
     writeFileSync(join(objectSource, "receipts", "receipt.json"), '{"amountCents":4200}\n');
     writeFileSync(configSource, Buffer.from([0, 255, 19, 71, 105, 114, 111, 77, 101, 115, 97]));
+    writeFileSync(runtimeEnv, "POSTGRES_DB=giromesa\nSECRET=bound-only-by-hmac\n");
     writeFileSync(
       smokeSql,
       [
@@ -137,10 +139,10 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         targetMigrationId,
         "-ObjectDirectory",
         objectSource,
-        "-EncryptedConfigArchive",
-        configSource,
+        "-RuntimeEnvFile",
+        runtimeEnv,
       ],
-      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey } },
+      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
     );
     const backupDirectory = backupOutput.split(/\r?\n/).at(-1);
     assert.ok(backupDirectory);
@@ -174,7 +176,7 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         "-SmokeSqlFile",
         smokeSql,
       ],
-      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey } },
+      { env: { ...process.env, GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey, GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64") } },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -203,8 +205,8 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
       '{"amountCents":4200}\n',
     );
     assert.deepEqual(
-      readFileSync(join(configRestore, "configuration.enc")),
-      readFileSync(configSource),
+      readFileSync(join(configRestore, "runtime.env.restored")),
+      readFileSync(runtimeEnv),
     );
 
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));

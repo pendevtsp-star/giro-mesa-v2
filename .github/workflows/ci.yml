@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, release/rollback-0029]
 
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
         env:
           POSTGRES_DB: giromesa_ci
           POSTGRES_USER: giromesa
@@ -26,11 +26,11 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 11.7.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -83,14 +83,14 @@ jobs:
   dotnet:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 11.7.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -105,11 +105,155 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
       - run: terraform fmt -check -recursive
         working-directory: infra/terraform
       - run: terraform init -backend=false
         working-directory: infra/terraform
       - run: terraform validate
         working-directory: infra/terraform
+
+  release-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+      - name: Reject repository secrets before privileged publication
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+          dir --redact --no-banner /repo
+      - name: Reject high or critical container definition findings
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          aquasec/trivy:0.69.2@sha256:3d1f862cb6c4fe13c1506f96f816096030d8d5ccdb2380a3069f7bf07daa86aa
+          fs --quiet --exit-code 1 --severity HIGH,CRITICAL
+          --scanners vuln,misconfig /repo
+      - name: Verify immutable supply-chain release contract
+        run: node scripts/check-supply-chain.mjs
+
+  recovery-publish:
+    needs: [typescript, dotnet, terraform, release-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/rollback-0029'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: site, app: site, dockerfile: Dockerfile }
+          - { service: customer, app: customer, dockerfile: Dockerfile }
+          - { service: api, app: api, dockerfile: Dockerfile }
+          - { service: worker, app: worker, dockerfile: Dockerfile }
+          - { service: ops, app: ops, dockerfile: Dockerfile.ops }
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: image=moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: |
+            APP=${{ matrix.app }}
+            NEXT_PUBLIC_API_URL=https://api.giromesa.com.br
+            NEXT_PUBLIC_OPS_URL=https://app.giromesa.com.br
+            NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true
+            NEXT_PUBLIC_CUSTOMER_API_URL=https://api.giromesa.com.br
+            NEXT_PUBLIC_CUSTOMER_API_ENABLED=true
+            NEXT_PUBLIC_DEMO_HUB_ACK=false
+            CUSTOMER_QA_DEMO_SLUG=demo
+            VITE_API_URL=https://api.giromesa.com.br
+            VITE_SITE_URL=https://giromesa.com.br
+            VITE_DEMO_MODE=false
+          tags: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:recovery-${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Sign exact recovery digest
+        env:
+          IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+      - name: Create recovery digest fragment
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          SERVICE: ${{ matrix.service }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          mkdir fragment
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          digest, service, source = os.environ["DIGEST"], os.environ["SERVICE"], os.environ["SOURCE_SHA"]
+          if service not in {"site", "customer", "api", "worker", "ops"}: raise SystemExit("invalid service")
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or not re.fullmatch(r"[0-9a-f]{40}", source): raise SystemExit("invalid identity")
+          pathlib.Path(f"fragment/{service}.json").write_text(json.dumps({"service":service,"digest":digest,"sourceCommit":source}, sort_keys=True, separators=(",", ":"))+"\n", encoding="utf-8")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: recovery-digest-${{ matrix.service }}-${{ github.sha }}
+          path: fragment/${{ matrix.service }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  recovery-release-manifest:
+    needs: recovery-publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/rollback-0029'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: recovery-digest-*-${{ github.sha }}
+          path: fragments
+          merge-multiple: true
+      - name: Aggregate exact recovery release
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re
+          source=os.environ["SOURCE_SHA"]
+          entries=[json.loads(path.read_text(encoding="utf-8")) for path in pathlib.Path("fragments").glob("*.json")]
+          expected={"site","customer","api","worker","ops"}
+          if len(entries)!=5 or {item.get("service") for item in entries}!=expected or any(item.get("sourceCommit")!=source for item in entries): raise SystemExit("invalid recovery fragments")
+          if any(not re.fullmatch(r"sha256:[0-9a-f]{64}", item.get("digest", "")) for item in entries): raise SystemExit("invalid recovery digest")
+          images=[f"ghcr.io/pendevtsp-star/giro-mesa-v2-{item['service']}@{item['digest']}" for item in sorted(entries,key=lambda item:item["service"])]
+          target=pathlib.Path(f"giromesa-image-attestation-{source}.json")
+          target.write_text(json.dumps({"schemaVersion":1,"sourceCommit":source,"workflow":"ci.yml","images":images},sort_keys=True,separators=(",",":"))+"\n",encoding="utf-8")
+          pathlib.Path(f"{target}.sha256").write_text(f"{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n",encoding="ascii")
+          PY
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: v3.0.2
+      - name: Sign recovery manifest
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: cosign sign-blob --yes --bundle "giromesa-image-attestation-${SOURCE_SHA}.json.bundle" "giromesa-image-attestation-${SOURCE_SHA}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-recovery-attestation-${{ github.sha }}
+          path: giromesa-image-attestation-${{ github.sha }}.json*
+          if-no-files-found: error
+          retention-days: 90
