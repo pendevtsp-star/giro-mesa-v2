@@ -80,7 +80,13 @@ import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { RemunerationPage } from "./remuneration";
 import { parseRoute, routeHref } from "./router";
-import { calculateCartTotal, canAccess, formatMoney, isValidTerminalPin } from "./rules";
+import {
+  calculateCartTotal,
+  canAccess,
+  formatMoney,
+  isValidTerminalPin,
+  nextTicketStatus,
+} from "./rules";
 import { SalonMap, type SalonMapTable } from "./salon-map";
 
 type Session = {
@@ -1229,7 +1235,7 @@ function OperationalApp({
                       size="sm"
                       variant="secondary"
                     >
-                      Trocar colaborador por PIN
+                      {session.demo ? "Trocar perfil demonstrativo" : "Trocar colaborador"}
                     </Button>
                   )}
                   <Button onClick={onLogout} size="sm" variant="ghost">
@@ -1297,6 +1303,7 @@ function OperationalApp({
       {pinOpen && (
         <PinDialog
           currentProfile={session.profile}
+          demo={session.demo}
           onClose={() => setPinOpen(false)}
           onSwitch={(profile) => {
             onSessionChange({ ...session, profile });
@@ -3010,26 +3017,21 @@ function AlertsPage() {
 
 function PinDialog({
   currentProfile,
+  demo,
   onClose,
   onSwitch,
 }: {
   currentProfile: Profile;
+  demo: boolean;
   onClose: () => void;
   onSwitch: (profile: Profile) => void;
 }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
   const candidates = profiles.filter((profile) => profile.id !== "platform");
+  const [selectedId, setSelectedId] = useState(candidates[0]?.id ?? "owner");
   function submit() {
-    if (!isValidTerminalPin(pin)) {
-      setError("Informe os quatro dígitos do PIN.");
-      return;
-    }
-    const profile = candidates.find((item) => item.pin === pin);
-    if (!profile) {
-      setError("PIN demonstrativo não reconhecido.");
-      return;
-    }
+    if (!demo) return;
+    const profile = candidates.find((item) => item.id === selectedId);
+    if (!profile) return;
     onSwitch(profile);
   }
   return (
@@ -3056,35 +3058,30 @@ function PinDialog({
             <strong>{currentProfile.name}</strong>
           </span>
         </div>
-        <label className="pin-field">
-          PIN de 4 dígitos
-          <input
-            aria-describedby={error ? "pin-error" : undefined}
-            inputMode="numeric"
-            maxLength={4}
-            onChange={(event) => {
-              setPin(event.target.value.replace(/\D/g, ""));
-              setError("");
-            }}
-            onKeyDown={(event) => event.key === "Enter" && submit()}
-            type="password"
-            value={pin}
-          />
-        </label>
-        {error && (
-          <p className="field-error" id="pin-error" role="alert">
-            {error}
+        {demo ? (
+          <label className="pin-field">
+            Perfil demonstrativo
+            <select
+              onChange={(event) => setSelectedId(event.target.value as Profile["id"])}
+              value={selectedId}
+            >
+              {candidates.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.role} — {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="field-error" role="alert">
+            A troca de colaborador exige autenticação pela API e não está disponível localmente.
           </p>
         )}
-        <div className="demo-pin">
-          <strong>PINs da demonstração</strong>
-          <span>1024 proprietária · 2468 gerente · 1357 garçom · 9090 caixa</span>
-        </div>
         <div className="dialog-actions">
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button disabled={pin.length !== 4} onClick={submit}>
+          <Button disabled={!demo} onClick={submit}>
             Trocar acesso
           </Button>
         </div>

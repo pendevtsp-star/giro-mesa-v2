@@ -17,7 +17,6 @@ export const profiles: Profile[] = [
     shortName: "MC",
     role: "Proprietária",
     description: "Visão completa da operação e gestão",
-    pin: "1024",
     permissions: [
       ...basePermissions,
       "onboarding.manage",
@@ -43,7 +42,6 @@ export const profiles: Profile[] = [
     shortName: "RN",
     role: "Gerente",
     description: "Turno, equipe, aprovações e exceções",
-    pin: "2468",
     permissions: [
       ...basePermissions,
       "onboarding.manage",
@@ -69,7 +67,6 @@ export const profiles: Profile[] = [
     shortName: "LM",
     role: "Garçom",
     description: "Mesas, chamados e pedidos",
-    pin: "1357",
     permissions: [
       ...basePermissions,
       "salon.operate",
@@ -84,7 +81,6 @@ export const profiles: Profile[] = [
     shortName: "BL",
     role: "Caixa",
     description: "Recebimentos, turnos e fechamento",
-    pin: "9090",
     permissions: [...basePermissions, "counter.operate", "catalog.manage", "cash.operate"],
   },
   {
@@ -93,7 +89,6 @@ export const profiles: Profile[] = [
     shortName: "AR",
     role: "Cozinha / KDS",
     description: "Produção e disponibilidade",
-    pin: "7788",
     permissions: [...basePermissions, "catalog.manage", "kds.operate"],
   },
   {
@@ -102,7 +97,6 @@ export const profiles: Profile[] = [
     shortName: "CA",
     role: "Estoque e compras",
     description: "Suprimentos, contagens e perdas",
-    pin: "1122",
     permissions: [...basePermissions, "inventory.manage", "purchases.manage"],
   },
   {
@@ -111,7 +105,6 @@ export const profiles: Profile[] = [
     shortName: "CF",
     role: "Financeiro",
     description: "Contas, conciliação e margem",
-    pin: "3300",
     permissions: [
       ...basePermissions,
       "cash.operate",
@@ -126,7 +119,6 @@ export const profiles: Profile[] = [
     shortName: "DR",
     role: "Delivery",
     description: "Pedidos, prazos e despacho",
-    pin: "4848",
     permissions: [
       ...basePermissions,
       "counter.operate",
@@ -141,7 +133,6 @@ export const profiles: Profile[] = [
     shortName: "GM",
     role: "Plataforma",
     description: "Tenants, suporte e incidentes",
-    pin: "5566",
     permissions: [...basePermissions, "platform.manage"],
   },
 ];
@@ -149,94 +140,58 @@ export const profiles: Profile[] = [
 export const organizations: Organization[] = [
   {
     id: "a1111111-1111-4111-8111-111111111111",
-    name: "Grupo Aurora",
-    document: "12.345.678/0001-90",
+    name: "[DEMO] Grupo Aurora",
+    document: "00.000.000/0035-00",
     units: [
       {
         id: "b1111111-1111-4111-8111-111111111111",
-        name: "Aurora Centro",
+        name: "[DEMO] Aurora Centro",
         city: "Belo Horizonte, MG",
         timezone: "America/Sao_Paulo",
       },
       {
         id: "b2222222-2222-4222-8222-222222222222",
-        name: "Aurora Lagoa",
+        name: "[DEMO] Aurora Lagoa",
         city: "Belo Horizonte, MG",
-        timezone: "America/Sao_Paulo",
-      },
-    ],
-  },
-  {
-    id: "a2222222-2222-4222-8222-222222222222",
-    name: "Quintal da Serra",
-    document: "98.765.432/0001-10",
-    units: [
-      {
-        id: "b3333333-3333-4333-8333-333333333333",
-        name: "Quintal Matriz",
-        city: "Nova Lima, MG",
         timezone: "America/Sao_Paulo",
       },
     ],
   },
 ];
 
-export const initialTables: DiningTable[] = [
-  {
-    id: "m01",
-    name: "Mesa 01",
-    seats: 4,
-    status: "occupied",
-    server: "Lia",
-    totalCents: 14680,
-    openedMinutes: 48,
-    area: "Salão principal",
-  },
-  { id: "m02", name: "Mesa 02", seats: 2, status: "free", area: "Salão principal" },
-  {
-    id: "m03",
-    name: "Mesa 03",
-    seats: 6,
-    status: "attention",
-    server: "João",
-    totalCents: 28740,
-    openedMinutes: 76,
-    area: "Salão principal",
-  },
-  {
-    id: "m04",
-    name: "Mesa 04",
-    seats: 4,
-    status: "closing",
-    server: "Lia",
-    totalCents: 9230,
-    openedMinutes: 61,
-    area: "Salão principal",
-  },
-  { id: "m05", name: "Mesa 05", seats: 2, status: "reserved", area: "Salão principal" },
-  { id: "m06", name: "Mesa 06", seats: 4, status: "free", area: "Salão principal" },
-  {
-    id: "v01",
-    name: "Varanda 01",
-    seats: 4,
-    status: "occupied",
-    server: "Lia",
-    totalCents: 17600,
-    openedMinutes: 32,
-    area: "Varanda",
-  },
-  { id: "v02", name: "Varanda 02", seats: 4, status: "free", area: "Varanda" },
-  {
-    id: "b01",
-    name: "Balcão 01",
-    seats: 1,
-    status: "occupied",
-    server: "Bruno",
-    totalCents: 3800,
-    openedMinutes: 14,
-    area: "Balcão",
-  },
+const tableAreas: DiningTable["area"][] = ["Salão principal", "Varanda", "Balcão"];
+const tableStatuses: DiningTable["status"][] = [
+  "free",
+  "occupied",
+  "free",
+  "attention",
+  "free",
+  "closing",
+  "reserved",
+  "free",
 ];
+
+export const initialTables: DiningTable[] = tableAreas.flatMap((area, areaIndex) =>
+  Array.from({ length: 40 }, (_, tableIndex) => {
+    const sequence = areaIndex * 40 + tableIndex + 1;
+    const status = tableStatuses[tableIndex % tableStatuses.length] ?? "free";
+    const isActive = status === "occupied" || status === "attention" || status === "closing";
+    return {
+      id: `demo-table-${String(sequence).padStart(3, "0")}`,
+      name: `Mesa ${String(sequence).padStart(3, "0")}`,
+      seats: [2, 4, 4, 6][tableIndex % 4] ?? 4,
+      status,
+      ...(isActive
+        ? {
+            server: tableIndex % 2 === 0 ? "Lia" : "Rafael",
+            totalCents: 4_000 + sequence * 173,
+            openedMinutes: 8 + ((sequence * 7) % 74),
+          }
+        : {}),
+      area,
+    };
+  }),
+);
 
 export const products: Product[] = [
   {
@@ -301,7 +256,7 @@ export const initialTickets: KitchenTicket[] = [
     station: "Cozinha",
     items: ["2× Burger Aurora", "1× Risoto do Cerrado"],
     elapsedMinutes: 21,
-    status: "preparing",
+    status: "new",
     priority: true,
   },
   {
@@ -310,7 +265,7 @@ export const initialTickets: KitchenTicket[] = [
     station: "Bar",
     items: ["2× Limonada da casa"],
     elapsedMinutes: 4,
-    status: "new",
+    status: "preparing",
   },
   {
     id: "k03",
@@ -318,7 +273,7 @@ export const initialTickets: KitchenTicket[] = [
     station: "Cozinha",
     items: ["1× Croquete de costela", "1× Burger Aurora"],
     elapsedMinutes: 9,
-    status: "preparing",
+    status: "ready",
   },
   {
     id: "k04",
@@ -326,7 +281,7 @@ export const initialTickets: KitchenTicket[] = [
     station: "Cozinha",
     items: ["1× Risoto do Cerrado"],
     elapsedMinutes: 16,
-    status: "ready",
+    status: "preparing",
   },
 ];
 
@@ -377,6 +332,61 @@ export const stock: StockItem[] = [
     supplier: "Empório Sul",
   },
 ];
+
+export function createDemoScenario() {
+  return {
+    metadata: {
+      dataset: "giromesa-complete-demo",
+      version: 1,
+      demoOnly: true,
+      referenceTime: "2026-08-10T18:00:00.000Z",
+    },
+    serviceAreas: [
+      { id: "demo-area-main", name: "Salão principal", tableCount: 40 },
+      { id: "demo-area-balcony", name: "Varanda", tableCount: 40 },
+      { id: "demo-area-counter", name: "Balcão", tableCount: 40 },
+    ],
+    shifts: [
+      { id: "demo-shift-lunch-1", unit: "[DEMO] Aurora Centro", name: "Almoço", state: "closed" },
+      { id: "demo-shift-dinner-1", unit: "[DEMO] Aurora Centro", name: "Jantar", state: "open" },
+      { id: "demo-shift-lunch-2", unit: "[DEMO] Aurora Lagoa", name: "Almoço", state: "closed" },
+      { id: "demo-shift-dinner-2", unit: "[DEMO] Aurora Lagoa", name: "Jantar", state: "scheduled" },
+    ],
+    kdsTickets: initialTickets.map((ticket) => ({ ...ticket, items: [...ticket.items] })),
+    inventory: {
+      locations: [
+        { id: "demo-location-main", name: "Estoque principal" },
+        { id: "demo-location-bar", name: "Bar" },
+      ],
+      items: stock.map((item) => ({ ...item })),
+    },
+    returnables: [
+      { id: "demo-returnable-keg", name: "Barril retornável 30 L", tracking: "serialized", custody: "unit" },
+      { id: "demo-returnable-crate", name: "Engradado 24 unidades", tracking: "aggregate", custody: "supplier" },
+      { id: "demo-returnable-bottle", name: "Garrafa retornável 600 ml", tracking: "aggregate", custody: "table" },
+    ],
+    incidents: [
+      { id: "demo-incident-breakage", kind: "breakage", summary: "Quebra registrada para análise gerencial", amountCents: 7_400 },
+      { id: "demo-incident-missing-returnable", kind: "missing_returnable", summary: "Vasilhame ausente aguardando conferência", amountCents: 12_000 },
+    ],
+    finance: {
+      payments: [
+        { id: "demo-payment-cash", method: "cash", amountCents: 14_680, state: "settled" },
+        { id: "demo-payment-debit", method: "debit_simulator", amountCents: 28_740, state: "settled" },
+        { id: "demo-payment-voucher", method: "voucher_simulator", amountCents: 9_230, state: "pending" },
+      ],
+      payable: { id: "demo-payable-produce", description: "Compra demonstrativa de insumos", amountCents: 184_000 },
+      receivable: { id: "demo-receivable-event", description: "Evento demonstrativo", amountCents: 98_000 },
+    },
+    doseClub: {
+      provider: "doseclub",
+      status: "disabled",
+      mode: "simulator",
+      mappingCount: 3,
+      pendingReconciliationCount: 1,
+    },
+  } as const;
+}
 
 export const alerts: AlertItem[] = [
   {

@@ -56,7 +56,6 @@ export interface Profile {
   role: string;
   description: string;
   permissions: Permission[];
-  pin: string;
 }
 
 export interface Organization {

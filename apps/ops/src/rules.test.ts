@@ -8,7 +8,6 @@ const waiter: Profile = {
   shortName: "LM",
   role: "Garçom",
   description: "Atendimento",
-  pin: "1234",
   permissions: ["dashboard.view", "salon.operate", "alerts.view"],
 };
 
