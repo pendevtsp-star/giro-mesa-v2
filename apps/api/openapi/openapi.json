@@ -34320,6 +34320,938 @@
           }
         }
       }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/overview": {
+      "get": {
+        "operationId": "DoseClubReconciliationController_overview[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubOverviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          }
+        },
+        "summary": "Get tenant-scoped DoseClub mapping and reconciliation status",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/overview": {
+      "get": {
+        "operationId": "DoseClubReconciliationController_overview[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubOverviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          }
+        },
+        "summary": "Get tenant-scoped DoseClub mapping and reconciliation status",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_createMapping[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "productId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "stockLocationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "productId",
+                  "inventoryItemId",
+                  "stockLocationId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubMappingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Mapping already exists"
+          }
+        },
+        "summary": "Create a local mapping using the POS product id as external id",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_createMapping[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "productId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "stockLocationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "productId",
+                  "inventoryItemId",
+                  "stockLocationId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubMappingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Mapping already exists"
+          }
+        },
+        "summary": "Create a local mapping using the POS product id as external id",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings/{mappingId}": {
+      "patch": {
+        "operationId": "DoseClubReconciliationController_updateMapping[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mappingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "stockLocationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "inventoryItemId",
+                  "stockLocationId",
+                  "active",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubMappingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Mapping version conflict"
+          }
+        },
+        "summary": "Update a mapping with optimistic concurrency",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/mappings/{mappingId}": {
+      "patch": {
+        "operationId": "DoseClubReconciliationController_updateMapping[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mappingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "stockLocationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "inventoryItemId",
+                  "stockLocationId",
+                  "active",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubMappingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Mapping version conflict"
+          }
+        },
+        "summary": "Update a mapping with optimistic concurrency",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/runs": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_requestRun[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "unitId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          }
+        },
+        "summary": "Queue an idempotent local reconciliation scan",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/runs": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_requestRun[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "unitId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          }
+        },
+        "summary": "Queue an idempotent local reconciliation scan",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/runs/{runId}/retry": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_retryRun[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Run state or version conflict"
+          }
+        },
+        "summary": "Requeue a failed local scan using optimistic concurrency",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/runs/{runId}/retry": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_retryRun[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "409": {
+            "description": "Run state or version conflict"
+          }
+        },
+        "summary": "Requeue a failed local scan using optimistic concurrency",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/integrations/doseclub/findings/{findingId}/recheck": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_recheckFinding[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "404": {
+            "description": "Finding not found in the tenant unit"
+          },
+          "409": {
+            "description": "Finding state, version or idempotency conflict"
+          }
+        },
+        "summary": "Queue a local recheck for a current finding",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/integrations/doseclub/findings/{findingId}/recheck": {
+      "post": {
+        "operationId": "DoseClubReconciliationController_recheckFinding[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid route or request contract"
+          },
+          "401": {
+            "description": "Authenticated session required"
+          },
+          "403": {
+            "description": "Owner or manager role required"
+          },
+          "404": {
+            "description": "Finding not found in the tenant unit"
+          },
+          "409": {
+            "description": "Finding state, version or idempotency conflict"
+          }
+        },
+        "summary": "Queue a local recheck for a current finding",
+        "tags": [
+          "DoseClub administration"
+        ]
+      }
     }
   },
   "info": {
@@ -36756,6 +37688,334 @@
           "partial",
           "blockedDomains",
           "data"
+        ]
+      },
+      "DoseClubIntegrationDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "doseclub"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "unitId",
+          "updatedAt"
+        ]
+      },
+      "DoseClubReconciliationRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "manual",
+              "retry"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "findingCount": {
+            "type": "number"
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "number"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unitId",
+          "runDate",
+          "trigger",
+          "status",
+          "findingCount",
+          "failureCode",
+          "version",
+          "startedAt",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DoseClubReconciliationSummaryDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_scanned",
+              "healthy",
+              "attention",
+              "failed"
+            ]
+          },
+          "remoteHeartbeat": {
+            "type": "string",
+            "enum": [
+              "partial"
+            ]
+          },
+          "lastRun": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+              }
+            ]
+          },
+          "openFindingCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "remoteHeartbeat",
+          "lastRun",
+          "openFindingCount"
+        ]
+      },
+      "DoseClubMappingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalProductId": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemName": {
+            "type": "string"
+          },
+          "stockLocationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stockLocationName": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unitId",
+          "externalProductId",
+          "productId",
+          "productName",
+          "inventoryItemId",
+          "inventoryItemName",
+          "stockLocationId",
+          "stockLocationName",
+          "active",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "DoseClubFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing_mapping",
+              "inactive_mapping",
+              "invalid_inventory_dimension",
+              "invalid_inventory_unit",
+              "state_version_gap",
+              "missing_reconcile_heartbeat"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved",
+              "superseded"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "critical"
+            ]
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "firstDetectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastDetectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "unitId",
+          "kind",
+          "status",
+          "severity",
+          "entityType",
+          "entityId",
+          "summary",
+          "evidence",
+          "firstDetectedAt",
+          "lastDetectedAt",
+          "resolvedAt",
+          "version"
+        ]
+      },
+      "DoseClubOverviewDto": {
+        "type": "object",
+        "properties": {
+          "integration": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DoseClubIntegrationDto"
+              }
+            ]
+          },
+          "reconciliation": {
+            "$ref": "#/components/schemas/DoseClubReconciliationSummaryDto"
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoseClubMappingDto"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoseClubFindingDto"
+            }
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoseClubReconciliationRunDto"
+            }
+          }
+        },
+        "required": [
+          "integration",
+          "reconciliation",
+          "mappings",
+          "findings",
+          "runs"
         ]
       },
       "RemunerationController_createRule_0__request_recursive": {

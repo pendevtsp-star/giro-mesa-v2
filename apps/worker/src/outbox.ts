@@ -25,6 +25,7 @@ import {
   emailProviderConfiguration,
 } from "./email.js";
 import { consumeOrderSentInventory, InventoryConsumptionError } from "./inventory.js";
+import { DoseClubReconciliationWorker } from "./doseclub-reconciliation.js";
 import { WorkerObservability } from "./observability.js";
 import { failPrivacyRequest, processPrivacyRequest } from "./privacy.js";
 import { deliverWebhook, parseWebhookDeliveryRequest, WebhookDeliveryError } from "./webhook.js";
@@ -102,12 +103,14 @@ function activeExpiry(payload: Record<string, unknown>) {
 
 export class OutboxWorker {
   private readonly connection: DatabaseConnection;
+  private readonly doseClubReconciliation: DoseClubReconciliationWorker;
 
   constructor(
     connection: DatabaseConnection = createDatabase(),
     private readonly observability = new WorkerObservability(),
   ) {
     this.connection = connection;
+    this.doseClubReconciliation = new DoseClubReconciliationWorker(connection);
   }
 
   private get db() {
@@ -193,6 +196,10 @@ export class OutboxWorker {
       );
     }
     return changed;
+  }
+
+  async reconcileDoseClub() {
+    return this.doseClubReconciliation.runOnce();
   }
 
   async close() {

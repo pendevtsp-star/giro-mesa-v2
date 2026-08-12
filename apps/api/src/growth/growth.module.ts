@@ -8,6 +8,8 @@ import {
   GrowthPublicMenuController,
 } from "./growth.controller.js";
 import { GrowthService } from "./growth.service.js";
+import { DoseClubReconciliationController } from "./doseclub-reconciliation.controller.js";
+import { DoseClubReconciliationService } from "./doseclub-reconciliation.service.js";
 
 @Module({
   imports: [AuthModule, OrganizationsModule],
@@ -16,8 +18,9 @@ import { GrowthService } from "./growth.service.js";
     GrowthPublicController,
     GrowthPublicMenuController,
     GrowthPublicApiController,
+    DoseClubReconciliationController,
   ],
-  providers: [GrowthService],
+  providers: [GrowthService, DoseClubReconciliationService],
   exports: [GrowthService],
 })
 export class GrowthModule {}

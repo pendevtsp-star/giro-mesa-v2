@@ -331,3 +331,40 @@ export const doseClubSchema = z.object({
   config: z.record(z.string(), z.unknown()).default({}),
 });
 export type DoseClubInput = z.infer<typeof doseClubSchema>;
+
+export const doseClubReconciliationUnitSchema = z.object({ unitId: id }).strict();
+export type DoseClubReconciliationUnitInput = z.infer<
+  typeof doseClubReconciliationUnitSchema
+>;
+
+export const doseClubMappingCreateSchema = z
+  .object({
+    unitId: id,
+    productId: id,
+    inventoryItemId: id,
+    stockLocationId: id,
+  })
+  .strict();
+export type DoseClubMappingCreateInput = z.infer<typeof doseClubMappingCreateSchema>;
+
+export const doseClubMappingUpdateSchema = z
+  .object({
+    unitId: id,
+    inventoryItemId: id,
+    stockLocationId: id,
+    active: z.boolean(),
+    expectedVersion: z.number().int().positive(),
+  })
+  .strict();
+export type DoseClubMappingUpdateInput = z.infer<typeof doseClubMappingUpdateSchema>;
+
+export const doseClubRetryRunSchema = z
+  .object({
+    unitId: id,
+    expectedVersion: z.number().int().positive(),
+  })
+  .strict();
+export type DoseClubRetryRunInput = z.infer<typeof doseClubRetryRunSchema>;
+
+export const doseClubFindingRecheckSchema = doseClubRetryRunSchema;
+export type DoseClubFindingRecheckInput = z.infer<typeof doseClubFindingRecheckSchema>;

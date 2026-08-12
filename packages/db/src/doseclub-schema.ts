@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -15,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { managementInventoryItems, managementStockLocations } from "./management-schema.js";
 import { posProducts } from "./operations-schema.js";
-import { organizations, units } from "./schema.js";
+import { identities, organizations, units } from "./schema.js";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -201,10 +202,170 @@ export const doseClubOperations = pgTable(
   ],
 );
 
+export type DoseClubReconciliationTrigger = "scheduled" | "manual" | "retry";
+export type DoseClubReconciliationRunStatus = "pending" | "running" | "completed" | "failed";
+export type DoseClubReconciliationFindingStatus = "open" | "resolved" | "superseded";
+export type DoseClubReconciliationFindingKind =
+  | "missing_mapping"
+  | "inactive_mapping"
+  | "invalid_inventory_dimension"
+  | "invalid_inventory_unit"
+  | "state_version_gap"
+  | "missing_reconcile_heartbeat";
+
+export const doseClubReconciliationRuns = pgTable(
+  "doseclub_reconciliation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull(),
+    runDate: date("run_date", { mode: "string" }).notNull(),
+    trigger: varchar("trigger", { length: 16 })
+      .$type<DoseClubReconciliationTrigger>()
+      .notNull(),
+    status: varchar("status", { length: 16 })
+      .$type<DoseClubReconciliationRunStatus>()
+      .notNull()
+      .default("pending"),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }),
+    requestedByIdentityId: uuid("requested_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    leaseOwner: varchar("lease_owner", { length: 120 }),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    findingCount: integer("finding_count").notNull().default(0),
+    failureCode: varchar("failure_code", { length: 80 }),
+    version: integer("version").notNull().default(1),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("doseclub_reconciliation_runs_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("doseclub_reconciliation_runs_scheduled_day_unique")
+      .on(table.organizationId, table.unitId, table.runDate)
+      .where(sql`${table.trigger} = 'scheduled'`),
+    uniqueIndex("doseclub_reconciliation_runs_idempotency_unique")
+      .on(table.organizationId, table.unitId, table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} is not null`),
+    index("doseclub_reconciliation_runs_claim_idx").on(
+      table.status,
+      table.leaseUntil,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "doseclub_reconciliation_runs_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "doseclub_reconciliation_runs_trigger_check",
+      sql`${table.trigger} in ('scheduled','manual','retry')`,
+    ),
+    check(
+      "doseclub_reconciliation_runs_status_check",
+      sql`${table.status} in ('pending','running','completed','failed')`,
+    ),
+    check("doseclub_reconciliation_runs_version_check", sql`${table.version} > 0`),
+    check(
+      "doseclub_reconciliation_runs_idempotency_check",
+      sql`(${table.idempotencyKey} is null and ${table.requestFingerprint} is null) or (${table.idempotencyKey} is not null and ${table.requestFingerprint} is not null)`,
+    ),
+  ],
+);
+
+export const doseClubReconciliationFindings = pgTable(
+  "doseclub_reconciliation_findings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull(),
+    lastRunId: uuid("last_run_id").notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    kind: varchar("kind", { length: 48 })
+      .$type<DoseClubReconciliationFindingKind>()
+      .notNull(),
+    status: varchar("status", { length: 16 })
+      .$type<DoseClubReconciliationFindingStatus>()
+      .notNull()
+      .default("open"),
+    severity: varchar("severity", { length: 16 }).notNull(),
+    entityType: varchar("entity_type", { length: 32 }).notNull(),
+    entityId: varchar("entity_id", { length: 180 }).notNull(),
+    summary: varchar("summary", { length: 300 }).notNull(),
+    evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+    firstDetectedAt: timestamp("first_detected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastDetectedAt: timestamp("last_detected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [
+    unique("doseclub_reconciliation_findings_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("doseclub_reconciliation_findings_fingerprint_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.fingerprint,
+    ),
+    index("doseclub_reconciliation_findings_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.lastDetectedAt,
+    ),
+    foreignKey({
+      name: "doseclub_reconciliation_findings_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "doseclub_reconciliation_findings_run_fk",
+      columns: [table.organizationId, table.unitId, table.lastRunId],
+      foreignColumns: [
+        doseClubReconciliationRuns.organizationId,
+        doseClubReconciliationRuns.unitId,
+        doseClubReconciliationRuns.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "doseclub_reconciliation_findings_kind_check",
+      sql`${table.kind} in ('missing_mapping','inactive_mapping','invalid_inventory_dimension','invalid_inventory_unit','state_version_gap','missing_reconcile_heartbeat')`,
+    ),
+    check(
+      "doseclub_reconciliation_findings_status_check",
+      sql`${table.status} in ('open','resolved','superseded')`,
+    ),
+    check(
+      "doseclub_reconciliation_findings_severity_check",
+      sql`${table.severity} in ('warning','critical')`,
+    ),
+    check("doseclub_reconciliation_findings_version_check", sql`${table.version} > 0`),
+  ],
+);
+
 export const doseClubTenantTables = [
   doseClubProductMappings,
   doseClubStates,
   doseClubOperations,
+  doseClubReconciliationRuns,
+  doseClubReconciliationFindings,
 ] as const;
 
 for (const table of doseClubTenantTables) table.enableRLS();
