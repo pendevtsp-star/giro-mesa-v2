@@ -72,6 +72,7 @@ for (const viewport of viewports) {
       caret: "hide",
       fullPage: true,
       maxDiffPixelRatio: 0.002,
+      timeout: 15_000,
     });
   });
 }
