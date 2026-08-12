@@ -31,7 +31,6 @@ const owner: Profile = {
   shortName: "MC",
   role: "Proprietaria",
   description: "Gestao",
-  pin: "1024",
   permissions: ["dashboard.view", "onboarding.manage", "alerts.view"],
 };
 
