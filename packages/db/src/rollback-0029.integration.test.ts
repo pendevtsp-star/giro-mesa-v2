@@ -78,6 +78,78 @@ async function assertLatestMigrationContract(client: Client) {
   });
 }
 
+async function assertSchemaLevel(client: Client, level: 26 | 27 | 28 | 29) {
+  const [metadata] = await client<
+    {
+      contact_forced_rls: boolean;
+      incident_function: boolean;
+      privacy_function: boolean;
+      reconciliation_table: boolean;
+      trial_forced_rls: boolean;
+    }[]
+  >`
+    select
+      (select relforcerowsecurity from pg_class where oid = 'public.trial_applications'::regclass)
+        as trial_forced_rls,
+      (select relforcerowsecurity from pg_class where oid = 'public.contact_requests'::regclass)
+        as contact_forced_rls,
+      to_regclass('public.doseclub_reconciliation_runs') is not null
+        as reconciliation_table,
+      to_regprocedure(
+        'public.giromesa_privacy_export_domain(uuid,uuid,integer,character varying)'
+      ) is not null as privacy_function,
+      to_regprocedure(
+        'public.giromesa_platform_transition_incident(uuid,uuid,uuid,text,text,text,text,uuid)'
+      ) is not null as incident_function
+  `;
+  assert.deepEqual(
+    metadata,
+    {
+      contact_forced_rls: level >= 29,
+      incident_function: level >= 29,
+      privacy_function: level >= 28,
+      reconciliation_table: level >= 27,
+      trial_forced_rls: level >= 29,
+    },
+    `schema level ${level} is not exact`,
+  );
+}
+
+async function seedPublicCatalog(client: Client) {
+  const catalogId = randomUUID();
+  await client`
+    insert into public.commercial_catalog_versions (
+      id, version, status, published_at, created_at
+    ) values (
+      ${catalogId}, 20260812, 'published', now(), now()
+    )
+  `;
+  await client`
+    insert into public.commercial_plans (
+      id, catalog_version_id, slug, name, monthly_price_cents,
+      annual_price_cents, included_units, entitlements, created_at
+    ) values (
+      ${randomUUID()}, ${catalogId}, 'operacao', 'Operação', 14900,
+      149000, 1, '["pilot"]'::jsonb, now()
+    )
+  `;
+}
+
+async function assertPublicCatalogReadable(client: Client) {
+  const rows = await client.begin(async (transaction) => {
+    await transaction.unsafe("set local role giromesa_public");
+    return transaction.unsafe<{ plan_slug: string; version: number }[]>(`
+      select plan.slug as plan_slug, catalog.version
+      from public.commercial_catalog_versions catalog
+      join public.commercial_plans plan on plan.catalog_version_id = catalog.id
+      where catalog.status = 'published'
+      order by catalog.version desc, plan.monthly_price_cents
+    `);
+  });
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], { plan_slug: "operacao", version: 20260812 });
+}
+
 async function assertPublicIntakeLeastPrivilege(client: Client) {
   const trialId = randomUUID();
   const contactId = randomUUID();
@@ -183,9 +255,70 @@ async function assertPublicIntakeLeastPrivilege(client: Client) {
         where id in (${trialEventId}, ${contactEventId})) as events
   `;
   assert.deepEqual(persisted, { contacts: 1, events: 2, trials: 1 });
+
+  const processed = await client.begin(async (transaction) => {
+    await transaction.unsafe("set local role giromesa_worker");
+    const claimed = await transaction.unsafe<{ id: string }[]>(
+      `
+      update public.outbox_events
+      set locked_at = now(), attempts = attempts + 1
+      where id = any($1::uuid[]) and processed_at is null
+      returning id
+      `,
+      [[trialEventId, contactEventId]],
+    );
+    await transaction.unsafe(
+      `
+      update public.outbox_events
+      set processed_at = now(), locked_at = null, last_error = null
+      where id = any($1::uuid[])
+      `,
+      [[trialEventId, contactEventId]],
+    );
+    return claimed.length;
+  });
+  assert.equal(processed, 2);
+  const [outbox] = await client<{ processed: number }[]>`
+    select count(*)::int as processed
+    from public.outbox_events
+    where id in (${trialEventId}, ${contactEventId})
+      and processed_at is not null
+      and locked_at is null
+      and attempts = 1
+  `;
+  assert.deepEqual(outbox, { processed: 2 });
 }
 
 describe("rollback release compatible with schema 0029", () => {
+  it("keeps pilot catalog and worker contracts valid at every partial recovery level", async (context) => {
+    if (!integrationUrl) {
+      context.skip("ROLLBACK_0029_DATABASE_URL not configured");
+      return;
+    }
+    await withEphemeralDatabase("rollback_matrix", async (client) => {
+      const files = await migrationFiles();
+      for (const level of [26, 27, 28, 29] as const) {
+        const pending = files.filter(
+          (file) =>
+            Number.parseInt(file.slice(0, 4), 10) <= level &&
+            Number.parseInt(file.slice(0, 4), 10) > level - 1,
+        );
+        if (level === 26) {
+          for (const file of files.filter((file) => Number.parseInt(file.slice(0, 4), 10) <= 26)) {
+            await applyMigration(client, file);
+          }
+          await seedPublicCatalog(client);
+        } else {
+          assert.equal(pending.length, 1);
+          await applyMigration(client, pending[0] as string);
+        }
+        await assertSchemaLevel(client, level);
+        await assertPublicCatalogReadable(client);
+        await assertPublicIntakeLeastPrivilege(client);
+      }
+    });
+  });
+
   it("installs fresh through 0029 and preserves least-privilege public intake", async (context) => {
     if (!integrationUrl) {
       context.skip("ROLLBACK_0029_DATABASE_URL not configured");
