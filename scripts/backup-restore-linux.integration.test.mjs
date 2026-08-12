@@ -49,6 +49,7 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
   const configRestore = join(directory, "config-restored");
   const smokeSql = join(directory, "smoke.sql");
   const artifact = `git:${"a".repeat(40)}`;
+  const targetArtifact = `git:${"b".repeat(40)}`;
   const manifestKey = Buffer.alloc(48, 37).toString("base64");
   const path = (value) => value.replaceAll("\\", "/");
 
@@ -110,9 +111,13 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "giromesa",
         "--output-directory",
         path(backupRoot),
-        "--artifact",
+        "--source-artifact",
         artifact,
-        "--migration-id",
+        "--source-migration-id",
+        "0029_platform_incident_projection_actions",
+        "--target-artifact",
+        targetArtifact,
+        "--target-migration-id",
         "0029_platform_incident_projection_actions",
         "--object-directory",
         path(objectSource),
@@ -139,6 +144,10 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "giromesa",
         "--expected-artifact",
         artifact,
+        "--expected-target-artifact",
+        targetArtifact,
+        "--expected-target-migration-id",
+        "0029_platform_incident_projection_actions",
         "--restore-object-directory",
         path(objectRestore),
         "--restore-encrypted-config-directory",
@@ -175,6 +184,8 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
     );
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
     assert.equal(evidence.artifact, artifact);
+    assert.equal(evidence.sourceArtifact, artifact);
+    assert.equal(evidence.targetArtifact, targetArtifact);
     assert.equal(evidence.smoke, "passed");
   } finally {
     for (const container of [source, target]) spawnSync("docker", ["rm", "--force", container]);

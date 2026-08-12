@@ -18,6 +18,7 @@ const rollbackScript = join(root, "deploy", "vps", "rollback-app.sh");
 const bootstrapScript = join(root, "deploy", "vps", "bootstrap-env.sh");
 const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
 const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
+const imageProvenance = join(root, "deploy", "vps", "verify-image-provenance.sh");
 const compatibilityMatrix = join(root, "deploy", "vps", "rollback-compatibility.json");
 
 function posix(path) {
@@ -155,6 +156,15 @@ test("Linux restore rejects signed path traversal before Docker", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("Linux restore publishes evidence atomically and rejects symlink destinations", () => {
+  const restore = readFileSync(restoreScript, "utf8");
+  assert.match(restore, /BACKUP_PATH_SYMLINK_FORBIDDEN/);
+  assert.match(restore, /RESTORE_EVIDENCE_ALREADY_EXISTS/);
+  assert.match(restore, /tempfile\.mkstemp/);
+  assert.match(restore, /os\.replace\(temporary, destination\)/);
+  assert.match(restore, /os\.O_NOFOLLOW/);
 });
 
 test("runtime env hardening preserves existing secrets and is byte-idempotent", () => {
@@ -296,6 +306,8 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /pg_restore|database\.dump|restore-drill/);
   assert.doesNotMatch(rollback, /(?:DROP|DELETE|UPDATE|INSERT|ALTER)\s+(?:DATABASE|TABLE|SCHEMA)/i);
   assert.match(rollback, /restore_previous_release/);
+  assert.match(rollback, /trap recover_previous_release EXIT/);
+  assert.match(rollback, /ROLLBACK_SERVICE_UNSTABLE/);
   assert.match(rollback, /ROLLBACK_CURRENT_IMAGE_ATTESTATION_FILE/);
   assert.match(rollback, /drizzle\.__drizzle_migrations/);
   assert.match(rollback, /rollback-compatibility\.json/);
@@ -348,6 +360,11 @@ test("deployment and rollback compose contracts always include observability and
     assert.match(images, new RegExp(`GIROMESA_${variable}_IMAGE:\\?`));
   }
   assert.doesNotMatch(base, /postgres:17-alpine/);
+  const provenance = readFileSync(imageProvenance, "utf8");
+  assert.match(provenance, /gh attestation verify/);
+  assert.match(provenance, /--signer-workflow/);
+  assert.match(provenance, /--source-digest/);
+  assert.match(provenance, /--deny-self-hosted-runners/);
 });
 
 test("release paths are canonical releases SHA directories", () => {

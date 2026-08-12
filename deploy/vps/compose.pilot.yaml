@@ -14,7 +14,7 @@ x-web-service: &web-service
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${GIROMESA_POSTGRES_IMAGE:?GIROMESA_POSTGRES_IMAGE digest is provided by compose.images.yaml}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-giromesa_v2}
       POSTGRES_USER: ${POSTGRES_USER:-giromesa}

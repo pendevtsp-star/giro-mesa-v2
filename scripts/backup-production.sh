@@ -5,10 +5,13 @@ database_container=""
 database_name=""
 database_user=""
 output_directory=""
-artifact=""
-migration_id=""
+source_artifact=""
+source_migration_id=""
+target_artifact=""
+target_migration_id=""
 object_directory=""
 encrypted_config_archive=""
+external_coverage_attestation=""
 max_rpo_minutes=5
 
 while (($#)); do
@@ -17,16 +20,21 @@ while (($#)); do
     --database-name) database_name=${2-}; shift 2 ;;
     --database-user) database_user=${2-}; shift 2 ;;
     --output-directory) output_directory=${2-}; shift 2 ;;
-    --artifact) artifact=${2-}; shift 2 ;;
-    --migration-id) migration_id=${2-}; shift 2 ;;
+    --artifact) source_artifact=${2-}; target_artifact=${2-}; shift 2 ;;
+    --migration-id) source_migration_id=${2-}; target_migration_id=${2-}; shift 2 ;;
+    --source-artifact) source_artifact=${2-}; shift 2 ;;
+    --source-migration-id) source_migration_id=${2-}; shift 2 ;;
+    --target-artifact) target_artifact=${2-}; shift 2 ;;
+    --target-migration-id) target_migration_id=${2-}; shift 2 ;;
     --object-directory) object_directory=${2-}; shift 2 ;;
     --encrypted-config-archive) encrypted_config_archive=${2-}; shift 2 ;;
+    --external-coverage-attestation) external_coverage_attestation=${2-}; shift 2 ;;
     --max-rpo-minutes) max_rpo_minutes=${2-}; shift 2 ;;
     *) echo "BACKUP_ARGUMENT_INVALID" >&2; exit 1 ;;
   esac
 done
 
-for required in database_container database_name database_user output_directory artifact migration_id; do
+for required in database_container database_name database_user output_directory source_artifact source_migration_id target_artifact target_migration_id; do
   if [[ -z ${!required} ]]; then
     echo "BACKUP_ARGUMENT_REQUIRED:$required" >&2
     exit 1
@@ -39,19 +47,18 @@ if [[ ! $database_container =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] ||
   echo "BACKUP_DATABASE_IDENTIFIER_INVALID" >&2
   exit 1
 fi
-if [[ ! $artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
+if [[ ! $source_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $source_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
   echo "BACKUP_ARTIFACT_NOT_IMMUTABLE" >&2
   exit 1
 fi
-if [[ ! $migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
+if [[ ! $target_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $target_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
+  echo "BACKUP_ARTIFACT_NOT_IMMUTABLE" >&2
+  exit 1
+fi
+if [[ ! $source_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]] || [[ ! $target_migration_id =~ ^[0-9]{4}_[A-Za-z0-9_.-]+$ ]]; then
   echo "BACKUP_MIGRATION_ID_INVALID" >&2
   exit 1
 fi
-if [[ ! $max_rpo_minutes =~ ^[1-5]$ ]]; then
-  echo "BACKUP_RPO_INVALID" >&2
-  exit 1
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "BACKUP_TOOL_REQUIRED:python3" >&2
   exit 1
@@ -72,6 +79,40 @@ if len(decoded) < 32:
     raise SystemExit(1)
 PY
 then
+  exit 1
+fi
+coverage_mode=embedded
+if [[ -z $object_directory || -z $encrypted_config_archive ]]; then
+  coverage_mode=external_attestation
+  if [[ -z $external_coverage_attestation || ! -f $external_coverage_attestation || -L $external_coverage_attestation ]]; then
+    echo "BACKUP_COVERAGE_ATTESTATION_REQUIRED" >&2
+    exit 1
+  fi
+  if ! python3 - "$external_coverage_attestation" "$source_artifact" "$source_migration_id" <<'PY'
+import datetime, json, pathlib, re, sys
+path, artifact, migration = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+try:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    expires = datetime.datetime.fromisoformat(value["expiresAt"].replace("Z", "+00:00"))
+    valid = (
+        value.get("schemaVersion") == 1
+        and value.get("sourceArtifact") == artifact
+        and value.get("sourceMigrationId") == migration
+        and value.get("objects") == "externally_protected"
+        and value.get("encryptedConfiguration") == "externally_protected"
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", value.get("evidenceDigest", ""))
+        and expires > datetime.datetime.now(datetime.timezone.utc)
+    )
+except Exception:
+    valid = False
+if not valid:
+    print("BACKUP_COVERAGE_ATTESTATION_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+PY
+  then exit 1; fi
+fi
+if [[ ! $max_rpo_minutes =~ ^[1-5]$ ]]; then
+  echo "BACKUP_RPO_INVALID" >&2
   exit 1
 fi
 
@@ -166,13 +207,14 @@ if ((duration_seconds > max_rpo_minutes * 60)); then
 fi
 completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-python3 - "$backup_directory" "$backup_id" "$artifact" "$migration_id" \
+python3 - "$backup_directory" "$backup_id" "$source_artifact" "$source_migration_id" "$target_artifact" "$target_migration_id" \
   "$database_container" "$database_name" "$started_at" "$completed_at" \
-  "$duration_seconds" "$max_rpo_minutes" <<'PY'
+  "$duration_seconds" "$max_rpo_minutes" "$coverage_mode" "$external_coverage_attestation" <<'PY'
 import base64, hashlib, hmac, json, os, pathlib, sys
 (
-    root_raw, backup_id, artifact, migration_id, source_container, database_name,
-    created_at, completed_at, duration, rpo,
+    root_raw, backup_id, source_artifact, source_migration_id, target_artifact,
+    target_migration_id, source_container, database_name, created_at, completed_at,
+    duration, rpo, coverage_mode, coverage_attestation,
 ) = sys.argv[1:]
 root = pathlib.Path(root_raw)
 kind_by_name = {
@@ -191,8 +233,13 @@ for path in sorted(root.iterdir(), key=lambda item: item.name):
 payload = {
     "schemaVersion": 1,
     "backupId": backup_id,
-    "artifact": artifact,
-    "migrationId": migration_id,
+    "artifact": source_artifact,
+    "migrationId": source_migration_id,
+    "sourceArtifact": source_artifact,
+    "sourceMigrationId": source_migration_id,
+    "targetArtifact": target_artifact,
+    "targetMigrationId": target_migration_id,
+    "coverage": {"mode": coverage_mode},
     "sourceDatabaseContainer": source_container,
     "databaseName": database_name,
     "createdAt": created_at,
@@ -201,6 +248,9 @@ payload = {
     "declaredRpoMinutes": int(rpo),
     "files": files,
 }
+if coverage_attestation:
+    raw = pathlib.Path(coverage_attestation).read_bytes()
+    payload["coverage"]["attestationSha256"] = hashlib.sha256(raw).hexdigest()
 payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
 key = base64.b64decode(os.environ["GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64"], validate=True)
 manifest = {

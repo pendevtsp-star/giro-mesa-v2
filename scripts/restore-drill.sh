@@ -6,6 +6,8 @@ target_database_container=""
 database_name=""
 database_user=""
 expected_artifact=""
+expected_target_artifact=""
+expected_target_migration_id=""
 restore_object_directory=""
 restore_encrypted_config_directory=""
 smoke_sql_file=""
@@ -18,6 +20,8 @@ while (($#)); do
     --database-name) database_name=${2-}; shift 2 ;;
     --database-user) database_user=${2-}; shift 2 ;;
     --expected-artifact) expected_artifact=${2-}; shift 2 ;;
+    --expected-target-artifact) expected_target_artifact=${2-}; shift 2 ;;
+    --expected-target-migration-id) expected_target_migration_id=${2-}; shift 2 ;;
     --restore-object-directory) restore_object_directory=${2-}; shift 2 ;;
     --restore-encrypted-config-directory) restore_encrypted_config_directory=${2-}; shift 2 ;;
     --smoke-sql-file) smoke_sql_file=${2-}; shift 2 ;;
@@ -25,6 +29,7 @@ while (($#)); do
     *) echo "RESTORE_ARGUMENT_INVALID" >&2; exit 1 ;;
   esac
 done
+expected_target_artifact=${expected_target_artifact:-$expected_artifact}
 
 for required in backup_directory target_database_container database_name database_user expected_artifact; do
   if [[ -z ${!required} ]]; then
@@ -56,6 +61,10 @@ if [[ ! -d $backup_directory || ! -f $backup_directory/manifest.json ]]; then
   echo "BACKUP_MANIFEST_MISSING" >&2
   exit 1
 fi
+if [[ -L $backup_directory || -L $backup_directory/manifest.json ]]; then
+  echo "BACKUP_PATH_SYMLINK_FORBIDDEN" >&2
+  exit 1
+fi
 if [[ -n $smoke_sql_file && (! -f $smoke_sql_file || -L $smoke_sql_file) ]]; then
   echo "RESTORE_SMOKE_SQL_INVALID" >&2
   exit 1
@@ -79,13 +88,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! python3 - "$backup_directory" "$stage" "$expected_artifact" "$target_database_container" <<'PY'
+if ! python3 - "$backup_directory" "$stage" "$expected_artifact" "$expected_target_artifact" "$expected_target_migration_id" "$target_database_container" <<'PY'
 import base64, hashlib, hmac, json, os, pathlib, shutil, sys, tarfile
 
-root = pathlib.Path(sys.argv[1]).resolve()
+root_input = pathlib.Path(sys.argv[1])
+if root_input.is_symlink():
+    print("BACKUP_PATH_SYMLINK_FORBIDDEN", file=sys.stderr)
+    raise SystemExit(1)
+root = root_input.resolve()
 stage = pathlib.Path(sys.argv[2]).resolve()
 expected_artifact = sys.argv[3]
-target_container = sys.argv[4]
+expected_target_artifact = sys.argv[4]
+expected_target_migration = sys.argv[5]
+target_container = sys.argv[6]
 
 def fail(code):
     print(code, file=sys.stderr)
@@ -115,8 +130,12 @@ except Exception:
     fail("MANIFEST_PAYLOAD_INVALID")
 if manifest.get("schemaVersion") != 1 or payload.get("schemaVersion") != 1:
     fail("BACKUP_SCHEMA_UNSUPPORTED")
-if payload.get("artifact") != expected_artifact:
+if payload.get("sourceArtifact", payload.get("artifact")) != expected_artifact:
     fail("BACKUP_ARTIFACT_MISMATCH")
+if payload.get("targetArtifact", payload.get("artifact")) != expected_target_artifact:
+    fail("BACKUP_TARGET_ARTIFACT_MISMATCH")
+if expected_target_migration and payload.get("targetMigrationId", payload.get("migrationId")) != expected_target_migration:
+    fail("BACKUP_TARGET_MIGRATION_MISMATCH")
 if not isinstance(payload.get("declaredRpoMinutes"), int) or not 1 <= payload["declaredRpoMinutes"] <= 5:
     fail("BACKUP_RPO_INVALID")
 source = payload.get("sourceDatabaseContainer")
@@ -165,15 +184,21 @@ if archive.exists():
         with tarfile.open(archive, "r:gz") as value:
             for member in value.getmembers():
                 path = pathlib.PurePosixPath(member.name)
-                if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk() or member.isdev():
+                if (path.is_absolute() or ".." in path.parts or member.issym() or member.islnk()
+                        or member.isdev() or not (member.isdir() or member.isfile())):
                     fail("BACKUP_OBJECT_PATH_INVALID")
+            object_stage = stage / "objects-restored"
+            object_stage.mkdir(mode=0o700)
+            value.extractall(object_stage)
     except (tarfile.TarError, OSError):
         fail("BACKUP_OBJECT_ARCHIVE_INVALID")
 
 plan = {
     "backupId": payload.get("backupId"),
-    "artifact": payload.get("artifact"),
-    "migrationId": payload.get("migrationId"),
+    "sourceArtifact": payload.get("sourceArtifact", payload.get("artifact")),
+    "sourceMigrationId": payload.get("sourceMigrationId", payload.get("migrationId")),
+    "targetArtifact": payload.get("targetArtifact", payload.get("artifact")),
+    "targetMigrationId": payload.get("targetMigrationId", payload.get("migrationId")),
     "sourceDatabaseContainer": source,
     "hasObjects": archive.exists(),
     "configName": next((name for name in ("configuration.age", "configuration.gpg", "configuration.enc") if (stage / name).exists()), ""),
@@ -187,7 +212,7 @@ fi
 mapfile -t plan < <(python3 - "$stage/plan.json" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
-for key in ("backupId", "artifact", "migrationId", "sourceDatabaseContainer", "hasObjects", "configName"):
+for key in ("backupId", "sourceArtifact", "sourceMigrationId", "targetArtifact", "targetMigrationId", "sourceDatabaseContainer", "hasObjects", "configName"):
     print(value.get(key, ""))
 PY
 )
@@ -195,16 +220,18 @@ for index in "${!plan[@]}"; do plan[index]=${plan[index]%$'\r'}; done
 backup_id=${plan[0]}
 artifact=${plan[1]}
 migration_id=${plan[2]}
-has_objects=${plan[4]}
-config_name=${plan[5]}
+target_artifact=${plan[3]}
+target_migration_id=${plan[4]}
+has_objects=${plan[6]}
+config_name=${plan[7]}
 
 if [[ $has_objects == True ]]; then
   if [[ -z $restore_object_directory ]]; then
     echo "RESTORE_OBJECT_DIRECTORY_REQUIRED" >&2
     exit 1
   fi
-  if [[ -e $restore_object_directory ]] && [[ -n $(find "$restore_object_directory" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
-    echo "RESTORE_OBJECT_TARGET_NOT_EMPTY" >&2
+  if [[ -e $restore_object_directory || -L $restore_object_directory ]]; then
+    echo "RESTORE_OBJECT_TARGET_MUST_NOT_EXIST" >&2
     exit 1
   fi
 fi
@@ -213,10 +240,15 @@ if [[ -n $config_name ]]; then
     echo "RESTORE_CONFIG_DIRECTORY_REQUIRED" >&2
     exit 1
   fi
-  if [[ -e $restore_encrypted_config_directory ]] && [[ -n $(find "$restore_encrypted_config_directory" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
-    echo "RESTORE_CONFIG_TARGET_NOT_EMPTY" >&2
+  if [[ -e $restore_encrypted_config_directory || -L $restore_encrypted_config_directory ]]; then
+    echo "RESTORE_CONFIG_TARGET_MUST_NOT_EXIST" >&2
     exit 1
   fi
+fi
+evidence_path="$backup_directory/restore-evidence.json"
+if [[ -e $evidence_path || -L $evidence_path ]]; then
+  echo "RESTORE_EVIDENCE_ALREADY_EXISTS" >&2
+  exit 1
 fi
 smoke_sha=""
 if [[ -n $smoke_sql_file ]]; then
@@ -240,24 +272,40 @@ docker exec "$target_database_container" psql --username "$database_user" --dbna
   --set ON_ERROR_STOP=1 --tuples-only --command "SELECT 1" >/dev/null
 
 if [[ $has_objects == True ]]; then
-  mkdir -p -- "$restore_object_directory"
-  tar_force_local=()
-  if [[ $stage == *:* ]]; then tar_force_local+=(--force-local); fi
-  tar "${tar_force_local[@]}" --extract --gzip --file "$stage/objects.tar.gz" --directory "$restore_object_directory" --no-same-owner --no-same-permissions
+  python3 - "$stage/objects-restored" "$restore_object_directory" <<'PY'
+import os, pathlib, sys
+source, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+parent = destination.parent
+if destination.exists() or destination.is_symlink() or parent.is_symlink() or not parent.is_dir():
+    raise SystemExit("RESTORE_OBJECT_TARGET_UNSAFE")
+parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
+try:
+    os.rename(source, destination.name, dst_dir_fd=parent_fd)
+finally:
+    os.close(parent_fd)
+PY
 fi
 if [[ -n $config_name ]]; then
-  mkdir -p -- "$restore_encrypted_config_directory"
-  cp -- "$stage/$config_name" "$restore_encrypted_config_directory/$config_name"
-  if ! python3 - "$stage/$config_name" "$restore_encrypted_config_directory/$config_name" <<'PY'
-import hashlib, hmac, sys
-left = hashlib.sha256(open(sys.argv[1], "rb").read()).digest()
-right = hashlib.sha256(open(sys.argv[2], "rb").read()).digest()
-raise SystemExit(0 if hmac.compare_digest(left, right) else 1)
+  python3 - "$stage/$config_name" "$restore_encrypted_config_directory" "$config_name" <<'PY'
+import hashlib, hmac, os, pathlib, shutil, sys, tempfile
+source, destination, name = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+parent = destination.parent
+if destination.exists() or destination.is_symlink() or parent.is_symlink() or not parent.is_dir():
+    raise SystemExit("RESTORE_CONFIG_TARGET_UNSAFE")
+temporary = pathlib.Path(tempfile.mkdtemp(prefix="giromesa-config.", dir=parent))
+try:
+    target = temporary / name
+    shutil.copyfile(source, target)
+    left = hashlib.sha256(source.read_bytes()).digest()
+    right = hashlib.sha256(target.read_bytes()).digest()
+    if not hmac.compare_digest(left, right): raise SystemExit("RESTORE_CONFIG_COPY_HASH_MISMATCH")
+    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
+    try: os.rename(temporary, destination.name, dst_dir_fd=parent_fd)
+    finally: os.close(parent_fd)
+except BaseException:
+    shutil.rmtree(temporary, ignore_errors=True)
+    raise
 PY
-  then
-    echo "RESTORE_CONFIG_COPY_HASH_MISMATCH" >&2
-    exit 1
-  fi
 fi
 if [[ -n $smoke_sql_file ]]; then
   docker cp "$smoke_sql_file" "$target_database_container:$container_smoke"
@@ -270,16 +318,19 @@ if ((duration_seconds > max_rto_minutes * 60)); then
   echo "RESTORE_RTO_EXCEEDED" >&2
   exit 1
 fi
-evidence_path="$backup_directory/restore-evidence.json"
-python3 - "$evidence_path" "$backup_id" "$artifact" "$migration_id" "$target_database_container" \
+python3 - "$evidence_path" "$backup_id" "$artifact" "$migration_id" "$target_artifact" "$target_migration_id" "$target_database_container" \
   "$duration_seconds" "$max_rto_minutes" "$smoke_sha" "$has_objects" "$config_name" <<'PY'
-import json, sys
-path, backup_id, artifact, migration_id, target, duration, rto, smoke_sha, objects, config_name = sys.argv[1:]
+import json, os, pathlib, sys, tempfile
+path, backup_id, artifact, migration_id, target_artifact, target_migration_id, target, duration, rto, smoke_sha, objects, config_name = sys.argv[1:]
 value = {
     "schemaVersion": 1,
     "backupId": backup_id,
     "artifact": artifact,
     "migrationId": migration_id,
+    "sourceArtifact": artifact,
+    "sourceMigrationId": migration_id,
+    "targetArtifact": target_artifact,
+    "targetMigrationId": target_migration_id,
     "targetDatabaseContainer": target,
     "durationSeconds": int(duration),
     "declaredRtoMinutes": int(rto),
@@ -288,7 +339,19 @@ value = {
     "objectsRestored": objects == "True",
     "encryptedConfigurationRestored": bool(config_name),
 }
-open(path, "w", encoding="utf-8").write(json.dumps(value, indent=2) + "\n")
+destination = pathlib.Path(path)
+if destination.exists() or destination.is_symlink(): raise SystemExit("RESTORE_EVIDENCE_ALREADY_EXISTS")
+fd, temporary = tempfile.mkstemp(prefix="restore-evidence.", dir=destination.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(value, handle, indent=2); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
+    os.chmod(temporary, 0o400)
+    if destination.exists() or destination.is_symlink(): raise SystemExit("RESTORE_EVIDENCE_ALREADY_EXISTS")
+    os.replace(temporary, destination)
+    directory_fd = os.open(destination.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try: os.fsync(directory_fd)
+    finally: os.close(directory_fd)
+finally:
+    if os.path.exists(temporary): os.unlink(temporary)
 PY
-chmod 400 -- "$evidence_path"
 printf '%s\n' "$evidence_path"
