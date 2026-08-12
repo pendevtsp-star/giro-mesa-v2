@@ -484,6 +484,13 @@ test("recovery validation provisions the historical migration owner before datab
   assert.match(publish, /ROLLBACK_0029_DATABASE_URL=/);
 });
 
+test("trusted recovery evidence requires a real DoseClub reconciliation proof", () => {
+  const entrypoint = readFileSync(trustedEntrypoint, "utf8");
+  const provenance = readFileSync(imageProvenance, "utf8");
+  assert.match(entrypoint, /evidence\.get\("doseClubReconciliation"\) == "passed"/);
+  assert.match(provenance, /evidence\.get\("doseClubReconciliation"\) == "passed"/);
+});
+
 test("trusted entrypoint sanitizes privileged execution and serializes release operations", () => {
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");
   assert.match(entrypoint, /^#!\/bin\/bash/);

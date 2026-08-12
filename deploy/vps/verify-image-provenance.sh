@@ -221,6 +221,7 @@ try:
             and evidence.get("schemaLevels") == [26, 27, 28, 29]
             and evidence.get("targetMigration") == "0029_platform_incident_projection_actions"
             and evidence.get("testedUpgrade") is True
+            and evidence.get("doseClubReconciliation") == "passed"
             and evidence.get("result") == "passed"
             and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":29,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
         )
