@@ -177,6 +177,7 @@ export class DoseClubReconciliationWorker {
   ) {}
 
   async runOnce(limit = 10) {
+    if (!(await this.isSchemaAvailable())) return 0;
     await this.scheduleDailyRuns();
     let processed = 0;
     while (processed < limit) {
@@ -186,6 +187,15 @@ export class DoseClubReconciliationWorker {
       processed += 1;
     }
     return processed;
+  }
+
+  private async isSchemaAvailable() {
+    return withWorkerContext(this.connection, async (tx) => {
+      const [result] = await tx.execute<{ available: boolean }>(sql`
+        select to_regclass('public.doseclub_reconciliation_runs') is not null as available
+      `);
+      return result?.available === true;
+    });
   }
 
   private async scheduleDailyRuns() {
@@ -397,6 +407,7 @@ export class DoseClubReconciliationWorker {
             and lease_owner = ${run.lease_owner}
         `);
       });
+      throw error;
     }
   }
 }

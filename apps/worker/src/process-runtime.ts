@@ -5,7 +5,7 @@ export type SupportedSignal = "SIGINT" | "SIGTERM";
 
 interface WorkerLoop {
   expireAccessWindows(): Promise<unknown>;
-  reconcileDoseClub?(): Promise<unknown>;
+  reconcileDoseClub(): Promise<unknown>;
   runOnce(): Promise<number>;
   close(): Promise<unknown>;
 }
@@ -98,7 +98,7 @@ export async function startWorkerProcess(
         while (!stopRequested) {
           if (now() >= nextMaintenanceAt) {
             await worker.expireAccessWindows();
-            await worker.reconcileDoseClub?.();
+            await worker.reconcileDoseClub();
             nextMaintenanceAt = now() + 60_000;
           }
           const processed = await worker.runOnce();

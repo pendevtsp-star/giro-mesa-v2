@@ -333,6 +333,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+      - name: Reject secrets in the exact recovery checkout
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+          dir --redact --no-banner /repo
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 11.7.0
@@ -346,6 +352,7 @@ jobs:
           RECOVERY_SHA: ${{ needs.authorize-recovery.outputs.recovery_sha }}
         run: |
           set -Eeuo pipefail
+          pnpm --filter @giromesa/worker build
           for major in 16 17; do
             name="giromesa-recovery-pg${major}"
             if [ "$major" = 16 ]; then image="postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777"; else image="postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193"; fi
@@ -356,13 +363,14 @@ jobs:
             docker exec "$name" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
               "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$;"
             ROLLBACK_0029_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54${major}/postgres" pnpm --filter @giromesa/db test
+            DOSECLUB_RECONCILIATION_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54${major}/postgres" node --test apps/worker/dist/doseclub-reconciliation.integration.test.js
             docker rm -f "$name" >/dev/null
             trap - EXIT
           done
           mkdir evidence
           python3 - <<'PY'
           import json,os,pathlib
-          value={"schemaVersion":1,"role":"recovery","recoveryArtifact":"git:"+os.environ["RECOVERY_SHA"],"postgresMajors":[16,17],"schemaLevels":[26,27,28,29],"targetMigration":"0029_platform_incident_projection_actions","testedUpgrade":True,"result":"passed"}
+          value={"schemaVersion":1,"role":"recovery","recoveryArtifact":"git:"+os.environ["RECOVERY_SHA"],"postgresMajors":[16,17],"schemaLevels":[26,27,28,29],"targetMigration":"0029_platform_incident_projection_actions","testedUpgrade":True,"doseClubReconciliation":"passed","result":"passed"}
           pathlib.Path("evidence/recovery-validation.json").write_text(json.dumps(value,sort_keys=True,separators=(",",":"))+"\n")
           PY
       - name: Reprove recovery API and worker runtime on PostgreSQL 17

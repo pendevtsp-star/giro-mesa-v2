@@ -24,6 +24,37 @@ async function applyMigration(client: ReturnType<typeof createDatabase>["client"
 }
 
 describe("DoseClub reconciliation worker concurrency", () => {
+  it("treats migration 0026 as an explicit pre-reconciliation schema", async (context) => {
+    if (!integrationUrl) {
+      context.skip("DOSECLUB_RECONCILIATION_DATABASE_URL not configured");
+      return;
+    }
+    const databaseName = `gm_recovery_doseclub_0026_${randomUUID().replaceAll("-", "")}`;
+    const admin = createDatabase(integrationUrl).client;
+    const databaseUrl = new URL(integrationUrl);
+    databaseUrl.pathname = `/${databaseName}`;
+    let database: ReturnType<typeof createDatabase> | undefined;
+    try {
+      await admin.unsafe(`create database "${databaseName}"`);
+      database = createDatabase(databaseUrl.toString(), { max: 4 });
+      const migrations = (await readdir(migrationsDirectory))
+        .filter((file) => /^\d{4}_.*\.sql$/.test(file) && file <= "0026_doseclub_integration.sql")
+        .sort();
+      assert.equal(migrations.at(-1), "0026_doseclub_integration.sql");
+      for (const file of migrations) await applyMigration(database.client, file);
+
+      const worker = new DoseClubReconciliationWorker(database, "worker-0026");
+      assert.equal(await worker.runOnce(), 0);
+    } finally {
+      await database?.client.end();
+      await admin.unsafe(
+        `select pg_terminate_backend(pid) from pg_stat_activity where datname = '${databaseName}'`,
+      );
+      await admin.unsafe(`drop database if exists "${databaseName}"`);
+      await admin.end();
+    }
+  });
+
   it("schedules once, claims with SKIP LOCKED and reclaims an expired lease", async (context) => {
     if (!integrationUrl) {
       context.skip("DOSECLUB_RECONCILIATION_DATABASE_URL not configured");
@@ -91,6 +122,21 @@ describe("DoseClub reconciliation worker concurrency", () => {
         where id = ${expiredRunId}
       `;
       assert.deepEqual(reclaimed, { status: "completed", lease_owner: null, version: 4 });
+
+      const failedRunId = randomUUID();
+      await database.client`
+        insert into doseclub_reconciliation_runs (
+          id, organization_id, unit_id, run_date, trigger, status
+        ) values (
+          ${failedRunId}, ${organizationId}, ${unitId}, current_date, 'manual', 'pending'
+        )
+      `;
+      await database.client.unsafe("drop table public.doseclub_states cascade");
+      await assert.rejects(workerA.runOnce(), /doseclub_states/);
+      const [failed] = await database.client<{ status: string; failure_code: string }[]>`
+        select status, failure_code from doseclub_reconciliation_runs where id = ${failedRunId}
+      `;
+      assert.deepEqual(failed, { status: "failed", failure_code: "SCAN_FAILED" });
     } finally {
       await database?.client.end();
       await admin.unsafe(

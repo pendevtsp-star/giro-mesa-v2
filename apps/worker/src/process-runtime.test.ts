@@ -82,6 +82,7 @@ it("starts telemetry before the worker and closes both once on a signal", async 
         async expireAccessWindows() {
           events.push("worker.maintenance");
         },
+        async reconcileDoseClub() {},
         async runOnce() {
           events.push("worker.run");
           return 0;
@@ -168,6 +169,7 @@ it("records a heartbeat only after a successful worker cycle", async () => {
       async expireAccessWindows() {
         events.push("worker.maintenance");
       },
+      async reconcileDoseClub() {},
       async runOnce() {
         events.push("worker.run");
         return 0;
@@ -217,6 +219,7 @@ it("does not update the heartbeat when a worker cycle fails", async () => {
       async expireAccessWindows() {
         events.push("worker.maintenance");
       },
+      async reconcileDoseClub() {},
       async runOnce() {
         events.push("worker.run");
         throw new Error("cycle failed");
