@@ -491,6 +491,14 @@ test("recovery validation provisions the historical migration owner before datab
   assert.match(validator, /ROLLBACK_0029_DATABASE_URL=/);
 });
 
+test("recovery validation waits through the PostgreSQL temporary-server restart", () => {
+  const validator = readFileSync(join(root, "scripts", "validate-recovery-candidate.sh"), "utf8");
+  assert.match(validator, /local consecutive=0/);
+  assert.match(validator, /psql -U "\$user" -d "\$database" -Atqc "SELECT 1"/);
+  assert.match(validator, /if \(\(consecutive >= 3\)\); then return 0; fi/);
+  assert.doesNotMatch(validator, /pg_isready/);
+});
+
 test("trusted recovery evidence requires a real DoseClub reconciliation proof", () => {
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");
   const provenance = readFileSync(imageProvenance, "utf8");
