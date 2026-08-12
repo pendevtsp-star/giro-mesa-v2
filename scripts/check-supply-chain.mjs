@@ -61,6 +61,27 @@ export function validateWorkflowActionPins(workflow) {
   return errors;
 }
 
+export function validateWorkflowCheckoutCredentials(workflow) {
+  const lines = workflow.split(/\r?\n/);
+  const errors = [];
+  const indentation = (line) => line.match(/^\s*/)[0].length;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^\s*-\s+uses:\s*actions\/checkout@[0-9a-f]{40}(?:\s+#.*)?$/.test(lines[index])) {
+      continue;
+    }
+    const actionIndentation = indentation(lines[index]);
+    let end = index + 1;
+    while (end < lines.length) {
+      if (/^\s*-\s+/.test(lines[end]) && indentation(lines[end]) <= actionIndentation) break;
+      end += 1;
+    }
+    if (!/^\s*persist-credentials:\s*false\s*$/m.test(lines.slice(index + 1, end).join("\n"))) {
+      errors.push("checkout must set persist-credentials: false");
+    }
+  }
+  return errors;
+}
+
 export function validateCosignImageSignatures(workflow) {
   const commands = [
     ...workflow.matchAll(/\bcosign\s+sign\s+--yes(?<arguments>[\s\S]*?)["']\$IMAGE["']/g),
@@ -342,6 +363,7 @@ export function validateSupplyChain() {
   for (const workflow of workflows) {
     errors.push(...validateWorkflowBuildArgs(workflow));
     errors.push(...validateWorkflowActionPins(workflow));
+    errors.push(...validateWorkflowCheckoutCredentials(workflow));
     for (const line of workflow.split(/\r?\n/)) {
       const match = line.match(/^\s*(?:-\s+)?uses:\s*([^\s#]+)(?:\s+#.*)?$/);
       if (match && !/@[0-9a-f]{40}$/.test(match[1])) {
