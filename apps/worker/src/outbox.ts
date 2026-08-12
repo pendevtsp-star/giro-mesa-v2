@@ -18,6 +18,7 @@ import {
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
 import { and, eq, sql } from "drizzle-orm";
+import { DoseClubReconciliationWorker } from "./doseclub-reconciliation.js";
 import {
   deliverEmail,
   EmailDeliveryError,
@@ -102,12 +103,14 @@ function activeExpiry(payload: Record<string, unknown>) {
 
 export class OutboxWorker {
   private readonly connection: DatabaseConnection;
+  private readonly doseClubReconciliation: DoseClubReconciliationWorker;
 
   constructor(
     connection: DatabaseConnection = createDatabase(),
     private readonly observability = new WorkerObservability(),
   ) {
     this.connection = connection;
+    this.doseClubReconciliation = new DoseClubReconciliationWorker(connection);
   }
 
   private get db() {
@@ -193,6 +196,10 @@ export class OutboxWorker {
       );
     }
     return changed;
+  }
+
+  async reconcileDoseClub() {
+    return this.doseClubReconciliation.runOnce();
   }
 
   async close() {
