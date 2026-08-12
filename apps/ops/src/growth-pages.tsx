@@ -2,6 +2,7 @@ import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProfileId } from "./domain";
+import { DoseClubIntegrationPanel } from "./doseclub-integration";
 import { formatMoney } from "./rules";
 import { UiIcon } from "./ui-icon";
 
@@ -678,6 +679,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           </RemoteGate>
         </Card>
       </div>
+      <DoseClubIntegrationPanel scope={scope} />
     </div>
   );
 }

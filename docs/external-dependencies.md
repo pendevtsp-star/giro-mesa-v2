@@ -17,5 +17,6 @@ O código deve continuar funcional em modo demonstrativo e falhar de forma segur
 | Hub em produção | certificado TLS local, instalador, provisionamento e cofre de segredos | SQLCipher, replay e reconciliação validados localmente |
 | Backup/DR | object storage versionado com object-lock, cofre para HMAC, agenda a cada 5 min, alertas e infraestrutura isolada de restore | scripts fail-closed e ensaio local; RPO/RTO reais ainda não homologados |
 | Geocodificação | provedor e chave para converter endereço em coordenadas | endereço, região, taxa e pedido mínimo validados; ponto-no-polígono bloqueado |
+| DoseClub remoto | credencial tenant-scoped, endpoint administrativo e contrato de aggregate/version, heartbeat e requeue auditado | reconciliação local detectiva disponível; cobertura remota sinalizada como parcial conforme o [runbook](runbooks/doseclub-reconciliation.md) |
 
 Documentos jurídicos e procedimentos LGPD são modelos técnicos e exigem revisão profissional antes da publicação comercial.

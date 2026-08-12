@@ -730,6 +730,46 @@ export const api = {
       ),
     multiunitSummary: (organizationId: string) =>
       request<unknown>(growthPath(organizationId, "multiunit/summary")),
+    doseClubOverview: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        `${growthPath(organizationId, "integrations/doseclub/overview")}?unitId=${encodeURIComponent(unitId)}`,
+      ),
+    startDoseClubRun: (organizationId: string, unitId: string, idempotencyKey?: string) =>
+      idempotentRequest<unknown>(
+        growthPath(organizationId, "integrations/doseclub/runs"),
+        "POST",
+        { unitId },
+        idempotencyKey,
+      ),
+    retryDoseClubRun: (
+      organizationId: string,
+      unitId: string,
+      runId: string,
+      expectedVersion: number,
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `integrations/doseclub/runs/${encodeURIComponent(runId)}/retry`),
+        {
+          method: "POST",
+          body: JSON.stringify({ unitId, expectedVersion }),
+        },
+      ),
+    recheckDoseClubFinding: (
+      organizationId: string,
+      unitId: string,
+      findingId: string,
+      expectedVersion: number,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        growthPath(
+          organizationId,
+          `integrations/doseclub/findings/${encodeURIComponent(findingId)}/recheck`,
+        ),
+        "POST",
+        { unitId, expectedVersion },
+        idempotencyKey,
+      ),
     transitionReservation: (
       organizationId: string,
       reservationId: string,

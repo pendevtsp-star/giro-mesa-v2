@@ -418,7 +418,7 @@ Manter standalone, flag `inventoryMode`, v1 compativel e migracao explicita para
 - Criar: `apps/ops/src/doseclub-integration.tsx`
 - Testar: `e2e/doseclub-integration.spec.ts`
 
-Mapeamento de produtos, divergencias, DLQ, requeue e reconciliacao diaria.
+Mapeamento de produtos, divergencias persistentes e reconciliacao local diaria, sem correcao automatica de saldo. O requeue externo permanece sob autoridade do DoseClub e so entra quando houver contrato administrativo tenant-scoped homologado; a UI deve identificar a cobertura remota como parcial ate essa confirmacao.
 
 ## Lote 12 — Backoffice completo
 
