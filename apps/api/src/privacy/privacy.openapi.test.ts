@@ -82,5 +82,22 @@ describe("privacy generated contract", () => {
         );
       }
     }
+    const exportDataProperties = property(
+      document,
+      "components",
+      "schemas",
+      "PrivacyExportDataResponse",
+      "properties",
+    ) as Record<string, unknown>;
+    for (const domain of [
+      "operations",
+      "management_finance",
+      "growth_crm",
+      "objects_media",
+      "offline_edge",
+      "backups",
+    ]) {
+      assert.ok(exportDataProperties[domain], `missing export contract for ${domain}`);
+    }
   });
 });

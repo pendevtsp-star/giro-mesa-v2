@@ -17,12 +17,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import {
-  ApiCreatedResponse,
-  ApiHeader,
-  ApiOkResponse,
-  ApiProperty,
-} from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiProperty } from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { PrivacyService } from "./privacy.service.js";
@@ -99,6 +94,18 @@ class PrivacyExportDataResponse {
   declare identity: PrivacyExportIdentityResponse;
   @ApiProperty({ type: () => [PrivacyExportMembershipResponse] })
   declare organizationMemberships: PrivacyExportMembershipResponse[];
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare operations: Record<string, unknown>;
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare management_finance: Record<string, unknown>;
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare growth_crm: Record<string, unknown>;
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare objects_media: Record<string, unknown>;
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare offline_edge: Record<string, unknown>;
+  @ApiProperty({ type: "object", additionalProperties: true })
+  declare backups: Record<string, unknown>;
 }
 
 class PrivacyExportResponse {

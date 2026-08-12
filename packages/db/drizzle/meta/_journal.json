@@ -190,6 +190,11 @@
       "when": 1786497000000,
       "tag": "0027_doseclub_reconciliation",
       "breakpoints": true
+    },
+    {
+      "when": 1786501200000,
+      "tag": "0028_privacy_domain_processors",
+      "breakpoints": true
     }
   ]
 }

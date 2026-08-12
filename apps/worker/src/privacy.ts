@@ -11,13 +11,20 @@ import {
 import {
   encryptionKey,
   encryptSecret,
+  PRIVACY_REQUIRED_DOMAINS,
+  type PrivacyDomain,
   privacyCompletionState,
   redactPrivacyMetadata,
 } from "@giromesa/domain";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import {
+  type PrivacyRequestType,
+  privacyProcessingAggregateId,
+  privacyProcessorPolicy,
+  REGISTERED_PRIVACY_PROCESSORS,
+} from "./privacy-processors.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const LOCAL_DOMAINS = ["identity", "organization_membership"] as const;
 const EXPORT_TTL_MS = 15 * 60_000;
 
 export interface PrivacyProcessingEvent {
@@ -47,7 +54,7 @@ function processingInput(event: PrivacyProcessingEvent) {
   if (
     event.topic !== "privacy.request.processing" ||
     event.aggregate_type !== "privacy_request" ||
-    event.aggregate_id !== requestId ||
+    event.aggregate_id !== privacyProcessingAggregateId(requestId, attempt) ||
     event.organization_id !== organizationId ||
     event.unit_id !== null
   ) {
@@ -58,6 +65,44 @@ function processingInput(event: PrivacyProcessingEvent) {
 
 function privacyExportKey() {
   return encryptionKey(process.env.PRIVACY_EXPORT_ENCRYPTION_KEY, "PRIVACY_EXPORT_ENCRYPTION_KEY");
+}
+
+async function exportDomain(
+  db: Database,
+  input: { organizationId: string; requestId: string; attempt: number },
+  domain: Exclude<PrivacyDomain, "identity" | "organization_membership">,
+) {
+  const rows = (await db.execute(sql`
+    select public.giromesa_privacy_export_domain(
+      ${input.organizationId}::uuid,
+      ${input.requestId}::uuid,
+      ${input.attempt}::integer,
+      ${domain}::varchar
+    ) as domain_data
+  `)) as unknown as Array<{ domain_data: unknown }>;
+  if (!rows[0]?.domain_data) throw new Error(`PRIVACY_DOMAIN_EXPORT_EMPTY:${domain}`);
+  return rows[0].domain_data;
+}
+
+async function recordDomainAudit(
+  db: Database,
+  input: { organizationId: string; requestId: string; attempt: number },
+  domain: PrivacyDomain,
+  status: "completed" | "blocked",
+  reasonCode?: string,
+) {
+  await db.insert(auditEvents).values({
+    organizationId: input.organizationId,
+    action: `privacy.domain_${status}`,
+    entityType: "privacy_request",
+    entityId: input.requestId,
+    metadata: redactPrivacyMetadata({
+      attempt: input.attempt,
+      domain,
+      reasonCode,
+      state: status,
+    }),
+  });
 }
 
 export async function processPrivacyRequest(db: Database, event: PrivacyProcessingEvent) {
@@ -88,47 +133,56 @@ export async function processPrivacyRequest(db: Database, event: PrivacyProcessi
         eq(privacyRequestSteps.requestId, input.requestId),
       ),
     );
-  const missingDomains = existingSteps
-    .filter((step) => step.mandatory && step.reasonCode === "PROCESSOR_ABSENT")
+  const unknownDomains = existingSteps
+    .filter(
+      (step) => step.mandatory && !REGISTERED_PRIVACY_PROCESSORS.has(step.domain as PrivacyDomain),
+    )
     .map((step) => step.domain);
+  if (unknownDomains.length > 0) throw new Error("PRIVACY_PROCESSOR_REGISTRY_INCOMPLETE");
+
+  const [identity] = await db
+    .select({
+      id: identities.id,
+      email: identities.email,
+      displayName: identities.displayName,
+      emailVerifiedAt: identities.emailVerifiedAt,
+      createdAt: identities.createdAt,
+      updatedAt: identities.updatedAt,
+    })
+    .from(identities)
+    .where(eq(identities.id, request.subjectIdentityId))
+    .limit(1);
+  if (!identity) throw new Error("PRIVACY_SUBJECT_NOT_FOUND");
+  const membershipRows = await db
+    .select({
+      membershipId: memberships.id,
+      organizationId: memberships.organizationId,
+      status: memberships.status,
+      role: roleBindings.role,
+      unitId: roleBindings.unitId,
+    })
+    .from(memberships)
+    .leftJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+    .where(
+      and(
+        eq(memberships.identityId, request.subjectIdentityId),
+        eq(memberships.organizationId, input.organizationId),
+      ),
+    );
 
   if (request.type === "access_export") {
-    const [identity] = await db
-      .select({
-        id: identities.id,
-        email: identities.email,
-        displayName: identities.displayName,
-        emailVerifiedAt: identities.emailVerifiedAt,
-        createdAt: identities.createdAt,
-        updatedAt: identities.updatedAt,
-      })
-      .from(identities)
-      .where(eq(identities.id, request.subjectIdentityId))
-      .limit(1);
-    if (!identity) throw new Error("PRIVACY_SUBJECT_NOT_FOUND");
-    const membershipRows = await db
-      .select({
-        membershipId: memberships.id,
-        organizationId: memberships.organizationId,
-        status: memberships.status,
-        role: roleBindings.role,
-        unitId: roleBindings.unitId,
-      })
-      .from(memberships)
-      .leftJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-      .where(
-        and(
-          eq(memberships.identityId, request.subjectIdentityId),
-          eq(memberships.organizationId, input.organizationId),
-        ),
-      );
+    const domainData: Record<string, unknown> = {};
+    for (const domain of PRIVACY_REQUIRED_DOMAINS) {
+      if (domain === "identity" || domain === "organization_membership") continue;
+      domainData[domain] = await exportDomain(db, input, domain);
+    }
     const payload = JSON.stringify({
       schemaVersion: 1,
       requestId: request.id,
       generatedAt: new Date().toISOString(),
-      partial: missingDomains.length > 0,
-      blockedDomains: missingDomains,
-      data: { identity, organizationMemberships: membershipRows },
+      partial: false,
+      blockedDomains: [],
+      data: { identity, organizationMemberships: membershipRows, ...domainData },
     });
     const envelope = encryptSecret(
       payload,
@@ -169,27 +223,47 @@ export async function processPrivacyRequest(db: Database, event: PrivacyProcessi
         and(
           eq(privacyRequestSteps.organizationId, input.organizationId),
           eq(privacyRequestSteps.requestId, input.requestId),
-          inArray(privacyRequestSteps.domain, [...LOCAL_DOMAINS]),
+          inArray(privacyRequestSteps.domain, [...PRIVACY_REQUIRED_DOMAINS]),
         ),
       );
+    for (const domain of PRIVACY_REQUIRED_DOMAINS) {
+      await recordDomainAudit(db, input, domain, "completed");
+    }
   } else {
-    // Mutating processors are deliberately preflight-only until every mandatory
-    // propagation adapter exists. This prevents an irreversible partial erasure.
-    await db
-      .update(privacyRequestSteps)
-      .set({
-        status: "blocked",
-        reasonCode: "DEPENDENCY_BLOCKED",
-        attempts: sql`${privacyRequestSteps.attempts} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(privacyRequestSteps.organizationId, input.organizationId),
-          eq(privacyRequestSteps.requestId, input.requestId),
-          inArray(privacyRequestSteps.domain, [...LOCAL_DOMAINS]),
-        ),
-      );
+    // Every local adapter performs a read-only preflight first. Mutations are
+    // atomic across domains and therefore remain unapplied while backup/restore
+    // retention lacks an approved propagation policy.
+    for (const domain of PRIVACY_REQUIRED_DOMAINS) {
+      const policy = privacyProcessorPolicy(request.type as PrivacyRequestType, domain);
+      if (
+        policy.outcome === "preflight" &&
+        domain !== "identity" &&
+        domain !== "organization_membership"
+      ) {
+        await exportDomain(db, input, domain);
+      }
+    }
+    for (const domain of PRIVACY_REQUIRED_DOMAINS) {
+      const policy = privacyProcessorPolicy(request.type as PrivacyRequestType, domain);
+      const reasonCode = policy.outcome === "blocked" ? policy.reasonCode : "DEPENDENCY_BLOCKED";
+      await db
+        .update(privacyRequestSteps)
+        .set({
+          status: "blocked",
+          reasonCode,
+          attempts: sql`${privacyRequestSteps.attempts} + 1`,
+          completedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(privacyRequestSteps.organizationId, input.organizationId),
+            eq(privacyRequestSteps.requestId, input.requestId),
+            eq(privacyRequestSteps.domain, domain),
+          ),
+        );
+      await recordDomainAudit(db, input, domain, "blocked", reasonCode);
+    }
   }
 
   const finalSteps = await db

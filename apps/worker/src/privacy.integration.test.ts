@@ -22,7 +22,7 @@ after(async () => {
 });
 
 describe("privacy lifecycle on real PostgreSQL", () => {
-  it("enforces RLS, partial domains, encrypted one-time export and replay", async (context) => {
+  it("enforces RLS, complete local export, encrypted one-time download and replay", async (context) => {
     if (!database) {
       context.skip("TENANT_ISOLATION_DATABASE_URL not configured");
       return;
@@ -41,7 +41,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
     const processingEvent = (organizationId: string, requestId: string, attempt = 1) => ({
       topic: "privacy.request.processing",
       aggregate_type: "privacy_request",
-      aggregate_id: requestId,
+      aggregate_id: `${requestId}:${attempt}`,
       organization_id: organizationId,
       unit_id: null,
       payload: { organizationId, requestId, attempt },
@@ -94,12 +94,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
               organizationId,
               requestId,
               domain,
-              status: ["identity", "organization_membership"].includes(domain)
-                ? ("pending" as const)
-                : ("blocked" as const),
-              reasonCode: ["identity", "organization_membership"].includes(domain)
-                ? undefined
-                : "PROCESSOR_ABSENT",
+              status: "pending" as const,
             })),
           );
         },
@@ -128,7 +123,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
     const processed = await withWorkerContext(database, (tx) =>
       processPrivacyRequest(tx as never, event),
     );
-    assert.deepEqual(processed, { replayed: false, state: "partial" });
+    assert.deepEqual(processed, { replayed: false, state: "completed" });
     const replayed = await withWorkerContext(database, (tx) =>
       processPrivacyRequest(tx as never, event),
     );
@@ -153,19 +148,13 @@ describe("privacy lifecycle on real PostgreSQL", () => {
         processPrivacyRequest(tx as never, processingEvent(organizationB, requestB)),
       ),
     ]);
-    assert.equal(
-      concurrentResults.filter((result) => result.replayed === false).length,
-      1,
-    );
-    assert.equal(
-      concurrentResults.filter((result) => result.replayed === true).length,
-      1,
-    );
+    assert.equal(concurrentResults.filter((result) => result.replayed === false).length, 1);
+    assert.equal(concurrentResults.filter((result) => result.replayed === true).length, 1);
     const [requestBAudit] = await database.client<{ count: number }[]>`
       select count(*)::int as count from audit_events
       where organization_id = ${organizationB}
         and entity_id = ${requestB}
-        and action = 'privacy.processing_partial'
+        and action = 'privacy.processing_completed'
     `;
     assert.equal(requestBAudit?.count, 1);
 
@@ -178,8 +167,8 @@ describe("privacy lifecycle on real PostgreSQL", () => {
       where request.id = ${requestA}
     `;
     assert.deepEqual(persisted, {
-      state: "partial",
-      last_error_code: "MANDATORY_PROCESSORS_BLOCKED",
+      state: "completed",
+      last_error_code: null,
       display_name: "Privacy Subject A",
     });
     const steps = await database.client<
@@ -190,18 +179,11 @@ describe("privacy lifecycle on real PostgreSQL", () => {
     `;
     assert.deepEqual(
       steps.filter((step) => step.status === "completed").map((step) => step.domain),
-      ["identity", "organization_membership"],
+      [...PRIVACY_REQUIRED_DOMAINS].sort(),
     );
     assert.deepEqual(
       steps.filter((step) => step.status === "blocked").map((step) => step.domain),
-      [
-        "backups",
-        "growth_crm",
-        "management_finance",
-        "objects_media",
-        "offline_edge",
-        "operations",
-      ],
+      [],
     );
 
     const [storedExport] = await database.client<
@@ -233,16 +215,30 @@ describe("privacy lifecycle on real PostgreSQL", () => {
         encryptionKey(encryptionSecret, "PRIVACY_EXPORT_ENCRYPTION_KEY"),
         `privacy-export:${organizationA}:${requestA}:${identityA}`,
       ),
-    ) as { partial: boolean; blockedDomains: string[] };
-    assert.equal(decrypted.partial, true);
-    assert.deepEqual(decrypted.blockedDomains.sort(), [
-      "backups",
-      "growth_crm",
-      "management_finance",
-      "objects_media",
-      "offline_edge",
-      "operations",
-    ]);
+    ) as {
+      partial: boolean;
+      blockedDomains: string[];
+      data: Record<string, unknown> & {
+        backups: { externalDeletionClaimed: boolean; retentionPolicyStatus: string };
+      };
+    };
+    assert.equal(decrypted.partial, false);
+    assert.deepEqual(decrypted.blockedDomains, []);
+    assert.deepEqual(
+      Object.keys(decrypted.data).sort(),
+      [
+        "backups",
+        "growth_crm",
+        "identity",
+        "management_finance",
+        "objects_media",
+        "offline_edge",
+        "operations",
+        "organizationMemberships",
+      ].sort(),
+    );
+    assert.equal(decrypted.data.backups.externalDeletionClaimed, false);
+    assert.equal(decrypted.data.backups.retentionPolicyStatus, "legal_approval_required");
 
     const firstDownload = await withTenantContext(
       database,
@@ -305,12 +301,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
             organizationId: organizationA,
             requestId: correctionRequest,
             domain,
-            status: ["identity", "organization_membership"].includes(domain)
-              ? ("pending" as const)
-              : ("blocked" as const),
-            reasonCode: ["identity", "organization_membership"].includes(domain)
-              ? undefined
-              : "PROCESSOR_ABSENT",
+            status: "pending" as const,
           })),
         );
       },
@@ -325,6 +316,17 @@ describe("privacy lifecycle on real PostgreSQL", () => {
       where request.id = ${correctionRequest}
     `;
     assert.deepEqual(unchanged, { display_name: "Privacy Subject A", state: "partial" });
+    const correctionSteps = await database.client<
+      { domain: string; status: string; reason_code: string | null }[]
+    >`
+      select domain, status, reason_code from privacy_request_steps
+      where request_id = ${correctionRequest} order by domain
+    `;
+    assert.equal(
+      correctionSteps.find((step) => step.domain === "backups")?.reason_code,
+      "BACKUP_RETENTION_POLICY_UNAPPROVED",
+    );
+    assert.ok(correctionSteps.every((step) => step.status === "blocked"));
 
     await seedRequest(organizationA, identityA, failedRequest);
     process.env.PRIVACY_EXPORT_ENCRYPTION_KEY = "invalid";
@@ -361,12 +363,12 @@ describe("privacy lifecycle on real PostgreSQL", () => {
 
     await database.client`
       update privacy_requests set state = 'processing', updated_at = now()
-      where id = ${requestA}
+      where id = ${correctionRequest}
     `;
     await assert.rejects(
       () => database.client`
         update privacy_requests set state = 'completed', updated_at = now()
-        where id = ${requestA}
+        where id = ${correctionRequest}
       `,
       (error: unknown) =>
         (error as { message?: string }).message?.includes(
@@ -375,7 +377,7 @@ describe("privacy lifecycle on real PostgreSQL", () => {
     );
     await database.client`
       update privacy_requests set state = 'partial', updated_at = now()
-      where id = ${requestA}
+      where id = ${correctionRequest}
     `;
 
     await database.client`delete from organizations where id in (${organizationA}, ${organizationB})`;

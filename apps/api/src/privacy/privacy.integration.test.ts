@@ -72,6 +72,9 @@ describe("privacy API service on real PostgreSQL", () => {
           type: "access_export",
         }),
     );
+    assert.equal(created.steps.length, 8);
+    assert.ok(created.steps.every((step) => step.status === "pending"));
+    assert.ok(created.steps.every((step) => step.reasonCode === null));
     const replayed = await database.withTenantContext(
       { source: "http", organizationId, actorIdentityId: ownerId },
       () =>
@@ -115,12 +118,13 @@ describe("privacy API service on real PostgreSQL", () => {
     );
     assert.equal(approved.state, "processing");
     assert.equal(approvalReplay.state, "processing");
-    const [eventCount] = await connection.client<{ count: number }[]>`
-      select count(*)::int as count from outbox_events
+    const [eventCount] = await connection.client<{ count: number; aggregate_id: string }[]>`
+      select count(*)::int as count, min(aggregate_id) as aggregate_id from outbox_events
       where topic = 'privacy.request.processing'
         and payload ->> 'requestId' = ${created.id}
     `;
     assert.equal(eventCount?.count, 1);
+    assert.equal(eventCount?.aggregate_id, `${created.id}:1`);
 
     await assert.rejects(
       () =>

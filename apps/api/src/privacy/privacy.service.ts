@@ -42,7 +42,7 @@ const ALL_ORGANIZATION_ROLES = [
   "finance",
 ] as const;
 const STEP_UP_TTL_MS = 10 * 60_000;
-const LOCAL_PROCESSORS = new Set(["identity", "organization_membership"]);
+const LOCAL_PROCESSORS = new Set(PRIVACY_REQUIRED_DOMAINS);
 
 function fingerprint(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");

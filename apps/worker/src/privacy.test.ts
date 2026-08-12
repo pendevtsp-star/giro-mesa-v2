@@ -14,7 +14,7 @@ describe("privacy worker event boundary", () => {
         processPrivacyRequest({} as never, {
           topic: "privacy.request.processing",
           aggregate_type: "privacy_request",
-          aggregate_id: requestId,
+          aggregate_id: `${requestId}:1`,
           organization_id: envelopeOrganizationId,
           unit_id: null,
           payload: { organizationId: payloadOrganizationId, requestId, attempt: 1 },

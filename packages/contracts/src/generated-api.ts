@@ -7868,6 +7868,24 @@ export interface components {
     PrivacyExportDataResponse: {
       identity: components["schemas"]["PrivacyExportIdentityResponse"];
       organizationMemberships: components["schemas"]["PrivacyExportMembershipResponse"][];
+      operations: {
+        [key: string]: unknown;
+      };
+      management_finance: {
+        [key: string]: unknown;
+      };
+      growth_crm: {
+        [key: string]: unknown;
+      };
+      objects_media: {
+        [key: string]: unknown;
+      };
+      offline_edge: {
+        [key: string]: unknown;
+      };
+      backups: {
+        [key: string]: unknown;
+      };
     };
     PrivacyExportResponse: {
       /**

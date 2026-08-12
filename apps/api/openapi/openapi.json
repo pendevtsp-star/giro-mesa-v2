@@ -37633,11 +37633,41 @@
             "items": {
               "$ref": "#/components/schemas/PrivacyExportMembershipResponse"
             }
+          },
+          "operations": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "management_finance": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "growth_crm": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "objects_media": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "offline_edge": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "backups": {
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "required": [
           "identity",
-          "organizationMemberships"
+          "organizationMemberships",
+          "operations",
+          "management_finance",
+          "growth_crm",
+          "objects_media",
+          "offline_edge",
+          "backups"
         ]
       },
       "PrivacyExportResponse": {
