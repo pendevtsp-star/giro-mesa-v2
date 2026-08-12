@@ -19,6 +19,7 @@ const bootstrapScript = join(root, "deploy", "vps", "bootstrap-env.sh");
 const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
 const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
 const imageProvenance = join(root, "deploy", "vps", "verify-image-provenance.sh");
+const imageLock = join(root, "deploy", "vps", "image-lock.json");
 const compatibilityMatrix = join(root, "deploy", "vps", "rollback-compatibility.json");
 
 function posix(path) {
@@ -164,7 +165,7 @@ test("Linux restore publishes evidence atomically and rejects symlink destinatio
   assert.match(restore, /RESTORE_EVIDENCE_ALREADY_EXISTS/);
   assert.match(restore, /tempfile\.mkstemp/);
   assert.match(restore, /os\.replace\(temporary, destination\)/);
-  assert.match(restore, /os\.O_NOFOLLOW/);
+  assert.match(restore, /getattr\(os, "O_NOFOLLOW"/);
 });
 
 test("runtime env hardening preserves existing secrets and is byte-idempotent", () => {
@@ -361,6 +362,9 @@ test("deployment and rollback compose contracts always include observability and
   }
   assert.doesNotMatch(base, /postgres:17-alpine/);
   const provenance = readFileSync(imageProvenance, "utf8");
+  const lock = JSON.parse(readFileSync(imageLock, "utf8"));
+  assert.match(lock.images.postgres.reference, /^postgres@sha256:[0-9a-f]{64}$/);
+  assert.equal(lock.images.postgres.upstreamRepository, "docker.io/library/postgres");
   assert.match(provenance, /gh attestation verify/);
   assert.match(provenance, /--signer-workflow/);
   assert.match(provenance, /--source-digest/);

@@ -12,18 +12,29 @@ for tool in gh docker python3; do
     exit 1
   fi
 done
+lock_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/image-lock.json"
+if [[ ! -f $lock_file || -L $lock_file ]]; then
+  echo "IMAGE_PROVENANCE_LOCK_REQUIRED" >&2
+  exit 1
+fi
 
-python3 - "$attestation" "${GIROMESA_RELEASE_ARTIFACT_SHA:-}" \
+python3 - "$attestation" "$lock_file" "${GIROMESA_RELEASE_ARTIFACT_SHA:-}" "${GIROMESA_POSTGRES_IMAGE:-}" \
   "${GIROMESA_API_IMAGE:-}" "${GIROMESA_WORKER_IMAGE:-}" "${GIROMESA_SITE_IMAGE:-}" \
   "${GIROMESA_CUSTOMER_IMAGE:-}" "${GIROMESA_OPS_IMAGE:-}" <<'PY'
 import json, pathlib, re, sys
-path, artifact, *images = sys.argv[1:]
+path, lock_path, artifact, postgres, *images = sys.argv[1:]
 digest = re.compile(r"^ghcr\.io/pendevtsp-star/giro-mesa-v2-(?:api|worker|site|customer|ops)@sha256:[0-9a-f]{64}$")
 try:
     value = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    lock = json.loads(pathlib.Path(lock_path).read_text(encoding="utf-8"))
+    postgres_lock = lock["images"]["postgres"]
     valid = (
         re.fullmatch(r"[0-9a-f]{40}", artifact)
         and value.get("schemaVersion") == 1
+        and lock.get("schemaVersion") == 1
+        and postgres_lock.get("reference") == postgres
+        and postgres_lock.get("upstreamRepository") == "docker.io/library/postgres"
+        and postgres_lock.get("upstreamTag") == "17-alpine"
         and value.get("sourceCommit") == artifact
         and value.get("workflow") == "publish-images.yml"
         and sorted(value.get("images", [])) == sorted(images)
@@ -37,6 +48,7 @@ if not valid:
     print("IMAGE_PROVENANCE_ATTESTATION_INVALID", file=sys.stderr)
     raise SystemExit(1)
 PY
+docker image inspect "$GIROMESA_POSTGRES_IMAGE" --format '{{json .RepoDigests}}' >/dev/null
 
 for image in "$GIROMESA_API_IMAGE" "$GIROMESA_WORKER_IMAGE" "$GIROMESA_SITE_IMAGE" "$GIROMESA_CUSTOMER_IMAGE" "$GIROMESA_OPS_IMAGE"; do
   docker image inspect "$image" --format '{{json .RepoDigests}}' >/dev/null

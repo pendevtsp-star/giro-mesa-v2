@@ -278,11 +278,15 @@ source, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 parent = destination.parent
 if destination.exists() or destination.is_symlink() or parent.is_symlink() or not parent.is_dir():
     raise SystemExit("RESTORE_OBJECT_TARGET_UNSAFE")
-parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
-try:
-    os.rename(source, destination.name, dst_dir_fd=parent_fd)
-finally:
-    os.close(parent_fd)
+if os.rename in os.supports_dir_fd:
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        os.rename(source, destination.name, dst_dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+else:
+    if parent.is_symlink(): raise SystemExit("RESTORE_OBJECT_TARGET_UNSAFE")
+    os.rename(source, destination)
 PY
 fi
 if [[ -n $config_name ]]; then
@@ -299,9 +303,14 @@ try:
     left = hashlib.sha256(source.read_bytes()).digest()
     right = hashlib.sha256(target.read_bytes()).digest()
     if not hmac.compare_digest(left, right): raise SystemExit("RESTORE_CONFIG_COPY_HASH_MISMATCH")
-    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
-    try: os.rename(temporary, destination.name, dst_dir_fd=parent_fd)
-    finally: os.close(parent_fd)
+    if os.rename in os.supports_dir_fd:
+        parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            os.rename(temporary, destination.name, dst_dir_fd=parent_fd)
+        finally: os.close(parent_fd)
+    else:
+        if parent.is_symlink(): raise SystemExit("RESTORE_CONFIG_TARGET_UNSAFE")
+        os.rename(temporary, destination)
 except BaseException:
     shutil.rmtree(temporary, ignore_errors=True)
     raise
@@ -348,9 +357,10 @@ try:
     os.chmod(temporary, 0o400)
     if destination.exists() or destination.is_symlink(): raise SystemExit("RESTORE_EVIDENCE_ALREADY_EXISTS")
     os.replace(temporary, destination)
-    directory_fd = os.open(destination.parent, os.O_RDONLY | os.O_DIRECTORY)
-    try: os.fsync(directory_fd)
-    finally: os.close(directory_fd)
+    if os.name == "posix":
+        directory_fd = os.open(destination.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try: os.fsync(directory_fd)
+        finally: os.close(directory_fd)
 finally:
     if os.path.exists(temporary): os.unlink(temporary)
 PY

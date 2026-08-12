@@ -27,6 +27,9 @@ provenance_script="$target_release/deploy/vps/verify-image-provenance.sh"
 for file in "$compose_file" "$images_file" "$observability_file" "$matrix_file" "$provenance_script" "$env_file"; do
   [[ -f $file ]] || { echo "ROLLBACK_FILE_REQUIRED:$file" >&2; exit 1; }
 done
+for tool in docker python3 curl readlink gh; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "ROLLBACK_TOOL_REQUIRED:$tool" >&2; exit 1; }
+done
 read_env_key() {
   python3 - "$env_file" "$1" <<'PY'
 import json, pathlib, re, sys
