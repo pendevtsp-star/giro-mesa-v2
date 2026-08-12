@@ -1,15 +1,20 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   type Database,
+  type PublicTableCapability,
   publicMenus,
   publicTableServiceSettings,
   publicTableSessionNonces,
   publicTableSessionRateLimits,
   publicTableSessions,
   tableOccupancies,
-  type PublicTableCapability,
 } from "@giromesa/db";
-import { ForbiddenException, HttpException, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 
@@ -74,10 +79,7 @@ export class TableSessionCodec {
     };
   }
 
-  issueSession(
-    claims: Omit<TableSessionClaims, "type" | "nonce" | "expiresAt">,
-    expiresAt: Date,
-  ) {
+  issueSession(claims: Omit<TableSessionClaims, "type" | "nonce" | "expiresAt">, expiresAt: Date) {
     const nonce = randomBytes(24).toString("base64url");
     const payload: TableSessionClaims = {
       type: "table-session",
@@ -123,13 +125,16 @@ export class TableSessionCodec {
 
   private sign(prefix: "q1" | "v1", payload: unknown) {
     const body = encoded(payload);
-    const signature = createHmac("sha256", this.key()).update(`${prefix}.${body}`).digest("base64url");
+    const signature = createHmac("sha256", this.key())
+      .update(`${prefix}.${body}`)
+      .digest("base64url");
     return `${prefix}.${body}.${signature}`;
   }
 
   private verify(prefix: "q1" | "v1", token: string) {
     const [actualPrefix, body, suppliedSignature, extra] = token.split(".");
-    if (actualPrefix !== prefix || !body || !suppliedSignature || extra) throw new Error("INVALID_TOKEN");
+    if (actualPrefix !== prefix || !body || !suppliedSignature || extra)
+      throw new Error("INVALID_TOKEN");
     const expectedSignature = createHmac("sha256", this.key())
       .update(`${prefix}.${body}`)
       .digest("base64url");
@@ -165,12 +170,25 @@ export class TableSessionService {
     try {
       qr = this.codec.verifyTableQr(qrToken);
     } catch {
-      throw new UnauthorizedException({ code: "INVALID_TABLE_QR", message: "QR da mesa inválido." });
+      throw new UnauthorizedException({
+        code: "INVALID_TABLE_QR",
+        message: "QR da mesa inválido.",
+      });
     }
     const [menu] = await this.database.db
-      .select({ id: publicMenus.id, organizationId: publicMenus.organizationId, unitId: publicMenus.unitId })
+      .select({
+        id: publicMenus.id,
+        organizationId: publicMenus.organizationId,
+        unitId: publicMenus.unitId,
+      })
       .from(publicMenus)
-      .where(and(eq(publicMenus.slug, slug), eq(publicMenus.active, true), gt(publicMenus.publishedAt, new Date(0))))
+      .where(
+        and(
+          eq(publicMenus.slug, slug),
+          eq(publicMenus.active, true),
+          gt(publicMenus.publishedAt, new Date(0)),
+        ),
+      )
       .limit(1);
     if (
       !menu ||
@@ -178,7 +196,10 @@ export class TableSessionService {
       menu.organizationId !== qr.organizationId ||
       menu.unitId !== qr.unitId
     ) {
-      throw new UnauthorizedException({ code: "INVALID_TABLE_QR", message: "QR da mesa inválido." });
+      throw new UnauthorizedException({
+        code: "INVALID_TABLE_QR",
+        message: "QR da mesa inválido.",
+      });
     }
     await this.enforceRateLimit(menu.organizationId, menu.unitId, menu.id, requestSource);
     const [occupancy] = await this.database.db
@@ -194,7 +215,10 @@ export class TableSessionService {
       )
       .limit(1);
     if (!occupancy) {
-      throw new UnauthorizedException({ code: "TABLE_OCCUPANCY_REQUIRED", message: "A mesa não possui atendimento aberto." });
+      throw new UnauthorizedException({
+        code: "TABLE_OCCUPANCY_REQUIRED",
+        message: "A mesa não possui atendimento aberto.",
+      });
     }
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1_000);
@@ -227,14 +251,32 @@ export class TableSessionService {
     return { token: issued.token, expiresAt: expiresAt.toISOString(), capabilities };
   }
 
-  async validate(slug: string, token: string, capability: PublicTableCapability) {
+  async validate(slug: string, token: string, capability: PublicTableCapability, tx?: Transaction) {
     let claims: TableSessionClaims;
     try {
       claims = this.codec.verifySession(token);
     } catch {
-      throw new UnauthorizedException({ code: "INVALID_TABLE_SESSION", message: "Sessão da mesa inválida ou expirada." });
+      throw new UnauthorizedException({
+        code: "INVALID_TABLE_SESSION",
+        message: "Sessão da mesa inválida ou expirada.",
+      });
     }
-    const [session] = await this.database.db
+    const client = tx ?? this.database.db;
+    if (tx) {
+      await tx.execute(
+        sql`select 1 from ${publicTableSessions} where ${publicTableSessions.id} = ${claims.sessionId} for share`,
+      );
+      await tx.execute(
+        sql`select 1 from ${publicTableServiceSettings}
+            where ${publicTableServiceSettings.organizationId} = ${claims.organizationId}
+              and ${publicTableServiceSettings.unitId} = ${claims.unitId}
+            for share`,
+      );
+      await tx.execute(
+        sql`select 1 from ${tableOccupancies} where ${tableOccupancies.id} = ${claims.occupancyId} for share`,
+      );
+    }
+    const [session] = await client
       .select({
         occupancyEpoch: publicTableSessions.occupancyEpoch,
         capabilities: publicTableSessions.capabilities,
@@ -257,16 +299,27 @@ export class TableSessionService {
         ),
       )
       .limit(1);
-    if (!session) throw new UnauthorizedException({ code: "TABLE_SESSION_STALE", message: "TABLE_SESSION_STALE" });
-    const currentCapabilities = await this.currentCapabilities(claims.organizationId, claims.unitId);
+    if (!session)
+      throw new UnauthorizedException({
+        code: "TABLE_SESSION_STALE",
+        message: "TABLE_SESSION_STALE",
+      });
+    const currentCapabilities = await this.currentCapabilities(
+      claims.organizationId,
+      claims.unitId,
+      client,
+    );
     if (
       !session.capabilities.includes(capability) ||
       !claims.capabilities.includes(capability) ||
       !currentCapabilities.includes(capability)
     ) {
-      throw new ForbiddenException({ code: "TABLE_SESSION_CAPABILITY_DENIED", message: "Ação não permitida para esta mesa." });
+      throw new ForbiddenException({
+        code: "TABLE_SESSION_CAPABILITY_DENIED",
+        message: "Ação não permitida para esta mesa.",
+      });
     }
-    const [occupancy] = await this.database.db
+    const [occupancy] = await client
       .select({ id: tableOccupancies.id })
       .from(tableOccupancies)
       .where(
@@ -281,11 +334,18 @@ export class TableSessionService {
       )
       .limit(1);
     if (!occupancy) {
-      await this.database.db
+      await client
         .update(publicTableSessions)
-        .set({ revokedAt: new Date(), revokeReason: "occupancy_epoch_changed", resourceVersion: sql`${publicTableSessions.resourceVersion} + 1` })
+        .set({
+          revokedAt: new Date(),
+          revokeReason: "occupancy_epoch_changed",
+          resourceVersion: sql`${publicTableSessions.resourceVersion} + 1`,
+        })
         .where(eq(publicTableSessions.id, claims.sessionId));
-      throw new UnauthorizedException({ code: "TABLE_SESSION_STALE", message: "TABLE_SESSION_STALE" });
+      throw new UnauthorizedException({
+        code: "TABLE_SESSION_STALE",
+        message: "TABLE_SESSION_STALE",
+      });
     }
     return claims;
   }
@@ -297,7 +357,10 @@ export class TableSessionService {
     tx?: Transaction,
   ) {
     if (!/^[A-Za-z0-9_-]{24,128}$/.test(nonce)) {
-      throw new UnauthorizedException({ code: "INVALID_REQUEST_NONCE", message: "Nonce inválido." });
+      throw new UnauthorizedException({
+        code: "INVALID_REQUEST_NONCE",
+        message: "Nonce inválido.",
+      });
     }
     try {
       await (tx ?? this.database.db).insert(publicTableSessionNonces).values({
@@ -312,14 +375,21 @@ export class TableSessionService {
     } catch (error) {
       const databaseError = error as { code?: string; cause?: { code?: string } };
       if (databaseError.code === "23505" || databaseError.cause?.code === "23505") {
-        throw new UnauthorizedException({ code: "TABLE_SESSION_REPLAY", message: "Comando já consumido." });
+        throw new UnauthorizedException({
+          code: "TABLE_SESSION_REPLAY",
+          message: "Comando já consumido.",
+        });
       }
       throw error;
     }
   }
 
-  async currentCapabilities(organizationId: string, unitId: string) {
-    const [settings] = await this.database.db
+  async currentCapabilities(
+    organizationId: string,
+    unitId: string,
+    client: Database | Transaction = this.database.db,
+  ) {
+    const [settings] = await client
       .select()
       .from(publicTableServiceSettings)
       .where(
@@ -336,7 +406,12 @@ export class TableSessionService {
     return capabilities;
   }
 
-  private async enforceRateLimit(organizationId: string, unitId: string, menuId: string, source: string) {
+  private async enforceRateLimit(
+    organizationId: string,
+    unitId: string,
+    menuId: string,
+    source: string,
+  ) {
     const bucketHash = this.codec.hash(source.trim() || "unknown");
     const windowStartedAt = new Date(Math.floor(Date.now() / 60_000) * 60_000);
     const [bucket] = await this.database.db
@@ -359,7 +434,10 @@ export class TableSessionService {
       })
       .returning({ requestCount: publicTableSessionRateLimits.requestCount });
     if (bucket && bucket.requestCount > 12) {
-      throw new HttpException({ code: "TABLE_SESSION_RATE_LIMITED", message: "Muitas tentativas para este QR." }, 429);
+      throw new HttpException(
+        { code: "TABLE_SESSION_RATE_LIMITED", message: "Muitas tentativas para este QR." },
+        429,
+      );
     }
   }
 }

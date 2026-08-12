@@ -1,23 +1,25 @@
 import { createHash } from "node:crypto";
 import {
   areaAssignments,
+  type Database,
   memberships,
   outboxEvents,
   posOrderItems,
   posOrders,
   posTabs,
+  publicTableServiceSettings,
+  publicTableSessionRateLimits,
   roleBindings,
   serviceShifts,
   staffPresenceLeases,
   tableLayoutNodes,
   tableLayoutVersions,
   tableOccupancies,
-  publicTableServiceSettings,
-  tableServiceCallReceipts,
   tableServiceCallEvents,
+  tableServiceCallReceipts,
   tableServiceCalls,
 } from "@giromesa/db";
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, HttpException, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -25,9 +27,14 @@ import { RealtimeService } from "../realtime/realtime.service.js";
 import { TableSessionService } from "./table-session.js";
 
 type CallKind = "waiter" | "bill";
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 function fingerprint(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+export function tableCallFingerprint(kind: CallKind, occupancyId: string, occupancyEpoch: string) {
+  return fingerprint({ kind, occupancyId, occupancyEpoch });
 }
 
 function conflict(code: string, message: string) {
@@ -53,14 +60,10 @@ export class TableServiceService {
     if (idempotencyKey.length < 8 || idempotencyKey.length > 160) {
       throw conflict("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key inválida.");
     }
-    const capability = kind === "waiter" ? "call_waiter" : "request_bill";
-    const claims = await this.sessions.validate(slug, token, capability);
-    const requestHash = fingerprint({
-      kind,
-      occupancyId: claims.occupancyId,
-      occupancyEpoch: claims.occupancyEpoch,
-    });
     const result = await this.database.db.transaction(async (tx) => {
+      const capability = kind === "waiter" ? "call_waiter" : "request_bill";
+      const claims = await this.sessions.validate(slug, token, capability, tx);
+      const requestHash = tableCallFingerprint(kind, claims.occupancyId, claims.occupancyEpoch);
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`table-call:${claims.organizationId}:${claims.unitId}:${claims.occupancyId}:${claims.occupancyEpoch}:${kind}`}))`,
       );
@@ -92,6 +95,7 @@ export class TableServiceService {
         };
       }
 
+      await this.enforceCallRateLimit(claims, tx);
       await this.sessions.consumeRequestNonce(claims, requestNonce, `call:${kind}`, tx);
       const [cooldown] = await tx
         .select()
@@ -127,7 +131,12 @@ export class TableServiceService {
         };
       }
 
-      const route = await this.resolveRoute(claims.organizationId, claims.unitId, claims.tableId);
+      const route = await this.resolveRoute(
+        claims.organizationId,
+        claims.unitId,
+        claims.tableId,
+        tx,
+      );
       const state = route.identityId ? "routed" : "received";
       const now = new Date();
       const [created] = await tx
@@ -224,50 +233,56 @@ export class TableServiceService {
   }
 
   async partial(slug: string, token: string) {
-    const claims = await this.sessions.validate(slug, token, "view_partial");
-    const [tab] = await this.database.db
-      .select({
-        id: posTabs.id,
-        guestCount: posTabs.guestCount,
-        subtotalCents: posTabs.subtotalCents,
-        discountCents: posTabs.discountCents,
-        serviceChargeCents: posTabs.serviceChargeCents,
-        tipCents: posTabs.tipCents,
-        totalCents: posTabs.totalCents,
-      })
-      .from(posTabs)
-      .innerJoin(tableOccupancies, eq(tableOccupancies.tabId, posTabs.id))
-      .where(
-        and(
-          eq(posTabs.organizationId, claims.organizationId),
-          eq(posTabs.unitId, claims.unitId),
-          eq(posTabs.tableId, claims.tableId),
-          eq(posTabs.status, "open"),
-          eq(tableOccupancies.id, claims.occupancyId),
-          eq(tableOccupancies.occupancyEpoch, claims.occupancyEpoch),
-          inArray(tableOccupancies.state, ["open", "paying"]),
-        ),
-      )
-      .limit(1);
-    if (!tab) throw new NotFoundException({ code: "CURRENT_OCCUPANCY_TAB_NOT_FOUND", message: "Comanda atual não encontrada." });
-    const items = await this.database.db
-      .select({
-        id: posOrderItems.id,
-        productName: posOrderItems.productName,
-        quantity: posOrderItems.quantity,
-        netCents: posOrderItems.netCents,
-        status: posOrderItems.status,
-      })
-      .from(posOrderItems)
-      .innerJoin(posOrders, eq(posOrders.id, posOrderItems.orderId))
-      .where(
-        and(
-          eq(posOrders.organizationId, claims.organizationId),
-          eq(posOrders.unitId, claims.unitId),
-          eq(posOrders.tabId, tab.id),
-        ),
-      );
-    return { occupancyId: claims.occupancyId, occupancyEpoch: claims.occupancyEpoch, tab, items };
+    return this.database.db.transaction(async (tx) => {
+      const claims = await this.sessions.validate(slug, token, "view_partial", tx);
+      const [tab] = await tx
+        .select({
+          id: posTabs.id,
+          guestCount: posTabs.guestCount,
+          subtotalCents: posTabs.subtotalCents,
+          discountCents: posTabs.discountCents,
+          serviceChargeCents: posTabs.serviceChargeCents,
+          tipCents: posTabs.tipCents,
+          totalCents: posTabs.totalCents,
+        })
+        .from(posTabs)
+        .innerJoin(tableOccupancies, eq(tableOccupancies.tabId, posTabs.id))
+        .where(
+          and(
+            eq(posTabs.organizationId, claims.organizationId),
+            eq(posTabs.unitId, claims.unitId),
+            eq(posTabs.tableId, claims.tableId),
+            eq(posTabs.status, "open"),
+            eq(tableOccupancies.id, claims.occupancyId),
+            eq(tableOccupancies.occupancyEpoch, claims.occupancyEpoch),
+            inArray(tableOccupancies.state, ["open", "paying"]),
+          ),
+        )
+        .limit(1);
+      if (!tab)
+        throw new NotFoundException({
+          code: "CURRENT_OCCUPANCY_TAB_NOT_FOUND",
+          message: "Comanda atual não encontrada.",
+        });
+      const items = await tx
+        .select({
+          id: posOrderItems.id,
+          productName: posOrderItems.productName,
+          quantity: posOrderItems.quantity,
+          netCents: posOrderItems.netCents,
+          status: posOrderItems.status,
+        })
+        .from(posOrderItems)
+        .innerJoin(posOrders, eq(posOrders.id, posOrderItems.orderId))
+        .where(
+          and(
+            eq(posOrders.organizationId, claims.organizationId),
+            eq(posOrders.unitId, claims.unitId),
+            eq(posOrders.tabId, tab.id),
+          ),
+        );
+      return { occupancyId: claims.occupancyId, occupancyEpoch: claims.occupancyEpoch, tab, items };
+    });
   }
 
   async capabilitySettings(identityId: string, organizationId: string, unitId: string) {
@@ -356,9 +371,20 @@ export class TableServiceService {
     });
   }
 
-  async attend(identityId: string, organizationId: string, unitId: string, callId: string, expectedVersion: number) {
+  async attend(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    callId: string,
+    expectedVersion: number,
+  ) {
     await this.scope.requireUnitAccess(identityId, organizationId, unitId);
-    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner", "manager", "waiter", "cashier"]);
+    await this.scope.requireOrganizationRole(identityId, organizationId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
     const [attended] = await this.database.db.transaction(async (tx) => {
       const [updated] = await tx
         .update(tableServiceCalls)
@@ -409,8 +435,45 @@ export class TableServiceService {
     return attended;
   }
 
-  private async resolveRoute(organizationId: string, unitId: string, tableId: string) {
-    const [node] = await this.database.db
+  private async enforceCallRateLimit(
+    claims: { organizationId: string; unitId: string; menuId: string; sessionId: string },
+    tx: Transaction,
+  ) {
+    const windowStartedAt = new Date(Math.floor(Date.now() / 60_000) * 60_000);
+    const [bucket] = await tx
+      .insert(publicTableSessionRateLimits)
+      .values({
+        organizationId: claims.organizationId,
+        unitId: claims.unitId,
+        menuId: claims.menuId,
+        bucketHash: fingerprint(`table-call:${claims.sessionId}`),
+        windowStartedAt,
+        expiresAt: new Date(windowStartedAt.getTime() + 2 * 60_000),
+      })
+      .onConflictDoUpdate({
+        target: [
+          publicTableSessionRateLimits.menuId,
+          publicTableSessionRateLimits.bucketHash,
+          publicTableSessionRateLimits.windowStartedAt,
+        ],
+        set: { requestCount: sql`${publicTableSessionRateLimits.requestCount} + 1` },
+      })
+      .returning({ requestCount: publicTableSessionRateLimits.requestCount });
+    if (bucket && bucket.requestCount > 8) {
+      throw new HttpException(
+        { code: "TABLE_SERVICE_RATE_LIMITED", message: "Muitos chamados para esta mesa." },
+        429,
+      );
+    }
+  }
+
+  private async resolveRoute(
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    tx: Transaction,
+  ) {
+    const [node] = await tx
       .select({ areaId: tableLayoutNodes.areaId })
       .from(tableLayoutNodes)
       .innerJoin(tableLayoutVersions, eq(tableLayoutVersions.id, tableLayoutNodes.layoutVersionId))
@@ -425,7 +488,7 @@ export class TableServiceService {
       .orderBy(desc(tableLayoutVersions.version))
       .limit(1);
     const [assignment] = node?.areaId
-      ? await this.database.db
+      ? await tx
           .select({
             primaryIdentityId: areaAssignments.primaryIdentityId,
             supportIdentityId: areaAssignments.supportIdentityId,
@@ -445,7 +508,7 @@ export class TableServiceService {
       : [];
     const present = async (identityId: string | null) => {
       if (!identityId) return false;
-      const [lease] = await this.database.db
+      const [lease] = await tx
         .select({ identityId: staffPresenceLeases.identityId })
         .from(staffPresenceLeases)
         .where(
@@ -462,9 +525,11 @@ export class TableServiceService {
     };
     const primaryIdentityId = assignment?.primaryIdentityId ?? null;
     const supportIdentityId = assignment?.supportIdentityId ?? null;
-    if (await present(primaryIdentityId)) return { identityId: primaryIdentityId, source: "primary" as const };
-    if (await present(supportIdentityId)) return { identityId: supportIdentityId, source: "support" as const };
-    const [fallback] = await this.database.db
+    if (await present(primaryIdentityId))
+      return { identityId: primaryIdentityId, source: "primary" as const };
+    if (await present(supportIdentityId))
+      return { identityId: supportIdentityId, source: "support" as const };
+    const [fallback] = await tx
       .select({ identityId: memberships.identityId })
       .from(memberships)
       .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
