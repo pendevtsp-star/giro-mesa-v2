@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 export const fiscalIssueSchema = z
   .object({
     saleReference: z.string().trim().min(1).max(160),
     documentType: z.enum(["nfce", "nfe"]),
-    totalCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    totalCents: z.number().int().positive().max(POSTGRES_INT4_MAX),
     document: z.record(z.string(), z.unknown()),
   })
   .strict();

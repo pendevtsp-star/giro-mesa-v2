@@ -12,6 +12,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { managementRequestHash } from "../management/management.rules.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -157,7 +158,9 @@ export class ReturnablesService {
       input.name.trim().length === 0 ||
       input.name.length > 160 ||
       (input.depositCents !== undefined &&
-        (!Number.isSafeInteger(input.depositCents) || input.depositCents < 0)) ||
+        (!Number.isSafeInteger(input.depositCents) ||
+          input.depositCents < 0 ||
+          input.depositCents > POSTGRES_INT4_MAX)) ||
       new Set(serialNumbers).size !== serialNumbers.length ||
       serialNumbers.some((serial) => serial.length === 0 || serial.length > 120) ||
       (input.trackingMode === "serialized" && serialNumbers.length === 0) ||

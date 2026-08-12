@@ -9,6 +9,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { managementRequestHash } from "../management/management.rules.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -132,7 +133,8 @@ export class FiscalService {
       input.saleReference.trim().length === 0 ||
       input.saleReference.length > 160 ||
       !Number.isSafeInteger(input.totalCents) ||
-      input.totalCents <= 0
+      input.totalCents <= 0 ||
+      input.totalCents > POSTGRES_INT4_MAX
     )
       throw new BadRequestException({
         code: "INVALID_FISCAL_REQUEST",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 const evidence = z.object({
   kind: z.enum(["document", "photo", "note", "reference"]),
@@ -10,7 +11,7 @@ export const incidentReportSchema = z.object({
   incidentType: z.string().trim().min(3).max(48),
   neutralSummary: z.string().trim().min(15).max(1_000),
   evidence: z.array(evidence).max(50).default([]),
-  amountCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  amountCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX).optional(),
   occurredAt: z.string().datetime({ offset: true }),
 });
 

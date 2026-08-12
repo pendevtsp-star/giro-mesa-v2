@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 const id = z.string().uuid();
-const cents = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const cents = z.number().int().nonnegative().max(POSTGRES_INT4_MAX);
 const positiveCents = cents.positive();
 const name = z.string().trim().min(1).max(160);
 const quantity = z
@@ -14,6 +15,11 @@ const positiveQuantity = quantity.refine(
   (value) => Number(value) > 0,
   "A quantidade deve ser positiva.",
 );
+
+function quantityToMicro(value: string | number) {
+  const [whole, fraction = ""] = String(value).split(".");
+  return BigInt(whole ?? "0") * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+}
 const preciseQuantity = z
   .union([z.string().trim(), z.number().finite()])
   .transform((value) => String(value))
@@ -88,14 +94,37 @@ export const inventoryEventSchema = z.object({
     .max(500),
 });
 
-export const purchaseOrderSchema = z.object({
-  supplierId: id,
-  expectedAt: instant.optional(),
-  items: z
-    .array(z.object({ inventoryItemId: id, quantity: positiveQuantity, unitCostCents: cents }))
-    .min(1)
-    .max(500),
-});
+export const purchaseOrderSchema = z
+  .object({
+    supplierId: id,
+    expectedAt: instant.optional(),
+    items: z
+      .array(z.object({ inventoryItemId: id, quantity: positiveQuantity, unitCostCents: cents }))
+      .min(1)
+      .max(500),
+  })
+  .superRefine((value, context) => {
+    let totalCents = 0n;
+    for (const [index, item] of value.items.entries()) {
+      const lineCents =
+        (quantityToMicro(item.quantity) * BigInt(item.unitCostCents) + 500_000n) / 1_000_000n;
+      totalCents += lineCents;
+      if (lineCents > BigInt(POSTGRES_INT4_MAX)) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", index, "quantity"],
+          message: "O total da linha excede o limite monetário permitido.",
+        });
+      }
+    }
+    if (totalCents > BigInt(POSTGRES_INT4_MAX)) {
+      context.addIssue({
+        code: "custom",
+        path: ["items"],
+        message: "O total do pedido excede o limite monetário permitido.",
+      });
+    }
+  });
 
 export const purchaseReceiptSchema = z.object({
   receivedAt: instant.optional(),

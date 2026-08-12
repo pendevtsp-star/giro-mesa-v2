@@ -27,6 +27,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { managementRequestHash } from "../management/management.rules.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -119,6 +120,7 @@ export class PaymentsService {
     if (
       !Number.isSafeInteger(input.amountCents) ||
       input.amountCents <= 0 ||
+      input.amountCents > POSTGRES_INT4_MAX ||
       input.sourceType.trim().length === 0 ||
       input.sourceType.length > 48 ||
       input.sourceId.trim().length === 0 ||
@@ -195,6 +197,7 @@ export class PaymentsService {
     if (
       !Number.isSafeInteger(input.amountCents) ||
       input.amountCents <= 0 ||
+      input.amountCents > POSTGRES_INT4_MAX ||
       input.method.trim().length === 0
     ) {
       throw new BadRequestException({

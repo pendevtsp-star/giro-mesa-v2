@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 const id = z.string().uuid();
 const custody = z.object({
@@ -10,7 +11,7 @@ export const createReturnableAssetSchema = z.object({
   sku: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(160),
   trackingMode: z.enum(["aggregate", "serialized"]),
-  depositCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  depositCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX).optional(),
   serialNumbers: z.array(z.string().trim().min(1).max(120)).max(1_000).default([]),
 });
 

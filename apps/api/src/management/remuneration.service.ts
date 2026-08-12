@@ -20,6 +20,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { managementRequestHash } from "./management.rules.js";
@@ -114,7 +115,10 @@ function pdfBuffer(lines: string[]) {
 
 function safeSimulation(rule: RemunerationRuleVersion, metrics: RemunerationMetrics) {
   try {
-    return simulateRemunerationRule(rule, metrics);
+    const simulation = simulateRemunerationRule(rule, metrics);
+    if (simulation.outputCents > POSTGRES_INT4_MAX)
+      throw new RangeError("Remuneration output exceeds the monetary storage limit.");
+    return simulation;
   } catch (error) {
     throw new BadRequestException({
       code: "REMUNERATION_RULE_INVALID",
@@ -575,6 +579,7 @@ export class RemunerationService {
     if (
       !Number.isSafeInteger(input.amountCents) ||
       input.amountCents <= 0 ||
+      input.amountCents > POSTGRES_INT4_MAX ||
       input.reason.trim().length < 15 ||
       input.reason.length > 500 ||
       input.sourceReferences.length === 0 ||

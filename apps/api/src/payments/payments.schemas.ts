@@ -1,16 +1,17 @@
 import { z } from "zod";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 export const paymentIntentSchema = z
   .object({
     sourceType: z.string().trim().min(1).max(48),
     sourceId: z.string().trim().min(1).max(160),
-    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    amountCents: z.number().int().positive().max(POSTGRES_INT4_MAX),
   })
   .strict();
 
 export const paymentAttemptSchema = z
   .object({
-    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    amountCents: z.number().int().positive().max(POSTGRES_INT4_MAX),
     method: z.enum(["credit", "debit", "pix"]),
     terminalId: z.uuid().optional(),
   })
@@ -31,7 +32,7 @@ export const paymentProviderCallbackSchema = z
     providerEventId: z.string().trim().min(1).max(160),
     status: z.enum(["authorized", "declined", "unknown"]),
     providerReference: z.string().trim().min(1).max(160).optional(),
-    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    amountCents: z.number().int().positive().max(POSTGRES_INT4_MAX).optional(),
     safePayload: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();

@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import { assertPostgresInt4, POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 
 export type InventoryEventType = "loss" | "count" | "adjustment";
 
 function assertCents(value: number, field: string, allowZero = false) {
-  if (!Number.isSafeInteger(value) || (allowZero ? value < 0 : value <= 0)) {
+  if (
+    !Number.isSafeInteger(value) ||
+    value > POSTGRES_INT4_MAX ||
+    (allowZero ? value < 0 : value <= 0)
+  ) {
     throw new BadRequestException({
       code: "INVALID_MONEY_AMOUNT",
       message: `${field} deve ser informado em centavos inteiros${allowZero ? " e não negativos" : " e positivos"}.`,
@@ -118,7 +123,10 @@ export function cashConference(input: {
   assertCents(input.countedCents, "countedCents", true);
   const expectedCents =
     input.openingCents + input.suppliesCents - input.withdrawalsCents + input.cashReceiptsCents;
-  return { expectedCents, differenceCents: input.countedCents - expectedCents };
+  const differenceCents = input.countedCents - expectedCents;
+  assertPostgresInt4(expectedCents, "expectedCents");
+  assertPostgresInt4(differenceCents, "differenceCents");
+  return { expectedCents, differenceCents };
 }
 
 export function profitabilityCoverage(

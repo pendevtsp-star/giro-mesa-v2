@@ -44,6 +44,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { assertPostgresCents } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
@@ -837,10 +838,16 @@ export class ManagementService {
             code: "INVENTORY_ITEM_NOT_FOUND",
             message: "Um ou mais itens não pertencem à unidade.",
           });
-        const totalCents = input.items.reduce(
-          (sum, item) =>
-            sum + Math.round((quantityToMilli(item.quantity) * item.unitCostCents) / 1_000_000),
-          0,
+        const lineTotals = input.items.map((item, index) => {
+          assertPostgresCents(item.unitCostCents, `items.${index}.unitCostCents`);
+          return assertPostgresCents(
+            Math.round((quantityToMilli(item.quantity) * item.unitCostCents) / 1_000_000),
+            `items.${index}.totalCents`,
+          );
+        });
+        const totalCents = assertPostgresCents(
+          lineTotals.reduce((sum, lineTotal) => sum + lineTotal, 0),
+          "totalCents",
         );
         const purchaseOrderId = randomUUID();
         await tx.insert(managementPurchaseOrders).values({
@@ -853,16 +860,14 @@ export class ManagementService {
           expectedAt: input.expectedAt ? new Date(input.expectedAt) : undefined,
         });
         await tx.insert(managementPurchaseOrderItems).values(
-          input.items.map((item) => ({
+          input.items.map((item, index) => ({
             organizationId,
             unitId,
             purchaseOrderId,
             inventoryItemId: item.inventoryItemId,
             quantity: String(item.quantity),
             unitCostCents: item.unitCostCents,
-            totalCents: Math.round(
-              (quantityToMilli(item.quantity) * item.unitCostCents) / 1_000_000,
-            ),
+            totalCents: lineTotals[index] as number,
           })),
         );
         await this.record(

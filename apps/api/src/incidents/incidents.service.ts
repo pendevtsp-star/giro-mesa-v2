@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, asc, eq, sql } from "drizzle-orm";
+import { POSTGRES_INT4_MAX } from "../common/postgres-integers.js";
 import { DatabaseService } from "../database/database.module.js";
 import { managementRequestHash } from "../management/management.rules.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -105,7 +106,9 @@ export class IncidentsService {
           (item.checksum !== undefined && item.checksum.length > 160),
       ) ||
       (input.amountCents !== undefined &&
-        (!Number.isSafeInteger(input.amountCents) || input.amountCents < 0))
+        (!Number.isSafeInteger(input.amountCents) ||
+          input.amountCents < 0 ||
+          input.amountCents > POSTGRES_INT4_MAX))
     )
       throw new BadRequestException({
         code: "INCIDENT_REPORT_INVALID",

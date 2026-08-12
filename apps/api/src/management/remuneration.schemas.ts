@@ -1,7 +1,8 @@
 import { type RemunerationExpression, remunerationMetrics } from "@giromesa/domain";
 import { z } from "zod";
+import { POSTGRES_INT4_MAX, POSTGRES_INT4_MIN } from "../common/postgres-integers.js";
 
-const safeInteger = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
+const safeInteger = z.number().int().min(POSTGRES_INT4_MIN).max(POSTGRES_INT4_MAX);
 
 const expressionNode: z.ZodType<RemunerationExpression> = z.lazy(() =>
   z.discriminatedUnion("type", [
@@ -84,11 +85,11 @@ export const remunerationExpressionSchema = expressionNode.superRefine((expressi
 });
 
 const metrics = z.object({
-  grossSalesCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  netSalesCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  serviceChargeCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  eligibleSalesCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  profitCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  grossSalesCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX),
+  netSalesCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX),
+  serviceChargeCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX),
+  eligibleSalesCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX),
+  profitCents: z.number().int().nonnegative().max(POSTGRES_INT4_MAX),
   hoursMinutes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   unitsSold: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
@@ -125,7 +126,7 @@ export const remunerationCalculationSchema = z.object({
     .max(1_000),
 });
 export const remunerationAdjustmentSchema = z.object({
-  amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  amountCents: z.number().int().positive().max(POSTGRES_INT4_MAX),
   reason: z.string().trim().min(15).max(500),
   sourceReferences: z.array(z.string().trim().min(1).max(240)).min(1).max(100),
   recipient: z.object({
