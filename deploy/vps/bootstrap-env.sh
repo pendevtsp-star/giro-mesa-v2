@@ -60,7 +60,39 @@ resend_from=${resend_from:-GiroMesa <contato@giromesa.com.br>}
 resend_reply_to=$(read_key PLATFORM_SUPPORT_EMAIL "$legacy_primary" "$legacy_runtime" || true)
 resend_reply_to=${resend_reply_to:-contato@giromesa.com.br}
 admin_emails=${PLATFORM_ADMIN_EMAILS_OVERRIDE:-}
+platform_admin_grants=${PLATFORM_ADMIN_GRANTS_OVERRIDE:-}
 whatsapp_number=${WHATSAPP_NUMBER_OVERRIDE:-}
+
+if [[ -z "$platform_admin_grants" ]]; then
+  echo "PLATFORM_ADMIN_GRANTS_OVERRIDE obrigatÃ³rio para novos ambientes; use concessÃµes revisadas e de menor privilÃ©gio." >&2
+  exit 1
+fi
+if ! PLATFORM_ADMIN_GRANTS_CANDIDATE="$platform_admin_grants" python3 - <<'PY'
+import os, re, sys
+allowed = {
+    "platform.read", "platform.pii.read", "platform.action.propose",
+    "platform.action.approve", "platform.action.reject", "platform.tenant.suspend",
+    "platform.tenant.restore", "platform.membership.disable", "platform.membership.restore",
+}
+email = re.compile(r"^[^@\s=;]+@[^@\s=;]+\.[^@\s=;]+$")
+value = os.environ["PLATFORM_ADMIN_GRANTS_CANDIDATE"]
+valid = bool(value) and "\n" not in value and "\r" not in value
+for grant in value.split(";") if valid else ():
+    if grant.count("=") != 1:
+        valid = False
+        break
+    address, raw = grant.split("=", 1)
+    permissions = raw.split("|")
+    if not email.fullmatch(address.strip()) or not permissions or any(item.strip() not in allowed for item in permissions):
+        valid = False
+        break
+if not valid:
+    print("PLATFORM_ADMIN_GRANTS_OVERRIDE invÃ¡lido.", file=sys.stderr)
+    raise SystemExit(1)
+PY
+then
+  exit 1
+fi
 
 postgres_password=$(openssl rand -hex 24)
 session_secret=$(openssl rand -hex 48)
@@ -68,6 +100,10 @@ mfa_key=$(openssl rand -base64 32)
 outbox_key=$(openssl rand -base64 32)
 internal_key=$(openssl rand -hex 32)
 webhook_key=$(openssl rand -base64 32)
+command_fingerprint_key=$(openssl rand -base64 32)
+privacy_export_key=$(openssl rand -base64 32)
+table_session_key=$(openssl rand -base64 32)
+backup_manifest_key=$(openssl rand -base64 32)
 
 mkdir -p "$(dirname "$target")"
 umask 077
@@ -101,6 +137,7 @@ write_key SESSION_SECRET "$session_secret"
 write_key MFA_ENCRYPTION_KEY "$mfa_key"
 write_key OUTBOX_ENCRYPTION_KEY "$outbox_key"
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"
+write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"
 write_key INTERNAL_API_KEY "$internal_key"
 write_key COOKIE_DOMAIN .giromesa.com.br
 write_key GOOGLE_OAUTH_CLIENT_ID "$google_client_id"
@@ -114,6 +151,11 @@ write_key RESEND_FROM "$resend_from"
 write_key RESEND_REPLY_TO "$resend_reply_to"
 write_key PUBLIC_HUB_ACK_TIMEOUT_MS 5000
 write_key WEBHOOK_SIGNING_MASTER_KEY "$webhook_key"
+write_key COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION v1
+write_key COMMAND_FINGERPRINT_KEYS "{\"v1\":\"${command_fingerprint_key}\"}"
+write_key PRIVACY_EXPORT_ENCRYPTION_KEY "$privacy_export_key"
+write_key PUBLIC_TABLE_SESSION_SIGNING_KEY "$table_session_key"
+write_key GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64 "$backup_manifest_key"
 write_key DOSECLUB_PROVIDER_ENABLED false
 write_key ASAAS_API_URL https://api-sandbox.asaas.com/v3
 write_key ASAAS_API_KEY ""

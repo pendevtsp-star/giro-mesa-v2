@@ -17,7 +17,7 @@ O manifesto usa HMAC-SHA-256 com chave de ao menos 32 bytes fornecida exclusivam
 
 1. Confirme um diretório dedicado fora do host primário.
 2. Exporte a configuração já criptografada; nunca passe `.env` ao script.
-3. Execute `scripts/backup-production.ps1` com container, banco, usuário, artefato e migration exatos.
+3. Na VPS Linux, execute `scripts/backup-production.sh` com container, banco, usuário, artefato e migration exatos. O `.env` nunca é copiado: a chave HMAC entra somente pelo processo e é removida ao sair. O PowerShell `scripts/backup-production.ps1` permanece equivalente para ensaios Windows.
 4. Envie a pasta para armazenamento versionado com object-lock e replique em outra zona/conta.
 5. Monitore idade do manifesto, duração, upload e espaço. Idade acima de cinco minutos viola o RPO.
 
@@ -25,13 +25,21 @@ O manifesto usa HMAC-SHA-256 com chave de ao menos 32 bytes fornecida exclusivam
 
 1. Crie banco/container descartável, isolado e diferente da origem.
 2. Prepare diretórios de destino vazios para objetos e configuração e um arquivo SQL de smoke funcional, versionado junto da release.
-3. Execute `scripts/restore-drill.ps1` com o artefato esperado e `-SmokeSqlFile`; o script registra o SHA-256 desse smoke na evidência.
+3. Na VPS Linux, execute `scripts/restore-drill.sh` com o artefato esperado e `--smoke-sql-file`; o script registra o SHA-256 desse smoke na evidência. O PowerShell `scripts/restore-drill.ps1` permanece equivalente para ensaios Windows.
 4. O script valida HMAC, hashes, caminhos e destinos vazios antes de tocar no banco; depois restaura banco, objetos e configuração criptografada.
 5. O smoke funcional roda por último, com `ON_ERROR_STOP`; ele deve validar migrations, RLS negativo e invariantes de ledger aplicáveis à release.
 6. Confirme a leitura dos objetos e que a configuração restaurada continua criptografada.
 7. Registre `restore-evidence.json`, duração, artefato, migration, hashes e aprovadores; destrua o ambiente descartável.
 
 Falha de assinatura/hash, versão divergente, RTO acima de 30 minutos ou teste funcional incompleto invalida o ensaio. Não repare o backup durante uma restauração real; escolha uma geração íntegra anterior e registre a perda efetiva.
+
+O teste Docker Linux é opt-in para não iniciar containers por acidente: `DISASTER_RECOVERY_DOCKER_TEST=1 node --test scripts/backup-restore-linux.integration.test.mjs`. Ele deve passar na release antes da promoção. O fluxo usa outro container PostgreSQL e recusa restaurar sobre a origem.
+
+## Pré-deploy e rollback da aplicação
+
+`deploy/vps/deploy-pilot.sh` executa `ensure-runtime-env.sh`, valida ferramentas, deriva o SHA imutável e a última migration do journal e conclui `backup-production.sh` antes de iniciar qualquer migration. Falta de chave HMAC, grants administrativos revisados ou manifesto aborta o deploy. Objetos e configuração já criptografada podem ser incluídos por `GIROMESA_OBJECT_DIRECTORY` e `GIROMESA_ENCRYPTED_CONFIG_ARCHIVE`; nenhum snapshot novo do `.env` em claro é permitido.
+
+`deploy/vps/rollback-app.sh` troca somente a release da aplicação por SHA completo já instalado. Ele exige que operador declare migrations atual e alvo iguais, registra `rollback-app.json`, executa smoke e nunca chama restauração do banco. Schema divergente bloqueia esse rollback e exige plano de recuperação específico revisado.
 
 ## Promoção e incidente
 

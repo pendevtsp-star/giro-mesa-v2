@@ -16,6 +16,8 @@ API e worker inicializam o NodeSDK antes de importar a aplicação e registram p
 
 O arquivo `otel-collector.yaml` encaminha OTLP para um endpoint configurado no ambiente. Sem endpoint válido, a observabilidade externa permanece deliberadamente não configurada; a aplicação não inventa um backend.
 
+Para diagnóstico local ou durante o piloto, `deploy/vps/compose.observability.yaml` oferece um Collector fixado por digest que usa somente o exporter `debug`. Esse overlay não possui porta pública nem armazenamento durável e, portanto, não atende retenção, alertas ou auditoria de produção. Um backend externo aprovado continua obrigatório para observabilidade operacional.
+
 Arquivos:
 
 - `cardinality-budgets.json`: limites aprovados por dimensão.

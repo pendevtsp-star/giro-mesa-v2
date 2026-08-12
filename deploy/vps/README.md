@@ -14,11 +14,17 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, portas locais `3110`, `3111`, `3
 
 1. Publicar as imagens `pilot` pelo workflow `Publish pilot images`.
 2. Criar uma release em `/srv/apps/giromesa-v2/releases/<sha>` e apontar o link `current` para ela.
-3. Executar `bootstrap-env.sh` uma única vez. Ele reaproveita Google e Resend, cria segredos novos para o V2 e não imprime valores.
+3. Executar `bootstrap-env.sh` uma única vez com `PLATFORM_ADMIN_GRANTS_OVERRIDE` revisado. Ele reaproveita Google e Resend, cria segredos novos para o V2 e não imprime valores.
 4. Executar `ensure-cloudflare-dns.sh`.
 5. Executar `deploy-pilot.sh`.
 6. Executar `provision-ingress.sh`.
 7. Validar os quatro endpoints públicos e o callback Google exato.
+
+Ambientes já existentes devem executar `ensure-runtime-env.sh` antes do deploy. O script preserva valores presentes, adiciona atomicamente apenas chaves ausentes e bloqueia `PLATFORM_ADMIN_GRANTS` ausente ou inválido em vez de inventar privilégios. Execute-o novamente para comprovar idempotência.
+
+O deploy chama o backup Linux completo e assinado antes das migrations. Para incluir objetos ou configuração já criptografada, configure `GIROMESA_OBJECT_DIRECTORY` e `GIROMESA_ENCRYPTED_CONFIG_ARCHIVE`; nunca aponte o segundo para `.env`. O overlay `compose.observability.yaml` usa apenas saída debug sem retenção e não substitui um backend durável.
+
+Rollback de aplicação usa `rollback-app.sh` com SHA completo e migrations atual/alvo explicitamente iguais. Ele não restaura banco. Se o schema divergir, pare e siga o runbook de recuperação de desastre.
 
 ## Domínios definitivos
 
