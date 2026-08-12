@@ -66,7 +66,28 @@ describe("DoseClub reconciliation detector", () => {
       new Date("2026-08-11T01:00:00.000Z"),
     );
 
-    assert.deepEqual(findings.map((finding) => finding.kind), ["state_version_gap"]);
+    assert.deepEqual(
+      findings.map((finding) => finding.kind),
+      ["state_version_gap"],
+    );
     assert.equal(findings[0]?.evidence.latestOperationVersion, null);
+  });
+
+  it("counts one finding when several clubs reference the same missing product", () => {
+    const states = ["club-a", "club-b"].map((externalClubId) => ({
+      externalClubId,
+      eligibleProductIds: ["shared-missing-product"],
+      contractVersion: "v1",
+      version: 1,
+      updatedAt: new Date("2026-08-11T00:00:00.000Z"),
+      latestOperationVersion: 1,
+      latestReconcileAt: null,
+    }));
+
+    const findings = buildDoseClubFindings({ mappings: [], states });
+
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0]?.kind, "missing_mapping");
+    assert.equal(findings[0]?.entityId, "shared-missing-product");
   });
 });

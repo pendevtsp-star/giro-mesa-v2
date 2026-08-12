@@ -164,7 +164,9 @@ export function buildDoseClubFindings(
       );
   }
 
-  return findings.sort((left, right) => left.fingerprint.localeCompare(right.fingerprint));
+  return [...new Map(findings.map((item) => [item.fingerprint, item])).values()].sort(
+    (left, right) => left.fingerprint.localeCompare(right.fingerprint),
+  );
 }
 
 export class DoseClubReconciliationWorker {
