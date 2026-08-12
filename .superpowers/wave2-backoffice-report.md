@@ -38,7 +38,7 @@ Commits recuperáveis:
 ## Contratos e clientes
 
 - As 11 projeções são um `oneOf` discriminado por `resource`, com DTO próprio e `additionalProperties: false`.
-- Tenant, plano, entitlements, usuários, onboarding, billing, integrações e audit têm itens concretos. Leads, suporte e incidentes continuam `unavailable`, com lista obrigatoriamente vazia e sem sucesso sintético.
+- Tenant, plano, entitlements, usuários, onboarding, billing, integrações e audit têm itens concretos. A integração final da migration `0029_platform_incident_projection_actions` adiciona filas globais sanitizadas de leads/suporte e incidentes tenant-scoped acionáveis; texto livre, evidências, hashes e configuração sensível permanecem fora dos DTOs.
 - OpenAPI e cliente TypeScript foram regenerados sem `Record<string, never>[]` nas projeções.
 - O cliente C# foi regenerado por Kiota e compilado com .NET 10: 0 erros e 0 avisos.
 
@@ -84,7 +84,16 @@ Screenshots inspecionados:
 ## Limites e concerns
 
 - O login da aplicação precisa receber membership na role `giromesa_platform` durante provisioning operacional; a migration não presume o nome da role de login e não executa deploy.
-- Leads, suporte e incidentes dependem dos adapters reais das ondas correspondentes e permanecem explicitamente indisponíveis.
+- Leads e suporte são filas globais somente leitura porque o modelo atual não possui vínculo tenant confiável para mutação. Incidentes são tenant-scoped e só oferecem transições explicitamente permitidas pelo estado projetado, unidade e separação entre relator/aprovador.
 - QA visual usa fixture HTTP somente para exercitar a UI; autorização, RLS, concorrência e exactly-once foram verificados separadamente em PostgreSQL real descartável.
 - Os avisos Kiota sobre formatos email/URI e error types do Sync são preexistentes e fora do contrato platform.
 - Nenhum provider, sessão externa, push ou deploy foi executado.
+
+## Integração final das Tasks 33–34
+
+- Commits integrados no candidato final: `d4bdc4a`, `31a403f`, `c310984`, `4a2eb65` e `a34b5aa`.
+- PostgreSQL 16 e 17 passaram em fresh e upgrade até `0029`, com RLS/FORCE, grants por coluna, dual-control e função `SECURITY DEFINER` restrita.
+- O teste HTTP PostgreSQL percorreu 506 incidentes em seis páginas keyset, sem duplicação, omissão ou quebra do isolamento tenant; 8/8 cenários passaram no PostgreSQL 17.
+- Leads e suporte usam paginação keyset global; incidentes usam paginação keyset por organização/unidade e a interface oferece carregamento incremental para manter incidentes antigos acionáveis.
+- A autorização antecipada da interface falha fechada se o incidente não estiver projetado, bloqueia autoaprovação e deriva `expectedState` do estado real (`approved` ou `rejected`).
+- Gates finais deste bloco: API 169 pass/69 skips condicionais, Ops 109/109, Playwright desktop+mobile 10/10, typecheck, build, Axe, Biome nos arquivos funcionais alterados e `git diff --check` verdes.
