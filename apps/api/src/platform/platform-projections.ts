@@ -145,11 +145,11 @@ function encodeCursor(offset: number) {
 const platformKeysetIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type PlatformKeysetRow = { id: string; createdAt: Date };
+type PlatformKeysetRow = { id: string };
 
-function encodePlatformKeysetCursor(row: PlatformKeysetRow) {
+function encodePlatformKeysetCursor(row: PlatformKeysetRow, timestamp: Date) {
   return Buffer.from(
-    JSON.stringify({ createdAt: row.createdAt.toISOString(), id: row.id }),
+    JSON.stringify({ createdAt: timestamp.toISOString(), id: row.id }),
     "utf8",
   ).toString("base64url");
 }
@@ -181,13 +181,15 @@ export function finalizePlatformKeysetPage<T extends PlatformKeysetRow, R>(
   rows: T[],
   limit: number,
   project: (row: T) => R,
+  timestamp: (row: T) => Date,
 ) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("INVALID_LIMIT");
   const visible = rows.slice(0, limit);
   const last = visible.at(-1);
   return {
     items: visible.map(project),
-    nextCursor: rows.length > limit && last ? encodePlatformKeysetCursor(last) : null,
+    nextCursor:
+      rows.length > limit && last ? encodePlatformKeysetCursor(last, timestamp(last)) : null,
   };
 }
 

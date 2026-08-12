@@ -149,10 +149,58 @@ export class PlatformService {
     if (resource === "leads" || resource === "support")
       return unavailablePlatformProjection(resource, "PLATFORM_RESOURCE_GLOBAL_ONLY");
 
+    if (resource === "incidents") {
+      const pageRequest = parsePlatformKeysetPage(limit, options.cursor);
+      const scope = options.unitId
+        ? and(
+            eq(managementIncidents.organizationId, organizationId),
+            eq(managementIncidents.unitId, options.unitId),
+          )
+        : eq(managementIncidents.organizationId, organizationId);
+      const rows = await this.database.db
+        .select({
+          id: managementIncidents.id,
+          organizationId: managementIncidents.organizationId,
+          unitId: managementIncidents.unitId,
+          incidentType: managementIncidents.incidentType,
+          status: managementIncidents.status,
+          neutralSummary: managementIncidents.neutralSummary,
+          amountCents: managementIncidents.amountCents,
+          reporterIdentityId: managementIncidents.reporterIdentityId,
+          approverIdentityId: managementIncidents.approverIdentityId,
+          occurredAt: managementIncidents.occurredAt,
+          updatedAt: managementIncidents.updatedAt,
+        })
+        .from(managementIncidents)
+        .where(
+          pageRequest.cursor
+            ? and(
+                scope,
+                or(
+                  lt(managementIncidents.occurredAt, pageRequest.cursor.createdAt),
+                  and(
+                    eq(managementIncidents.occurredAt, pageRequest.cursor.createdAt),
+                    lt(managementIncidents.id, pageRequest.cursor.id),
+                  ),
+                ),
+              )
+            : scope,
+        )
+        .orderBy(desc(managementIncidents.occurredAt), desc(managementIncidents.id))
+        .limit(pageRequest.limit + 1);
+      const page = finalizePlatformKeysetPage(
+        rows,
+        pageRequest.limit,
+        sanitizePlatformIncident,
+        (row) => row.occurredAt,
+      );
+      return { resource, availability: "available", ...page };
+    }
+
     const items = await this.projectAvailableResource(
       organizationId,
       options.unitId,
-      resource,
+      resource as Exclude<PlatformResource, "leads" | "support" | "incidents">,
       access,
     );
     const page = paginatePlatformItems(items, limit, options.cursor);
@@ -197,8 +245,11 @@ export class PlatformService {
         )
         .orderBy(desc(trialApplications.createdAt), desc(trialApplications.id))
         .limit(pageRequest.limit + 1);
-      const page = finalizePlatformKeysetPage(rows, pageRequest.limit, (row) =>
-        sanitizePlatformLead(row, canReadPii),
+      const page = finalizePlatformKeysetPage(
+        rows,
+        pageRequest.limit,
+        (row) => sanitizePlatformLead(row, canReadPii),
+        (row) => row.createdAt,
       );
       return { resource, availability: "available", ...page };
     }
@@ -225,8 +276,11 @@ export class PlatformService {
       )
       .orderBy(desc(contactRequests.createdAt), desc(contactRequests.id))
       .limit(pageRequest.limit + 1);
-    const page = finalizePlatformKeysetPage(rows, pageRequest.limit, (row) =>
-      sanitizePlatformSupportRequest(row, canReadPii),
+    const page = finalizePlatformKeysetPage(
+      rows,
+      pageRequest.limit,
+      (row) => sanitizePlatformSupportRequest(row, canReadPii),
+      (row) => row.createdAt,
     );
     return { resource, availability: "available", ...page };
   }
@@ -537,7 +591,7 @@ export class PlatformService {
   private async projectAvailableResource(
     organizationId: string,
     unitId: string | undefined,
-    resource: Exclude<PlatformResource, "leads" | "support">,
+    resource: Exclude<PlatformResource, "leads" | "support" | "incidents">,
     access: PlatformAccess,
   ): Promise<Record<string, unknown>[]> {
     if (resource === "tenant") {
@@ -678,34 +732,6 @@ export class PlatformService {
             : eq(growthIntegrations.organizationId, organizationId),
         );
       return rows.map(sanitizePlatformIntegration);
-    }
-    if (resource === "incidents") {
-      const rows = await this.database.db
-        .select({
-          id: managementIncidents.id,
-          organizationId: managementIncidents.organizationId,
-          unitId: managementIncidents.unitId,
-          incidentType: managementIncidents.incidentType,
-          status: managementIncidents.status,
-          neutralSummary: managementIncidents.neutralSummary,
-          amountCents: managementIncidents.amountCents,
-          reporterIdentityId: managementIncidents.reporterIdentityId,
-          approverIdentityId: managementIncidents.approverIdentityId,
-          occurredAt: managementIncidents.occurredAt,
-          updatedAt: managementIncidents.updatedAt,
-        })
-        .from(managementIncidents)
-        .where(
-          unitId
-            ? and(
-                eq(managementIncidents.organizationId, organizationId),
-                eq(managementIncidents.unitId, unitId),
-              )
-            : eq(managementIncidents.organizationId, organizationId),
-        )
-        .orderBy(desc(managementIncidents.occurredAt), desc(managementIncidents.id))
-        .limit(500);
-      return rows.map(sanitizePlatformIncident);
     }
     const rows = await this.database.db
       .select({

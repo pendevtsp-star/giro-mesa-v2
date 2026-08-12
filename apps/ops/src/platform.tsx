@@ -734,15 +734,17 @@ export function RealPlatformPage({
       resource: PlatformResource,
       selectedUnitId?: string,
       expectedScope?: number,
+      cursor?: string,
     ) => {
       const scope = expectedScope ?? tenantScopeEpoch.current;
       if (scope !== tenantScopeEpoch.current) return Promise.resolve();
       const request = projectionRequests.current.begin();
-      setProjection({ status: "loading" });
+      if (!cursor) setProjection({ status: "loading" });
       return api.platform
         .projection(organizationId, resource, {
           unitId: selectedUnitId || undefined,
           limit: 50,
+          cursor,
           signal: request.signal,
         })
         .then(parsePlatformProjection)
@@ -751,7 +753,14 @@ export function RealPlatformPage({
             scope === tenantScopeEpoch.current &&
             projectionRequests.current.isCurrent(request.epoch)
           )
-            setProjection({ status: "ready", data });
+            setProjection((previous) => {
+              if (cursor && previous.status === "ready" && previous.data.resource === data.resource)
+                return {
+                  status: "ready",
+                  data: { ...data, items: [...previous.data.items, ...data.items] },
+                };
+              return { status: "ready", data };
+            });
         })
         .catch((error: unknown) => {
           if (
@@ -1202,66 +1211,85 @@ export function RealPlatformPage({
                 </div>
               )}
               {projection.status === "ready" && projection.data.availability === "available" && (
-                <div className="platform-records">
-                  {projection.data.items.length === 0 ? (
-                    <div className="platform-empty">
-                      <strong>Sem registros neste contexto</strong>
-                      <span>A fonte respondeu sem itens.</span>
-                    </div>
-                  ) : (
-                    projection.data.items.map((row, index) => (
-                      <article
-                        className="platform-record"
-                        key={String(row.id ?? row.membershipId ?? index)}
-                      >
-                        {safeColumns(selectedResource, row).map(([key, value]) => (
-                          <div key={key}>
-                            <span>{columnLabels[key] ?? key}</span>
-                            <strong>{cellValue(value)}</strong>
-                          </div>
-                        ))}
-                        {selectedResource === "incidents" &&
-                          Array.isArray(row.availableActions) && (
-                            <div className="platform-action-row__buttons">
-                              {row.availableActions.flatMap((candidate) => {
-                                if (typeof candidate !== "string") return [];
-                                const incidentAction = candidate as PlatformActionName;
-                                const context = projectedIncidentActionContext(
-                                  incidentAction,
-                                  String(row.id ?? ""),
-                                  projection.data,
-                                  actorIdentityId,
-                                );
-                                const label = incidentPreparationLabels[incidentAction];
-                                if (!context || !label) return [];
-                                return [
-                                  <Button
-                                    key={incidentAction}
-                                    onClick={() => {
-                                      setAction(incidentAction);
-                                      setTargetId(String(row.id));
-                                      setUnitId(context.unitId);
-                                      setConfirmed(false);
-                                      document
-                                        .getElementById("platform-action-title")
-                                        ?.scrollIntoView({
-                                          behavior: "smooth",
-                                          block: "start",
-                                        });
-                                    }}
-                                    size="sm"
-                                    variant="secondary"
-                                  >
-                                    {label}
-                                  </Button>,
-                                ];
-                              })}
+                <>
+                  <div className="platform-records">
+                    {projection.data.items.length === 0 ? (
+                      <div className="platform-empty">
+                        <strong>Sem registros neste contexto</strong>
+                        <span>A fonte respondeu sem itens.</span>
+                      </div>
+                    ) : (
+                      projection.data.items.map((row, index) => (
+                        <article
+                          className="platform-record"
+                          key={String(row.id ?? row.membershipId ?? index)}
+                        >
+                          {safeColumns(selectedResource, row).map(([key, value]) => (
+                            <div key={key}>
+                              <span>{columnLabels[key] ?? key}</span>
+                              <strong>{cellValue(value)}</strong>
                             </div>
-                          )}
-                      </article>
-                    ))
+                          ))}
+                          {selectedResource === "incidents" &&
+                            Array.isArray(row.availableActions) && (
+                              <div className="platform-action-row__buttons">
+                                {row.availableActions.flatMap((candidate) => {
+                                  if (typeof candidate !== "string") return [];
+                                  const incidentAction = candidate as PlatformActionName;
+                                  const context = projectedIncidentActionContext(
+                                    incidentAction,
+                                    String(row.id ?? ""),
+                                    projection.data,
+                                    actorIdentityId,
+                                  );
+                                  const label = incidentPreparationLabels[incidentAction];
+                                  if (!context || !label) return [];
+                                  return [
+                                    <Button
+                                      key={incidentAction}
+                                      onClick={() => {
+                                        setAction(incidentAction);
+                                        setTargetId(String(row.id));
+                                        setUnitId(context.unitId);
+                                        setConfirmed(false);
+                                        document
+                                          .getElementById("platform-action-title")
+                                          ?.scrollIntoView({
+                                            behavior: "smooth",
+                                            block: "start",
+                                          });
+                                      }}
+                                      size="sm"
+                                      variant="secondary"
+                                    >
+                                      {label}
+                                    </Button>,
+                                  ];
+                                })}
+                              </div>
+                            )}
+                        </article>
+                      ))
+                    )}
+                  </div>
+                  {selectedResource === "incidents" && projection.data.nextCursor && (
+                    <Button
+                      onClick={() =>
+                        void loadProjection(
+                          activeContext.organization.id,
+                          selectedResource,
+                          unitId,
+                          undefined,
+                          projection.data.nextCursor ?? undefined,
+                        )
+                      }
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Carregar mais incidentes
+                    </Button>
                   )}
-                </div>
+                </>
               )}
             </section>
 

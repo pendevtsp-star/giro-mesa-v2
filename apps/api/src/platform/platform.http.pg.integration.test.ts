@@ -343,6 +343,60 @@ describe("platform HTTP database boundary", () => {
     assert.equal(eventCount?.count, 1);
   });
 
+  it("pages every incident beyond the legacy 500-row boundary without duplicates", async (context) => {
+    if (!app || !ownerConnection) return context.skip("PLATFORM_HTTP_DATABASE_URL not configured");
+    const generatedKeyPrefix = `platform-pagination-${suffix}`;
+    const owner = ownerConnection.client;
+    await owner.unsafe(
+      `insert into management_incidents (
+        id, organization_id, unit_id, incident_type, neutral_summary, amount_cents,
+        idempotency_key, request_hash, reporter_identity_id, occurred_at
+      )
+      select
+        gen_random_uuid(), $2::uuid, $3::uuid, 'inventory_variance',
+        'Incidente paginado para teste.', series,
+        $1 || '-' || series::text, md5($1 || '-hash-' || series::text), $4::uuid,
+        timestamptz '2026-08-12 12:00:00+00' - make_interval(secs => series)
+      from generate_series(1, 505) series`,
+      [generatedKeyPrefix, organizationId, unitId, reporterIdentityId],
+    );
+
+    try {
+      const ids = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const query = new URLSearchParams({ unitId, limit: "100" });
+        if (cursor) query.set("cursor", cursor);
+        const response: {
+          statusCode: number;
+          body: string;
+          json(): { items: { id: string }[]; nextCursor: string | null };
+        } = await app.inject({
+          method: "GET",
+          url: `/api/v1/platform/tenants/${organizationId}/resources/incidents?${query}`,
+          headers: { authorization: `Bearer ${tokenA}` },
+        });
+        assert.equal(response.statusCode, 200, response.body);
+        const page = response.json();
+        for (const item of page.items) {
+          assert.equal(ids.has(item.id), false, `duplicate incident ${item.id}`);
+          ids.add(item.id);
+        }
+        cursor = page.nextCursor;
+      } while (cursor);
+
+      assert.equal(ids.size, 506);
+      assert.equal(ids.has(incidentId), true);
+    } finally {
+      await owner`set session_replication_role = replica`;
+      try {
+        await owner`delete from management_incidents where idempotency_key like ${`${generatedKeyPrefix}-%`}`;
+      } finally {
+        await owner`set session_replication_role = origin`;
+      }
+    }
+  });
+
   it("keeps incident table mutations and unsafe columns unavailable to platform", async (context) => {
     if (!ownerConnection) return context.skip("PLATFORM_HTTP_DATABASE_URL not configured");
     const [privileges] = await ownerConnection.client<

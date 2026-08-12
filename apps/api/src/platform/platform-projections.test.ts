@@ -63,7 +63,12 @@ describe("platform projections", () => {
         createdAt: new Date("2026-08-11T12:00:00.000Z"),
       },
     ];
-    const first = finalizePlatformKeysetPage(rows, 2, (row) => row.id);
+    const first = finalizePlatformKeysetPage(
+      rows,
+      2,
+      (row) => row.id,
+      (row) => row.createdAt,
+    );
 
     assert.deepEqual(first.items, [rows[0]?.id, rows[1]?.id]);
     assert.ok(first.nextCursor);

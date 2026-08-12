@@ -32,6 +32,7 @@ async function installPlatformFixture(
     withExternalProposal?: boolean;
     projectionDelays?: Partial<Record<string, number>>;
     incidentStatus?: "under_review" | "approved" | "rejected";
+    pagedIncidents?: boolean;
     expectedProposal?: {
       action: "tenant.suspend" | "incident.close";
       targetId: string;
@@ -184,6 +185,7 @@ async function installPlatformFixture(
         return;
       }
       if (resource === "incidents") {
+        const cursor = url.searchParams.get("cursor");
         const incidentStatus = options.incidentStatus ?? "under_review";
         const availableActions =
           incidentStatus === "under_review"
@@ -193,23 +195,26 @@ async function installPlatformFixture(
           json: {
             resource,
             availability: "available",
-            items: [
-              {
-                id: "f1111111-1111-4111-8111-111111111113",
-                organizationId,
-                unitId,
-                incidentType: "inventory_variance",
-                status: incidentStatus,
-                neutralSummary: "Diferença neutra confirmada na contagem.",
-                amountCents: 1290,
-                reporterIdentityId: otherIdentityId,
-                approverIdentityId: null,
-                occurredAt: now,
-                updatedAt: now,
-                availableActions,
-              },
-            ],
-            nextCursor: null,
+            items:
+              options.pagedIncidents && !cursor
+                ? []
+                : [
+                    {
+                      id: "f1111111-1111-4111-8111-111111111113",
+                      organizationId,
+                      unitId,
+                      incidentType: "inventory_variance",
+                      status: incidentStatus,
+                      neutralSummary: "Diferença neutra confirmada na contagem.",
+                      amountCents: 1290,
+                      reporterIdentityId: otherIdentityId,
+                      approverIdentityId: null,
+                      occurredAt: now,
+                      updatedAt: now,
+                      availableActions,
+                    },
+                  ],
+            nextCursor: options.pagedIncidents && !cursor ? "incident-page-2" : null,
           },
         });
         return;
@@ -372,7 +377,7 @@ test("mantém contexto permanente, indisponibilidade verdadeira e leitura acess�
 test("abre filas globais sem tenant e prepara ação pela projeção do incidente", async ({
   page,
 }) => {
-  await installPlatformFixture(page, { privileged: true });
+  await installPlatformFixture(page, { privileged: true, pagedIncidents: true });
   await page.goto("http://127.0.0.1:3213/#platform");
 
   await expect(page.getByRole("heading", { name: "Filas globais sanitizadas" })).toBeVisible();
@@ -383,6 +388,7 @@ test("abre filas globais sem tenant e prepara ação pela projeção do incident
 
   await openTenant(page);
   await page.getByRole("tab", { name: "Incidentes" }).click();
+  await page.getByRole("button", { name: "Carregar mais incidentes" }).click();
   const incident = page.getByRole("article").filter({
     hasText: "Diferença neutra confirmada na contagem.",
   });
