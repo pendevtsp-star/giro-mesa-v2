@@ -143,6 +143,8 @@ test("exibe estado real, passa Axe e confirma uma nova execução somente após 
   await installGrowthFixture(page);
   await page.goto("http://127.0.0.1:3213");
   await page.getByRole("button", { name: /abrir operação/i }).click();
+  const menuButton = page.getByRole("button", { name: "Abrir menu", exact: true });
+  if (await menuButton.isVisible()) await menuButton.click();
   await page.getByRole("link", { name: "Clientes e campanhas" }).click();
 
   const panel = page.getByRole("region", { name: "DoseClub e estoque físico" });
