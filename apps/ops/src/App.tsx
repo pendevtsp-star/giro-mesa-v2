@@ -4,7 +4,6 @@ import {
   Card,
   EmptyState,
   Icon,
-  type IconName,
   Progress,
   VisuallyHidden,
 } from "@giromesa/ui";
@@ -79,6 +78,7 @@ import { RealPlatformPage } from "./platform";
 import { clearPwaRuntimeState, withPwaMutation } from "./pwa-update";
 import { type RealtimeStatus, subscribeScopeRealtime } from "./realtime";
 import { RemunerationPage } from "./remuneration";
+import { rolePresentation } from "./role-presentation";
 import { parseRoute, routeHref } from "./router";
 import {
   calculateCartTotal,
@@ -88,6 +88,7 @@ import {
   nextTicketStatus,
 } from "./rules";
 import { SalonMap, type SalonMapTable } from "./salon-map";
+import { UiIcon, type UiIconName } from "./ui-icon";
 
 type Session = {
   identityId: string;
@@ -122,23 +123,23 @@ const browserRuntime: DeviceContext = {
 
 const SEAT_MARKERS = ["one", "two", "three", "four", "five", "six"] as const;
 
-const navItems: { route: RouteId; label: string; icon: IconName }[] = [
-  { route: "dashboard", label: "Visão geral", icon: "home" },
-  { route: "onboarding", label: "Configurar operação", icon: "clipboard" },
-  { route: "salon", label: "Salão", icon: "dish" },
+const navItems: { route: RouteId; label: string; icon: UiIconName }[] = [
+  { route: "dashboard", label: "Visão geral", icon: "dashboard" },
+  { route: "onboarding", label: "Configurar operação", icon: "list" },
+  { route: "salon", label: "Salão", icon: "salon" },
   { route: "counter", label: "Balcão", icon: "counter" },
-  { route: "catalog", label: "Cardápio", icon: "menu" },
-  { route: "kds", label: "Produção", icon: "kitchen" },
-  { route: "cash", label: "Caixa", icon: "wallet" },
-  { route: "inventory", label: "Estoque", icon: "box" },
-  { route: "purchases", label: "Compras", icon: "package" },
-  { route: "finance", label: "Financeiro", icon: "trend-up" },
-  { route: "remuneration", label: "Remuneração", icon: "wallet" },
-  { route: "people", label: "Pessoas", icon: "users" },
-  { route: "delivery", label: "Delivery", icon: "truck" },
-  { route: "reservations", label: "Reservas e espera", icon: "calendar" },
-  { route: "crm", label: "Clientes e campanhas", icon: "heart" },
-  { route: "multiunit", label: "Multiunidade", icon: "building" },
+  { route: "catalog", label: "Cardápio", icon: "catalog" },
+  { route: "kds", label: "Produção", icon: "kds" },
+  { route: "cash", label: "Caixa", icon: "cash" },
+  { route: "inventory", label: "Estoque", icon: "inventory" },
+  { route: "purchases", label: "Compras", icon: "purchases" },
+  { route: "finance", label: "Financeiro", icon: "finance" },
+  { route: "remuneration", label: "Remuneração", icon: "cash" },
+  { route: "people", label: "Pessoas", icon: "people" },
+  { route: "delivery", label: "Delivery", icon: "delivery" },
+  { route: "reservations", label: "Reservas e espera", icon: "reservations" },
+  { route: "crm", label: "Clientes e campanhas", icon: "crm" },
+  { route: "multiunit", label: "Multiunidade", icon: "multiunit" },
   { route: "platform", label: "Plataforma", icon: "platform" },
   { route: "alerts", label: "Alertas", icon: "alert" },
 ];
@@ -313,7 +314,7 @@ function Brand() {
   return (
     <div className="brand" aria-label="GiroMesa" role="img">
       <span aria-hidden="true" className="brand__mark">
-        G
+        <UiIcon name="brand" />
       </span>
       <span>
         <strong>Giro</strong>Mesa
@@ -336,7 +337,9 @@ function BootstrapError({ message, onRetry }: { message: string; onRetry: () => 
   return (
     <main className="fatal-state">
       <Card>
-        <Icon className="action-icon action-icon--danger" name="alert" />
+        <span aria-hidden="true" className="action-icon action-icon--danger">
+          <UiIcon name="alert" />
+        </span>
         <h1>Não foi possível iniciar o GiroMesa</h1>
         <p>{message}</p>
         <Button onClick={onRetry}>Tentar novamente</Button>
@@ -1091,10 +1094,11 @@ function OperationalApp({
 
   const visibleNav = navItems.filter((item) => canAccess(session.profile, item.route));
   const page = pageMeta[route];
+  const presentation = rolePresentation(session.profile);
   const visibleAlertCount = session.demo ? 3 : reconciliationCount;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-profile={session.profile.id} data-route={route}>
       <a className="skip-link" href="#main-content">
         Ir para o conteúdo
       </a>
@@ -1107,7 +1111,7 @@ function OperationalApp({
             onClick={() => setNavOpen(false)}
             type="button"
           >
-            <Icon name="close" />
+            <UiIcon name="close" />
           </button>
         </div>
         <div className="unit-chip">
@@ -1127,7 +1131,7 @@ function OperationalApp({
               onClick={() => setNavOpen(false)}
             >
               <span aria-hidden="true" className="nav-icon">
-                <Icon className="nav-icon__svg" name={item.icon} />
+                <UiIcon name={item.icon} />
               </span>
               {item.label}
               {item.route === "alerts" && visibleAlertCount > 0 && (
@@ -1138,7 +1142,10 @@ function OperationalApp({
         </nav>
         <div className="sidebar__footer">
           <button className="support-link" onClick={() => setHelpOpen(true)} type="button">
-            <Icon name="help" /> Central de ajuda
+            <span aria-hidden="true">
+              <UiIcon name="help" />
+            </span>{" "}
+            Central de ajuda
           </button>
           <small>GiroMesa Operação · {session.demo ? "demo local" : "ambiente seguro"}</small>
         </div>
@@ -1161,7 +1168,7 @@ function OperationalApp({
             onClick={() => setNavOpen(true)}
             type="button"
           >
-            <Icon name="menu" />
+            <UiIcon name="menu" />
           </button>
           <div className="topbar__title">
             <span>{organization?.name}</span>
@@ -1199,7 +1206,7 @@ function OperationalApp({
               {session.demo && syncState === "syncing" && "Sincronizando…"}
             </button>
             <a aria-label="Ver alertas" className="alert-button" href={routeHref("alerts")}>
-              <Icon name="alert" />
+              <UiIcon name="alert" />
               {visibleAlertCount > 0 && <span>{visibleAlertCount}</span>}
             </a>
             <div className="profile-menu">
@@ -1215,7 +1222,9 @@ function OperationalApp({
                   <strong>{session.profile.name}</strong>
                   <small>{session.profile.role}</small>
                 </span>
-                <Icon name="chevron-down" />
+                <span aria-hidden="true">
+                  <UiIcon name="chevron-down" />
+                </span>
               </button>
               {profileMenu && (
                 <div className="profile-popover">
@@ -1275,13 +1284,16 @@ function OperationalApp({
           <div className="runtime-error" role="alert">
             <strong>Atenção:</strong> {runtimeError}
             <button aria-label="Fechar aviso" onClick={() => setRuntimeError(null)} type="button">
-              <Icon name="close" />
+              <UiIcon name="close" />
             </button>
           </div>
         )}
 
-        <main className="main-content" id="main-content">
+        <main className="main-content" data-density={presentation.density} id="main-content">
           <PageHeading title={page.title} description={page.description} />
+          {(route === "dashboard" || (route === "kds" && session.profile.id === "kitchen")) && (
+            <RoleContext currentRoute={route} profile={session.profile} />
+          )}
           <PageContent
             dispatchPilot={dispatchPilot}
             loadPilot={loadPilot}
@@ -1397,6 +1409,45 @@ function PageHeading({ title, description }: { title: string; description: strin
         <p>{description}</p>
       </div>
     </div>
+  );
+}
+
+function RoleContext({ currentRoute, profile }: { currentRoute: RouteId; profile: Profile }) {
+  const presentation = rolePresentation(profile);
+  return (
+    <section
+      aria-label="Contexto do perfil"
+      className={`role-context role-context--${presentation.density}`}
+    >
+      <div className="role-context__identity">
+        <span aria-hidden="true" className="role-context__icon">
+          <UiIcon
+            name={
+              presentation.density === "production"
+                ? "kds"
+                : presentation.density === "transaction"
+                  ? "cash"
+                  : presentation.density === "service"
+                    ? "salon"
+                    : "dashboard"
+            }
+          />
+        </span>
+        <div>
+          <p>{presentation.label}</p>
+          <h2>{presentation.title}</h2>
+        </div>
+      </div>
+      <p className="role-context__summary">{presentation.summary}</p>
+      {currentRoute === presentation.primaryRoute ? (
+        <span className="role-context__current">Área principal</span>
+      ) : (
+        <a className="role-context__action" href={routeHref(presentation.primaryRoute)}>
+          {presentation.primaryAction}
+          <UiIcon name="arrow-right" />
+        </a>
+      )}
+    </section>
   );
 }
 
@@ -1589,7 +1640,7 @@ function DemoFeaturePage({ title }: { title: string }) {
 function UnavailableRealPage({ title }: { title: string }) {
   return (
     <EmptyState
-      icon={<Icon name="box" />}
+      icon={<UiIcon name="info" />}
       title={`${title} sem fonte autenticada`}
       description="Esta V2 não exibe fixtures em sessões reais. A tela será ativada quando houver um endpoint autenticado correspondente."
     />
@@ -1736,7 +1787,7 @@ function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => void })
             onClick={onClose}
             type="button"
           >
-            <Icon name="close" />
+            <UiIcon name="close" />
           </button>
         </div>
         <p className="muted">
@@ -1773,6 +1824,11 @@ function Dashboard({
   const lateTicket = tickets.find(
     (ticket) => ticket.elapsedMinutes >= 20 && ticket.status !== "ready",
   );
+  const presentation = rolePresentation(profile);
+  const canHandleTable = Boolean(urgentTable && canAccess(profile, "salon"));
+  const canHandleTicket = Boolean(lateTicket && canAccess(profile, "kds"));
+  const priorityCount = Number(canHandleTable) + Number(canHandleTicket);
+  const showsSalesGoal = profile.id === "owner" || profile.id === "manager";
   return (
     <div className="dashboard-grid">
       <div className="metrics-grid">
@@ -1789,47 +1845,56 @@ function Dashboard({
       <Card className="attention-card">
         <div className="card-header">
           <div>
-            <p className="eyebrow">Prioridades</p>
-            <h2>Faça agora</h2>
+            <p className="eyebrow">{priorityCount > 0 ? "Prioridades" : "Fluxo principal"}</p>
+            <h2>{priorityCount > 0 ? "Faça agora" : "Próximo passo"}</h2>
           </div>
-          <Badge tone="danger">3 pendências</Badge>
+          {priorityCount > 0 && (
+            <Badge tone="danger">
+              {priorityCount} {priorityCount === 1 ? "pendência" : "pendências"}
+            </Badge>
+          )}
         </div>
         <div className="action-list">
-          {urgentTable && (
+          {urgentTable && canHandleTable && (
             <a className="action-link" href={routeHref("salon")}>
-              <Icon className="action-icon action-icon--danger" name="alert" />
+              <span className="action-icon action-icon--danger">
+                <UiIcon name="alert" />
+              </span>
               <span>
                 <strong>Atender chamado da {urgentTable.name}</strong>
                 <small>
                   Aberta há {urgentTable.openedMinutes} min · responsável {urgentTable.server}
                 </small>
               </span>
-              <Icon name="arrow-right" />
+              <UiIcon aria-hidden="true" name="arrow-right" />
             </a>
           )}
-          {lateTicket && (
+          {lateTicket && canHandleTicket && (
             <a className="action-link" href={routeHref("kds")}>
-              <Icon className="action-icon action-icon--warning" name="clock" />
+              <span className="action-icon action-icon--warning">
+                <UiIcon name="clock" />
+              </span>
               <span>
                 <strong>Produção acima do tempo</strong>
                 <small>
                   {lateTicket.reference} · {lateTicket.elapsedMinutes} minutos
                 </small>
               </span>
-              <Icon name="arrow-right" />
+              <UiIcon aria-hidden="true" name="arrow-right" />
             </a>
           )}
-          <a
-            className="action-link"
-            href={routeHref(canAccess(profile, "inventory") ? "inventory" : "alerts")}
-          >
-            <Icon className="action-icon" name="box" />
-            <span>
-              <strong>Repor três insumos críticos</strong>
-              <small>Um item está zerado e afeta o cardápio</small>
-            </span>
-            <Icon name="arrow-right" />
-          </a>
+          {priorityCount === 0 && (
+            <a className="action-link" href={routeHref(presentation.primaryRoute)}>
+              <span className="action-icon">
+                <UiIcon name="dashboard" />
+              </span>
+              <span>
+                <strong>{presentation.primaryAction}</strong>
+                <small>{presentation.summary}</small>
+              </span>
+              <UiIcon aria-hidden="true" name="arrow-right" />
+            </a>
+          )}
         </div>
       </Card>
 
@@ -1869,37 +1934,39 @@ function Dashboard({
         </div>
       </Card>
 
-      <Card className="shift-card">
-        <div className="card-header">
-          <div>
-            <p className="eyebrow">Meta do turno</p>
-            <h2>Vendas</h2>
+      {showsSalesGoal && (
+        <Card className="shift-card">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Meta do turno</p>
+              <h2>Vendas</h2>
+            </div>
+            <strong>R$ 8.742</strong>
           </div>
-          <strong>R$ 8.742</strong>
-        </div>
-        <Progress label="R$ 8.742 de R$ 12.000" value={73} />
-        <div className="hour-bars" aria-label="Vendas por horário" role="img">
-          {[
-            { time: "18h", height: 18 },
-            { time: "19h", height: 31 },
-            { time: "20h", height: 46 },
-            { time: "21h", height: 64 },
-            { time: "22h", height: 84 },
-            { time: "23h", height: 72 },
-            { time: "00h", height: 48 },
-            { time: "01h", height: 28 },
-          ].map((item) => (
-            <span key={item.time} style={{ height: `${item.height}%` }}>
-              <VisuallyHidden>{item.time}</VisuallyHidden>
-            </span>
-          ))}
-        </div>
-        <div className="hour-labels">
-          <span>18h</span>
-          <span>22h</span>
-          <span>01h</span>
-        </div>
-      </Card>
+          <Progress label="R$ 8.742 de R$ 12.000" value={73} />
+          <div className="hour-bars" aria-label="Vendas por horário" role="img">
+            {[
+              { time: "18h", height: 18 },
+              { time: "19h", height: 31 },
+              { time: "20h", height: 46 },
+              { time: "21h", height: 64 },
+              { time: "22h", height: 84 },
+              { time: "23h", height: 72 },
+              { time: "00h", height: 48 },
+              { time: "01h", height: 28 },
+            ].map((item) => (
+              <span key={item.time} style={{ height: `${item.height}%` }}>
+                <VisuallyHidden>{item.time}</VisuallyHidden>
+              </span>
+            ))}
+          </div>
+          <div className="hour-labels">
+            <span>18h</span>
+            <span>22h</span>
+            <span>01h</span>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1970,7 +2037,7 @@ function SalonPage({
         <Card className="table-drawer">
           {!selected ? (
             <EmptyState
-              icon={<Icon name="dish" />}
+              icon={<UiIcon name="salon" />}
               title="Selecione uma mesa"
               description="Veja a comanda, lance itens ou atenda chamados."
             />
@@ -2216,7 +2283,7 @@ function OrderWorkspace({
         )}
         {!cart.length ? (
           <EmptyState
-            icon={<Icon name="plus" />}
+            icon={<UiIcon name="plus" />}
             title="Comanda vazia"
             description="Toque em um produto para começar o pedido."
           />
@@ -2309,7 +2376,7 @@ function ModifierDialog({
             <h2 id="modifier-title">{product.name}</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            <Icon name="close" />
+            <UiIcon name="close" />
           </button>
         </div>
         <fieldset className="modifier-list">
@@ -2448,7 +2515,9 @@ function CashPage({ onCommand }: { onCommand: CommandRecorder }) {
               className={`cash-row ${received.includes(tab.id) ? "cash-row--done" : ""}`}
               key={tab.id}
             >
-              <Icon className="action-icon" name="wallet" />
+              <span className="action-icon">
+                <UiIcon name="cash" />
+              </span>
               <span>
                 <strong>{tab.reference}</strong>
                 <small>
@@ -2846,7 +2915,9 @@ function DeliveryPage() {
   return (
     <div>
       <div className="channel-notice">
-        <Icon className="action-icon" name="info" />
+        <span className="action-icon">
+          <UiIcon name="info" />
+        </span>
         <span>
           <strong>Modo demonstrativo</strong> Marketplaces e pagamento online só serão exibidos após
           credenciais e homologação.
@@ -3048,7 +3119,7 @@ function PinDialog({
             <h2 id="pin-title">Trocar colaborador</h2>
           </div>
           <button aria-label="Fechar" className="close-button" onClick={onClose} type="button">
-            <Icon name="close" />
+            <UiIcon name="close" />
           </button>
         </div>
         <div className="scope-profile">

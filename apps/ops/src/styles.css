@@ -1022,10 +1022,10 @@ html {
   box-shadow: 0 0 0 3px var(--gm-brand-soft);
 }
 .real-table--occupied {
-  border-color: var(--gm-accent);
+  border-color: color-mix(in srgb, var(--gm-accent) 55%, var(--gm-border));
 }
 .real-table--reserved {
-  border-color: #c08a1a;
+  border-color: color-mix(in srgb, var(--gm-warning) 55%, var(--gm-border));
   border-style: dashed;
 }
 .real-table span {
@@ -1195,7 +1195,7 @@ html {
   padding-left: 1.5rem;
 }
 .honest-limit {
-  border-left: 4px solid var(--gm-brand);
+  border-color: color-mix(in srgb, var(--gm-brand) 40%, var(--gm-border));
   display: grid;
   gap: 0.65rem;
 }
@@ -1406,6 +1406,10 @@ small {
   place-items: center;
   width: 36px;
 }
+.brand__mark svg {
+  height: 24px;
+  width: 24px;
+}
 .skip-link {
   background: var(--gm-ink);
   color: #fff;
@@ -1473,8 +1477,7 @@ small {
   position: relative;
 }
 .auth-story::after {
-  background: radial-gradient(circle, rgba(229, 108, 50, 0.42) 0 2px, transparent 3px);
-  background-size: 26px 26px;
+  background: radial-gradient(circle, rgba(229, 108, 50, 0.38), transparent 68%);
   content: "";
   height: 390px;
   opacity: 0.45;
@@ -1750,7 +1753,7 @@ small {
   font-size: 0.83rem;
   font-weight: 670;
   gap: 0.75rem;
-  min-height: 43px;
+  min-height: 48px;
   padding: 0.65rem 0.75rem;
   text-decoration: none;
 }
@@ -1769,6 +1772,10 @@ small {
   place-items: center;
   width: 22px;
 }
+.nav-icon svg {
+  height: 19px;
+  width: 19px;
+}
 .nav-count {
   background: var(--gm-accent);
   border-radius: 99px;
@@ -1783,7 +1790,7 @@ small {
   margin-top: auto;
 }
 .sidebar__footer small {
-  color: #89a99b;
+  color: #93a89e;
   font-size: 0.62rem;
   padding-left: 0.5rem;
 }
@@ -1796,6 +1803,7 @@ small {
   display: flex;
   font-size: 0.78rem;
   gap: 0.7rem;
+  min-height: 48px;
   padding: 0.5rem;
 }
 .support-link span {
@@ -1839,10 +1847,14 @@ small {
   gap: 0.65rem;
 }
 .menu-button {
+  align-items: center;
   background: none;
   border: 0;
   display: none;
   font-size: 1.2rem;
+  justify-content: center;
+  min-height: 48px;
+  min-width: 48px;
 }
 .sync-pill {
   align-items: center;
@@ -1854,6 +1866,7 @@ small {
   font-size: 0.67rem;
   font-weight: 700;
   gap: 0.4rem;
+  min-height: 48px;
   padding: 0.5rem 0.65rem;
 }
 .sync-pill span {
@@ -1886,11 +1899,11 @@ small {
   color: var(--gm-ink);
   display: flex;
   font-weight: 900;
-  height: 39px;
+  height: 48px;
   justify-content: center;
   position: relative;
   text-decoration: none;
-  width: 39px;
+  width: 48px;
 }
 .alert-button span {
   background: var(--gm-danger);
@@ -1915,6 +1928,7 @@ small {
   cursor: pointer;
   display: flex;
   gap: 0.55rem;
+  min-height: 48px;
   padding: 0.2rem;
   text-align: left;
 }
@@ -2096,6 +2110,8 @@ small {
   cursor: pointer;
   font-size: 1rem;
   margin-left: auto;
+  min-height: 48px;
+  min-width: 48px;
 }
 .main-content {
   margin: 0 auto;
@@ -2111,6 +2127,96 @@ small {
 .page-heading p {
   color: var(--gm-muted);
   margin: 0;
+}
+.role-context {
+  align-items: center;
+  border-bottom: 1px solid var(--gm-border);
+  border-top: 1px solid var(--gm-border);
+  display: grid;
+  gap: 1rem clamp(1rem, 2vw, 2rem);
+  grid-template-columns: minmax(260px, 0.9fr) minmax(220px, 1fr) auto;
+  margin: -0.45rem 0 1.25rem;
+  padding: 0.9rem 0;
+}
+.role-context__identity {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.role-context__identity > div {
+  min-width: 0;
+}
+.role-context__identity p {
+  color: var(--gm-brand-strong);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.18rem;
+}
+.role-context__identity h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.role-context__icon {
+  background: var(--gm-brand-soft);
+  border-radius: 12px;
+  color: var(--gm-brand-strong);
+  display: grid;
+  flex: 0 0 auto;
+  height: 44px;
+  place-items: center;
+  width: 44px;
+}
+.role-context--transaction .role-context__icon {
+  background: #e3eef8;
+  color: var(--gm-info);
+}
+.role-context--production .role-context__icon {
+  background: #fff0ce;
+  color: #8a5c13;
+}
+.role-context--service .role-context__icon {
+  background: #f7e4dd;
+  color: #8b452e;
+}
+.role-context__summary {
+  color: var(--gm-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.role-context__action,
+.role-context__current {
+  align-items: center;
+  border: 1px solid var(--gm-border);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 800;
+  gap: 0.5rem;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.65rem 0.9rem;
+  white-space: nowrap;
+}
+.role-context__action {
+  color: var(--gm-brand-strong);
+  text-decoration: none;
+}
+.role-context__action:hover {
+  background: var(--gm-brand-soft);
+  border-color: color-mix(in srgb, var(--gm-brand) 35%, var(--gm-border));
+}
+.role-context__current {
+  background: var(--gm-surface-soft);
+  color: #505a54;
+}
+.app-shell .gm-button {
+  min-height: 48px;
+}
+.app-shell .gm-badge--neutral {
+  color: #505a54;
 }
 
 /* Common operational cards */
@@ -2176,6 +2282,22 @@ small {
   display: grid;
   gap: 1rem;
   grid-template-columns: 1.25fr 0.75fr;
+}
+.app-shell[data-profile="waiter"] .dashboard-grid,
+.app-shell[data-profile="cashier"] .dashboard-grid,
+.app-shell[data-profile="kitchen"] .dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.app-shell[data-profile="waiter"] .metric-card,
+.app-shell[data-profile="cashier"] .metric-card,
+.app-shell[data-profile="kitchen"] .metric-card {
+  min-height: 116px;
+}
+.app-shell[data-profile="kitchen"][data-route="kds"] .main-content {
+  max-width: none;
+}
+.app-shell[data-profile="kitchen"][data-route="kds"] .page-heading {
+  margin-bottom: 1rem;
 }
 .attention-card,
 .pulse-card,
@@ -2385,7 +2507,6 @@ small {
 .table-tile {
   background: #fff;
   border: 1px solid var(--gm-border);
-  border-left: 4px solid var(--gm-border);
   border-radius: var(--gm-radius);
   cursor: pointer;
   display: grid;
@@ -2400,13 +2521,13 @@ small {
   box-shadow: 0 6px 18px rgba(28, 41, 34, 0.08);
 }
 .table-tile--occupied {
-  border-left-color: var(--gm-info);
+  border-color: color-mix(in srgb, var(--gm-info) 55%, var(--gm-border));
 }
 .table-tile--attention {
-  border-left-color: var(--gm-danger);
+  border-color: color-mix(in srgb, var(--gm-danger) 55%, var(--gm-border));
 }
 .table-tile--closing {
-  border-left-color: var(--gm-warning);
+  border-color: color-mix(in srgb, var(--gm-warning) 55%, var(--gm-border));
 }
 .table-tile__top {
   align-items: center;
@@ -2692,8 +2813,8 @@ small {
   border-radius: 50%;
   cursor: pointer;
   font-size: 1.2rem;
-  height: 36px;
-  width: 36px;
+  height: 48px;
+  width: 48px;
 }
 .modifier-list {
   border: 0;
@@ -3250,6 +3371,8 @@ small {
     color: #fff;
     display: block;
     font-size: 1.5rem;
+    min-height: 48px;
+    min-width: 48px;
   }
   .workspace {
     margin-left: 0;
@@ -3275,6 +3398,13 @@ small {
   .delivery-board {
     grid-template-columns: repeat(2, 1fr);
   }
+  .role-context {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .role-context__summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 900px) {
@@ -3292,6 +3422,11 @@ small {
     grid-template-columns: repeat(2, 1fr);
   }
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-shell[data-profile="waiter"] .dashboard-grid,
+  .app-shell[data-profile="cashier"] .dashboard-grid,
+  .app-shell[data-profile="kitchen"] .dashboard-grid {
     grid-template-columns: 1fr;
   }
   .salon-layout,
@@ -3351,8 +3486,8 @@ small {
     display: none;
   }
   .sync-pill {
-    height: 38px;
-    width: 38px;
+    height: 48px;
+    width: 48px;
   }
   .sync-pill span {
     display: block;
@@ -3375,6 +3510,21 @@ small {
     font-size: 0.7rem;
     min-height: 38px;
     padding: 0.5rem 0.7rem;
+  }
+  .role-context {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    margin-top: -0.55rem;
+  }
+  .role-context__summary,
+  .role-context__action,
+  .role-context__current {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .role-context__action,
+  .role-context__current {
+    width: 100%;
   }
   .metrics-grid,
   .metrics-grid--three {

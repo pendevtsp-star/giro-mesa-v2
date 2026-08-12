@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { api } from "./api";
 import type { ProfileId } from "./domain";
 import { formatMoney } from "./rules";
+import { UiIcon } from "./ui-icon";
 
 export interface ManagementScope {
   organizationId: string;
@@ -565,7 +566,7 @@ export function RealDashboard({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Este perfil não possui indicadores gerenciais disponíveis no backend. Os módulos operacionais continuam acessíveis conforme as permissões."
-              icon={<Icon name="info" />}
+              icon={<UiIcon name="info" />}
               title="Sem indicadores gerenciais para este perfil"
             />
           </Card>
@@ -888,7 +889,7 @@ function RecipeManager({ scope, inventory }: { scope: ManagementScope; inventory
                     ) : (
                       <EmptyState
                         description="Selecione um produto, adicione os insumos consumidos e salve a primeira versão."
-                        icon={<Icon name="list" />}
+                        icon={<UiIcon name="list" />}
                         title="Nenhuma ficha técnica ativa"
                       />
                     )}
@@ -932,7 +933,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               <Card>
                 <EmptyState
                   description="Cadastre locais e insumos para iniciar o controle desta unidade."
-                  icon={<Icon name="box" />}
+                  icon={<UiIcon name="inventory" />}
                   title="Estoque ainda não configurado"
                 />
               </Card>
@@ -1095,7 +1096,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Nenhum pedido foi criado para esta unidade."
-              icon={<Icon name="plus" />}
+              icon={<UiIcon name="plus" />}
               title="Sem pedidos de compra"
             />
           </Card>
@@ -1164,7 +1165,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               ) : (
                 <EmptyState
                   description="Não há contas a pagar ou receber nesta unidade."
-                  icon={<Icon name="currency" />}
+                  icon={<UiIcon name="cash" />}
                   title="Financeiro sem lançamentos"
                 />
               )}
@@ -1350,7 +1351,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 {!data.timeEntries.some((entry) => !entry.clockedOutAt) && (
                   <EmptyState
                     description="Não há marcações de ponto abertas."
-                    icon={<Icon name="clock" />}
+                    icon={<UiIcon name="clock" />}
                     title="Nenhum turno em andamento"
                   />
                 )}
@@ -1361,7 +1362,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
           <Card>
             <EmptyState
               description="Cadastre pessoas para administrar escalas, ponto e comissões."
-              icon={<Icon name="plus" />}
+              icon={<UiIcon name="plus" />}
               title="Equipe ainda não cadastrada"
             />
           </Card>

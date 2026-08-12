@@ -206,6 +206,10 @@ select {
   place-items: center;
   width: 48px;
 }
+.gm-empty__icon svg {
+  height: 22px;
+  width: 22px;
+}
 
 .gm-sr-only {
   clip: rect(0 0 0 0);
@@ -221,6 +225,8 @@ select {
   *,
   *::before,
   *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
     scroll-behavior: auto;
     transition-duration: 0.01ms;
   }
