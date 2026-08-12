@@ -4,6 +4,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Commissions;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Schedules;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeEntries;
+using GiroMesa.ApiClient.Models;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Microsoft.Kiota.Abstractions;
@@ -56,36 +57,37 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public PeopleRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/people", rawUrl)
         {
         }
-        /// <returns>A <see cref="Stream"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.ManagementPeopleDashboardResponse"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementPeopleDashboardResponse?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementPeopleDashboardResponse> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
-            return await RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Models.ManagementPeopleDashboardResponse>(requestInfo, global::GiroMesa.ApiClient.Models.ManagementPeopleDashboardResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.ManagementCommandResponse"/></returns>
         /// <param name="body">The request body</param>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementCommandResponse?> PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementCommandResponse> PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = ToPostRequestInformation(body, requestConfiguration);
-            await RequestAdapter.SendNoContentAsync(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Models.ManagementCommandResponse>(requestInfo, global::GiroMesa.ApiClient.Models.ManagementCommandResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
@@ -100,6 +102,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             return requestInfo;
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
@@ -117,6 +120,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = new RequestInformation(Method.POST, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             requestInfo.SetContentFromParsable(RequestAdapter, "application/json", body);
             return requestInfo;
         }

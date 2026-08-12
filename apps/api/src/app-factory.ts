@@ -13,6 +13,7 @@ import { AppModule } from "./app.module.js";
 import { AuthService } from "./auth/auth.service.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
+import { addFinanceResponses } from "./common/finance-openapi.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
 import {
   DOSECLUB_KEY_RATE_LIMIT,
@@ -100,6 +101,7 @@ export async function createApplication() {
   );
   addZodRequestBodies(app, document);
   closePlatformProjectionSchemas(document.components?.schemas ?? {});
+  addFinanceResponses(document);
   fastify.get("/api/v1/openapi.json", async () => document);
   fastify.get("/openapi.json", async () => document);
 

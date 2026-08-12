@@ -32,7 +32,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -60,7 +67,7 @@
                   "totalCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "document": {
@@ -112,7 +119,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -140,7 +154,7 @@
                   "totalCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "document": {
@@ -192,7 +206,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -231,7 +252,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -270,7 +298,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -330,7 +365,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2956,7 +2998,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3015,7 +3064,7 @@
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "occurredAt": {
                     "type": "string",
@@ -3065,7 +3114,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3124,7 +3180,7 @@
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "occurredAt": {
                     "type": "string",
@@ -3182,7 +3238,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3249,7 +3312,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3316,7 +3386,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3391,7 +3468,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3466,7 +3550,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3533,7 +3624,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3592,7 +3690,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentReportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3651,7 +3756,7 @@
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "occurredAt": {
                     "type": "string",
@@ -3701,7 +3806,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentReportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3760,7 +3872,7 @@
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "occurredAt": {
                     "type": "string",
@@ -19592,7 +19704,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableAssetResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -19625,7 +19744,7 @@
                   "depositCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "serialNumbers": {
                     "default": [],
@@ -19680,7 +19799,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableAssetResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -19713,7 +19839,7 @@
                   "depositCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "serialNumbers": {
                     "default": [],
@@ -19768,7 +19894,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableMovementResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -19925,7 +20058,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableMovementResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20082,7 +20222,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableReconciliationResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20194,7 +20341,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableReconciliationResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20306,7 +20460,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableLedgerResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20345,7 +20506,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnableLedgerResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20384,7 +20552,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentIntentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20410,7 +20585,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   }
                 },
@@ -20457,7 +20632,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentIntentResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20483,7 +20665,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   }
                 },
@@ -20538,7 +20720,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20554,7 +20743,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -20621,7 +20810,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20637,7 +20833,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -20696,7 +20892,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20735,7 +20938,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20774,7 +20984,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20842,7 +21059,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20894,7 +21118,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20907,16 +21138,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "unitId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
                   "attemptId": {
                     "type": "string",
                     "format": "uuid",
@@ -20943,7 +21164,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "safePayload": {
@@ -20952,8 +21173,6 @@
                   }
                 },
                 "required": [
-                  "organizationId",
-                  "unitId",
                   "attemptId",
                   "providerEventId",
                   "status"
@@ -20980,7 +21199,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAttemptResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -20993,16 +21219,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "unitId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
                   "attemptId": {
                     "type": "string",
                     "format": "uuid",
@@ -21029,7 +21245,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "safePayload": {
@@ -21038,8 +21254,6 @@
                   }
                 },
                 "required": [
-                  "organizationId",
-                  "unitId",
                   "attemptId",
                   "providerEventId",
                   "status"
@@ -22662,7 +22876,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementInventoryDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22693,7 +22914,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementInventoryDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22724,7 +22952,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22782,7 +23017,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22840,7 +23082,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -22937,7 +23186,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23042,7 +23298,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementInventoryEventResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23151,7 +23414,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementInventoryEventResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23252,7 +23522,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementEntityListResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23289,7 +23566,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23320,11 +23604,6 @@
                   "yieldUnit": {
                     "type": "string",
                     "enum": [
-                      "mg",
-                      "g",
-                      "kg",
-                      "ml",
-                      "l",
                       "unit",
                       "dozen"
                     ]
@@ -23421,7 +23700,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementEntityListResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23458,7 +23744,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23489,11 +23782,6 @@
                   "yieldUnit": {
                     "type": "string",
                     "enum": [
-                      "mg",
-                      "g",
-                      "kg",
-                      "ml",
-                      "l",
                       "unit",
                       "dozen"
                     ]
@@ -23590,7 +23878,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementEntityListResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23619,7 +23914,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23691,7 +23993,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementEntityListResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23720,7 +24029,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23792,7 +24108,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementPurchasesResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23829,7 +24152,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23877,7 +24207,7 @@
                         "unitCostCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         }
                       },
                       "required": [
@@ -23921,7 +24251,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementPurchasesResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23958,7 +24295,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24006,7 +24350,7 @@
                         "unitCostCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         }
                       },
                       "required": [
@@ -24066,7 +24410,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24113,7 +24464,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24160,7 +24518,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24272,7 +24637,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24368,7 +24740,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementFinanceDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24399,7 +24778,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementFinanceDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24438,7 +24824,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24464,7 +24857,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "competenceDate": {
@@ -24519,7 +24912,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24545,7 +24945,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "competenceDate": {
@@ -24608,7 +25008,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24624,7 +25031,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -24692,7 +25099,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24708,7 +25122,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -24768,7 +25182,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24794,7 +25215,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "competenceDate": {
@@ -24825,14 +25246,14 @@
                         "revenueCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "costCents": {
                           "anyOf": [
                             {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 9007199254740991
+                              "maximum": 2147483647
                             },
                             {
                               "type": "null"
@@ -24890,7 +25311,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -24916,7 +25344,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "competenceDate": {
@@ -24947,14 +25375,14 @@
                         "revenueCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "costCents": {
                           "anyOf": [
                             {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 9007199254740991
+                              "maximum": 2147483647
                             },
                             {
                               "type": "null"
@@ -25020,7 +25448,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25036,7 +25471,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -25109,7 +25544,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25125,7 +25567,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "method": {
@@ -25182,7 +25624,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCashShiftsResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25219,7 +25668,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25235,7 +25691,7 @@
                   "openingCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -25270,7 +25726,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCashShiftsResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25307,7 +25770,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25323,7 +25793,7 @@
                   "openingCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -25374,7 +25844,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25397,7 +25874,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "reason": {
@@ -25461,7 +25938,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25484,7 +25968,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "reason": {
@@ -25548,7 +26032,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25564,7 +26055,7 @@
                   "countedCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "closeReason": {
                     "type": "string",
@@ -25620,7 +26111,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25636,7 +26134,7 @@
                   "countedCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "closeReason": {
                     "type": "string",
@@ -25684,7 +26182,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25735,19 +26240,19 @@
                         "grossCents": {
                           "type": "integer",
                           "exclusiveMinimum": true,
-                          "maximum": 9007199254740991,
+                          "maximum": 2147483647,
                           "minimum": 0
                         },
                         "feeCents": {
                           "default": 0,
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "netCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "status": {
                           "type": "string",
@@ -25815,7 +26320,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25866,19 +26378,19 @@
                         "grossCents": {
                           "type": "integer",
                           "exclusiveMinimum": true,
-                          "maximum": 9007199254740991,
+                          "maximum": 2147483647,
                           "minimum": 0
                         },
                         "feeCents": {
                           "default": 0,
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "netCents": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 9007199254740991
+                          "maximum": 2147483647
                         },
                         "status": {
                           "type": "string",
@@ -25938,7 +26450,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementReportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -25969,7 +26488,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementReportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26000,7 +26526,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementPeopleDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26029,7 +26562,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26065,7 +26605,7 @@
                   "hourlyRateCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "hiredAt": {
                     "type": "string",
@@ -26105,7 +26645,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementPeopleDashboardResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26134,7 +26681,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26170,7 +26724,7 @@
                   "hourlyRateCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "hiredAt": {
                     "type": "string",
@@ -26210,7 +26764,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26284,7 +26845,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26366,7 +26934,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26444,7 +27019,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26530,7 +27112,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26597,7 +27186,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26648,7 +27244,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26679,12 +27282,12 @@
                   "baseCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -26720,7 +27323,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26751,12 +27361,12 @@
                   "baseCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -26800,7 +27410,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26831,12 +27448,12 @@
                   "baseCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -26880,7 +27497,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementCommandResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -26911,12 +27535,12 @@
                   "baseCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   },
                   "amountCents": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 2147483647
                   }
                 },
                 "required": [
@@ -26960,7 +27584,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRuleResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27038,7 +27669,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRuleResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27116,7 +27754,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRuleResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27179,7 +27824,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRuleResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27242,7 +27894,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationSimulationResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27261,27 +27920,27 @@
                       "grossSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "netSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "serviceChargeCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "eligibleSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "profitCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "hoursMinutes": {
                         "type": "integer",
@@ -27345,7 +28004,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationSimulationResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27364,27 +28030,27 @@
                       "grossSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "netSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "serviceChargeCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "eligibleSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "profitCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "hoursMinutes": {
                         "type": "integer",
@@ -27448,7 +28114,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27488,27 +28161,27 @@
                       "grossSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "netSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "serviceChargeCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "eligibleSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "profitCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "hoursMinutes": {
                         "type": "integer",
@@ -27618,7 +28291,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27658,27 +28338,27 @@
                       "grossSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "netSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "serviceChargeCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "eligibleSalesCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "profitCents": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 9007199254740991
+                        "maximum": 2147483647
                       },
                       "hoursMinutes": {
                         "type": "integer",
@@ -27788,7 +28468,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27827,7 +28514,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27866,7 +28560,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27905,7 +28606,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27952,7 +28660,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -27968,7 +28683,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "reason": {
@@ -28057,7 +28772,14 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationRunResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -28073,7 +28795,7 @@
                   "amountCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
+                    "maximum": 2147483647,
                     "minimum": 0
                   },
                   "reason": {
@@ -28162,7 +28884,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationPortfolioResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -28209,7 +28938,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationPortfolioResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -28256,7 +28992,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationExportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -28303,7 +29046,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemunerationExportResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -36054,8 +36804,8 @@
           },
           "value": {
             "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "minimum": -2147483648,
+            "maximum": 2147483647
           }
         },
         "required": [
@@ -36272,8 +37022,8 @@
           },
           "value": {
             "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "minimum": -2147483648,
+            "maximum": 2147483647
           }
         },
         "required": [
@@ -36490,8 +37240,8 @@
           },
           "value": {
             "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "minimum": -2147483648,
+            "maximum": 2147483647
           }
         },
         "required": [
@@ -36708,8 +37458,8 @@
           },
           "value": {
             "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "minimum": -2147483648,
+            "maximum": 2147483647
           }
         },
         "required": [
@@ -36879,6 +37629,1117 @@
           "alternate"
         ],
         "additionalProperties": false
+      },
+      "FiscalDocumentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "saleReference",
+          "status",
+          "attemptCount",
+          "adapter",
+          "adapterHomologated",
+          "salePreserved"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saleReference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "documentReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "adapter": {
+            "type": "string"
+          },
+          "adapterHomologated": {
+            "type": "boolean"
+          },
+          "salePreserved": {
+            "type": "boolean"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "IncidentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "incidentId",
+          "incidentType",
+          "status",
+          "neutralSummary",
+          "evidence",
+          "amountCents",
+          "payrollAction",
+          "reporterIdentityId",
+          "occurredAt",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "incidentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "neutralSummary": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "payrollAction": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "reporterIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approverIdentityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "IncidentReportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "incidentId",
+          "incidentType",
+          "status",
+          "neutralSummary",
+          "evidence",
+          "amountCents",
+          "payrollAction",
+          "reporterIdentityId",
+          "occurredAt",
+          "idempotentReplay",
+          "events"
+        ],
+        "properties": {
+          "incidentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "neutralSummary": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "payrollAction": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "reporterIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approverIdentityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementCommandResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipeVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplierId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purchaseOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payableId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivableId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashShiftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "importId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scheduleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timeEntryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commissionRuleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commissionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "totalCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ManagementInventoryEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "lines"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementEntityListResponse": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "unitId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "locationId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "inventoryItemId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "recipeVersionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "supplierId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "purchaseOrderId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "receiptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "payableId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "paymentId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "receivableId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "cashShiftId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "movementId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "importId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "personId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "scheduleId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "timeEntryId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "commissionRuleId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "commissionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "amountCents": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "totalCents": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "version": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "idempotentReplay": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "ManagementInventoryDashboardResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locations",
+          "items",
+          "balances",
+          "recentMovements"
+        ],
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "recentMovements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementPurchasesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "orders",
+          "items",
+          "receipts"
+        ],
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementCashShiftsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "shifts",
+          "movements"
+        ],
+        "properties": {
+          "shifts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementFinanceDashboardResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payables",
+          "payablePayments",
+          "receivables",
+          "receivablePayments",
+          "reconciliationImports",
+          "reconciliationEntries"
+        ],
+        "properties": {
+          "payables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "payablePayments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "receivables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "receivablePayments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "reconciliationImports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "reconciliationEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementPeopleDashboardResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "people",
+          "schedules",
+          "timeEntries",
+          "commissionRules",
+          "commissions"
+        ],
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "timeEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "commissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "commissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "ManagementReportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "period",
+          "cashFlow",
+          "incomeStatement"
+        ],
+        "properties": {
+          "period": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "cashFlow": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "incomeStatement": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PaymentIntentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intentId",
+          "amountCents",
+          "capturedCents",
+          "status",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "capturedCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PaymentAttemptResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "intentId",
+          "status",
+          "intentStatus",
+          "amountCents",
+          "reviewRequired",
+          "nextAction",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "intentStatus": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "providerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewRequired": {
+            "type": "boolean"
+          },
+          "nextAction": {
+            "type": "string"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RemunerationRuleResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruleSetId",
+          "ruleVersionId",
+          "version",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "ruleSetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ruleVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RemunerationSimulationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outputCents",
+          "trace"
+        ],
+        "properties": {
+          "outputCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "trace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "RemunerationRunResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "kind",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "outputCents",
+          "memoryHash",
+          "idempotentReplay",
+          "estimated"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "outputCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "memoryHash": {
+            "type": "string"
+          },
+          "adjustmentOf": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          },
+          "estimated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RemunerationPortfolioResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "byKind",
+          "disclaimer"
+        ],
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "byKind": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        }
+      },
+      "RemunerationExportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "fileName"
+        ],
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyBase64": {
+            "type": "string"
+          }
+        }
+      },
+      "ReturnableAssetResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "sku",
+          "name",
+          "trackingMode",
+          "depositCents",
+          "serials",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "trackingMode": {
+            "type": "string"
+          },
+          "depositCents": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReturnableMovementResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "movementId",
+          "assetId",
+          "movementType",
+          "quantity",
+          "occurredAt",
+          "idempotentReplay"
+        ],
+        "properties": {
+          "movementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movementType": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReturnableReconciliationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedQuantity",
+          "physicalQuantity",
+          "adjustmentQuantity",
+          "movementId",
+          "movementIds"
+        ],
+        "properties": {
+          "expectedQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "physicalQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "adjustmentQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "movementId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "movementIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "idempotentReplay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReturnableLedgerResponse": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ReturnableMovementResponse"
+        }
       }
     }
   }

@@ -4,6 +4,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Invento
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Recipes;
+using GiroMesa.ApiClient.Models;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Microsoft.Kiota.Abstractions;
@@ -56,20 +57,20 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public InventoryRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory", rawUrl)
         {
         }
-        /// <returns>A <see cref="Stream"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.ManagementInventoryDashboardResponse"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementInventoryDashboardResponse?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Models.ManagementInventoryDashboardResponse> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
-            return await RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Models.ManagementInventoryDashboardResponse>(requestInfo, global::GiroMesa.ApiClient.Models.ManagementInventoryDashboardResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
@@ -84,6 +85,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             return requestInfo;
         }
         /// <summary>

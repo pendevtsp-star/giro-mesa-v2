@@ -16,8 +16,6 @@ namespace GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item
         public int? AmountCents { get; set; }
         /// <summary>The attemptId property</summary>
         public Guid? AttemptId { get; set; }
-        /// <summary>The organizationId property</summary>
-        public Guid? OrganizationId { get; set; }
         /// <summary>The providerEventId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -44,8 +42,6 @@ namespace GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item
 #endif
         /// <summary>The status property</summary>
         public global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_status? Status { get; set; }
-        /// <summary>The unitId property</summary>
-        public Guid? UnitId { get; set; }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -66,12 +62,10 @@ namespace GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
                 { "attemptId", n => { AttemptId = n.GetGuidValue(); } },
-                { "organizationId", n => { OrganizationId = n.GetGuidValue(); } },
                 { "providerEventId", n => { ProviderEventId = n.GetStringValue(); } },
                 { "providerReference", n => { ProviderReference = n.GetStringValue(); } },
                 { "safePayload", n => { SafePayload = n.GetObjectValue<global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_safePayload>(global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_safePayload.CreateFromDiscriminatorValue); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_status>(); } },
-                { "unitId", n => { UnitId = n.GetGuidValue(); } },
             };
         }
         /// <summary>
@@ -83,12 +77,10 @@ namespace GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
             writer.WriteGuidValue("attemptId", AttemptId);
-            writer.WriteGuidValue("organizationId", OrganizationId);
             writer.WriteStringValue("providerEventId", ProviderEventId);
             writer.WriteStringValue("providerReference", ProviderReference);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_safePayload>("safePayload", SafePayload);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.PaymentProviderCallbacks.Item.WithAdapterPostRequestBody_status>("status", Status);
-            writer.WriteGuidValue("unitId", UnitId);
         }
     }
 }

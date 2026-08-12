@@ -7984,6 +7984,404 @@ export interface components {
       consequent: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
       alternate: components["schemas"]["RemunerationController_publishVersion_1__request_recursive"];
     };
+    FiscalDocumentResponse: {
+      /** Format: uuid */
+      documentId: string;
+      saleReference: string;
+      status: string;
+      documentReference?: string | null;
+      lastErrorCode?: string | null;
+      /** Format: int32 */
+      attemptCount: number;
+      adapter: string;
+      adapterHomologated: boolean;
+      salePreserved: boolean;
+      idempotentReplay?: boolean;
+    };
+    IncidentResponse: {
+      /** Format: uuid */
+      incidentId: string;
+      incidentType: string;
+      status: string;
+      neutralSummary: string;
+      evidence: {
+        [key: string]: unknown;
+      }[];
+      /** Format: int32 */
+      amountCents: number | null;
+      /** @enum {boolean} */
+      payrollAction: false;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId?: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+    };
+    IncidentReportResponse: {
+      /** Format: uuid */
+      incidentId: string;
+      incidentType: string;
+      status: string;
+      neutralSummary: string;
+      evidence: {
+        [key: string]: unknown;
+      }[];
+      /** Format: int32 */
+      amountCents: number | null;
+      /** @enum {boolean} */
+      payrollAction: false;
+      /** Format: uuid */
+      reporterIdentityId: string;
+      /** Format: uuid */
+      approverIdentityId?: string | null;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+      events: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementCommandResponse: {
+      /** Format: uuid */
+      id?: string;
+      /** Format: uuid */
+      organizationId?: string;
+      /** Format: uuid */
+      unitId?: string;
+      status?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: uuid */
+      locationId?: string;
+      /** Format: uuid */
+      inventoryItemId?: string;
+      /** Format: uuid */
+      eventId?: string;
+      /** Format: uuid */
+      recipeVersionId?: string;
+      /** Format: uuid */
+      supplierId?: string;
+      /** Format: uuid */
+      purchaseOrderId?: string;
+      /** Format: uuid */
+      receiptId?: string;
+      /** Format: uuid */
+      payableId?: string;
+      /** Format: uuid */
+      paymentId?: string;
+      /** Format: uuid */
+      receivableId?: string;
+      /** Format: uuid */
+      cashShiftId?: string;
+      /** Format: uuid */
+      movementId?: string;
+      /** Format: uuid */
+      importId?: string;
+      /** Format: uuid */
+      personId?: string;
+      /** Format: uuid */
+      scheduleId?: string;
+      /** Format: uuid */
+      timeEntryId?: string;
+      /** Format: uuid */
+      commissionRuleId?: string;
+      /** Format: uuid */
+      commissionId?: string;
+      /** Format: int32 */
+      amountCents?: number;
+      /** Format: int32 */
+      totalCents?: number;
+      /** Format: int32 */
+      version?: number;
+      lines?: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay?: boolean;
+    } & {
+      [key: string]: unknown;
+    };
+    ManagementInventoryEventResponse: {
+      /** Format: uuid */
+      eventId: string;
+      lines: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementEntityListResponse: ({
+      /** Format: uuid */
+      id?: string;
+      /** Format: uuid */
+      organizationId?: string;
+      /** Format: uuid */
+      unitId?: string;
+      status?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date-time */
+      updatedAt?: string;
+      /** Format: uuid */
+      locationId?: string;
+      /** Format: uuid */
+      inventoryItemId?: string;
+      /** Format: uuid */
+      eventId?: string;
+      /** Format: uuid */
+      recipeVersionId?: string;
+      /** Format: uuid */
+      supplierId?: string;
+      /** Format: uuid */
+      purchaseOrderId?: string;
+      /** Format: uuid */
+      receiptId?: string;
+      /** Format: uuid */
+      payableId?: string;
+      /** Format: uuid */
+      paymentId?: string;
+      /** Format: uuid */
+      receivableId?: string;
+      /** Format: uuid */
+      cashShiftId?: string;
+      /** Format: uuid */
+      movementId?: string;
+      /** Format: uuid */
+      importId?: string;
+      /** Format: uuid */
+      personId?: string;
+      /** Format: uuid */
+      scheduleId?: string;
+      /** Format: uuid */
+      timeEntryId?: string;
+      /** Format: uuid */
+      commissionRuleId?: string;
+      /** Format: uuid */
+      commissionId?: string;
+      /** Format: int32 */
+      amountCents?: number;
+      /** Format: int32 */
+      totalCents?: number;
+      /** Format: int32 */
+      version?: number;
+      lines?: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay?: boolean;
+    } & {
+      [key: string]: unknown;
+    })[];
+    ManagementInventoryDashboardResponse: {
+      locations: {
+        [key: string]: unknown;
+      }[];
+      items: {
+        [key: string]: unknown;
+      }[];
+      balances: {
+        [key: string]: unknown;
+      }[];
+      recentMovements: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementPurchasesResponse: {
+      orders: {
+        [key: string]: unknown;
+      }[];
+      items: {
+        [key: string]: unknown;
+      }[];
+      receipts: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementCashShiftsResponse: {
+      shifts: {
+        [key: string]: unknown;
+      }[];
+      movements: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementFinanceDashboardResponse: {
+      payables: {
+        [key: string]: unknown;
+      }[];
+      payablePayments: {
+        [key: string]: unknown;
+      }[];
+      receivables: {
+        [key: string]: unknown;
+      }[];
+      receivablePayments: {
+        [key: string]: unknown;
+      }[];
+      reconciliationImports: {
+        [key: string]: unknown;
+      }[];
+      reconciliationEntries: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementPeopleDashboardResponse: {
+      people: {
+        [key: string]: unknown;
+      }[];
+      schedules: {
+        [key: string]: unknown;
+      }[];
+      timeEntries: {
+        [key: string]: unknown;
+      }[];
+      commissionRules: {
+        [key: string]: unknown;
+      }[];
+      commissions: {
+        [key: string]: unknown;
+      }[];
+    };
+    ManagementReportResponse: {
+      period: {
+        [key: string]: unknown;
+      };
+      cashFlow: {
+        [key: string]: unknown;
+      };
+      incomeStatement: {
+        [key: string]: unknown;
+      };
+    };
+    PaymentIntentResponse: {
+      /** Format: uuid */
+      intentId: string;
+      /** Format: int32 */
+      amountCents: number;
+      /** Format: int32 */
+      capturedCents: number;
+      status: string;
+      idempotentReplay: boolean;
+    };
+    PaymentAttemptResponse: {
+      /** Format: uuid */
+      attemptId: string;
+      /** Format: uuid */
+      intentId: string;
+      status: string;
+      intentStatus: string;
+      /** Format: int32 */
+      amountCents: number;
+      providerReference?: string | null;
+      reviewRequired: boolean;
+      nextAction: string;
+      idempotentReplay: boolean;
+    };
+    RemunerationRuleResponse: {
+      /** Format: uuid */
+      ruleSetId: string;
+      /** Format: uuid */
+      ruleVersionId: string;
+      /** Format: int32 */
+      version: number;
+      idempotentReplay: boolean;
+    };
+    RemunerationSimulationResponse: {
+      /** Format: int32 */
+      outputCents: number;
+      trace: {
+        [key: string]: unknown;
+      }[];
+      results?: {
+        [key: string]: unknown;
+      }[];
+    };
+    RemunerationRunResponse: {
+      /** Format: uuid */
+      runId: string;
+      kind: string;
+      /** Format: date */
+      periodStart: string;
+      /** Format: date */
+      periodEnd: string;
+      status: string;
+      /** Format: int32 */
+      outputCents: number;
+      memoryHash: string;
+      /** Format: uuid */
+      adjustmentOf?: string | null;
+      /** Format: date-time */
+      approvedAt?: string | null;
+      /** Format: date-time */
+      closedAt?: string | null;
+      idempotentReplay: boolean;
+      estimated: boolean;
+    };
+    RemunerationPortfolioResponse: {
+      /** Format: date */
+      periodStart: string;
+      /** Format: date */
+      periodEnd: string;
+      byKind: {
+        [key: string]: unknown;
+      };
+      disclaimer: string;
+    };
+    RemunerationExportResponse: {
+      contentType: string;
+      fileName: string | null;
+      body?: string;
+      bodyBase64?: string;
+    };
+    ReturnableAssetResponse: {
+      /** Format: uuid */
+      assetId: string;
+      sku: string;
+      name: string;
+      trackingMode: string;
+      /** Format: int32 */
+      depositCents: number;
+      serials: {
+        [key: string]: unknown;
+      }[];
+      idempotentReplay: boolean;
+    };
+    ReturnableMovementResponse: {
+      /** Format: uuid */
+      movementId: string;
+      /** Format: uuid */
+      assetId: string;
+      movementType: string;
+      /** Format: int32 */
+      quantity: number;
+      /** Format: date-time */
+      occurredAt: string;
+      idempotentReplay: boolean;
+    } & {
+      [key: string]: unknown;
+    };
+    ReturnableReconciliationResponse: {
+      /** Format: int32 */
+      expectedQuantity: number;
+      /** Format: int32 */
+      physicalQuantity: number;
+      /** Format: int32 */
+      adjustmentQuantity: number;
+      /** Format: uuid */
+      movementId: string | null;
+      movementIds: string[];
+      idempotentReplay?: boolean;
+    };
+    ReturnableLedgerResponse: components["schemas"]["ReturnableMovementResponse"][];
   };
   responses: never;
   parameters: never;
@@ -8023,7 +8421,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -8057,7 +8457,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -8078,7 +8480,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -8099,7 +8503,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -8126,7 +8532,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -8153,7 +8561,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["FiscalDocumentResponse"];
+        };
       };
     };
   };
@@ -9843,7 +10253,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -9882,7 +10294,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -9911,7 +10325,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -9940,7 +10356,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -9971,7 +10389,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -10002,7 +10422,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -10031,7 +10453,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -10060,7 +10484,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentResponse"];
+        };
       };
     };
   };
@@ -10098,7 +10524,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentReportResponse"];
+        };
       };
     };
   };
@@ -10136,7 +10564,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["IncidentReportResponse"];
+        };
       };
     };
   };
@@ -16682,7 +17112,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableAssetResponse"];
+        };
       };
     };
   };
@@ -16716,7 +17148,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableAssetResponse"];
+        };
       };
     };
   };
@@ -16772,7 +17206,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableMovementResponse"];
+        };
       };
     };
   };
@@ -16828,7 +17264,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableMovementResponse"];
+        };
       };
     };
   };
@@ -16867,7 +17305,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableReconciliationResponse"];
+        };
       };
     };
   };
@@ -16906,7 +17346,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableReconciliationResponse"];
+        };
       };
     };
   };
@@ -16927,7 +17369,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableLedgerResponse"];
+        };
       };
     };
   };
@@ -16948,7 +17392,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ReturnableLedgerResponse"];
+        };
       };
     };
   };
@@ -16978,7 +17424,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentIntentResponse"];
+        };
       };
     };
   };
@@ -17008,7 +17456,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentIntentResponse"];
+        };
       };
     };
   };
@@ -17041,7 +17491,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17074,7 +17526,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17095,7 +17549,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17116,7 +17572,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17145,7 +17603,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17174,7 +17634,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17191,10 +17653,6 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
-          organizationId: string;
-          /** Format: uuid */
-          unitId: string;
-          /** Format: uuid */
           attemptId: string;
           providerEventId: string;
           /** @enum {string} */
@@ -17212,7 +17670,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -17229,10 +17689,6 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
-          organizationId: string;
-          /** Format: uuid */
-          unitId: string;
-          /** Format: uuid */
           attemptId: string;
           providerEventId: string;
           /** @enum {string} */
@@ -17250,7 +17706,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["PaymentAttemptResponse"];
+        };
       };
     };
   };
@@ -18058,7 +18516,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryDashboardResponse"];
+        };
       };
     };
   };
@@ -18078,7 +18538,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryDashboardResponse"];
+        };
       };
     };
   };
@@ -18105,7 +18567,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18132,7 +18596,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18169,7 +18635,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18206,7 +18674,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18245,7 +18715,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryEventResponse"];
+        };
       };
     };
   };
@@ -18284,7 +18756,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementInventoryEventResponse"];
+        };
       };
     };
   };
@@ -18304,7 +18778,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -18327,7 +18803,7 @@ export interface operations {
           productId: string;
           yieldQuantity?: string | number;
           /** @enum {string} */
-          yieldUnit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          yieldUnit?: "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
@@ -18348,7 +18824,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18368,7 +18846,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -18391,7 +18871,7 @@ export interface operations {
           productId: string;
           yieldQuantity?: string | number;
           /** @enum {string} */
-          yieldUnit?: "mg" | "g" | "kg" | "ml" | "l" | "unit" | "dozen";
+          yieldUnit?: "unit" | "dozen";
           components: {
             /** Format: uuid */
             inventoryItemId: string;
@@ -18412,7 +18892,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18432,7 +18914,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -18463,7 +18947,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18483,7 +18969,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementEntityListResponse"];
+        };
       };
     };
   };
@@ -18514,7 +19002,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18534,7 +19024,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPurchasesResponse"];
+        };
       };
     };
   };
@@ -18571,7 +19063,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18591,7 +19085,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPurchasesResponse"];
+        };
       };
     };
   };
@@ -18628,7 +19124,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18651,7 +19149,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18674,7 +19174,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18713,7 +19215,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18752,7 +19256,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18772,7 +19278,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementFinanceDashboardResponse"];
+        };
       };
     };
   };
@@ -18792,7 +19300,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementFinanceDashboardResponse"];
+        };
       };
     };
   };
@@ -18825,7 +19335,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18858,7 +19370,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18891,7 +19405,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18924,7 +19440,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -18965,7 +19483,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19006,7 +19526,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19041,7 +19563,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19076,7 +19600,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19096,7 +19622,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCashShiftsResponse"];
+        };
       };
     };
   };
@@ -19124,7 +19652,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19144,7 +19674,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCashShiftsResponse"];
+        };
       };
     };
   };
@@ -19172,7 +19704,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19206,7 +19740,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19240,7 +19776,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19270,7 +19808,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19300,7 +19840,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19344,7 +19886,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19388,7 +19932,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19408,7 +19954,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportResponse"];
+        };
       };
     };
   };
@@ -19428,7 +19976,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportResponse"];
+        };
       };
     };
   };
@@ -19448,7 +19998,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPeopleDashboardResponse"];
+        };
       };
     };
   };
@@ -19480,7 +20032,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19500,7 +20054,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementPeopleDashboardResponse"];
+        };
       };
     };
   };
@@ -19532,7 +20088,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19566,7 +20124,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19600,7 +20160,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19638,7 +20200,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19676,7 +20240,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19706,7 +20272,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19736,7 +20304,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19769,7 +20339,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19802,7 +20374,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19837,7 +20411,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19872,7 +20448,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementCommandResponse"];
+        };
       };
     };
   };
@@ -19905,7 +20483,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
       };
     };
   };
@@ -19938,7 +20518,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
       };
     };
   };
@@ -19967,7 +20549,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
       };
     };
   };
@@ -19996,7 +20580,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRuleResponse"];
+        };
       };
     };
   };
@@ -20031,7 +20617,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationSimulationResponse"];
+        };
       };
     };
   };
@@ -20066,7 +20654,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationSimulationResponse"];
+        };
       };
     };
   };
@@ -20114,7 +20704,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20162,7 +20754,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20183,7 +20777,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20204,7 +20800,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20225,7 +20823,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20246,7 +20846,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20281,7 +20883,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20316,7 +20920,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationRunResponse"];
+        };
       };
     };
   };
@@ -20339,7 +20945,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationPortfolioResponse"];
+        };
       };
     };
   };
@@ -20362,7 +20970,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationPortfolioResponse"];
+        };
       };
     };
   };
@@ -20384,7 +20994,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationExportResponse"];
+        };
       };
     };
   };
@@ -20406,7 +21018,9 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["RemunerationExportResponse"];
+        };
       };
     };
   };

@@ -8,26 +8,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
     public enum RecipesPostRequestBody_yieldUnit
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "mg")]
-        #pragma warning disable CS1591
-        Mg,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "g")]
-        #pragma warning disable CS1591
-        G,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "kg")]
-        #pragma warning disable CS1591
-        Kg,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "ml")]
-        #pragma warning disable CS1591
-        Ml,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "l")]
-        #pragma warning disable CS1591
-        L,
-        #pragma warning restore CS1591
         [EnumMember(Value = "unit")]
         #pragma warning disable CS1591
         Unit,
