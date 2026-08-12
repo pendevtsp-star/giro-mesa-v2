@@ -106,3 +106,43 @@ Commit de implementação: `673d918` (`fix(finance): enforce database state mach
 - Biome focado e `git diff --check`: sem erros.
 
 O banco PG17 descartável `giromesa_finance_gate_w1p` e o container PG16 `giromesa-finance-pg16-w1p` foram usados apenas para os gates e removidos ao final. Nenhum provider real, push ou deploy foi executado.
+
+## Correções da revisão financeira final
+
+Branch isolada: `codex/giromesa-wave1-finance-review-fix`, base `ce6817e`.
+
+| Escopo revisado | Correção | Commit |
+| --- | --- | --- |
+| Custódia agregada e reconciliação | Lock por ativo, saldo agregado, cadeia temporal global e leitura/aplicação da reconciliação na mesma transação; reconciliação seriada é all-or-nothing | `e3d82ca` |
+| Período de remuneração | A versão publicada deve cobrir todo `[periodStart, periodEnd]`, inclusive o início do período | `e221594` |
+| Incidentes | Grafo e independência impostos no PostgreSQL; `giromesa_app` usa apenas funções de comando estreitas e não possui INSERT/UPDATE arbitrário | `097d15e` |
+| Limites monetários | Zod, serviços e OpenAPI respeitam `int4`; totais derivados e linhas de compra são verificados antes de persistir | `43aaf37` |
+| Callback de pagamento | Escopo tenant derivado de `attemptId + adapter` por função `SECURITY DEFINER` acessível somente a `giromesa_internal`; body não aceita organização/unidade | `6c2f8ce` |
+| Rendimento de ficha técnica | `yieldUnit` é contável (`unit`/`dozen`) na API, DDL, OpenAPI e clientes; worker mantém conversão exata e rejeita dimensão incompatível com erro específico | `23db6fd` |
+| Respostas financeiras | Os 56 handlers, nos 112 aliases, publicam response DTO JSON; TS e C# preservam `intentId`, `status`, `lines/results` e demais resultados | `08f17a0`, `af05273` |
+
+### Evidência RED → GREEN
+
+- Retornáveis: saldo agregado 10 permitia saída 11 e reconciliação seriada podia confirmar prefixo; ambos falharam antes e passaram após lock/saldo/transação única. Corridas 7 + 7 permitem apenas um commit.
+- Remuneração: uma regra iniciando no meio do período era aceita; agora `effectiveFrom <= periodStart` e `effectiveUntil > periodEnd` são obrigatórios.
+- Incidentes: DML direto e transições inválidas eram possíveis com o papel da aplicação; testes SQL negativos agora recebem negação de privilégio ou violação do grafo.
+- Limites: `2_147_483_648` passava em contratos que persistem `integer`; contratos e serviços agora o rejeitam como 400 antes do PostgreSQL.
+- Callback: o teste HTTP passou a provar ambos aliases, replay, body forjado rejeitado e resolução de escopo sem owner/membership.
+- Ficha técnica: `kg`/`ml` eram aceitos como rendimento e depois falhavam na conversão do worker; o teste de contrato capturou o RED e agora somente `unit`/`dozen` são gerados também nos clientes.
+- OpenAPI: as 56 operações lógicas tinham respostas sem `content/schema`; o teste percorre 112 aliases e exige schema nomeado. Builders C# verificados não usam mais `SendNoContentAsync` nas árvores financeiras.
+
+### Gates desta revisão
+
+- PostgreSQL 17 e 16: state machines/least privilege em fresh + upgrade, **2/2 por versão**, com bancos descartáveis criados e removidos pelo teste.
+- PostgreSQL 17 recém-migrado: **9/9** integrações financeiras API, cobrindo fiscal concorrente, incidentes, gestão, remuneração, ledger/pagamentos, callback HTTP e retornáveis.
+- Worker com PostgreSQL: estoque **1/1**; regras dimensionais e de rendimento **5/5**.
+- API completa sem integrações condicionais: **106 pass, 50 skips, 0 fail**; as nove condicionais financeiras foram executadas separadamente com banco real.
+- Worker completo: **16 pass, 3 skips, 0 fail**. Domain: **52/52**. Contracts: **9/9** e typecheck verde.
+- OpenAPI gerado; teste de contrato financeiro **3/3**; TypeScript e C# regenerados. Não há `SendNoContentAsync` nos request builders financeiros.
+- Turbo `typecheck` verde e build workspace **8/8**.
+- Biome focado nos dois novos arquivos de contrato: sem erros; `git diff --check`: verde. O lint completo de contracts continua bloqueado por normalização CRLF preexistente em `contracts.test.ts` e `index.ts`, sem reformatar arquivos fora do escopo.
+
+### Limites atuais
+
+- O gerador Kiota 1.34.1 concluiu com sucesso, porém `dotnet` não está disponível no PATH desta sessão; o `.csproj` regenerado não pôde ser compilado neste round. O teste de contrato inspeciona tipos de retorno/DTOs gerados e ausência de `SendNoContentAsync`, mas isso não substitui o build .NET.
+- O banco descartável `w1pfix_final_0811` foi mantido somente até o encerramento dos gates e então removido. Nenhum provider real, storage, e-mail, push ou deploy foi usado.
