@@ -1,5 +1,15 @@
 {
   "schemaVersion": 2,
   "requiredAppliedMigration": "0029_platform_incident_projection_actions",
-  "transitions": []
+  "transitions": [
+    {
+      "appliedMigration": "0029_platform_incident_projection_actions",
+      "targetReleaseMigration": "0029_platform_incident_projection_actions",
+      "targetArtifact": "git:e73f407b7ab900cf4e321aae4ca3800383e554e0",
+      "evidence": {
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/31651582729",
+        "testReportDigest": "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f"
+      }
+    }
+  ]
 }

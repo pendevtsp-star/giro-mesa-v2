@@ -371,7 +371,17 @@ test("application rollback only accepts immutable releases and refuses database 
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
   assert.equal(matrix.requiredAppliedMigration, "0029_platform_incident_projection_actions");
-  assert.deepEqual(matrix.transitions, []);
+  assert.deepEqual(matrix.transitions, [
+    {
+      appliedMigration: "0029_platform_incident_projection_actions",
+      targetReleaseMigration: "0029_platform_incident_projection_actions",
+      targetArtifact: "git:e73f407b7ab900cf4e321aae4ca3800383e554e0",
+      evidence: {
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/31651582729",
+        testReportDigest: "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f",
+      },
+    },
+  ]);
   assert.match(rollback, /targetArtifact/);
   assert.match(rollback, /testReportDigest/);
   assert.match(rollback, /actions\/runs/);
@@ -399,7 +409,19 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
   assert.equal(recovery.targetMigration, "0029_platform_incident_projection_actions");
-  assert.deepEqual(recovery.transitions, []);
+  assert.deepEqual(recovery.transitions, [
+    {
+      appliedBefore: "0026_doseclub_integration",
+      appliedAfter: "0029_platform_incident_projection_actions",
+      recoveryMigration: "0029_platform_incident_projection_actions",
+      recoveryArtifact: "git:e73f407b7ab900cf4e321aae4ca3800383e554e0",
+      testedUpgrade: true,
+      evidence: {
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/31651582729",
+        testReportDigest: "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f",
+      },
+    },
+  ]);
 });
 
 test("deployment and rollback compose contracts always include observability and digest images", () => {
