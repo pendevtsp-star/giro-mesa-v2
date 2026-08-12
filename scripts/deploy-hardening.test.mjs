@@ -477,11 +477,13 @@ test("private repository publishes keyless Sigstore signatures for every image d
 
 test("recovery validation provisions the historical migration owner before database tests", () => {
   const publish = readFileSync(join(root, ".github", "workflows", "publish-images.yml"), "utf8");
+  const validator = readFileSync(join(root, "scripts", "validate-recovery-candidate.sh"), "utf8");
+  assert.match(publish, /scripts\/validate-recovery-candidate\.sh/);
   assert.match(
-    publish,
+    validator,
     /create role giromesa nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls/i,
   );
-  assert.match(publish, /ROLLBACK_0029_DATABASE_URL=/);
+  assert.match(validator, /ROLLBACK_0029_DATABASE_URL=/);
 });
 
 test("trusted recovery evidence requires a real DoseClub reconciliation proof", () => {

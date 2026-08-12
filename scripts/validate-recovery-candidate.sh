@@ -113,7 +113,7 @@ run_database_matrix() {
   docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 "$image" >/dev/null
   wait_for_postgres "$container" postgres postgres
   docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-    -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa LOGIN; END IF; END \$\$" >/dev/null
+    -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
   binding="$(docker port "$container" 5432/tcp | head -n 1)"
   port="${binding##*:}"
   [[ "$port" =~ ^[0-9]+$ ]] || { printf 'RECOVERY_POSTGRES_PORT_INVALID\n' >&2; return 1; }
@@ -148,7 +148,7 @@ docker run -d --name "$runtime_postgres" --network "$network" --network-alias po
   -e POSTGRES_PASSWORD=postgres "$postgres17" >/dev/null
 wait_for_postgres "$runtime_postgres" postgres postgres
 docker exec "$runtime_postgres" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-  -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa LOGIN; END IF; END \$\$" >/dev/null
+  -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
 otel_image="otel/opentelemetry-collector-contrib@sha256:09f7a495e6542343cc25aa4e3facba144ba03b0f0b030e4469186e8164a9ed64"
 MSYS_NO_PATHCONV=1 docker run -d --name "$otel_collector" --network "$network" --network-alias otel \
   --read-only --cap-drop ALL --security-opt no-new-privileges \

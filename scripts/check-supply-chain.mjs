@@ -133,6 +133,7 @@ export function validateSupplyChain() {
   const dockerfile = read("Dockerfile");
   const opsDockerfile = read("Dockerfile.ops");
   const publish = read(".github/workflows/publish-images.yml");
+  const recoveryValidator = read("scripts/validate-recovery-candidate.sh");
   const nginx = read("deploy/vps/ops-nginx.conf");
   const runbook = read("docs/runbooks/vulnerability-response.md");
   const imageLock = JSON.parse(read("deploy/vps/image-lock.json"));
@@ -209,14 +210,14 @@ export function validateSupplyChain() {
     errors,
   );
   requireText(
-    publish,
-    /validate-recovery:[\s\S]*gitleaks:v8\.28\.0@sha256:[0-9a-f]{64}[\s\S]*dir --redact --no-banner \/repo/,
+    recoveryValidator,
+    /gitleaks:v8\.28\.0@sha256:[0-9a-f]{64}[\s\S]*--volume "\$candidate_directory:\/repo:ro"[\s\S]*dir --config \/trusted-gitleaks\.toml --redact --no-banner \/repo/,
     "recovery validation must scan the exact recovery checkout for secrets",
     errors,
   );
   requireText(
-    publish,
-    /postgresMajors.*\[16,17\]/,
+    recoveryValidator,
+    /"postgresMajors":\s*\[16,17\]/,
     "recovery validation must cover PostgreSQL 16 and 17",
     errors,
   );
