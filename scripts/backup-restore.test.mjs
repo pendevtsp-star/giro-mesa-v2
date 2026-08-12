@@ -21,9 +21,10 @@ const sourceArtifact = `git:${"1".repeat(40)}`;
 const targetArtifact = `git:${"2".repeat(40)}`;
 const sourceMigrationId = "0029_platform_incident_projection_actions";
 const targetMigrationId = "0030_dr_target_release";
+const powershellBinary = process.platform === "win32" ? "powershell" : "pwsh";
 
 function powershell(script, args, env = {}) {
-  return spawnSync("powershell", ["-NoProfile", "-File", script, ...args], {
+  return spawnSync(powershellBinary, ["-NoProfile", "-File", script, ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: {
