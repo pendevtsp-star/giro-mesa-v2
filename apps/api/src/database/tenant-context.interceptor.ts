@@ -5,6 +5,7 @@ import {
   type ExecutionContext,
   Injectable,
   type NestInterceptor,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
@@ -116,7 +117,20 @@ export class TenantContextInterceptor implements NestInterceptor {
       }
       if (role === "public-menu") {
         const slug = typeof request.params?.slug === "string" ? request.params.slug : "";
-        return from(this.database.withPublicMenuContext(slug, () => lastValueFrom(next.handle())));
+        return from(
+          this.database
+            .withPublicMenuContext(slug, () => lastValueFrom(next.handle()))
+            .catch((error: unknown) => {
+              if (error instanceof Error && error.message === "PUBLIC_MENU_SCOPE_NOT_FOUND") {
+                throw new NotFoundException({
+                  statusCode: 404,
+                  code: "PUBLIC_MENU_NOT_FOUND",
+                  message: "O cardapio solicitado nao foi encontrado.",
+                });
+              }
+              throw error;
+            }),
+        );
       }
       return from(
         this.database.withRoleContext(role, request.auth?.identityId ?? null, () =>
