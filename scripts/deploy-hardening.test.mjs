@@ -465,7 +465,12 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(workflow, /head_repository\.full_name == github\.repository/);
   assert.match(workflow, /head_sha == github\.sha/);
   assert.doesNotMatch(workflow, /head_sha \|\| github\.sha/);
-  assert.match(workflow, /cosign-release: v3\.0\.2/);
+  const cosignInstallerPins = workflow.match(
+    /sigstore\/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4\.1\.2/g,
+  );
+  const cosignReleasePins = workflow.match(/cosign-release: v3\.0\.6/g);
+  assert.equal(cosignInstallerPins?.length, 4);
+  assert.equal(cosignReleasePins?.length, 4);
   assert.match(provenance, /workflow_trigger=workflow_run/);
   assert.match(provenance, /--certificate-github-workflow-trigger "\$workflow_trigger"/);
   assert.doesNotMatch(provenance, /ci\.yml@refs\/heads\/release\/rollback-0029/);
