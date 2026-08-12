@@ -60,9 +60,19 @@ services:
   worker:
     <<: *backend-service
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-worker:${GIROMESA_IMAGE_TAG:-pilot}
+    environment:
+      WORKER_HEARTBEAT_FILE: ${WORKER_HEARTBEAT_FILE:-/tmp/giromesa-worker-heartbeat}
+      WORKER_HEARTBEAT_MAX_AGE_MS: ${WORKER_HEARTBEAT_MAX_AGE_MS:-30000}
+      WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN: ${WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN:-false}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "apps/worker/dist/worker-healthcheck.js"]
+      interval: ${WORKER_HEARTBEAT_CHECK_INTERVAL:-10s}
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   site:
     <<: *web-service

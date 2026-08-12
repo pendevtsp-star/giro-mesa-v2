@@ -154,6 +154,101 @@ it("runs DoseClub reconciliation before the generic outbox cycle", async () => {
   ]);
 });
 
+it("records a heartbeat only after a successful worker cycle", async () => {
+  const events: string[] = [];
+  const telemetry = fakeTelemetry(events);
+  let processRuntime: WorkerProcessRuntime | undefined;
+  processRuntime = await startWorkerProcess({
+    env: {},
+    startTelemetry: async () => {
+      await telemetry.start();
+      return telemetry;
+    },
+    createWorker: async () => ({
+      async expireAccessWindows() {
+        events.push("worker.maintenance");
+      },
+      async runOnce() {
+        events.push("worker.run");
+        return 0;
+      },
+      async close() {
+        events.push("worker.close");
+      },
+    }),
+    createHeartbeat: () => ({
+      async recordSuccessfulCycle() {
+        events.push("heartbeat.record");
+      },
+      async cleanup() {
+        events.push("heartbeat.cleanup");
+      },
+    }),
+    registerSignal: () => undefined,
+    now: () => 1,
+    sleep: async () => {
+      await processRuntime?.stop();
+    },
+  });
+
+  await processRuntime.run();
+  assert.deepEqual(events, [
+    "telemetry.start",
+    "worker.maintenance",
+    "worker.run",
+    "heartbeat.record",
+    "worker.close",
+    "heartbeat.cleanup",
+    "telemetry.flush",
+    "telemetry.shutdown",
+  ]);
+});
+
+it("does not update the heartbeat when a worker cycle fails", async () => {
+  const events: string[] = [];
+  const telemetry = fakeTelemetry(events);
+  const processRuntime = await startWorkerProcess({
+    env: {},
+    startTelemetry: async () => {
+      await telemetry.start();
+      return telemetry;
+    },
+    createWorker: async () => ({
+      async expireAccessWindows() {
+        events.push("worker.maintenance");
+      },
+      async runOnce() {
+        events.push("worker.run");
+        throw new Error("cycle failed");
+      },
+      async close() {
+        events.push("worker.close");
+      },
+    }),
+    createHeartbeat: () => ({
+      async recordSuccessfulCycle() {
+        events.push("heartbeat.record");
+      },
+      async cleanup() {
+        events.push("heartbeat.cleanup");
+      },
+    }),
+    registerSignal: () => undefined,
+    now: () => 1,
+  });
+
+  await assert.rejects(processRuntime.run(), /cycle failed/);
+  assert.deepEqual(events, [
+    "telemetry.start",
+    "worker.maintenance",
+    "worker.run",
+    "worker.close",
+    "heartbeat.cleanup",
+    "telemetry.flush",
+    "telemetry.shutdown",
+  ]);
+});
+
 it("flushes telemetry when worker construction fails", async () => {
   const events: string[] = [];
   const telemetry = fakeTelemetry(events);
