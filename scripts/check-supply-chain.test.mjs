@@ -1,10 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  validateCosignImageSignatures,
   validateSupplyChain,
   validateWorkflowActionPins,
   validateWorkflowBuildArgs,
 } from "./check-supply-chain.mjs";
+
+test("accepts annotated multiline Cosign target and recovery signatures", () => {
+  const workflow = `
+IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-\${{ matrix.service }}@\${{ steps.build.outputs.digest }}
+run: >-
+  cosign sign --yes
+  -a role=target
+  -a sourceCommit=\${{ github.event.workflow_run.head_sha }}
+  -a authorizedByMain=\${{ github.event.workflow_run.head_sha }}
+  "$IMAGE"
+IMAGE: ghcr.io/pendevtsp-star/giro-mesa-v2-\${{ matrix.service }}@\${{ steps.build.outputs.digest }}
+run: >-
+  cosign sign --yes -a role=recovery
+  -a sourceCommit=\${{ needs.authorize-recovery.outputs.recovery_sha }}
+  -a authorizedByMain=\${{ github.event.workflow_run.head_sha }} "$IMAGE"
+`;
+  assert.deepEqual(validateCosignImageSignatures(workflow), []);
+  assert.deepEqual(validateCosignImageSignatures(workflow.replace("-a role=recovery", "")), [
+    "recovery image signature must bind role, source commit and main authorization",
+  ]);
+});
 
 test("supply-chain configuration meets the local release contract", () => {
   assert.deepEqual(validateSupplyChain(), []);

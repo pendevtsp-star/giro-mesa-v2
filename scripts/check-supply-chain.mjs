@@ -61,6 +61,46 @@ export function validateWorkflowActionPins(workflow) {
   return errors;
 }
 
+export function validateCosignImageSignatures(workflow) {
+  const commands = [
+    ...workflow.matchAll(/\bcosign\s+sign\s+--yes(?<arguments>[\s\S]*?)["']\$IMAGE["']/g),
+  ].map((match) => match.groups.arguments.replace(/\s+/g, " ").trim());
+  const errors = [];
+  const digestBindings = workflow.match(
+    /IMAGE:\s*ghcr\.io\/pendevtsp-star\/giro-mesa-v2-\$\{\{\s*matrix\.service\s*\}\}@\$\{\{\s*steps\.build\.outputs\.digest\s*\}\}/g,
+  );
+  if ((digestBindings ?? []).length !== 2) {
+    errors.push("image signatures must use the exact digests emitted by both builds");
+  }
+  const actionExpression = (value) => `$${`{{ ${value} }}`}`;
+  const contracts = [
+    {
+      role: "target",
+      source: `sourceCommit=${actionExpression("github.event.workflow_run.head_sha")}`,
+      authorization: `authorizedByMain=${actionExpression("github.event.workflow_run.head_sha")}`,
+    },
+    {
+      role: "recovery",
+      source: `sourceCommit=${actionExpression("needs.authorize-recovery.outputs.recovery_sha")}`,
+      authorization: `authorizedByMain=${actionExpression("github.event.workflow_run.head_sha")}`,
+    },
+  ];
+  for (const contract of contracts) {
+    const valid = commands.some(
+      (command) =>
+        command.includes(`-a role=${contract.role}`) &&
+        command.includes(`-a ${contract.source}`) &&
+        command.includes(`-a ${contract.authorization}`),
+    );
+    if (!valid) {
+      errors.push(
+        `${contract.role} image signature must bind role, source commit and main authorization`,
+      );
+    }
+  }
+  return errors;
+}
+
 export function validateSupplyChain() {
   const errors = [];
   const ci = read(".github/workflows/ci.yml");
@@ -157,12 +197,7 @@ export function validateSupplyChain() {
   );
   requireText(publish, /provenance:\s*mode=max/, "image builds must emit provenance", errors);
   requireText(publish, /sbom:\s*true/, "image builds must emit an SBOM", errors);
-  requireText(
-    publish,
-    /cosign sign --yes "\$IMAGE"/,
-    "image publication must sign the built digest with Cosign",
-    errors,
-  );
+  errors.push(...validateCosignImageSignatures(publish));
   requireText(
     publish,
     /cosign sign-blob --yes/,
