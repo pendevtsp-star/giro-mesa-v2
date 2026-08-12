@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "transitions": [
+    {
+      "appliedMigration": "0029_platform_incident_projection_actions",
+      "targetReleaseMigration": "0029_platform_incident_projection_actions",
+      "evidence": "same-schema application rollback; verified by deploy hardening tests"
+    }
+  ]
+}
