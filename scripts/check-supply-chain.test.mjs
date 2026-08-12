@@ -5,7 +5,23 @@ import {
   validateSupplyChain,
   validateWorkflowActionPins,
   validateWorkflowBuildArgs,
+  validateWorkflowCheckoutCredentials,
 } from "./check-supply-chain.mjs";
+
+test("requires checkout credentials to be discarded after read-only checkout", () => {
+  assert.deepEqual(
+    validateWorkflowCheckoutCredentials(
+      "steps:\n  - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955\n",
+    ),
+    ["checkout must set persist-credentials: false"],
+  );
+  assert.deepEqual(
+    validateWorkflowCheckoutCredentials(
+      "steps:\n  - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955\n    with:\n      ref: abc\n      persist-credentials: false\n",
+    ),
+    [],
+  );
+});
 
 test("accepts annotated multiline Cosign target and recovery signatures", () => {
   const workflow = `
