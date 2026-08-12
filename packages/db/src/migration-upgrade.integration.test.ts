@@ -126,3 +126,83 @@ describe("0009 tenant RLS upgrade", () => {
     }
   });
 });
+
+describe("0018-0019 operations upgrade", () => {
+  it("upgrades a 0017 database with RLS, column grants and state-machine guards", async (context) => {
+    if (!integrationUrl) {
+      context.skip("TENANT_ISOLATION_DATABASE_URL not configured");
+      return;
+    }
+    const databaseName = `giromesa_operations_upgrade_${randomUUID().replaceAll("-", "")}`;
+    const admin = createDatabase(integrationUrl).client;
+    const databaseUrl = new URL(integrationUrl);
+    databaseUrl.pathname = `/${databaseName}`;
+    let database: ReturnType<typeof createDatabase> | undefined;
+    try {
+      await admin.unsafe(`create database "${databaseName}"`);
+      database = createDatabase(databaseUrl.toString(), { max: 1 });
+      const baselineFiles = (await readdir(migrationsDirectory))
+        .filter((file) => /^(?:000\d|001[0-7])_.*\.sql$/.test(file))
+        .sort();
+      assert.equal(baselineFiles.at(-1), "0017_public_menu_branding.sql");
+      for (const file of baselineFiles) await applyMigration(database.client, file);
+
+      await applyMigration(database.client, "0018_operational_map.sql");
+      await applyMigration(database.client, "0019_dispatch_ledger.sql");
+
+      const [metadata] = await database.client<
+        {
+          forced_rls: number;
+          state_machine_triggers: number;
+          table_update_grants: number;
+          transition_column_grants: number;
+        }[]
+      >`
+        select
+          (select count(*)::int from pg_class
+           where oid in (
+             'table_occupancies'::regclass,
+             'public_table_sessions'::regclass,
+             'table_service_calls'::regclass,
+             'dispatch_effects'::regclass,
+             'dispatch_dead_letters'::regclass
+           ) and relrowsecurity and relforcerowsecurity) forced_rls,
+          (select count(*)::int from information_schema.triggers
+           where trigger_name in (
+             'table_occupancies_state_machine',
+             'public_table_sessions_state_machine',
+             'table_service_calls_state_machine',
+             'dispatch_effects_state_machine',
+             'dispatch_dead_letters_state_machine'
+           )) state_machine_triggers,
+          (select count(*)::int from (values
+            (has_table_privilege('giromesa_app', 'table_occupancies', 'update')),
+            (has_table_privilege('giromesa_app', 'public_table_sessions', 'update')),
+            (has_table_privilege('giromesa_app', 'table_service_calls', 'update')),
+            (has_table_privilege('giromesa_app', 'dispatch_effects', 'update')),
+            (has_table_privilege('giromesa_app', 'dispatch_dead_letters', 'update'))
+          ) as grants(allowed) where allowed) table_update_grants,
+          (select count(*)::int from (values
+            (has_column_privilege('giromesa_app', 'table_occupancies', 'state', 'update')),
+            (has_column_privilege('giromesa_app', 'public_table_sessions', 'revoked_at', 'update')),
+            (has_column_privilege('giromesa_app', 'table_service_calls', 'state', 'update')),
+            (has_column_privilege('giromesa_app', 'dispatch_effects', 'state', 'update')),
+            (has_column_privilege('giromesa_app', 'dispatch_dead_letters', 'resolved_at', 'update'))
+          ) as grants(allowed) where allowed) transition_column_grants
+      `;
+      assert.deepEqual(metadata, {
+        forced_rls: 5,
+        state_machine_triggers: 5,
+        table_update_grants: 0,
+        transition_column_grants: 5,
+      });
+    } finally {
+      if (database) await database.client.end();
+      await admin.unsafe(
+        `select pg_terminate_backend(pid) from pg_stat_activity where datname = '${databaseName}'`,
+      );
+      await admin.unsafe(`drop database if exists "${databaseName}"`);
+      await admin.end();
+    }
+  });
+});
