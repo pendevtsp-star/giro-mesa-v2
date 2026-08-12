@@ -11,12 +11,12 @@ const now = "2026-08-11T12:00:00.000Z";
 type ActionRow = {
   id: string;
   organizationId: string;
-  action: "tenant.suspend";
-  targetType: "organization";
+  action: "tenant.suspend" | "incident.close";
+  targetType: "organization" | "incident";
   targetId: string;
   requestedByIdentityId: string;
   justification: string;
-  payload: { expectedState: string };
+  payload: { expectedState: string; unitId?: string };
   status: "pending" | "executed";
   version: number;
   requestedAt: string;
@@ -31,6 +31,12 @@ async function installPlatformFixture(
     privileged: boolean;
     withExternalProposal?: boolean;
     projectionDelays?: Partial<Record<string, number>>;
+    incidentStatus?: "under_review" | "approved" | "rejected";
+    expectedProposal?: {
+      action: "tenant.suspend" | "incident.close";
+      targetId: string;
+      payload: { expectedState: string; unitId?: string };
+    };
   },
 ) {
   const permissions = options.privileged
@@ -178,6 +184,11 @@ async function installPlatformFixture(
         return;
       }
       if (resource === "incidents") {
+        const incidentStatus = options.incidentStatus ?? "under_review";
+        const availableActions =
+          incidentStatus === "under_review"
+            ? ["incident.approve", "incident.reject"]
+            : ["incident.close"];
         await route.fulfill({
           json: {
             resource,
@@ -188,14 +199,14 @@ async function installPlatformFixture(
                 organizationId,
                 unitId,
                 incidentType: "inventory_variance",
-                status: "under_review",
+                status: incidentStatus,
                 neutralSummary: "Diferença neutra confirmada na contagem.",
                 amountCents: 1290,
                 reporterIdentityId: otherIdentityId,
                 approverIdentityId: null,
                 occurredAt: now,
                 updatedAt: now,
-                availableActions: ["incident.approve", "incident.reject"],
+                availableActions,
               },
             ],
             nextCursor: null,
@@ -233,21 +244,23 @@ async function installPlatformFixture(
     if (path === `/v1/platform/tenants/${organizationId}/actions` && request.method() === "POST") {
       expect(request.headers()["idempotency-key"]).toBeTruthy();
       const body = request.postDataJSON() as {
-        action: "tenant.suspend";
+        action: "tenant.suspend" | "incident.close";
         targetId: string;
         justification: string;
-        payload: { expectedState: string };
+        payload: { expectedState: string; unitId?: string };
       };
-      expect(body).toMatchObject({
-        action: "tenant.suspend",
-        targetId: organizationId,
-        payload: { expectedState: "active" },
-      });
+      expect(body).toMatchObject(
+        options.expectedProposal ?? {
+          action: "tenant.suspend",
+          targetId: organizationId,
+          payload: { expectedState: "active" },
+        },
+      );
       const proposal: ActionRow = {
         id: `f1111111-1111-4111-8111-${String(sequence++).padStart(12, "0")}`,
         organizationId,
         action: body.action,
-        targetType: "organization",
+        targetType: body.action.startsWith("incident.") ? "incident" : "organization",
         targetId: body.targetId,
         requestedByIdentityId: actorIdentityId,
         justification: body.justification,
@@ -326,20 +339,20 @@ test("mantém contexto permanente, indisponibilidade verdadeira e leitura acess�
   await page.keyboard.press("ArrowRight");
   await expect(planTab).toBeFocused();
   await expect(planTab).toHaveAttribute("aria-selected", "true");
-  const panel = page.getByRole("tabpanel");
+  const panel = page.getByRole("tabpanel", { name: "Plano" });
   await expect(panel).toHaveAttribute("aria-labelledby", "platform-tab-plan");
   await expect(panel).toHaveAttribute("id", "platform-panel-plan");
   await page.keyboard.press("End");
-  await expect(page.getByRole("tab", { name: "Suporte" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Auditoria" })).toBeFocused();
   await page.keyboard.press("Home");
   await expect(tenantTab).toBeFocused();
   await page.getByRole("tab", { name: "Incidentes" }).click();
   await expect(page.getByText("Diferença neutra confirmada na contagem.")).toBeVisible();
   await page.getByRole("tab", { name: "Leads" }).click();
   await expect(page.getByText("Bar Horizonte")).toBeVisible();
-  await expect(page.getByText("LEAD_WORKFLOW_NOT_AVAILABLE")).toBeVisible();
+  await expect(page.getByText("Acompanhamento de lead ainda não disponível")).toBeVisible();
   await page.getByRole("tab", { name: "Suporte" }).click();
-  await expect(page.getByText("SUPPORT_WORKFLOW_NOT_AVAILABLE")).toBeVisible();
+  await expect(page.getByText("Atendimento de suporte ainda não disponível")).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).include(".app-shell").analyze();
   expect(accessibility.violations).toEqual([]);
@@ -354,6 +367,33 @@ test("mantém contexto permanente, indisponibilidade verdadeira e leitura acess�
     fullPage: true,
     path: `.superpowers/screenshots/wave2-backoffice-${testInfo.project.name}.png`,
   });
+});
+
+test("abre filas globais sem tenant e prepara ação pela projeção do incidente", async ({
+  page,
+}) => {
+  await installPlatformFixture(page, { privileged: true });
+  await page.goto("http://127.0.0.1:3213/#platform");
+
+  await expect(page.getByRole("heading", { name: "Filas globais sanitizadas" })).toBeVisible();
+  await page.getByRole("tab", { name: "Leads" }).click();
+  await expect(page.getByText("Bar Horizonte")).toBeVisible();
+  await page.getByRole("tab", { name: "Suporte" }).click();
+  await expect(page.getByText("Atendimento de suporte ainda não disponível")).toBeVisible();
+
+  await openTenant(page);
+  await page.getByRole("tab", { name: "Incidentes" }).click();
+  const incident = page.getByRole("article").filter({
+    hasText: "Diferença neutra confirmada na contagem.",
+  });
+  await incident.getByRole("button", { name: "Preparar aprovação" }).click();
+  await expect(page.getByRole("combobox", { name: "Ação", exact: true })).toHaveValue(
+    "incident.approve",
+  );
+  await expect(page.getByRole("textbox", { name: "Alvo", exact: true })).toHaveValue(
+    "f1111111-1111-4111-8111-111111111113",
+  );
+  await expect(page.getByLabel("Unidade")).toHaveValue(unitId);
 });
 
 test("executa somente aprovação alheia e impede autoaprovação", async ({ page }) => {
@@ -379,6 +419,34 @@ test("executa somente aprovação alheia e impede autoaprovação", async ({ pag
   await expect(own.getByRole("button", { name: "Aprovar e executar" })).toBeDisabled();
 });
 
+test("encerra incidente rejeitado usando o estado projetado, sem presumir aprovação", async ({
+  page,
+}) => {
+  const incidentId = "f1111111-1111-4111-8111-111111111113";
+  await installPlatformFixture(page, {
+    privileged: true,
+    incidentStatus: "rejected",
+    expectedProposal: {
+      action: "incident.close",
+      targetId: incidentId,
+      payload: { expectedState: "rejected", unitId },
+    },
+  });
+  await openTenant(page);
+
+  await page.getByLabel("Unidade").selectOption(unitId);
+  await page.getByRole("combobox", { name: "Ação", exact: true }).selectOption("incident.close");
+  await expect(page.getByRole("tabpanel", { name: "Incidentes" })).toContainText("Rejeitado");
+  await page.getByRole("textbox", { name: "Alvo", exact: true }).fill(incidentId);
+  await page
+    .getByLabel("Justificativa auditável")
+    .fill("Incidente rejeitado confirmado e encerramento auditável solicitado.");
+  await page.getByText("Confirmo o tenant, o alvo e o impacto acima.").click();
+  await expect(page.getByRole("button", { name: "Criar proposta" })).toBeEnabled();
+  await page.getByRole("button", { name: "Criar proposta" }).click();
+  await expect(page.getByText("Aguardando aprovação", { exact: true })).toBeVisible();
+});
+
 test("mantem somente a projection da selecao mais recente", async ({ page }) => {
   await installPlatformFixture(page, {
     privileged: false,
@@ -387,7 +455,7 @@ test("mantem somente a projection da selecao mais recente", async ({ page }) => 
   await openTenant(page);
 
   await page.getByRole("tab", { name: "Plano" }).click();
-  const panel = page.getByRole("tabpanel");
+  const panel = page.getByRole("tabpanel", { name: "Plano" });
   await expect(panel).toContainText("Plano atual");
   await page.waitForTimeout(400);
   await expect(panel).toContainText("Plano atual");

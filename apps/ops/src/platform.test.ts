@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiClientError } from "./api";
 import {
+  actionPermission,
+  canApprovePlatformAction,
   InvalidPlatformPayloadError,
   LatestPlatformRequest,
   parsePlatformActionPage,
@@ -8,11 +10,124 @@ import {
   parsePlatformProjection,
   parsePlatformTenantContext,
   platformRecovery,
+  projectedIncidentActionContext,
+  projectedIncidentExpectedState,
 } from "./platform";
 
 const organizationId = "a1111111-1111-4111-8111-111111111111";
 
 describe("backoffice seguro", () => {
+  it("deriva o estado de fechamento do incidente projetado sem presumir aprovação", () => {
+    const projection = parsePlatformProjection({
+      resource: "incidents",
+      availability: "available",
+      items: [
+        { id: "incident-approved", status: "approved" },
+        { id: "incident-rejected", status: "rejected" },
+        { id: "incident-review", status: "under_review" },
+      ],
+      nextCursor: null,
+    });
+
+    expect(projectedIncidentExpectedState("incident.close", "incident-approved", projection)).toBe(
+      "approved",
+    );
+    expect(projectedIncidentExpectedState("incident.close", "incident-rejected", projection)).toBe(
+      "rejected",
+    );
+    expect(
+      projectedIncidentExpectedState("incident.close", "incident-review", projection),
+    ).toBeNull();
+    expect(projectedIncidentExpectedState("incident.close", "unknown", projection)).toBeNull();
+    expect(actionPermission("incident.close")).toBe("platform.incident.transition");
+  });
+
+  it("uses only projected incident actions and blocks the incident reporter", () => {
+    const projection = parsePlatformProjection({
+      resource: "incidents",
+      availability: "available",
+      items: [
+        {
+          id: "f1111111-1111-4111-8111-111111111111",
+          unitId: "b1111111-1111-4111-8111-111111111111",
+          status: "under_review",
+          reporterIdentityId: "c1111111-1111-4111-8111-111111111111",
+          availableActions: ["incident.approve", "incident.reject"],
+        },
+      ],
+      nextCursor: null,
+    });
+
+    expect(
+      projectedIncidentActionContext(
+        "incident.approve",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "c1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBeNull();
+    expect(
+      projectedIncidentActionContext(
+        "incident.reject",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toEqual({
+      expectedState: "under_review",
+      unitId: "b1111111-1111-4111-8111-111111111111",
+    });
+    expect(
+      projectedIncidentActionContext(
+        "incident.close",
+        "f1111111-1111-4111-8111-111111111111",
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBeNull();
+
+    expect(
+      canApprovePlatformAction(
+        {
+          id: "e1111111-1111-4111-8111-111111111111",
+          organizationId,
+          action: "incident.approve",
+          targetType: "incident",
+          targetId: "f1111111-1111-4111-8111-111111111111",
+          requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+          justification: "Independent review documented for the incident.",
+          payload: { expectedState: "under_review" },
+          status: "pending",
+          version: 1,
+          requestedAt: "2026-08-11T12:00:00.000Z",
+          expiresAt: "2026-08-11T12:15:00.000Z",
+        },
+        projection,
+        "c1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBe(false);
+    expect(
+      canApprovePlatformAction(
+        {
+          id: "e1111111-1111-4111-8111-111111111112",
+          organizationId,
+          action: "incident.approve",
+          targetType: "incident",
+          targetId: "f1111111-1111-4111-8111-999999999999",
+          requestedByIdentityId: "d1111111-1111-4111-8111-111111111111",
+          justification: "Independent review documented for the incident.",
+          payload: { expectedState: "under_review" },
+          status: "pending",
+          version: 1,
+          requestedAt: "2026-08-11T12:00:00.000Z",
+          expiresAt: "2026-08-11T12:15:00.000Z",
+        },
+        projection,
+        "d1111111-1111-4111-8111-111111111111",
+      ),
+    ).toBe(false);
+  });
+
   it("aborta a leitura anterior e aceita somente o epoch mais recente", () => {
     const requests = new LatestPlatformRequest();
     const first = requests.begin();

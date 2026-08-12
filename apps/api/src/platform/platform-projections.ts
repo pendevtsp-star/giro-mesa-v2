@@ -142,6 +142,55 @@ function encodeCursor(offset: number) {
   return Buffer.from(JSON.stringify({ offset }), "utf8").toString("base64url");
 }
 
+const platformKeysetIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type PlatformKeysetRow = { id: string; createdAt: Date };
+
+function encodePlatformKeysetCursor(row: PlatformKeysetRow) {
+  return Buffer.from(
+    JSON.stringify({ createdAt: row.createdAt.toISOString(), id: row.id }),
+    "utf8",
+  ).toString("base64url");
+}
+
+export function parsePlatformKeysetPage(limit: number, cursor: string | undefined) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("INVALID_LIMIT");
+  if (!cursor) return { limit, cursor: null };
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      createdAt?: unknown;
+      id?: unknown;
+    };
+    if (
+      typeof parsed.createdAt !== "string" ||
+      typeof parsed.id !== "string" ||
+      !platformKeysetIdPattern.test(parsed.id)
+    )
+      throw new Error();
+    const createdAt = new Date(parsed.createdAt);
+    if (!Number.isFinite(createdAt.getTime()) || createdAt.toISOString() !== parsed.createdAt)
+      throw new Error();
+    return { limit, cursor: { createdAt, id: parsed.id } };
+  } catch {
+    throw new Error("INVALID_CURSOR");
+  }
+}
+
+export function finalizePlatformKeysetPage<T extends PlatformKeysetRow, R>(
+  rows: T[],
+  limit: number,
+  project: (row: T) => R,
+) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("INVALID_LIMIT");
+  const visible = rows.slice(0, limit);
+  const last = visible.at(-1);
+  return {
+    items: visible.map(project),
+    nextCursor: rows.length > limit && last ? encodePlatformKeysetCursor(last) : null,
+  };
+}
+
 function decodeCursor(cursor: string | undefined) {
   if (!cursor) return 0;
   try {

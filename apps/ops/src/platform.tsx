@@ -30,7 +30,9 @@ const resources = [
   "support",
 ] as const;
 type PlatformResource = (typeof resources)[number];
-const globalResources = new Set<PlatformResource>(["leads", "support"]);
+const globalResourceList = ["leads", "support"] as const;
+const globalResources = new Set<PlatformResource>(globalResourceList);
+const tenantResources = resources.filter((resource) => !globalResources.has(resource));
 
 const resourceLabels: Record<PlatformResource, string> = {
   tenant: "Tenant",
@@ -76,6 +78,48 @@ interface PlatformProjection {
   reasonCode?: string;
   items: Row[];
   nextCursor: string | null;
+}
+
+const incidentSourceStates: Partial<Record<PlatformActionName, readonly string[]>> = {
+  "incident.review": ["reported"],
+  "incident.approve": ["under_review"],
+  "incident.reject": ["under_review"],
+  "incident.close": ["approved", "rejected"],
+};
+
+export function projectedIncidentExpectedState(
+  action: PlatformActionName,
+  targetId: string,
+  projection: PlatformProjection | null,
+) {
+  const allowed = incidentSourceStates[action];
+  if (!allowed || projection?.resource !== "incidents" || projection.availability !== "available")
+    return null;
+  const target = projection.items.find((item) => item.id === targetId);
+  return typeof target?.status === "string" && allowed.includes(target.status)
+    ? target.status
+    : null;
+}
+
+export function projectedIncidentActionContext(
+  action: PlatformActionName,
+  targetId: string,
+  projection: PlatformProjection | null,
+  actorIdentityId: string,
+) {
+  const expectedState = projectedIncidentExpectedState(action, targetId, projection);
+  if (expectedState === null || projection === null) return null;
+  const target = projection.items.find((item) => item.id === targetId);
+  if (
+    !target ||
+    typeof target.unitId !== "string" ||
+    !Array.isArray(target.availableActions) ||
+    !target.availableActions.includes(action) ||
+    ((action === "incident.approve" || action === "incident.reject") &&
+      target.reporterIdentityId === actorIdentityId)
+  )
+    return null;
+  return { expectedState, unitId: target.unitId };
 }
 
 type PlatformActionName =
@@ -407,8 +451,19 @@ function actionLabel(action: PlatformActionName) {
   }[action];
 }
 
-function actionPermission(action: PlatformActionName) {
-  return `platform.${action}`;
+export function actionPermission(action: PlatformActionName) {
+  return action.startsWith("incident.") ? "platform.incident.transition" : `platform.${action}`;
+}
+
+export function canApprovePlatformAction(
+  item: PlatformAction,
+  projection: PlatformProjection | null,
+  actorIdentityId: string,
+) {
+  if (item.action !== "incident.approve" && item.action !== "incident.reject") return true;
+  if (projection?.resource !== "incidents" || projection.availability !== "available") return false;
+  const target = projection.items.find((row) => row.id === item.targetId);
+  return Boolean(target) && target?.reporterIdentityId !== actorIdentityId;
 }
 
 function actionTone(
@@ -461,6 +516,8 @@ function safeColumns(resource: PlatformResource, row: Row): Array<[string, unkno
       "actionReasonCode",
     ],
     incidents: [
+      "id",
+      "unitId",
       "incidentType",
       "status",
       "neutralSummary",
@@ -469,6 +526,7 @@ function safeColumns(resource: PlatformResource, row: Row): Array<[string, unkno
       "approverIdentityId",
       "occurredAt",
       "updatedAt",
+      "availableActions",
     ],
   };
   return (columns[resource] ?? []).flatMap<[string, unknown]>((key) =>
@@ -476,14 +534,60 @@ function safeColumns(resource: PlatformResource, row: Row): Array<[string, unkno
   );
 }
 
+const columnLabels: Record<string, string> = {
+  id: "Identificador",
+  unitId: "Unidade",
+  displayName: "Nome protegido",
+  email: "E-mail protegido",
+  phone: "Telefone protegido",
+  businessName: "Estabelecimento",
+  segment: "Segmento",
+  planSlug: "Plano solicitado",
+  submittedAt: "Recebido em",
+  actionAvailability: "Ações",
+  actionReasonCode: "Situação operacional",
+  incidentType: "Tipo",
+  status: "Estado",
+  neutralSummary: "Resumo neutro",
+  amountCents: "Valor em centavos",
+  reporterIdentityId: "Relator",
+  approverIdentityId: "Responsável pela decisão",
+  occurredAt: "Ocorrido em",
+  updatedAt: "Atualizado em",
+  availableActions: "Próximas ações",
+};
+
+const operationalReasonLabels: Record<string, string> = {
+  LEAD_WORKFLOW_NOT_AVAILABLE: "Acompanhamento de lead ainda não disponível",
+  SUPPORT_WORKFLOW_NOT_AVAILABLE: "Atendimento de suporte ainda não disponível",
+  unavailable: "Somente leitura",
+  inventory_variance: "Divergência de estoque",
+  reported: "Registrado",
+  under_review: "Em revisão",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
+  closed: "Encerrado",
+};
+
+const incidentPreparationLabels: Partial<Record<PlatformActionName, string>> = {
+  "incident.review": "Preparar revisão",
+  "incident.approve": "Preparar aprovação",
+  "incident.reject": "Preparar rejeição",
+  "incident.close": "Preparar encerramento",
+};
+
 function cellValue(value: unknown): string {
   if (value === null) return "Não informado";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
-    return String(value);
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return dateTime(value);
+    return operationalReasonLabels[value] ?? value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) {
     return value
       .slice(0, 12)
       .map((item) => {
+        if (typeof item === "string") return actionLabel(item as PlatformActionName);
         const row = record(item);
         return typeof row.name === "string"
           ? row.name
@@ -535,6 +639,11 @@ export function RealPlatformPage({
   const [context, setContext] = useState<AsyncState<PlatformTenantContext>>({ status: "idle" });
   const [selectedResource, setSelectedResource] = useState<PlatformResource>("tenant");
   const [projection, setProjection] = useState<AsyncState<PlatformProjection>>({ status: "idle" });
+  const [selectedGlobalResource, setSelectedGlobalResource] =
+    useState<(typeof globalResourceList)[number]>("leads");
+  const [globalProjection, setGlobalProjection] = useState<AsyncState<PlatformProjection>>({
+    status: "idle",
+  });
   const [actions, setActions] = useState<AsyncState<PlatformActionPage>>({ status: "idle" });
   const [unitId, setUnitId] = useState("");
   const [mutationError, setMutationError] = useState<unknown>(null);
@@ -547,6 +656,7 @@ export function RealPlatformPage({
   const overviewRequests = useRef(new LatestPlatformRequest());
   const contextRequests = useRef(new LatestPlatformRequest());
   const projectionRequests = useRef(new LatestPlatformRequest());
+  const globalProjectionRequests = useRef(new LatestPlatformRequest());
   const actionRequests = useRef(new LatestPlatformRequest());
   const tenantScopeEpoch = useRef(0);
 
@@ -569,6 +679,19 @@ export function RealPlatformPage({
   useEffect(() => {
     void refreshToken;
     loadOverview();
+    const request = globalProjectionRequests.current.begin();
+    setGlobalProjection({ status: "loading" });
+    api.platform
+      .globalProjection("leads", { limit: 50, signal: request.signal })
+      .then(parsePlatformProjection)
+      .then((data) => {
+        if (globalProjectionRequests.current.isCurrent(request.epoch))
+          setGlobalProjection({ status: "ready", data });
+      })
+      .catch((error: unknown) => {
+        if (globalProjectionRequests.current.isCurrent(request.epoch) && !isAbortError(error))
+          setGlobalProjection({ status: "error", error });
+      });
   }, [loadOverview, refreshToken]);
 
   useEffect(
@@ -577,6 +700,7 @@ export function RealPlatformPage({
       overviewRequests.current.invalidate();
       contextRequests.current.invalidate();
       projectionRequests.current.invalidate();
+      globalProjectionRequests.current.invalidate();
       actionRequests.current.invalidate();
     },
     [],
@@ -615,17 +739,12 @@ export function RealPlatformPage({
       if (scope !== tenantScopeEpoch.current) return Promise.resolve();
       const request = projectionRequests.current.begin();
       setProjection({ status: "loading" });
-      const load = globalResources.has(resource)
-        ? api.platform.globalProjection(resource as "leads" | "support", {
-            limit: 50,
-            signal: request.signal,
-          })
-        : api.platform.projection(organizationId, resource, {
-            unitId: selectedUnitId || undefined,
-            limit: 50,
-            signal: request.signal,
-          });
-      return load
+      return api.platform
+        .projection(organizationId, resource, {
+          unitId: selectedUnitId || undefined,
+          limit: 50,
+          signal: request.signal,
+        })
         .then(parsePlatformProjection)
         .then((data) => {
           if (
@@ -641,6 +760,32 @@ export function RealPlatformPage({
             !isAbortError(error)
           )
             setProjection({ status: "error", error });
+        });
+    },
+    [],
+  );
+
+  const loadGlobalProjection = useCallback(
+    (resource: (typeof globalResourceList)[number], cursor?: string) => {
+      const request = globalProjectionRequests.current.begin();
+      if (!cursor) setGlobalProjection({ status: "loading" });
+      return api.platform
+        .globalProjection(resource, { limit: 50, cursor, signal: request.signal })
+        .then(parsePlatformProjection)
+        .then((data) => {
+          if (!globalProjectionRequests.current.isCurrent(request.epoch)) return;
+          setGlobalProjection((previous) => {
+            if (cursor && previous.status === "ready" && previous.data.resource === data.resource)
+              return {
+                status: "ready",
+                data: { ...data, items: [...previous.data.items, ...data.items] },
+              };
+            return { status: "ready", data };
+          });
+        })
+        .catch((error: unknown) => {
+          if (globalProjectionRequests.current.isCurrent(request.epoch) && !isAbortError(error))
+            setGlobalProjection({ status: "error", error });
         });
     },
     [],
@@ -687,6 +832,12 @@ export function RealPlatformPage({
   const permissions = activeOverview?.access.permissions ?? [];
   const needsMembershipTarget = action.startsWith("membership.");
   const needsIncidentTarget = action.startsWith("incident.");
+  const incidentActionContext = projectedIncidentActionContext(
+    action,
+    targetId.trim(),
+    projection.status === "ready" ? projection.data : null,
+    actorIdentityId,
+  );
   const expectedState =
     action === "tenant.suspend"
       ? activeContext?.organization.billingState
@@ -694,13 +845,9 @@ export function RealPlatformPage({
         ? action.startsWith("tenant.")
           ? "suspended"
           : "disabled"
-        : action === "incident.review"
-          ? "reported"
-          : action === "incident.approve" || action === "incident.reject"
-            ? "under_review"
-            : action === "incident.close"
-              ? "approved"
-              : "active";
+        : needsIncidentTarget
+          ? (incidentActionContext?.expectedState ?? "")
+          : "active";
   const canPropose =
     Boolean(activeContext) &&
     activeOverview?.access.stepUp === true &&
@@ -709,7 +856,7 @@ export function RealPlatformPage({
     justification.trim().length >= 20 &&
     confirmed &&
     (!needsMembershipTarget || targetId.trim().length > 0) &&
-    (!needsIncidentTarget || (targetId.trim().length > 0 && unitId.length > 0));
+    (!needsIncidentTarget || (targetId.trim().length > 0 && incidentActionContext !== null));
 
   const impact = useMemo(() => {
     if (action === "tenant.suspend")
@@ -735,11 +882,12 @@ export function RealPlatformPage({
     setMutating(true);
     setMutationError(null);
     try {
-      const payload = action.startsWith("incident.")
-        ? { expectedState, unitId }
-        : action === "tenant.restore"
-          ? { expectedState: "suspended", restoreTo }
-          : { expectedState };
+      const payload =
+        action.startsWith("incident.") && incidentActionContext
+          ? { expectedState, unitId: incidentActionContext.unitId }
+          : action === "tenant.restore"
+            ? { expectedState: "suspended", restoreTo }
+            : { expectedState };
       await api.platform.propose(
         organizationId,
         {
@@ -806,16 +954,16 @@ export function RealPlatformPage({
   }
 
   function navigateResources(event: KeyboardEvent<HTMLButtonElement>, resource: PlatformResource) {
-    const currentIndex = resources.indexOf(resource);
+    const currentIndex = tenantResources.indexOf(resource);
     let nextIndex: number | undefined;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % resources.length;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tenantResources.length;
     if (event.key === "ArrowLeft")
-      nextIndex = (currentIndex - 1 + resources.length) % resources.length;
+      nextIndex = (currentIndex - 1 + tenantResources.length) % tenantResources.length;
     if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = resources.length - 1;
+    if (event.key === "End") nextIndex = tenantResources.length - 1;
     if (nextIndex === undefined) return;
     event.preventDefault();
-    const nextResource = resources[nextIndex];
+    const nextResource = tenantResources[nextIndex];
     if (!nextResource) return;
     selectResource(nextResource);
     document.getElementById(`platform-tab-${nextResource}`)?.focus();
@@ -859,6 +1007,95 @@ export function RealPlatformPage({
           </div>
         </section>
       )}
+
+      <section aria-labelledby="platform-global-title" className="platform-projection">
+        <div className="platform-section-heading">
+          <div>
+            <h2 id="platform-global-title">Filas globais sanitizadas</h2>
+            <p>
+              Entradas públicas independentes de tenant, com dados protegidos e sem ações simuladas.
+            </p>
+          </div>
+          <Badge tone="info">Leitura global</Badge>
+        </div>
+        <div className="platform-tabs" role="tablist" aria-label="Filas globais">
+          {globalResourceList.map((resource) => (
+            <button
+              aria-controls={`platform-global-panel-${resource}`}
+              aria-selected={resource === selectedGlobalResource}
+              id={`platform-global-tab-${resource}`}
+              key={resource}
+              onClick={() => {
+                setSelectedGlobalResource(resource);
+                void loadGlobalProjection(resource);
+              }}
+              onKeyDown={(event) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const next =
+                  event.key === "ArrowLeft" || event.key === "Home" ? "leads" : "support";
+                setSelectedGlobalResource(next);
+                void loadGlobalProjection(next);
+                document.getElementById(`platform-global-tab-${next}`)?.focus();
+              }}
+              role="tab"
+              tabIndex={resource === selectedGlobalResource ? 0 : -1}
+              type="button"
+            >
+              {resourceLabels[resource]}
+            </button>
+          ))}
+        </div>
+        <div
+          aria-labelledby={`platform-global-tab-${selectedGlobalResource}`}
+          id={`platform-global-panel-${selectedGlobalResource}`}
+          role="tabpanel"
+        >
+          {globalProjection.status === "loading" && <PlatformSkeleton />}
+          {globalProjection.status === "error" && (
+            <ErrorNotice
+              error={globalProjection.error}
+              onRetry={() => void loadGlobalProjection(selectedGlobalResource)}
+            />
+          )}
+          {globalProjection.status === "ready" && globalProjection.data.items.length === 0 && (
+            <div className="platform-empty">
+              <strong>Nenhuma entrada nesta fila</strong>
+              <span>A fonte global respondeu sem itens.</span>
+            </div>
+          )}
+          {globalProjection.status === "ready" && globalProjection.data.items.length > 0 && (
+            <>
+              <div className="platform-records">
+                {globalProjection.data.items.map((row, index) => (
+                  <article className="platform-record" key={String(row.id ?? index)}>
+                    {safeColumns(selectedGlobalResource, row).map(([key, value]) => (
+                      <div key={key}>
+                        <span>{columnLabels[key] ?? key}</span>
+                        <strong>{cellValue(value)}</strong>
+                      </div>
+                    ))}
+                  </article>
+                ))}
+              </div>
+              {globalProjection.data.nextCursor && (
+                <Button
+                  onClick={() =>
+                    void loadGlobalProjection(
+                      selectedGlobalResource,
+                      globalProjection.data.nextCursor ?? undefined,
+                    )
+                  }
+                  size="sm"
+                  variant="secondary"
+                >
+                  Carregar mais
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </section>
 
       <Card className="platform-context-card">
         <form className="platform-context-form" onSubmit={loadContext}>
@@ -917,7 +1154,7 @@ export function RealPlatformPage({
           </aside>
 
           <div className="platform-tabs" role="tablist" aria-label="Domínios do backoffice">
-            {resources.map((resource) => (
+            {tenantResources.map((resource) => (
               <button
                 aria-controls={`platform-panel-${resource}`}
                 aria-selected={resource === selectedResource}
@@ -979,10 +1216,48 @@ export function RealPlatformPage({
                       >
                         {safeColumns(selectedResource, row).map(([key, value]) => (
                           <div key={key}>
-                            <span>{key}</span>
+                            <span>{columnLabels[key] ?? key}</span>
                             <strong>{cellValue(value)}</strong>
                           </div>
                         ))}
+                        {selectedResource === "incidents" &&
+                          Array.isArray(row.availableActions) && (
+                            <div className="platform-action-row__buttons">
+                              {row.availableActions.flatMap((candidate) => {
+                                if (typeof candidate !== "string") return [];
+                                const incidentAction = candidate as PlatformActionName;
+                                const context = projectedIncidentActionContext(
+                                  incidentAction,
+                                  String(row.id ?? ""),
+                                  projection.data,
+                                  actorIdentityId,
+                                );
+                                const label = incidentPreparationLabels[incidentAction];
+                                if (!context || !label) return [];
+                                return [
+                                  <Button
+                                    key={incidentAction}
+                                    onClick={() => {
+                                      setAction(incidentAction);
+                                      setTargetId(String(row.id));
+                                      setUnitId(context.unitId);
+                                      setConfirmed(false);
+                                      document
+                                        .getElementById("platform-action-title")
+                                        ?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "start",
+                                        });
+                                    }}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    {label}
+                                  </Button>,
+                                ];
+                              })}
+                            </div>
+                          )}
                       </article>
                     ))
                   )}
@@ -1005,6 +1280,7 @@ export function RealPlatformPage({
                       const next = event.target.value as PlatformActionName;
                       setAction(next);
                       setTargetId(next.startsWith("tenant.") ? activeContext.organization.id : "");
+                      if (next.startsWith("incident.")) selectResource("incidents");
                     }}
                     value={action}
                   >
@@ -1119,11 +1395,21 @@ export function RealPlatformPage({
                   const canApprove =
                     item.status === "pending" &&
                     item.requestedByIdentityId !== actorIdentityId &&
+                    canApprovePlatformAction(
+                      item,
+                      projection.status === "ready" ? projection.data : null,
+                      actorIdentityId,
+                    ) &&
                     activeOverview?.access.stepUp === true &&
                     permissions.includes("platform.action.approve") &&
                     permissions.includes(actionPermission(item.action));
                   const canReject =
                     item.status === "pending" &&
+                    canApprovePlatformAction(
+                      item,
+                      projection.status === "ready" ? projection.data : null,
+                      actorIdentityId,
+                    ) &&
                     activeOverview?.access.stepUp === true &&
                     permissions.includes("platform.action.reject") &&
                     permissions.includes(actionPermission(item.action));

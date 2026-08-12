@@ -27,7 +27,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
 import type { AuthContext } from "../auth/auth.service.js";
 import { DatabaseService } from "../database/database.module.js";
 import {
@@ -50,10 +50,12 @@ import {
 } from "./platform-actions.js";
 import { PlatformDurableOutcomeError } from "./platform-errors.js";
 import {
+  finalizePlatformKeysetPage,
   maskPlatformEmail,
   type PlatformProjectionPage,
   type PlatformResource,
   paginatePlatformItems,
+  parsePlatformKeysetPage,
   sanitizePlatformAuditItem,
   sanitizePlatformIncident,
   sanitizePlatformIntegration,
@@ -167,6 +169,7 @@ export class PlatformService {
       throw new BadRequestException("INVALID_GLOBAL_PLATFORM_RESOURCE");
     const resource = resourceInput as "leads" | "support";
     const canReadPii = access.permissions.includes("platform.pii.read");
+    const pageRequest = parsePlatformKeysetPage(options.limit ?? 25, options.cursor);
     if (resource === "leads") {
       const rows = await this.database.db
         .select({
@@ -181,12 +184,21 @@ export class PlatformService {
           createdAt: trialApplications.createdAt,
         })
         .from(trialApplications)
+        .where(
+          pageRequest.cursor
+            ? or(
+                lt(trialApplications.createdAt, pageRequest.cursor.createdAt),
+                and(
+                  eq(trialApplications.createdAt, pageRequest.cursor.createdAt),
+                  lt(trialApplications.id, pageRequest.cursor.id),
+                ),
+              )
+            : undefined,
+        )
         .orderBy(desc(trialApplications.createdAt), desc(trialApplications.id))
-        .limit(500);
-      const page = paginatePlatformItems(
-        rows.map((row) => sanitizePlatformLead(row, canReadPii)),
-        options.limit ?? 25,
-        options.cursor,
+        .limit(pageRequest.limit + 1);
+      const page = finalizePlatformKeysetPage(rows, pageRequest.limit, (row) =>
+        sanitizePlatformLead(row, canReadPii),
       );
       return { resource, availability: "available", ...page };
     }
@@ -200,12 +212,21 @@ export class PlatformService {
         createdAt: contactRequests.createdAt,
       })
       .from(contactRequests)
+      .where(
+        pageRequest.cursor
+          ? or(
+              lt(contactRequests.createdAt, pageRequest.cursor.createdAt),
+              and(
+                eq(contactRequests.createdAt, pageRequest.cursor.createdAt),
+                lt(contactRequests.id, pageRequest.cursor.id),
+              ),
+            )
+          : undefined,
+      )
       .orderBy(desc(contactRequests.createdAt), desc(contactRequests.id))
-      .limit(500);
-    const page = paginatePlatformItems(
-      rows.map((row) => sanitizePlatformSupportRequest(row, canReadPii)),
-      options.limit ?? 25,
-      options.cursor,
+      .limit(pageRequest.limit + 1);
+    const page = finalizePlatformKeysetPage(rows, pageRequest.limit, (row) =>
+      sanitizePlatformSupportRequest(row, canReadPii),
     );
     return { resource, availability: "available", ...page };
   }

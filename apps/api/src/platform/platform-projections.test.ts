@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  finalizePlatformKeysetPage,
   maskPlatformEmail,
   paginatePlatformItems,
+  parsePlatformKeysetPage,
   sanitizePlatformAuditItem,
   sanitizePlatformIncident,
   sanitizePlatformIntegration,
@@ -44,6 +46,35 @@ describe("platform projections", () => {
     assert.deepEqual(paginatePlatformItems(["a", "b", "c"], 2, first.nextCursor).items, ["c"]);
     assert.throws(() => paginatePlatformItems(["a"], 2, "not-a-cursor"), /INVALID_CURSOR/);
     assert.throws(() => paginatePlatformItems(["a"], 101, undefined), /INVALID_LIMIT/);
+  });
+
+  it("keeps global pagination stable with a chronological keyset cursor", () => {
+    const rows = [
+      {
+        id: "e1111111-1111-4111-8111-111111111113",
+        createdAt: new Date("2026-08-11T12:00:02.000Z"),
+      },
+      {
+        id: "e1111111-1111-4111-8111-111111111112",
+        createdAt: new Date("2026-08-11T12:00:01.000Z"),
+      },
+      {
+        id: "e1111111-1111-4111-8111-111111111111",
+        createdAt: new Date("2026-08-11T12:00:00.000Z"),
+      },
+    ];
+    const first = finalizePlatformKeysetPage(rows, 2, (row) => row.id);
+
+    assert.deepEqual(first.items, [rows[0]?.id, rows[1]?.id]);
+    assert.ok(first.nextCursor);
+    assert.deepEqual(parsePlatformKeysetPage(2, first.nextCursor), {
+      limit: 2,
+      cursor: {
+        id: rows[1]?.id,
+        createdAt: rows[1]?.createdAt,
+      },
+    });
+    assert.throws(() => parsePlatformKeysetPage(2, "not-a-cursor"), /INVALID_CURSOR/);
   });
 
   it("keeps audit projection structural and drops arbitrary metadata", () => {
