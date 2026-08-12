@@ -1392,24 +1392,23 @@ export function RealPlatformPage({
             {actions.status === "ready" && (
               <div className="platform-action-list">
                 {actions.data.items.map((item) => {
+                  const needsIncidentProjection =
+                    item.action === "incident.approve" || item.action === "incident.reject";
+                  const incidentApprovalContextReady = canApprovePlatformAction(
+                    item,
+                    projection.status === "ready" ? projection.data : null,
+                    actorIdentityId,
+                  );
                   const canApprove =
                     item.status === "pending" &&
                     item.requestedByIdentityId !== actorIdentityId &&
-                    canApprovePlatformAction(
-                      item,
-                      projection.status === "ready" ? projection.data : null,
-                      actorIdentityId,
-                    ) &&
+                    incidentApprovalContextReady &&
                     activeOverview?.access.stepUp === true &&
                     permissions.includes("platform.action.approve") &&
                     permissions.includes(actionPermission(item.action));
                   const canReject =
                     item.status === "pending" &&
-                    canApprovePlatformAction(
-                      item,
-                      projection.status === "ready" ? projection.data : null,
-                      actorIdentityId,
-                    ) &&
+                    incidentApprovalContextReady &&
                     activeOverview?.access.stepUp === true &&
                     permissions.includes("platform.action.reject") &&
                     permissions.includes(actionPermission(item.action));
@@ -1425,23 +1424,31 @@ export function RealPlatformPage({
                       </div>
                       <Badge tone={actionTone(item.status)}>{statusLabel(item.status)}</Badge>
                       {item.status === "pending" && (
-                        <div className="platform-action-row__buttons">
-                          <Button
-                            disabled={!canReject || mutating}
-                            onClick={() => void decide(item, "reject")}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            Rejeitar
-                          </Button>
-                          <Button
-                            disabled={!canApprove || mutating}
-                            onClick={() => void decide(item, "approve")}
-                            size="sm"
-                          >
-                            Aprovar e executar
-                          </Button>
-                        </div>
+                        <>
+                          {needsIncidentProjection && !incidentApprovalContextReady && (
+                            <p className="platform-blocker">
+                              Abra Incidentes na unidade correta para validar o relator e liberar a
+                              decisão.
+                            </p>
+                          )}
+                          <div className="platform-action-row__buttons">
+                            <Button
+                              disabled={!canReject || mutating}
+                              onClick={() => void decide(item, "reject")}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Rejeitar
+                            </Button>
+                            <Button
+                              disabled={!canApprove || mutating}
+                              onClick={() => void decide(item, "approve")}
+                              size="sm"
+                            >
+                              Aprovar e executar
+                            </Button>
+                          </div>
+                        </>
                       )}
                     </article>
                   );
