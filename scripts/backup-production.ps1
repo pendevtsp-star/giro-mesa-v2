@@ -13,6 +13,7 @@ param(
   [string]$OutputDirectory,
   [Parameter(Mandatory = $true)]
   [string]$SourceArtifact,
+  [string[]]$SourceComponentImage = @(),
   [Parameter(Mandatory = $true)]
   [ValidatePattern('^[0-9]{4}_[A-Za-z0-9_.-]+$')]
   [string]$SourceMigrationId,
@@ -52,7 +53,7 @@ function Get-ManifestKey {
 
 function Assert-ImmutableArtifact {
   param([string]$Value)
-  if ($Value -notmatch '^(git:)?[0-9a-fA-F]{40}$' -and $Value -notmatch '@sha256:[0-9a-fA-F]{64}$') {
+  if ($Value -notmatch '^(git:)?[0-9a-fA-F]{40}$' -and $Value -notmatch '@sha256:[0-9a-fA-F]{64}$' -and $Value -notmatch '^runtime-set:sha256:[0-9a-f]{64}$') {
     throw 'BACKUP_ARTIFACT_NOT_IMMUTABLE'
   }
 }
@@ -226,6 +227,21 @@ function Add-BackupFile {
 
 Assert-ImmutableArtifact -Value $SourceArtifact
 Assert-ImmutableArtifact -Value $TargetArtifact
+if ($TargetArtifact.StartsWith('runtime-set:', [StringComparison]::Ordinal)) { throw 'BACKUP_TARGET_ARTIFACT_INVALID' }
+if ($SourceArtifact.StartsWith('runtime-set:sha256:', [StringComparison]::Ordinal)) {
+  if ($SourceComponentImage.Count -ne 2) { throw 'BACKUP_SOURCE_COMPONENTS_INVALID' }
+  $services = @{}
+  foreach ($image in $SourceComponentImage) {
+    $match = [regex]::Match($image, '^ghcr\.io/pendevtsp-star/giro-mesa-v2-(api|worker)@sha256:[0-9a-f]{64}$')
+    if (-not $match.Success -or $services.ContainsKey($match.Groups[1].Value)) { throw 'BACKUP_SOURCE_COMPONENTS_INVALID' }
+    $services[$match.Groups[1].Value] = $image
+  }
+  if (-not $services.ContainsKey('api') -or -not $services.ContainsKey('worker')) { throw 'BACKUP_SOURCE_COMPONENTS_INVALID' }
+  $canonical = ConvertTo-Json -InputObject @($SourceComponentImage | Sort-Object -CaseSensitive) -Compress
+  $runtimeHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($canonical))).ToLowerInvariant()
+  if ($SourceArtifact -cne "runtime-set:sha256:$runtimeHash") { throw 'BACKUP_SOURCE_RUNTIME_SET_MISMATCH' }
+}
+elseif ($SourceComponentImage.Count -ne 0) { throw 'BACKUP_SOURCE_COMPONENTS_UNEXPECTED' }
 $manifestKey = Get-ManifestKey
 $objectState = $null
 $objectStateJson = $null
@@ -266,7 +282,7 @@ if ($decodedConfigKey.Length -ne 32) { throw 'BACKUP_CONFIG_ENCRYPTION_KEY_INVAL
 if (-not $hasObjectInput -or $null -eq $runtimeEnvState) { throw 'BACKUP_COMPLETE_COVERAGE_REQUIRED' }
 
 $root = [IO.Path]::GetFullPath($OutputDirectory)
-[IO.Directory]::CreateDirectory($root) | Out-Null
+if (-not [IO.Directory]::Exists($root)) { throw 'BACKUP_OUTPUT_DIRECTORY_INVALID' }
 [void](Assert-NoReparsePath -Path $root -ErrorCode 'BACKUP_OUTPUT_REPARSE_POINT_FORBIDDEN')
 $startedAt = [DateTimeOffset]::UtcNow
 $backupId = '{0}-{1}' -f $startedAt.ToString('yyyyMMddTHHmmssZ'), ([Guid]::NewGuid().ToString('N'))
@@ -276,6 +292,12 @@ $dockerTouched = $false
 
 try {
   [IO.Directory]::CreateDirectory($backupDirectory) | Out-Null
+  $runtimeSnapshot = Join-Path $backupDirectory '.runtime-env.snapshot'
+  $runtimeSource = [IO.File]::Open($runtimeEnvPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  try {
+    $runtimeTarget = [IO.File]::Open($runtimeSnapshot, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $runtimeSource.CopyTo($runtimeTarget); $runtimeTarget.Flush($true) } finally { $runtimeTarget.Dispose() }
+  } finally { $runtimeSource.Dispose() }
   $databaseDump = Join-Path $backupDirectory 'database.dump'
   $dockerTouched = $true
   Invoke-CheckedDocker -Arguments @('exec', $DatabaseContainer, 'pg_dump', '--format=custom', '--compress=6', '--no-owner', '--no-acl', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--file', $containerDump)
@@ -290,7 +312,7 @@ try {
       throw 'BACKUP_OBJECT_TREE_CHANGED'
     }
   }
-  Protect-RuntimeConfiguration -Source $runtimeEnvPath -Destination (Join-Path $backupDirectory 'configuration.enc')
+  Protect-RuntimeConfiguration -Source $runtimeSnapshot -Destination (Join-Path $backupDirectory 'configuration.enc')
 
   $files = [System.Collections.ArrayList]::new()
   Add-BackupFile -Files $files -Root $backupDirectory -Path $databaseDump -Kind 'postgresql'
@@ -305,7 +327,7 @@ try {
   if ($durationSeconds -gt ($MaxRpoMinutes * 60)) { throw 'BACKUP_WINDOW_EXCEEDED' }
   $payload = [ordered]@{
     schemaVersion = 2; backupId = $backupId
-    sourceArtifact = $SourceArtifact; sourceMigrationId = $SourceMigrationId
+    sourceArtifact = $SourceArtifact; sourceComponentImages = @($SourceComponentImage | Sort-Object -CaseSensitive); sourceMigrationId = $SourceMigrationId
     targetArtifact = $TargetArtifact; targetMigrationId = $TargetMigrationId
     sourceDatabaseContainer = $DatabaseContainer; databaseName = $DatabaseName
     createdAt = $startedAt.ToString('o'); completedAt = $finishedAt.ToString('o')
@@ -315,10 +337,11 @@ try {
   $currentRuntimeEnv = Get-Item -LiteralPath (Assert-NoReparsePath -Path $runtimeEnvPath -ErrorCode 'BACKUP_RUNTIME_ENV_REPARSE_POINT_FORBIDDEN') -Force
   $currentRuntimeSha = Get-Sha256Hex -Path $runtimeEnvPath
   if ($currentRuntimeEnv.Length -ne $runtimeEnvState.Length -or $currentRuntimeEnv.LastWriteTimeUtc.Ticks -ne $runtimeEnvState.LastWriteTicks -or $currentRuntimeSha -ne $runtimeEnvState.Sha256) { throw 'BACKUP_RUNTIME_ENV_CHANGED' }
-  $runtimeBytes = [IO.File]::ReadAllBytes($runtimeEnvPath)
+  $runtimeBytes = [IO.File]::ReadAllBytes($runtimeSnapshot)
   $runtimeHmac = [Security.Cryptography.HMACSHA256]::new($manifestKey)
   try { $payload.runtimeConfigurationHmacSha256 = ($runtimeHmac.ComputeHash($runtimeBytes) | ForEach-Object { $_.ToString('x2') }) -join '' }
   finally { $runtimeHmac.Dispose(); [Array]::Clear($runtimeBytes, 0, $runtimeBytes.Length) }
+  Remove-Item -LiteralPath $runtimeSnapshot -Force
   $payloadJson = $payload | ConvertTo-Json -Depth 8 -Compress
   $utf8 = [Text.UTF8Encoding]::new($false)
   $payloadBytes = $utf8.GetBytes($payloadJson)

@@ -36,6 +36,12 @@
       "upstreamRepository": "docker.io/nginxinc/nginx-unprivileged",
       "upstreamTag": "1.29-alpine",
       "provenance": "Unprivileged Nginx index resolved and locked by digest"
+    },
+    "postgres16": {
+      "reference": "postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+      "upstreamRepository": "docker.io/library/postgres",
+      "upstreamTag": "16-alpine",
+      "provenance": "PostgreSQL 16 official image index locked by digest for recovery validation"
     }
   }
 }

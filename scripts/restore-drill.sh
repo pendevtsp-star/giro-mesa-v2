@@ -32,6 +32,7 @@ while (($#)); do
   esac
 done
 expected_target_artifact=${expected_target_artifact:-$expected_artifact}
+expected_target_migration_id=${expected_target_migration_id:-$expected_source_migration_id}
 
 for required in backup_directory target_database_container database_name database_user expected_artifact expected_source_migration_id; do
   if [[ -z ${!required} ]]; then
@@ -45,7 +46,7 @@ if [[ ! $target_database_container =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] ||
   echo "RESTORE_DATABASE_IDENTIFIER_INVALID" >&2
   exit 1
 fi
-if [[ ! $expected_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $expected_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]]; then
+if [[ ! $expected_artifact =~ ^(git:)?[0-9a-fA-F]{40}$ ]] && [[ ! $expected_artifact =~ @sha256:[0-9a-fA-F]{64}$ ]] && [[ ! $expected_artifact =~ ^runtime-set:sha256:[0-9a-f]{64}$ ]]; then
   echo "RESTORE_ARTIFACT_NOT_IMMUTABLE" >&2
   exit 1
 fi
@@ -91,7 +92,7 @@ cleanup() {
 trap cleanup EXIT
 
 if ! python3 - "$backup_directory" "$stage" "$expected_artifact" "$expected_source_migration_id" "$expected_target_artifact" "$expected_target_migration_id" "$target_database_container" <<'PY'
-import base64, hashlib, hmac, json, os, pathlib, shutil, sys, tarfile
+import base64, hashlib, hmac, json, os, pathlib, re, shutil, stat, sys, zipfile
 
 root_input = pathlib.Path(sys.argv[1])
 if root_input.is_symlink():
@@ -131,7 +132,7 @@ try:
     payload = json.loads(payload_bytes)
 except Exception:
     fail("MANIFEST_PAYLOAD_INVALID")
-if manifest.get("schemaVersion") != 1 or payload.get("schemaVersion") != 1:
+if manifest.get("schemaVersion") != 2 or payload.get("schemaVersion") != 2:
     fail("BACKUP_SCHEMA_UNSUPPORTED")
 if payload.get("coverage") != {"mode": "embedded", "database": True, "objects": True, "encryptedConfiguration": True}:
     fail("BACKUP_COMPLETE_COVERAGE_REQUIRED")
@@ -140,6 +141,14 @@ if not isinstance(runtime_config_hmac, str) or not __import__("re").fullmatch(r"
     fail("BACKUP_RUNTIME_CONFIGURATION_BINDING_INVALID")
 if payload.get("sourceArtifact", payload.get("artifact")) != expected_artifact:
     fail("BACKUP_ARTIFACT_MISMATCH")
+source_components = payload.get("sourceComponentImages", [])
+if expected_artifact.startswith("runtime-set:"):
+    pattern = re.compile(r"^ghcr\.io/pendevtsp-star/giro-mesa-v2-(api|worker)@sha256:[0-9a-f]{64}$")
+    matches = [pattern.fullmatch(value) for value in source_components if isinstance(value, str)]
+    canonical = json.dumps(sorted(source_components), separators=(",", ":"))
+    computed = "runtime-set:sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+    if len(source_components) != 2 or not all(matches) or {match.group(1) for match in matches} != {"api", "worker"} or len(set(source_components)) != 2 or computed != expected_artifact:
+        fail("BACKUP_SOURCE_RUNTIME_SET_INVALID")
 if payload.get("sourceMigrationId", payload.get("migrationId")) != expected_source_migration:
     fail("BACKUP_SOURCE_MIGRATION_MISMATCH")
 if payload.get("targetArtifact", payload.get("artifact")) != expected_target_artifact:
@@ -154,7 +163,7 @@ if not isinstance(source, str) or not source or source == target_container:
 
 allowed = {
     "database.dump": "postgresql",
-    "objects.tar.gz": "objects",
+    "objects.zip": "objects",
     "configuration.age": "encrypted_configuration",
     "configuration.gpg": "encrypted_configuration",
     "configuration.enc": "encrypted_configuration",
@@ -188,19 +197,22 @@ for item in payload.get("files", []):
 if database_count != 1:
     fail("BACKUP_DATABASE_FILE_INVALID")
 
-archive = stage / "objects.tar.gz"
+archive = stage / "objects.zip"
 if archive.exists():
     try:
-        with tarfile.open(archive, "r:gz") as value:
-            for member in value.getmembers():
-                path = pathlib.PurePosixPath(member.name)
-                if (path.is_absolute() or ".." in path.parts or member.issym() or member.islnk()
-                        or member.isdev() or not (member.isdir() or member.isfile())):
+        with zipfile.ZipFile(archive, "r") as value:
+            names=set()
+            for member in value.infolist():
+                path = pathlib.PurePosixPath(member.filename)
+                mode=(member.external_attr >> 16) & 0xFFFF
+                if (path.is_absolute() or ".." in path.parts or ":" in member.filename or member.filename in names
+                        or stat.S_ISLNK(mode) or (mode and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)))):
                     fail("BACKUP_OBJECT_PATH_INVALID")
+                names.add(member.filename)
             object_stage = stage / "objects-restored"
             object_stage.mkdir(mode=0o700)
             value.extractall(object_stage)
-    except (tarfile.TarError, OSError):
+    except (zipfile.BadZipFile, OSError):
         fail("BACKUP_OBJECT_ARCHIVE_INVALID")
 
 plan = {
@@ -388,7 +400,7 @@ python3 - "$evidence_path" "$backup_id" "$artifact" "$migration_id" "$target_art
 import json, os, pathlib, sys, tempfile
 path, backup_id, artifact, migration_id, target_artifact, target_migration_id, target, duration, rto, smoke_sha, objects, config_name = sys.argv[1:]
 value = {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "backupId": backup_id,
     "artifact": artifact,
     "migrationId": migration_id,

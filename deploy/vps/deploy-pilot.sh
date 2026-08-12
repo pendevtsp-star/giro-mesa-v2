@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+[[ ${GIROMESA_TRUST_BOOTSTRAP_VERIFIED:-} == true ]] || { echo "TRUST_BOOTSTRAP_REQUIRED" >&2; exit 1; }
 
 root=${GIROMESA_ROOT:-/srv/apps/giromesa-v2}
 env_file=${GIROMESA_ENV_FILE:-$root/shared/.env}
@@ -16,10 +17,12 @@ if [[ ! $artifact_sha =~ ^[0-9a-fA-F]{40}$ ]] || [[ $(readlink -f "$release_dir"
   echo "RELEASE_PATH_NOT_CANONICAL: expected releases/$artifact_sha" >&2
   exit 1
 fi
-if [[ ! $current_release =~ ^$root/releases/[0-9a-fA-F]{40}$ ]] || [[ ! -f $env_file ]]; then
+if [[ ! $current_release =~ ^$root/releases/[0-9a-fA-F]{40}$ ]] || [[ ! -f $env_file || -L $env_file ]]; then
   echo "CURRENT_RELEASE_PATH_NOT_CANONICAL" >&2
   exit 1
 fi
+env_mode=$(stat -c '%a' "$env_file"); env_uid=$(stat -c '%u' "$env_file")
+[[ $env_mode == 600 && $env_uid == $(id -u) ]] || { echo "RUNTIME_ENV_PERMISSIONS_INVALID" >&2; exit 1; }
 if [[ ! $recovery_sha =~ ^[0-9a-f]{40}$ || ! -d $recovery_release || $(readlink -f "$recovery_release") != "$recovery_release" ]]; then echo "RECOVERY_RELEASE_REQUIRED" >&2; exit 1; fi
 
 compose_file="$release_dir/deploy/vps/compose.pilot.yaml"
@@ -132,9 +135,10 @@ export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_va
 export GIROMESA_OPS_IMAGE=${image_values[4]}
 export GIROMESA_POSTGRES_IMAGE=postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
 export GIROMESA_RELEASE_ARTIFACT_SHA=$artifact_sha GIROMESA_IMAGE_ATTESTATION_FILE=$attestation
+export GIROMESA_RELEASE_DIRECTORY=$release_dir
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
 export DOCKER_CONFIG=${GIROMESA_DOCKER_CONFIG_DIRECTORY:?GIROMESA_DOCKER_CONFIG_DIRECTORY_REQUIRED}
-compose=(docker compose --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
+compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
 "${compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
 mapfile -t recovery_image_values < <(python3 - "$recovery_attestation" <<'PY'
@@ -145,18 +149,20 @@ for name in ("api", "worker", "site", "customer", "ops"): print(by_service.get(n
 PY
 )
 for index in "${!recovery_image_values[@]}"; do recovery_image_values[index]=${recovery_image_values[index]%$'\r'}; done
-export GIROMESA_RELEASE_ARTIFACT_SHA=$recovery_sha GIROMESA_IMAGE_ATTESTATION_FILE=$recovery_attestation GIROMESA_PROVENANCE_ROLE=recovery
+export GIROMESA_RELEASE_ARTIFACT_SHA=$recovery_sha GIROMESA_IMAGE_ATTESTATION_FILE=$recovery_attestation GIROMESA_EXPECTED_PROVENANCE_ROLE=recovery
+export GIROMESA_RELEASE_DIRECTORY=$recovery_release
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$recovery_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$recovery_attestation_checksum
 export GIROMESA_API_IMAGE=${recovery_image_values[0]} GIROMESA_WORKER_IMAGE=${recovery_image_values[1]}
 export GIROMESA_SITE_IMAGE=${recovery_image_values[2]} GIROMESA_CUSTOMER_IMAGE=${recovery_image_values[3]}
 export GIROMESA_OPS_IMAGE=${recovery_image_values[4]}
-recovery_compose=(docker compose --env-file "$env_file" -f "$recovery_release/deploy/vps/compose.pilot.yaml" -f "$recovery_release/deploy/vps/compose.images.yaml" -f "$recovery_release/deploy/vps/compose.observability.yaml")
+recovery_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$recovery_release/deploy/vps/compose.pilot.yaml" -f "$recovery_release/deploy/vps/compose.images.yaml" -f "$recovery_release/deploy/vps/compose.observability.yaml")
 "${recovery_compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$recovery_release/deploy/vps/verify-image-provenance.sh"
 "${recovery_compose[@]}" pull
 "$recovery_release/deploy/vps/verify-image-provenance.sh"
 export GIROMESA_RELEASE_ARTIFACT_SHA=$artifact_sha GIROMESA_IMAGE_ATTESTATION_FILE=$attestation
-export GIROMESA_PROVENANCE_ROLE=target
+export GIROMESA_RELEASE_DIRECTORY=$release_dir
+export GIROMESA_EXPECTED_PROVENANCE_ROLE=target
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
 export GIROMESA_API_IMAGE=${image_values[0]} GIROMESA_WORKER_IMAGE=${image_values[1]}
 export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_values[3]}
@@ -188,17 +194,58 @@ deployment_committed=0
 mutators_stopped=0
 recover_mutators() {
   if [[ $deployment_committed -eq 0 && $mutators_stopped -eq 1 ]]; then
-    ln -sfn "$recovery_release" "$root/.current-next" && mv -Tf "$root/.current-next" "$root/current"
-    export GIROMESA_RELEASE_ARTIFACT_SHA=$recovery_sha GIROMESA_IMAGE_ATTESTATION_FILE=$recovery_attestation GIROMESA_PROVENANCE_ROLE=recovery
+    export GIROMESA_RELEASE_ARTIFACT_SHA=$recovery_sha GIROMESA_IMAGE_ATTESTATION_FILE=$recovery_attestation GIROMESA_EXPECTED_PROVENANCE_ROLE=recovery
     export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$recovery_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$recovery_attestation_checksum
     export GIROMESA_API_IMAGE=${recovery_image_values[0]} GIROMESA_WORKER_IMAGE=${recovery_image_values[1]}
     export GIROMESA_SITE_IMAGE=${recovery_image_values[2]} GIROMESA_CUSTOMER_IMAGE=${recovery_image_values[3]} GIROMESA_OPS_IMAGE=${recovery_image_values[4]}
-    "${recovery_compose[@]}" up -d --remove-orphans >/dev/null 2>&1 || echo "RECOVERY_RELEASE_START_FAILED" >&2
+    if ! "${recovery_compose[@]}" up -d --remove-orphans; then
+      echo "RECOVERY_RELEASE_START_FAILED" >&2
+      return 97
+    fi
+    for service in api worker site customer ops; do
+      container_id=$("${recovery_compose[@]}" ps -q "$service")
+      status=
+      for _ in $(seq 1 30); do
+        status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+        [[ $status == healthy ]] && break
+        sleep 2
+      done
+      [[ $status == healthy ]] || { echo "RECOVERY_RELEASE_UNHEALTHY:$service" >&2; return 97; }
+    done
+    declare -A recovery_restarts=()
+    for service in api worker site customer ops; do
+      container_id=$("${recovery_compose[@]}" ps -q "$service")
+      recovery_restarts[$service]=$(docker inspect --format '{{.RestartCount}}' "$container_id")
+    done
+    sleep "${GIROMESA_RECOVERY_STABILITY_SECONDS:-5}"
+    for service in api worker site customer ops; do
+      container_id=$("${recovery_compose[@]}" ps -q "$service")
+      status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
+      [[ $status == healthy && $(docker inspect --format '{{.RestartCount}}' "$container_id") == "${recovery_restarts[$service]}" ]] || { echo "RECOVERY_RELEASE_UNSTABLE:$service" >&2; return 97; }
+    done
+    recovery_postgres_id=$("${recovery_compose[@]}" ps -q postgres)
+    recovery_probe=$(docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --set ON_ERROR_STOP=1 --quiet --tuples-only --no-align --command "WITH inserted AS (INSERT INTO outbox_events(topic,aggregate_type,aggregate_id,payload) VALUES ('system.worker_probe','system','deploy-recovery','{}'::jsonb) RETURNING id) SELECT id FROM inserted")
+    recovery_probe=${recovery_probe//$'\r'/}; recovery_probe=${recovery_probe//$'\n'/}
+    recovery_processed=
+    for _ in $(seq 1 30); do
+      recovery_processed=$(docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --tuples-only --no-align --command "SELECT processed_at IS NOT NULL FROM outbox_events WHERE id = '$recovery_probe'::uuid")
+      recovery_processed=${recovery_processed//$'\r'/}; recovery_processed=${recovery_processed//$'\n'/}
+      [[ $recovery_processed == t ]] && break
+      sleep 1
+    done
+    [[ $recovery_processed == t ]] || { echo "RECOVERY_WORKER_QUEUE_SMOKE_FAILED" >&2; return 97; }
+    docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --set ON_ERROR_STOP=1 --command "DELETE FROM outbox_events WHERE id = '$recovery_probe'::uuid" >/dev/null
+    ln -sfn "$recovery_release" "$root/.current-next" && mv -Tf "$root/.current-next" "$root/current"
+    python3 - "$root/shared/deploy-recovery.json" "git:$artifact_sha" "git:$recovery_sha" <<'PY'
+import datetime,json,os,pathlib,sys,tempfile
+destination=pathlib.Path(sys.argv[1]); value={"schemaVersion":1,"failedArtifact":sys.argv[2],"recoveryArtifact":sys.argv[3],"completedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),"health":"passed"}
+fd,temporary=tempfile.mkstemp(prefix="deploy-recovery.",dir=destination.parent)
+with os.fdopen(fd,"w",encoding="utf-8") as handle: json.dump(value,handle,sort_keys=True); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
+os.chmod(temporary,0o600); os.replace(temporary,destination)
+PY
   fi
 }
 trap recover_mutators EXIT
-docker stop --timeout "${GIROMESA_DRAIN_SECONDS:-30}" "${mutators[@]}" >/dev/null
-mutators_stopped=1
 
 mkdir -p "$backup_dir"
 chmod 700 "$root/shared" "$backup_dir"
@@ -216,14 +263,15 @@ unset GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64
 unset GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
 [[ -f $backup/manifest.json ]] || { echo "BACKUP_MANIFEST_MISSING" >&2; exit 1; }
 
+docker stop --timeout "${GIROMESA_DRAIN_SECONDS:-30}" "${mutators[@]}" >/dev/null
+mutators_stopped=1
+
 "${compose[@]}" pull
 "$provenance_script"
 "${compose[@]}" up -d postgres
 postgres_id=$("${compose[@]}" ps -q postgres)
 [[ $(docker inspect --format '{{.State.Health.Status}}' "$postgres_id") == healthy ]] || { echo "POSTGRES_UPDATE_UNHEALTHY" >&2; exit 1; }
 "${compose[@]}" --profile tools run --rm migrate
-ln -sfn "$release_dir" "$root/.current-next"
-mv -Tf "$root/.current-next" "$root/current"
 "${compose[@]}" up -d --remove-orphans
 
 for service in api worker site customer ops; do
@@ -275,6 +323,8 @@ curl --fail --silent --show-error http://127.0.0.1:3210/health >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:3110/ >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:3111/ >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:3112/health >/dev/null
+ln -sfn "$release_dir" "$root/.current-next"
+mv -Tf "$root/.current-next" "$root/current"
 deployment_committed=1
 trap - EXIT
 "${compose[@]}" ps

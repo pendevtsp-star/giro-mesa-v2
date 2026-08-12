@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+[[ ${GIROMESA_TRUST_BOOTSTRAP_VERIFIED:-} == true ]] || { echo "TRUST_BOOTSTRAP_REQUIRED" >&2; exit 1; }
 
 root=${GIROMESA_ROOT:-/srv/apps/giromesa-v2}
 env_file=${GIROMESA_ENV_FILE:-$root/shared/.env}
 target_sha=${ROLLBACK_RELEASE_SHA:-${1:-}}
 current_release=$(readlink -f "$root/current")
 target_candidate="$root/releases/$target_sha"
+[[ -f $env_file && ! -L $env_file && $(stat -c '%a:%u' "$env_file") == "600:$(id -u)" ]] || { echo "ROLLBACK_ENV_PERMISSIONS_INVALID" >&2; exit 1; }
 if [[ ! $target_sha =~ ^[0-9a-fA-F]{40}$ ]] || [[ ! -d $target_candidate ]]; then
   echo "ROLLBACK_RELEASE_SHA_INVALID" >&2
   exit 1
@@ -102,14 +104,14 @@ PY
 )
 for index in "${!image_values[@]}"; do image_values[index]=${image_values[index]%$'\r'}; done
 export GIROMESA_RELEASE_ARTIFACT_SHA="$target_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$attestation"
-export GIROMESA_PROVENANCE_ROLE=${ROLLBACK_TARGET_PROVENANCE_ROLE:-recovery}
+export GIROMESA_EXPECTED_PROVENANCE_ROLE=recovery GIROMESA_RELEASE_DIRECTORY=$target_release
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
 export GIROMESA_API_IMAGE=${image_values[0]} GIROMESA_WORKER_IMAGE=${image_values[1]}
 export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_values[3]}
 export GIROMESA_OPS_IMAGE=${image_values[4]}
 export GIROMESA_POSTGRES_IMAGE=postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
 export DOCKER_CONFIG=${GIROMESA_DOCKER_CONFIG_DIRECTORY:?GIROMESA_DOCKER_CONFIG_DIRECTORY_REQUIRED}
-compose=(docker compose --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
+compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
 "${compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
 "${compose[@]}" pull
@@ -123,15 +125,23 @@ for name in ("api", "worker", "site", "customer", "ops"): print(by_service.get(n
 PY
 )
 for index in "${!current_images[@]}"; do current_images[index]=${current_images[index]%$'\r'}; done
+for pair in "api:0" "worker:1" "site:2" "customer:3" "ops:4"; do
+  service=${pair%%:*}; index=${pair##*:}
+  running_id=$(docker ps --filter label=com.docker.compose.project=giromesa-v2-pilot --filter "label=com.docker.compose.service=$service" --format '{{.ID}}' --no-trunc)
+  [[ $running_id =~ ^[0-9a-f]{64}$ ]] || { echo "ROLLBACK_RUNNING_SERVICE_REQUIRED:$service" >&2; exit 1; }
+  image_id=$(docker inspect --format '{{.Image}}' "$running_id")
+  running_digest=$(docker image inspect "$image_id" --format '{{json .RepoDigests}}' | python3 -c "import json,sys; expected='${current_images[$index]}'; values=json.load(sys.stdin); print(expected if expected in values else '',end='')")
+  [[ $running_digest == "${current_images[$index]}" ]] || { echo "ROLLBACK_RUNNING_RELEASE_DRIFT:$service" >&2; exit 1; }
+done
 export GIROMESA_RELEASE_ARTIFACT_SHA="$current_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$current_attestation"
-export GIROMESA_PROVENANCE_ROLE=target
+export GIROMESA_EXPECTED_PROVENANCE_ROLE=target GIROMESA_RELEASE_DIRECTORY=$current_release
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$current_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$current_attestation_checksum
 export GIROMESA_API_IMAGE=${current_images[0]} GIROMESA_WORKER_IMAGE=${current_images[1]}
 export GIROMESA_SITE_IMAGE=${current_images[2]} GIROMESA_CUSTOMER_IMAGE=${current_images[3]}
 export GIROMESA_OPS_IMAGE=${current_images[4]}
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
 export GIROMESA_RELEASE_ARTIFACT_SHA="$target_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$attestation"
-export GIROMESA_PROVENANCE_ROLE=${ROLLBACK_TARGET_PROVENANCE_ROLE:-recovery}
+export GIROMESA_EXPECTED_PROVENANCE_ROLE=recovery GIROMESA_RELEASE_DIRECTORY=$target_release
 export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$target_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$target_attestation_checksum
 export GIROMESA_API_IMAGE=${image_values[0]} GIROMESA_WORKER_IMAGE=${image_values[1]}
 export GIROMESA_SITE_IMAGE=${image_values[2]} GIROMESA_CUSTOMER_IMAGE=${image_values[3]}
@@ -142,21 +152,68 @@ restore_previous_release() {
   ln -sfn "$current_release" "$root/.current-next"
   mv -Tf "$root/.current-next" "$root/current"
   export GIROMESA_RELEASE_ARTIFACT_SHA="$current_sha" GIROMESA_IMAGE_ATTESTATION_FILE="$current_attestation"
-  export GIROMESA_PROVENANCE_ROLE=target
+  export GIROMESA_EXPECTED_PROVENANCE_ROLE=target GIROMESA_RELEASE_DIRECTORY=$current_release
   export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$current_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$current_attestation_checksum
   export GIROMESA_API_IMAGE=${current_images[0]} GIROMESA_WORKER_IMAGE=${current_images[1]}
   export GIROMESA_SITE_IMAGE=${current_images[2]} GIROMESA_CUSTOMER_IMAGE=${current_images[3]}
   export GIROMESA_OPS_IMAGE=${current_images[4]}
-  "$provenance_script"
-  docker compose --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" \
+  "$current_release/deploy/vps/verify-image-provenance.sh"
+  docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" \
     -f "$current_release/deploy/vps/compose.images.yaml" -f "$current_release/deploy/vps/compose.observability.yaml" \
     up -d --remove-orphans
+  current_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$current_release/deploy/vps/compose.pilot.yaml" -f "$current_release/deploy/vps/compose.images.yaml" -f "$current_release/deploy/vps/compose.observability.yaml")
+  for service in api worker site customer ops; do
+    container_id=$("${current_compose[@]}" ps -q "$service")
+    status=
+    for _ in $(seq 1 30); do
+      status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+      [[ $status == healthy ]] && break
+      sleep 2
+    done
+    [[ $status == healthy ]] || { echo "ROLLBACK_RECOVERY_UNHEALTHY:$service" >&2; return 97; }
+  done
+  declare -A recovery_restarts=()
+  for service in api worker site customer ops; do
+    container_id=$("${current_compose[@]}" ps -q "$service")
+    recovery_restarts[$service]=$(docker inspect --format '{{.RestartCount}}' "$container_id")
+  done
+  sleep "${GIROMESA_RECOVERY_STABILITY_SECONDS:-5}"
+  for service in api worker site customer ops; do
+    container_id=$("${current_compose[@]}" ps -q "$service")
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
+    [[ $status == healthy && $(docker inspect --format '{{.RestartCount}}' "$container_id") == "${recovery_restarts[$service]}" ]] || { echo "ROLLBACK_RECOVERY_UNSTABLE:$service" >&2; return 97; }
+  done
+  recovery_postgres_id=$("${current_compose[@]}" ps -q postgres)
+  recovery_probe=$(docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --set ON_ERROR_STOP=1 --quiet --tuples-only --no-align --command "WITH inserted AS (INSERT INTO outbox_events(topic,aggregate_type,aggregate_id,payload) VALUES ('system.worker_probe','system','rollback-recovery','{}'::jsonb) RETURNING id) SELECT id FROM inserted")
+  recovery_probe=${recovery_probe//$'\r'/}; recovery_probe=${recovery_probe//$'\n'/}; recovery_processed=
+  for _ in $(seq 1 30); do
+    recovery_processed=$(docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --tuples-only --no-align --command "SELECT processed_at IS NOT NULL FROM outbox_events WHERE id='$recovery_probe'::uuid")
+    recovery_processed=${recovery_processed//$'\r'/}; recovery_processed=${recovery_processed//$'\n'/}
+    [[ $recovery_processed == t ]] && break
+    sleep 1
+  done
+  [[ $recovery_processed == t ]] || { echo "ROLLBACK_RECOVERY_WORKER_QUEUE_SMOKE_FAILED" >&2; return 97; }
+  docker exec "$recovery_postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" --set ON_ERROR_STOP=1 --command "DELETE FROM outbox_events WHERE id='$recovery_probe'::uuid" >/dev/null
+  for endpoint in http://127.0.0.1:3210/health http://127.0.0.1:3110/ http://127.0.0.1:3111/ http://127.0.0.1:3112/health; do
+    curl --fail --silent --show-error "$endpoint" >/dev/null || { echo "ROLLBACK_RECOVERY_SMOKE_FAILED" >&2; return 97; }
+  done
+  python3 - "$root/shared/rollback-recovery.json" "git:$target_sha" "git:$current_sha" <<'PY'
+import datetime,json,os,pathlib,sys,tempfile
+destination=pathlib.Path(sys.argv[1]); value={"schemaVersion":1,"failedArtifact":sys.argv[2],"recoveryArtifact":sys.argv[3],"completedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),"health":"passed"}
+fd,temporary=tempfile.mkstemp(prefix="rollback-recovery.",dir=destination.parent)
+with os.fdopen(fd,"w",encoding="utf-8") as handle: json.dump(value,handle,sort_keys=True); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
+os.chmod(temporary,0o600); os.replace(temporary,destination)
+PY
 }
 
 rollback_committed=0
 recover_previous_release() {
   if [[ $rollback_committed -eq 0 ]]; then
-    restore_previous_release || echo "ROLLBACK_PREVIOUS_RELEASE_RECOVERY_FAILED" >&2
+    rm -f -- "${evidence_pending:-$root/shared/.rollback-app.pending}"
+    if ! restore_previous_release; then
+      echo "ROLLBACK_PREVIOUS_RELEASE_RECOVERY_FAILED" >&2
+      exit 97
+    fi
   fi
 }
 trap recover_previous_release EXIT
@@ -169,8 +226,6 @@ for service in api worker; do
 done
 docker stop --timeout "${GIROMESA_DRAIN_SECONDS:-30}" "${mutators[@]}" >/dev/null
 
-ln -sfn "$target_release" "$root/.current-next"
-mv -Tf "$root/.current-next" "$root/current"
 if ! "${compose[@]}" up -d --remove-orphans; then
   echo "ROLLBACK_APPLICATION_START_FAILED" >&2
   exit 1
@@ -224,11 +279,12 @@ for endpoint in http://127.0.0.1:3210/health http://127.0.0.1:3110/ http://127.0
   curl --fail --silent --show-error "$endpoint" >/dev/null || { echo "ROLLBACK_APPLICATION_SMOKE_FAILED" >&2; exit 1; }
 done
 evidence="$root/shared/rollback-app.json"
-python3 - "$evidence" "git:$current_sha" "git:$target_sha" "$applied_migration" <<'PY'
+evidence_pending="$root/shared/.rollback-app.pending"
+python3 - "$evidence_pending" "git:$current_sha" "git:$target_sha" "$applied_migration" <<'PY'
 import datetime, json, os, pathlib, sys, tempfile
 path, previous, target, migration = sys.argv[1:]
 destination = pathlib.Path(path)
-if destination.is_symlink(): raise SystemExit("ROLLBACK_EVIDENCE_SYMLINK_FORBIDDEN")
+if destination.exists() or destination.is_symlink(): raise SystemExit("ROLLBACK_EVIDENCE_PENDING_EXISTS")
 value = {"schemaVersion":1,"previousArtifact":previous,"targetArtifact":target,
          "appliedMigration":migration,"databaseRestored":False,
          "completedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),"smoke":"passed"}
@@ -236,6 +292,14 @@ fd, temporary = tempfile.mkstemp(prefix="rollback-app.", dir=destination.parent)
 with os.fdopen(fd, "w", encoding="utf-8") as handle:
     json.dump(value, handle, indent=2); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
 os.chmod(temporary, 0o600); os.replace(temporary, destination)
+PY
+ln -sfn "$target_release" "$root/.current-next"
+mv -Tf "$root/.current-next" "$root/current"
+python3 - "$evidence_pending" "$evidence" <<'PY'
+import os,pathlib,sys
+source,destination=map(pathlib.Path,sys.argv[1:])
+if not source.is_file() or source.is_symlink() or destination.is_symlink(): raise SystemExit("ROLLBACK_EVIDENCE_INVALID")
+os.replace(source,destination)
 PY
 rollback_committed=1
 trap - EXIT

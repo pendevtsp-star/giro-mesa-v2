@@ -15,12 +15,14 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, banco próprio e releases imutá
 
 1. Execute `bootstrap-env.sh` uma única vez com `PLATFORM_ADMIN_GRANTS_OVERRIDE` revisado. O script não sobrescreve um `.env` existente.
 2. Configure `GIROMESA_OBJECT_DIRECTORY` com o armazenamento real de objetos e preserve-o fora do diretório do release.
-3. Antes da primeira promoção, derive o recovery R2 na branch exata `release/rollback-0029`, contendo schema 0029 e este hardening. O CI completo dessa branch publica e assina as cinco imagens e o manifesto de recuperação. Configure `GIROMESA_RECOVERY_RELEASE_SHA` e os três arquivos `GIROMESA_RECOVERY_IMAGE_ATTESTATION_*`. Não há trust-on-first-use nem bypass para release antigo sem assinatura.
-4. Publique as imagens alvo pelo workflow `Publish pilot images`. Ele só aceita CI de `push` da `main`, assina cada digest e gera `giromesa-image-attestation-<sha>`.
-5. Baixe juntos o JSON, o bundle Sigstore e o checksum de ambos os releases. Configure `GIROMESA_IMAGE_ATTESTATION_FILE`; bundle e checksum são descobertos pelos sufixos `.bundle` e `.sha256`, ou definidos explicitamente.
+3. Antes da primeira promoção, derive o recovery R2 contendo schema 0029 e este hardening. Autorize seu SHA e evidência na matriz versionada da `main`. A branch de recovery não recebe permissão de pacote ou OIDC: o workflow privilegiado da `main` refaz os testes PG16/17 e runtime, constrói e assina as imagens recovery. Configure `GIROMESA_RECOVERY_RELEASE_SHA` e os arquivos `GIROMESA_RECOVERY_IMAGE_ATTESTATION_*`.
+4. Publique target e recovery pelo workflow `Publish pilot images`. Ele só aceita CI de `push` da `main`, assina cada digest com role/source/authorization e gera manifestos separados. Com a matriz recovery vazia, a promoção permanece bloqueada por desenho.
+5. Baixe juntos o JSON, o bundle Sigstore e o checksum de ambos os releases, além de `giromesa-recovery-validation-<sha>.json` no mesmo diretório do manifesto recovery. Configure `GIROMESA_IMAGE_ATTESTATION_FILE`; bundle e checksum são descobertos pelos sufixos `.bundle` e `.sha256`, ou definidos explicitamente.
 6. Crie um Docker config dedicado somente à leitura do GHCR. Defina `GIROMESA_DOCKER_CONFIG_DIRECTORY`; o diretório deve ter modo `0700` e `config.json`, modo `0600`. Não reutilize credenciais administrativas.
-7. Crie `/srv/apps/giromesa-v2/releases/<sha>`, valide que o checkout corresponde ao SHA e execute `deploy-pilot.sh`. O recovery é baixado e validado antes de parar mutadores; qualquer falha posterior promove o recovery R2.
+7. Instale o bootstrap por uma cadeia independente, nunca pelo hash informado pelo próprio checkout. O runbook/configuration management deve provisionar por canal independente o Cosign `ghcr.io/sigstore/cosign/cosign@sha256:b29487e48205d875c324c79583e2806d9d269c0fa299e0861bbec023d8430c8b`; não confie inicialmente no `image-lock.json` ainda não verificado. Com esse pin, valide o bundle do manifesto contra a identidade exata `publish-images.yml@refs/heads/main`, issuer `token.actions.githubusercontent.com` e o SHA da `main` aprovado pelo operador. Extraia então `releaseFiles["deploy/vps/deploy-entrypoint.sh"]` do JSON assinado, compare o arquivo byte a byte com esse SHA-256 e só depois copie atomicamente para `/opt/giromesa/shared/trust/deploy-entrypoint.sh`, proprietário root e modo `0555`. Forneça esse hash em `GIROMESA_TRUSTED_ENTRYPOINT_SHA256`. Rotações repetem a validação pelo bootstrap antigo antes da troca; automação de configuração pode provisionar o mesmo hash por canal independente.
 8. Execute `ensure-cloudflare-dns.sh` e `provision-ingress.sh`, depois valide login, salão, balcão, QR, KDS, caixa e Edge Hub.
+
+Defina `GIROMESA_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<target-sha>` e `GIROMESA_RECOVERY_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<recovery-sha>`, juntamente com os dois pares manifesto/bundle, e inicie somente por `/opt/giromesa/shared/trust/deploy-entrypoint.sh deploy`. O script interno recusa execução direta.
 
 `ensure-runtime-env.sh` preserva valores existentes, adiciona atomicamente apenas segredos ausentes e rejeita chaves duplicadas. Sem grants explícitos, deriva apenas `platform.read` dos e-mails administrativos; não inventa permissão de mutação.
 
@@ -28,7 +30,7 @@ O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CO
 
 ## Rollback
 
-`rollback-app.sh` não reverte banco. A matriz `rollback-compatibility.json` está intencionalmente sem transições: o rollback de schema `0029` para release `0026` permanece bloqueado. Uma transição só pode ser adicionada após existir release de recuperação em schema `0029`, SHA/artifact imutável e evidência CI verificável. Se o schema divergir, siga o drill de recuperação de desastre.
+`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. A matriz `rollback-compatibility.json` está intencionalmente sem transições: o rollback de schema `0029` para release `0026` permanece bloqueado. Uma transição só pode ser adicionada após existir release de recuperação em schema `0029`, SHA/artifact imutável e evidência CI verificável. Se o schema divergir, siga o drill de recuperação de desastre.
 
 ## Domínios
 
