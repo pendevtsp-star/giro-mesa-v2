@@ -165,7 +165,17 @@ function Write-ObjectArchive {
         }
         $entry = $archive.CreateEntry([string]$item.RelativePath, [IO.Compression.CompressionLevel]::Optimal)
         $entryStream = $entry.Open()
-        try { $sourceStream.CopyTo($entryStream) } finally { $entryStream.Dispose() }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try {
+          $buffer = [byte[]]::new(1MB)
+          while (($read = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            [void]$sha.TransformBlock($buffer, 0, $read, $null, 0)
+            $entryStream.Write($buffer, 0, $read)
+          }
+          [void]$sha.TransformFinalBlock([byte[]]::new(0), 0, 0)
+          $copiedHash = ($sha.Hash | ForEach-Object { $_.ToString('x2') }) -join ''
+          if ($copiedHash -cne $item.Sha256) { throw 'BACKUP_OBJECT_TREE_CHANGED' }
+        } finally { $sha.Dispose(); $entryStream.Dispose() }
       } finally {
         $sourceStream.Dispose()
       }
@@ -298,6 +308,7 @@ try {
     $runtimeTarget = [IO.File]::Open($runtimeSnapshot, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
     try { $runtimeSource.CopyTo($runtimeTarget); $runtimeTarget.Flush($true) } finally { $runtimeTarget.Dispose() }
   } finally { $runtimeSource.Dispose() }
+  if ((Get-Sha256Hex -Path $runtimeSnapshot) -cne $runtimeEnvState.Sha256) { throw 'BACKUP_RUNTIME_ENV_CHANGED' }
   $databaseDump = Join-Path $backupDirectory 'database.dump'
   $dockerTouched = $true
   Invoke-CheckedDocker -Arguments @('exec', $DatabaseContainer, 'pg_dump', '--format=custom', '--compress=6', '--no-owner', '--no-acl', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--file', $containerDump)
