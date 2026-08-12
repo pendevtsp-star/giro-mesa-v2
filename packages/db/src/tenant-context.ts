@@ -170,3 +170,37 @@ export async function withPublicMenuContext<T>(
     );
   });
 }
+
+export async function withDoseClubContext<T>(
+  connection: DatabaseConnection,
+  input: { keyHash: string; scope: "doseclub:read" | "doseclub:write"; branchId?: string | null },
+  work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
+): Promise<T> {
+  if (!/^[0-9a-f]{64}$/.test(input.keyHash)) throw new TypeError("keyHash is invalid");
+  const branchId = input.branchId?.trim() || null;
+  if (branchId && branchId.length > 180) throw new TypeError("branchId is invalid");
+  return connection.db.transaction(async (transaction) => {
+    await transaction.execute(sql.raw("set local role giromesa_internal"));
+    const resolved = await transaction.execute<{ organization_id: string; unit_id: string | null }>(
+      sql`select organization_id, unit_id from public.giromesa_doseclub_scope(${input.keyHash}, ${input.scope}, ${branchId})`,
+    );
+    const [scope] = [...resolved];
+    if (!scope) throw new Error("DOSECLUB_SCOPE_NOT_FOUND");
+    const context = tenantContext({
+      source: "internal",
+      organizationId: scope.organization_id,
+      unitId: scope.unit_id,
+    });
+    await transaction.execute(sql.raw("set local role giromesa_app"));
+    await transaction.execute(sql`
+      select
+        set_config('app.current_organization_id', ${context.organizationId}, true),
+        set_config('app.current_unit_id', ${context.unitId ?? ""}, true),
+        set_config('app.current_actor_identity_id', '', true),
+        set_config('app.current_context_source', 'internal', true)
+    `);
+    return activeTenantScope.run({ context, database: transaction }, () =>
+      work(transaction, context),
+    );
+  });
+}

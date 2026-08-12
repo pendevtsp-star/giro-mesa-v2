@@ -9,9 +9,10 @@ import { FiscalModule } from "./fiscal/fiscal.module.js";
 import { GrowthModule } from "./growth/growth.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { IncidentsModule } from "./incidents/incidents.module.js";
+import { DoseClubModule } from "./integrations/doseclub/doseclub.module.js";
 import { ManagementModule } from "./management/management.module.js";
-import { ObservabilityModule } from "./observability/observability.module.js";
 import { MediaModule } from "./media/media.module.js";
+import { ObservabilityModule } from "./observability/observability.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
@@ -21,8 +22,8 @@ import { PlatformModule } from "./platform/platform.module.js";
 import { PrivacyModule } from "./privacy/privacy.module.js";
 import { PublicMenuModule } from "./public-menu/public-menu.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
-import { SalonModule } from "./salon/salon.module.js";
 import { ReturnablesModule } from "./returnables/returnables.module.js";
+import { SalonModule } from "./salon/salon.module.js";
 import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
@@ -31,6 +32,7 @@ import { SyncModule } from "./sync/sync.module.js";
     FiscalModule,
     HealthModule,
     IncidentsModule,
+    DoseClubModule,
     CatalogModule,
     AuthModule,
     OrganizationsModule,

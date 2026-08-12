@@ -1396,6 +1396,268 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/integrations/club-whisky/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List GiroMesa branches enabled for DoseClub */
+    get: operations["DoseClubController_listBranches[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List GiroMesa branches enabled for DoseClub */
+    get: operations["DoseClubController_listBranches[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/products": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List active GiroMesa products */
+    get: operations["DoseClubController_listProducts[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/products": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List active GiroMesa products */
+    get: operations["DoseClubController_listProducts[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read mapped stock for a DoseClub branch */
+    get: operations["DoseClubController_stock[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read mapped stock for a DoseClub branch */
+    get: operations["DoseClubController_stock[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/sales": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_sale[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/sales": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_sale[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reservation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reservation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/dose-consumptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_consumption[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/dose-consumptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_consumption[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/dose-consumptions/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reversal[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/dose-consumptions/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reversal[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/club-whisky/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reconcile[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integrations/club-whisky/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubController_reconcile[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/public/commercial-catalog": {
     parameters: {
       query?: never;
@@ -6688,6 +6950,60 @@ export interface components {
        */
       status: "already_verified";
     };
+    DoseClubV1AcknowledgementDto: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      contractVersion: "v1";
+      externalClubId: string;
+      operationId?: string;
+      /** @enum {string} */
+      outcome: "accepted" | "duplicate";
+      /** @enum {string} */
+      status: "ok";
+    };
+    DoseClubV2AcknowledgementDto: {
+      /** Format: date-time */
+      acknowledgedAt: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      contractVersion: "v2";
+      externalClubId: string;
+      operationId: string;
+      /** @enum {string} */
+      outcome: "accepted" | "duplicate" | "reconciled";
+      /** Format: int32 */
+      version: number;
+    };
+    DoseClubBranchDto: {
+      id: string;
+      name: string;
+      /** Format: uuid */
+      unitId: string;
+    };
+    DoseClubBranchListDto: {
+      branches: components["schemas"]["DoseClubBranchDto"][];
+    };
+    DoseClubProductDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      sku: Record<string, never> | null;
+    };
+    DoseClubProductListDto: {
+      products: components["schemas"]["DoseClubProductDto"][];
+    };
+    DoseClubStockDto: {
+      branchId: string;
+      productId: string;
+      /** @example 1000.000000 */
+      quantity: string;
+      /** @enum {string} */
+      unit: "ml";
+    };
     OnboardingEvidenceResponse: {
       /** Format: uuid */
       selectedUnitId?: string | null;
@@ -9817,6 +10133,988 @@ export interface operations {
     };
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listBranches[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubBranchListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listBranches[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubBranchListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listProducts[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubProductListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_listProducts[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubProductListDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_stock[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubStockDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_stock[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubStockDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_sale[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "sale";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {number} */
+          version?: 1;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          externalOfferId: string;
+          externalCustomerId?: string;
+          /** @enum {string} */
+          saleType: "individual" | "combo_pool";
+          productId?: string;
+          eligibleProductIds?: string[];
+          quantityBottles: number;
+          totalDoses?: number;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_sale[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "sale";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {number} */
+          version?: 1;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          externalOfferId: string;
+          externalCustomerId?: string;
+          /** @enum {string} */
+          saleType: "individual" | "combo_pool";
+          productId?: string;
+          eligibleProductIds?: string[];
+          quantityBottles: number;
+          totalDoses?: number;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reservation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reservation";
+          productId: string;
+          doses: number;
+          employeeRef?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reservation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reservation";
+          productId: string;
+          doses: number;
+          employeeRef?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_consumption[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "consumption";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          employeeRef?: string;
+          orderId?: string;
+          externalOfferId?: string;
+          /** @enum {string} */
+          offerType?: "individual" | "combo_pool";
+          externalConsumptionId?: string;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_consumption[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "consumption";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          employeeRef?: string;
+          orderId?: string;
+          externalOfferId?: string;
+          /** @enum {string} */
+          offerType?: "individual" | "combo_pool";
+          externalConsumptionId?: string;
+          doseMl?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reversal[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "reversal";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          originalOperationId?: string;
+          externalConsumptionId?: string;
+          externalReversalId?: string;
+          originalIdempotencyKey?: string;
+          doseMl?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reversal[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version"?: "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion?: "v2";
+          /** @enum {string} */
+          operation?: "reversal";
+          operationId?: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          version?: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot?: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          productId: string;
+          doses?: number;
+          originalOperationId?: string;
+          externalConsumptionId?: string;
+          externalReversalId?: string;
+          originalIdempotencyKey?: string;
+          doseMl?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["DoseClubV1AcknowledgementDto"]
+            | components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reconcile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reconcile";
+          productId: string;
+          expectedRemainingDoses: number;
+          expectedReservedDoses: number;
+          localVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubController_reconcile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "x-giromesa-integration-key": string;
+        "x-giromesa-contract-version": "2";
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          contractVersion: "v2";
+          operationId: string;
+          idempotencyKey: string;
+          /** Format: date-time */
+          occurredAt: string;
+          version: number;
+          branchId: string;
+          externalClubId: string;
+          purchaseSnapshot: {
+            volumeMlAtPurchase: number;
+            doseMlAtPurchase: number;
+            totalDoses: number;
+            remainingDoses: number;
+          };
+          /** @enum {string} */
+          operation: "reconcile";
+          productId: string;
+          expectedRemainingDoses: number;
+          expectedReservedDoses: number;
+          localVersion: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DoseClubV2AcknowledgementDto"];
+        };
+      };
+      /** @description The request does not satisfy the negotiated contract. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Integration key or scope is invalid. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The operation conflicts with the authoritative state. */
+      409: {
         headers: {
           [name: string]: unknown;
         };

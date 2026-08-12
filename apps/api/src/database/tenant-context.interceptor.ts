@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   BadRequestException,
   type CallHandler,
@@ -18,6 +19,8 @@ type TenantRequest = FastifyRequest & {
   auth?: AuthContext;
   internalDatabaseContext?: boolean;
   params?: { organizationId?: unknown; slug?: unknown; unitId?: unknown };
+  body?: unknown;
+  query?: unknown;
 };
 
 function routeUuid(value: unknown) {
@@ -83,6 +86,34 @@ export class TenantContextInterceptor implements NestInterceptor {
     }
     if (!organizationId) {
       if (!role) return next.handle();
+      if (role === "doseclub") {
+        const rawKey = request.headers["x-giromesa-integration-key"];
+        if (typeof rawKey !== "string" || !rawKey.trim()) throw new UnauthorizedException();
+        const body =
+          request.body && typeof request.body === "object" && !Array.isArray(request.body)
+            ? (request.body as Record<string, unknown>)
+            : null;
+        const query =
+          request.query && typeof request.query === "object" && !Array.isArray(request.query)
+            ? (request.query as Record<string, unknown>)
+            : null;
+        const candidate = body?.branchId ?? query?.branchId;
+        const branchId = typeof candidate === "string" ? candidate : null;
+        const scope = request.method === "GET" ? "doseclub:read" : "doseclub:write";
+        const keyHash = createHash("sha256").update(rawKey).digest("hex");
+        return from(
+          this.database
+            .withDoseClubContext({ keyHash, scope, branchId }, () =>
+              lastValueFrom(next.handle()),
+            )
+            .catch((error: unknown) => {
+              if (error instanceof Error && error.message === "DOSECLUB_SCOPE_NOT_FOUND") {
+                throw new UnauthorizedException();
+              }
+              throw error;
+            }),
+        );
+      }
       if (role === "public-menu") {
         const slug = typeof request.params?.slug === "string" ? request.params.slug : "";
         return from(this.database.withPublicMenuContext(slug, () => lastValueFrom(next.handle())));

@@ -3779,6 +3779,2182 @@
         }
       }
     },
+    "/api/v1/integrations/club-whisky/branches": {
+      "get": {
+        "operationId": "DoseClubController_listBranches[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubBranchListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "List GiroMesa branches enabled for DoseClub",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/v1/integrations/club-whisky/branches": {
+      "get": {
+        "operationId": "DoseClubController_listBranches[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubBranchListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "List GiroMesa branches enabled for DoseClub",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/api/v1/integrations/club-whisky/products": {
+      "get": {
+        "operationId": "DoseClubController_listProducts[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubProductListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "List active GiroMesa products",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/v1/integrations/club-whisky/products": {
+      "get": {
+        "operationId": "DoseClubController_listProducts[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubProductListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "List active GiroMesa products",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/api/v1/integrations/club-whisky/stock": {
+      "get": {
+        "operationId": "DoseClubController_stock[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubStockDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "Read mapped stock for a DoseClub branch",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/v1/integrations/club-whisky/stock": {
+      "get": {
+        "operationId": "DoseClubController_stock[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubStockDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "summary": "Read mapped stock for a DoseClub branch",
+        "tags": [
+          "DoseClub integration"
+        ]
+      }
+    },
+    "/api/v1/integrations/club-whisky/sales": {
+      "post": {
+        "operationId": "DoseClubController_sale[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "sale"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "externalOfferId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalCustomerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "saleType": {
+                    "type": "string",
+                    "enum": [
+                      "individual",
+                      "combo_pool"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "eligibleProductIds": {
+                    "minItems": 2,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    }
+                  },
+                  "quantityBottles": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "totalDoses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "externalOfferId",
+                  "saleType",
+                  "quantityBottles"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/club-whisky/sales": {
+      "post": {
+        "operationId": "DoseClubController_sale[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "sale"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "externalOfferId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalCustomerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "saleType": {
+                    "type": "string",
+                    "enum": [
+                      "individual",
+                      "combo_pool"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "eligibleProductIds": {
+                    "minItems": 2,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    }
+                  },
+                  "quantityBottles": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "totalDoses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "externalOfferId",
+                  "saleType",
+                  "quantityBottles"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/club-whisky/reservations": {
+      "post": {
+        "operationId": "DoseClubController_reservation[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reservation"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "employeeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  }
+                },
+                "required": [
+                  "contractVersion",
+                  "operationId",
+                  "idempotencyKey",
+                  "occurredAt",
+                  "version",
+                  "branchId",
+                  "externalClubId",
+                  "purchaseSnapshot",
+                  "operation",
+                  "productId",
+                  "doses"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/club-whisky/reservations": {
+      "post": {
+        "operationId": "DoseClubController_reservation[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reservation"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "employeeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  }
+                },
+                "required": [
+                  "contractVersion",
+                  "operationId",
+                  "idempotencyKey",
+                  "occurredAt",
+                  "version",
+                  "branchId",
+                  "externalClubId",
+                  "purchaseSnapshot",
+                  "operation",
+                  "productId",
+                  "doses"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/club-whisky/dose-consumptions": {
+      "post": {
+        "operationId": "DoseClubController_consumption[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "consumption"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "employeeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalOfferId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "offerType": {
+                    "type": "string",
+                    "enum": [
+                      "individual",
+                      "combo_pool"
+                    ]
+                  },
+                  "externalConsumptionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "productId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/club-whisky/dose-consumptions": {
+      "post": {
+        "operationId": "DoseClubController_consumption[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "consumption"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "employeeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalOfferId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "offerType": {
+                    "type": "string",
+                    "enum": [
+                      "individual",
+                      "combo_pool"
+                    ]
+                  },
+                  "externalConsumptionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "productId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/club-whisky/dose-consumptions/reversals": {
+      "post": {
+        "operationId": "DoseClubController_reversal[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reversal"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "originalOperationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalConsumptionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalReversalId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "originalIdempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "productId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/club-whisky/dose-consumptions/reversals": {
+      "post": {
+        "operationId": "DoseClubController_reversal[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DoseClubV1AcknowledgementDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "contractVersion",
+                    "mapping": {
+                      "v1": "#/components/schemas/DoseClubV1AcknowledgementDto",
+                      "v2": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reversal"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "doses": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "originalOperationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalConsumptionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalReversalId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "originalIdempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "doseMl": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "branchId",
+                  "externalClubId",
+                  "productId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/club-whisky/reconcile": {
+      "post": {
+        "operationId": "DoseClubController_reconcile[0]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reconcile"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "expectedRemainingDoses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "expectedReservedDoses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "localVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "contractVersion",
+                  "operationId",
+                  "idempotencyKey",
+                  "occurredAt",
+                  "version",
+                  "branchId",
+                  "externalClubId",
+                  "purchaseSnapshot",
+                  "operation",
+                  "productId",
+                  "expectedRemainingDoses",
+                  "expectedReservedDoses",
+                  "localVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integrations/club-whisky/reconcile": {
+      "post": {
+        "operationId": "DoseClubController_reconcile[1]",
+        "parameters": [
+          {
+            "name": "x-giromesa-integration-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-giromesa-contract-version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseClubV2AcknowledgementDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not satisfy the negotiated contract."
+          },
+          "401": {
+            "description": "Integration key or scope is invalid."
+          },
+          "409": {
+            "description": "The operation conflicts with the authoritative state."
+          }
+        },
+        "tags": [
+          "DoseClub integration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contractVersion": {
+                    "type": "string",
+                    "enum": [
+                      "v2"
+                    ]
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "externalClubId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "purchaseSnapshot": {
+                    "type": "object",
+                    "properties": {
+                      "volumeMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "doseMlAtPurchase": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "totalDoses": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                      },
+                      "remainingDoses": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "volumeMlAtPurchase",
+                      "doseMlAtPurchase",
+                      "totalDoses",
+                      "remainingDoses"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "reconcile"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "expectedRemainingDoses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "expectedReservedDoses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "localVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "contractVersion",
+                  "operationId",
+                  "idempotencyKey",
+                  "occurredAt",
+                  "version",
+                  "branchId",
+                  "externalClubId",
+                  "purchaseSnapshot",
+                  "operation",
+                  "productId",
+                  "expectedRemainingDoses",
+                  "expectedReservedDoses",
+                  "localVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/commercial-catalog": {
       "get": {
         "operationId": "CatalogController_catalog[0]",
@@ -31427,6 +33603,181 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "DoseClubV1AcknowledgementDto": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "type": "string",
+            "enum": [
+              "v1"
+            ]
+          },
+          "externalClubId": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "duplicate"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "contractVersion",
+          "externalClubId",
+          "outcome",
+          "status"
+        ]
+      },
+      "DoseClubV2AcknowledgementDto": {
+        "type": "object",
+        "properties": {
+          "acknowledgedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contractVersion": {
+            "type": "string",
+            "enum": [
+              "v2"
+            ]
+          },
+          "externalClubId": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "duplicate",
+              "reconciled"
+            ]
+          },
+          "version": {
+            "type": "number",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "acknowledgedAt",
+          "contractVersion",
+          "externalClubId",
+          "operationId",
+          "outcome",
+          "version"
+        ]
+      },
+      "DoseClubBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "unitId"
+        ]
+      },
+      "DoseClubBranchListDto": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoseClubBranchDto"
+            }
+          }
+        },
+        "required": [
+          "branches"
+        ]
+      },
+      "DoseClubProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sku"
+        ]
+      },
+      "DoseClubProductListDto": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoseClubProductDto"
+            }
+          }
+        },
+        "required": [
+          "products"
+        ]
+      },
+      "DoseClubStockDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "string",
+            "example": "1000.000000",
+            "pattern": "^-?[0-9]+\\.[0-9]{6}$"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "ml"
+            ]
+          }
+        },
+        "required": [
+          "branchId",
+          "productId",
+          "quantity",
+          "unit"
         ]
       },
       "OnboardingEvidenceResponse": {

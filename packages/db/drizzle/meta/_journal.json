@@ -176,6 +176,13 @@
       "when": 1786491000000,
       "tag": "0025_privacy_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786493658116,
+      "tag": "0026_doseclub_integration",
+      "breakpoints": true
     }
   ]
 }

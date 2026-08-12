@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Auth;
 using GiroMesa.ApiClient.V1.Growth;
+using GiroMesa.ApiClient.V1.Integrations;
 using GiroMesa.ApiClient.V1.Organizations;
 using GiroMesa.ApiClient.V1.PaymentProviderCallbacks;
 using GiroMesa.ApiClient.V1.Platform;
@@ -30,6 +31,11 @@ namespace GiroMesa.ApiClient.V1
         public global::GiroMesa.ApiClient.V1.Growth.GrowthRequestBuilder Growth
         {
             get => new global::GiroMesa.ApiClient.V1.Growth.GrowthRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The integrations property</summary>
+        public global::GiroMesa.ApiClient.V1.Integrations.IntegrationsRequestBuilder Integrations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Integrations.IntegrationsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The organizations property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.OrganizationsRequestBuilder Organizations

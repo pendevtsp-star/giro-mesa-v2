@@ -69,6 +69,7 @@ export class ZodPipe implements PipeTransform {
   constructor(
     readonly schema: ZodType,
     private readonly problemFactory?: ZodProblemFactory,
+    readonly openApiSchema?: ZodType,
   ) {}
 
   transform(value: unknown) {

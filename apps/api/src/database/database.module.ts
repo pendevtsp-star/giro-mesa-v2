@@ -7,6 +7,7 @@ import {
   type TenantContext,
   type TenantTransaction,
   withDatabaseRoleContext,
+  withDoseClubContext,
   withPlatformContext,
   withPublicMenuContext,
   withTenantContext,
@@ -68,6 +69,13 @@ export class DatabaseService implements OnModuleDestroy {
     work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
   ) {
     return withPublicMenuContext(this.connection, slug, work);
+  }
+
+  withDoseClubContext<T>(
+    input: { keyHash: string; scope: "doseclub:read" | "doseclub:write"; branchId?: string | null },
+    work: (database: TenantTransaction, context: TenantContext) => Promise<T> | T,
+  ) {
+    return withDoseClubContext(this.connection, input, work);
   }
 
   async onModuleDestroy() {

@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.Api.V1.Auth;
 using GiroMesa.ApiClient.Api.V1.Growth;
 using GiroMesa.ApiClient.Api.V1.Health;
+using GiroMesa.ApiClient.Api.V1.Integrations;
 using GiroMesa.ApiClient.Api.V1.Internal;
 using GiroMesa.ApiClient.Api.V1.Metrics;
 using GiroMesa.ApiClient.Api.V1.Organizations;
@@ -39,6 +40,11 @@ namespace GiroMesa.ApiClient.Api.V1
         public global::GiroMesa.ApiClient.Api.V1.Health.HealthRequestBuilder Health
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Health.HealthRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The integrations property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Integrations.IntegrationsRequestBuilder Integrations
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Integrations.IntegrationsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The internal property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Internal.InternalRequestBuilder Internal

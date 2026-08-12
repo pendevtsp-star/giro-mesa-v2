@@ -44,6 +44,9 @@ export function requestRateLimit(method: string, url: string) {
     return AUTH_RATE_LIMITS[endpoint] ?? { bucket: `auth:${endpoint}`, max: 10 };
   }
   const path = new URL(url, "http://localhost").pathname.replace(/\/+$/, "");
+  if (/^\/(?:api\/)?v1\/integrations\/club-whisky(?:\/|$)/.test(path)) {
+    return { bucket: "integration:doseclub", max: 6_000 } as const;
+  }
   if (
     method.toUpperCase() === "POST" &&
     (/^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:orders|reservations|waitlist|coupons\/validate)$/.test(
@@ -54,3 +57,22 @@ export function requestRateLimit(method: string, url: string) {
     return { bucket: "public-write", max: 20 } as const;
   return { bucket: "api", max: 100 } as const;
 }
+
+export const DOSECLUB_KEY_RATE_LIMIT = 600;
+
+export function requestRateLimitKey(input: {
+  method: string;
+  url: string;
+  ip: string;
+  integrationKey?: string | string[];
+}) {
+  const policy = requestRateLimit(input.method, input.url);
+  if (policy.bucket !== "integration:doseclub") return `${input.ip}:${policy.bucket}`;
+  const rawKey = Array.isArray(input.integrationKey) ? undefined : input.integrationKey?.trim();
+  if (!rawKey || !/^[\x21-\x7e]{32,256}$/.test(rawKey)) {
+    return `${policy.bucket}:ip:${input.ip}`;
+  }
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+  return `${policy.bucket}:key:${keyHash}`;
+}
+import { createHash } from "node:crypto";

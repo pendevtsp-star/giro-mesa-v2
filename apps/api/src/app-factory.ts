@@ -14,7 +14,12 @@ import { AuthService } from "./auth/auth.service.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
-import { isSensitiveAuthRequest, requestRateLimit } from "./common/rate-limit.js";
+import {
+  DOSECLUB_KEY_RATE_LIMIT,
+  isSensitiveAuthRequest,
+  requestRateLimit,
+  requestRateLimitKey,
+} from "./common/rate-limit.js";
 import { MetricsService } from "./health/health.module.js";
 import { closePlatformProjectionSchemas } from "./platform/platform-projection.dto.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
@@ -46,6 +51,22 @@ export async function createApplication() {
       `${request.ip}:${requestRateLimit(request.method, request.url).bucket}`,
     timeWindow: "1 minute",
   });
+  fastify.addHook(
+    "onRequest",
+    fastify.rateLimit({
+      max: DOSECLUB_KEY_RATE_LIMIT,
+      timeWindow: "1 minute",
+      allowList: (request) =>
+        requestRateLimit(request.method, request.url).bucket !== "integration:doseclub",
+      keyGenerator: (request) =>
+        requestRateLimitKey({
+          method: request.method,
+          url: request.url,
+          ip: request.ip,
+          integrationKey: request.headers["x-giromesa-integration-key"],
+        }),
+    }),
+  );
   await app.register(websocket, { options: { maxPayload: 16_384 } });
   app.enableCors(corsConfiguration());
 

@@ -156,7 +156,7 @@ export function addZodRequestBodies(app: NestFastifyApplication, document: OpenA
             const operation = path?.[method];
             if (!operation?.operationId?.startsWith(operationPrefix)) continue;
             const promoted = promoteOpenApiDefinitions(
-              toOpenApiSchema(pipe.schema),
+              toOpenApiSchema(pipe.openApiSchema ?? pipe.schema),
               `${operation.operationId}_request`,
             );
             document.components ??= {};

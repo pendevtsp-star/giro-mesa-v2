@@ -6,6 +6,7 @@ export const DATABASE_CONTEXT_ROLE = "giromesa.database-context-role";
 export type HttpDatabaseContext =
   | Exclude<DatabaseContextRole, "worker">
   | "public-menu"
+  | "doseclub"
   | "platform";
 
 export const DatabaseContext = (role: HttpDatabaseContext) =>
