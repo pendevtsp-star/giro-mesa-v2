@@ -19,9 +19,13 @@ text = target.read_text(encoding="utf-8")
 lines = text.splitlines()
 entry = re.compile(r"^([A-Z][A-Z0-9_]*)=(.*)$")
 values = {}
+duplicates = set()
 for line in lines:
     match = entry.match(line)
-    if match and match.group(1) not in values:
+    if match:
+        if match.group(1) in values:
+            duplicates.add(match.group(1))
+            continue
         raw = match.group(2).strip()
         if len(raw) >= 2 and raw[0] == raw[-1] == '"':
             try:
@@ -30,6 +34,9 @@ for line in lines:
                 print(f"RUNTIME_ENV_VALUE_INVALID:{match.group(1)}", file=sys.stderr)
                 raise SystemExit(1)
         values[match.group(1)] = raw
+if duplicates:
+    print(f"RUNTIME_ENV_DUPLICATE_KEY:{sorted(duplicates)[0]}", file=sys.stderr)
+    raise SystemExit(1)
 
 def valid_key(value, exact=False):
     try:
@@ -48,6 +55,7 @@ permissions = {
     "platform.tenant.restore",
     "platform.membership.disable",
     "platform.membership.restore",
+    "platform.incident.transition",
 }
 email_pattern = re.compile(r"^[^@\s=;]+@[^@\s=;]+\.[^@\s=;]+$")
 
@@ -69,11 +77,9 @@ additions = {}
 grants = values.get("PLATFORM_ADMIN_GRANTS")
 if grants is None:
     grants = os.environ.get("PLATFORM_ADMIN_GRANTS_BOOTSTRAP", "")
-    if not grants:
-        print("PLATFORM_ADMIN_GRANTS_REQUIRED: set PLATFORM_ADMIN_GRANTS_BOOTSTRAP once with reviewed least-privilege grants", file=sys.stderr)
-        raise SystemExit(1)
-    additions["PLATFORM_ADMIN_GRANTS"] = grants
-if not valid_grants(grants):
+    if grants:
+        additions["PLATFORM_ADMIN_GRANTS"] = grants
+if grants and not valid_grants(grants):
     print("PLATFORM_ADMIN_GRANTS_INVALID", file=sys.stderr)
     raise SystemExit(1)
 

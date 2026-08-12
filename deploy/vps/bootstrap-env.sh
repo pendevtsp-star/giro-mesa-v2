@@ -5,6 +5,11 @@ target=${1:-/srv/apps/giromesa-v2/shared/.env}
 legacy_primary=${2:-/srv/apps/giromesa/giro_mesa/.env}
 legacy_runtime=${3:-/srv/apps/giro_mesa/.env}
 
+if [[ -e "$target" && ${GIROMESA_BOOTSTRAP_ROTATION_APPROVED:-} != true ]]; then
+  echo "BOOTSTRAP_ENV_EXISTS: use ensure-runtime-env.sh; rotation requires GIROMESA_BOOTSTRAP_ROTATION_APPROVED=true." >&2
+  exit 1
+fi
+
 for source_file in "$legacy_primary" "$legacy_runtime"; do
   if [[ ! -f "$source_file" ]]; then
     echo "Arquivo de origem ausente: $source_file" >&2
@@ -63,16 +68,13 @@ admin_emails=${PLATFORM_ADMIN_EMAILS_OVERRIDE:-}
 platform_admin_grants=${PLATFORM_ADMIN_GRANTS_OVERRIDE:-}
 whatsapp_number=${WHATSAPP_NUMBER_OVERRIDE:-}
 
-if [[ -z "$platform_admin_grants" ]]; then
-  echo "PLATFORM_ADMIN_GRANTS_OVERRIDE obrigatÃ³rio para novos ambientes; use concessÃµes revisadas e de menor privilÃ©gio." >&2
-  exit 1
-fi
-if ! PLATFORM_ADMIN_GRANTS_CANDIDATE="$platform_admin_grants" python3 - <<'PY'
+if [[ -n "$platform_admin_grants" ]] && ! PLATFORM_ADMIN_GRANTS_CANDIDATE="$platform_admin_grants" python3 - <<'PY'
 import os, re, sys
 allowed = {
     "platform.read", "platform.pii.read", "platform.action.propose",
     "platform.action.approve", "platform.action.reject", "platform.tenant.suspend",
     "platform.tenant.restore", "platform.membership.disable", "platform.membership.restore",
+    "platform.incident.transition",
 }
 email = re.compile(r"^[^@\s=;]+@[^@\s=;]+\.[^@\s=;]+$")
 value = os.environ["PLATFORM_ADMIN_GRANTS_CANDIDATE"]
@@ -137,7 +139,7 @@ write_key SESSION_SECRET "$session_secret"
 write_key MFA_ENCRYPTION_KEY "$mfa_key"
 write_key OUTBOX_ENCRYPTION_KEY "$outbox_key"
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"
-write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"
+if [[ -n "$platform_admin_grants" ]]; then write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"; fi
 write_key INTERNAL_API_KEY "$internal_key"
 write_key COOKIE_DOMAIN .giromesa.com.br
 write_key GOOGLE_OAUTH_CLIENT_ID "$google_client_id"

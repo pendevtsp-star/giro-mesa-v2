@@ -15,6 +15,10 @@ const deployScript = join(root, "deploy", "vps", "deploy-pilot.sh");
 const observabilityCompose = join(root, "deploy", "vps", "compose.observability.yaml");
 const observabilityConfig = join(root, "infra", "observability", "otel-collector.debug.yaml");
 const rollbackScript = join(root, "deploy", "vps", "rollback-app.sh");
+const bootstrapScript = join(root, "deploy", "vps", "bootstrap-env.sh");
+const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
+const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
+const compatibilityMatrix = join(root, "deploy", "vps", "rollback-compatibility.json");
 
 function posix(path) {
   return path.replaceAll("\\", "/");
@@ -186,17 +190,66 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
   }
 });
 
-test("runtime env hardening blocks absent platform grants without partial writes", () => {
-  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-blocked-"));
+test("runtime env hardening keeps absent mutation grants in safe read-only mode", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-readonly-"));
   const envFile = join(directory, ".env");
-  writeFileSync(envFile, 'POSTGRES_PASSWORD="preserve-me"\n');
-  const before = readFileSync(envFile, "utf8");
+  writeFileSync(
+    envFile,
+    'POSTGRES_PASSWORD="preserve-me"\nPLATFORM_ADMIN_EMAILS="admin@example.com"\n',
+  );
   try {
     const result = run(ensureScript, [envFile], { PLATFORM_ADMIN_GRANTS_BOOTSTRAP: "" });
-    assert.notEqual(result.status, 0);
-    assert.match(output(result), /PLATFORM_ADMIN_GRANTS_REQUIRED/);
-    assert.equal(readFileSync(envFile, "utf8"), before);
+    assert.equal(result.status, 0, output(result));
+    assert.doesNotMatch(readFileSync(envFile, "utf8"), /^PLATFORM_ADMIN_GRANTS=/m);
     assert.doesNotMatch(output(result), /preserve-me/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runtime env accepts incident transition grant and rejects duplicate keys atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-duplicates-"));
+  const acceptedFile = join(directory, "accepted.env");
+  const duplicatedFile = join(directory, "duplicated.env");
+  writeFileSync(acceptedFile, "POSTGRES_PASSWORD=x\n");
+  const grants = "admin@example.com=platform.incident.transition";
+  try {
+    const accepted = run(ensureScript, [acceptedFile], { PLATFORM_ADMIN_GRANTS_BOOTSTRAP: grants });
+    assert.equal(accepted.status, 0, output(accepted));
+    assert.match(readFileSync(acceptedFile, "utf8"), /platform\.incident\.transition/);
+
+    writeFileSync(duplicatedFile, "POSTGRES_PASSWORD=first\nPOSTGRES_PASSWORD=second\n");
+    const before = readFileSync(duplicatedFile, "utf8");
+    const rejected = run(ensureScript, [duplicatedFile], {
+      PLATFORM_ADMIN_GRANTS_BOOTSTRAP: grants,
+    });
+    assert.notEqual(rejected.status, 0);
+    assert.match(output(rejected), /RUNTIME_ENV_DUPLICATE_KEY:POSTGRES_PASSWORD/);
+    assert.equal(readFileSync(duplicatedFile, "utf8"), before);
+    assert.doesNotMatch(output(rejected), /first|second/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("bootstrap refuses to overwrite an existing env without explicit rotation", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-bootstrap-existing-"));
+  const target = join(directory, ".env");
+  const legacyA = join(directory, "legacy-a.env");
+  const legacyB = join(directory, "legacy-b.env");
+  writeFileSync(target, "PRESERVE=this-value\n");
+  for (const legacy of [legacyA, legacyB]) {
+    writeFileSync(
+      legacy,
+      "GOOGLE_OAUTH_CLIENT_ID=id\nGOOGLE_OAUTH_CLIENT_SECRET=secret\nRESEND_API_KEY=resend\n",
+    );
+  }
+  try {
+    const result = run(bootstrapScript, [target, legacyA, legacyB]);
+    assert.notEqual(result.status, 0);
+    assert.match(output(result), /BOOTSTRAP_ENV_EXISTS/);
+    assert.equal(readFileSync(target, "utf8"), "PRESERVE=this-value\n");
+    assert.doesNotMatch(output(result), /this-value|secret|resend/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -204,13 +257,22 @@ test("runtime env hardening blocks absent platform grants without partial writes
 
 test("deploy invokes the complete backup before migration and never snapshots clear env", () => {
   const deploy = readFileSync(deployScript, "utf8");
-  const backupCall = deploy.indexOf("backup-production.sh");
+  const backupCall = deploy.indexOf('backup=$("$backup_script"');
   const migrationCall = deploy.indexOf("--profile tools run --rm migrate");
+  const composeInvocation = '"$' + '{compose[@]}"';
+  const pullCall = deploy.indexOf(`${composeInvocation} pull`);
+  const postgresUpCall = deploy.indexOf(`${composeInvocation} up -d postgres`);
   assert.ok(backupCall >= 0, "deploy must invoke the complete Linux backup");
   assert.ok(migrationCall > backupCall, "backup must finish before migrations start");
+  assert.ok(pullCall > backupCall, "backup must finish before pulling images");
+  assert.ok(postgresUpCall > backupCall, "backup must finish before updating PostgreSQL");
   assert.doesNotMatch(deploy, /(?:cp|tar|gzip)[^\n]*(?:env_file|\.env)/i);
   assert.match(deploy, /GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64/);
   assert.match(deploy, /ensure-runtime-env\.sh/);
+  assert.match(deploy, /BACKUP_COVERAGE_ATTESTATION_REQUIRED/);
+  assert.match(deploy, /--external-coverage-attestation/);
+  assert.match(deploy, /for service in api worker/);
+  assert.match(deploy, /docker stop --timeout/);
 });
 
 test("local observability overlay is pinned and explicitly debug-only without durable storage", () => {
@@ -231,9 +293,28 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /readlink -f/);
   assert.match(rollback, /git:\$current_sha|git:\$target_sha/);
   assert.match(rollback, /rollback-app\.json/);
-  assert.doesNotMatch(rollback, /pg_restore|psql|database\.dump|restore-drill/);
+  assert.doesNotMatch(rollback, /pg_restore|database\.dump|restore-drill/);
+  assert.doesNotMatch(rollback, /(?:DROP|DELETE|UPDATE|INSERT|ALTER)\s+(?:DATABASE|TABLE|SCHEMA)/i);
   assert.match(rollback, /restore_previous_release/);
-  assert.match(rollback, /GIROMESA_IMAGE_TAG="\$current_sha"/);
+  assert.match(rollback, /ROLLBACK_CURRENT_IMAGE_ATTESTATION_FILE/);
+  assert.match(rollback, /drizzle\.__drizzle_migrations/);
+  assert.match(rollback, /rollback-compatibility\.json/);
+  assert.match(rollback, /compose\.observability\.yaml/);
+  assert.match(rollback, /system\.worker_probe/);
+  const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
+  assert.equal(matrix.schemaVersion, 1);
+  assert.ok(
+    matrix.transitions.some(
+      (entry) =>
+        entry.appliedMigration === "0029_platform_incident_projection_actions" &&
+        entry.targetReleaseMigration === "0029_platform_incident_projection_actions",
+    ),
+  );
+  assert.ok(
+    !matrix.transitions.some(
+      (entry) => entry.targetReleaseMigration === "0026_pilot_operational_foundation",
+    ),
+  );
 });
 
 test("deploy health gate includes the asynchronous worker", () => {
@@ -247,6 +328,31 @@ test("pre-migration backup binds the migration actually applied in the source da
   const deploy = readFileSync(deployScript, "utf8");
   assert.match(deploy, /drizzle\.__drizzle_migrations/);
   assert.match(deploy, /source_migration_id/);
-  assert.match(deploy, /--migration-id\s+"\$source_migration_id"/);
-  assert.doesNotMatch(deploy, /--migration-id\s+"\$migration_id"/);
+  assert.match(deploy, /--source-migration-id\s+"\$source_migration_id"/);
+  assert.match(deploy, /--target-migration-id\s+"\$target_migration_id"/);
+  assert.match(deploy, /--source-artifact\s+"\$source_artifact"/);
+  assert.match(deploy, /--target-artifact\s+"\$target_artifact"/);
+});
+
+test("deployment and rollback compose contracts always include observability and digest images", () => {
+  const deploy = readFileSync(deployScript, "utf8");
+  const rollback = readFileSync(rollbackScript, "utf8");
+  const base = readFileSync(pilotCompose, "utf8");
+  const images = readFileSync(imagesCompose, "utf8");
+  assert.match(deploy, /compose\.observability\.yaml/);
+  assert.match(deploy, /compose\.images\.yaml/);
+  assert.match(deploy, /verify-image-provenance\.sh/);
+  assert.match(rollback, /compose\.images\.yaml/);
+  assert.match(images, /postgres@sha256:[0-9a-f]{64}/);
+  for (const variable of ["API", "WORKER", "SITE", "CUSTOMER", "OPS"]) {
+    assert.match(images, new RegExp(`GIROMESA_${variable}_IMAGE:\\?`));
+  }
+  assert.doesNotMatch(base, /postgres:17-alpine/);
+});
+
+test("release paths are canonical releases SHA directories", () => {
+  const deploy = readFileSync(deployScript, "utf8");
+  assert.match(deploy, /releases\/\$artifact_sha/);
+  assert.match(deploy, /readlink -f/);
+  assert.match(deploy, /RELEASE_PATH_NOT_CANONICAL/);
 });
