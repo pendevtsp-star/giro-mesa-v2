@@ -78,5 +78,20 @@ describe("order inventory consumption rules", () => {
       }),
       { quantity: "1000.000000", unit: "ml", dimension: "volume" },
     );
+    assert.throws(
+      () =>
+        recipeBatchConsumptionQuantity({
+          componentQuantity: "1",
+          componentUnit: "kg",
+          inventoryUnit: "g",
+          orderQuantity: 1,
+          yieldQuantity: "10",
+          yieldUnit: "kg",
+          lossBasisPoints: 0,
+        }),
+      (error: unknown) =>
+        error instanceof InventoryConsumptionError &&
+        error.message === "INVENTORY_RECIPE_YIELD_UNIT_INVALID",
+    );
   });
 });

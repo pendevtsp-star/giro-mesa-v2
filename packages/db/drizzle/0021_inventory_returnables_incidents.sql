@@ -21,6 +21,7 @@ ALTER TABLE "management_purchase_receipt_lines" ALTER COLUMN "quantity" TYPE num
 ALTER TABLE "management_recipe_versions" ADD COLUMN "yield_quantity" numeric(20,6) DEFAULT '1' NOT NULL;
 ALTER TABLE "management_recipe_versions" ADD COLUMN "yield_unit" varchar(20) DEFAULT 'unit' NOT NULL;
 ALTER TABLE "management_recipe_versions" ADD CONSTRAINT "management_recipe_version_yield_check" CHECK ("yield_quantity" > 0);
+ALTER TABLE "management_recipe_versions" ADD CONSTRAINT "management_recipe_version_yield_unit_check" CHECK ("yield_unit" IN ('unit','dozen'));
 ALTER TABLE "management_recipe_components" ADD COLUMN "quantity_micros" bigint;
 ALTER TABLE "management_recipe_components" ADD COLUMN "unit" varchar(20);
 UPDATE "management_recipe_components" AS component

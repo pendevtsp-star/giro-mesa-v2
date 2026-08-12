@@ -231,6 +231,9 @@ export function recipeBatchConsumptionQuantity(input: {
   yieldUnit: QuantityUnit;
   lossBasisPoints: number;
 }) {
+  if (input.yieldUnit !== "unit" && input.yieldUnit !== "dozen") {
+    throw new InventoryConsumptionError("INVENTORY_RECIPE_YIELD_UNIT_INVALID");
+  }
   if (
     !Number.isSafeInteger(input.orderQuantity) ||
     input.orderQuantity <= 0 ||

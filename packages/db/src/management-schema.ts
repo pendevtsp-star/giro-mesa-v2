@@ -546,6 +546,10 @@ export const managementRecipeVersions = pgTable(
     check("management_recipe_version_positive_check", sql`${table.version} > 0`),
     check("management_recipe_version_yield_check", sql`${table.yieldQuantity} > 0`),
     check(
+      "management_recipe_version_yield_unit_check",
+      sql`${table.yieldUnit} in ('unit', 'dozen')`,
+    ),
+    check(
       "management_recipe_version_window_check",
       sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`,
     ),

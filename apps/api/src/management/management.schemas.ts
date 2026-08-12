@@ -27,6 +27,7 @@ const preciseQuantity = z
     message: "Use até seis casas decimais e valor positivo.",
   });
 const dimensionalUnit = z.enum(["mg", "g", "kg", "ml", "l", "unit", "dozen"]);
+const recipeYieldUnit = z.enum(["unit", "dozen"]);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const instant = z.string().datetime({ offset: true });
 
@@ -55,7 +56,7 @@ export const inventoryItemSchema = z.object({
 export const recipeConfigurationSchema = z.object({
   productId: id,
   yieldQuantity: preciseQuantity.optional(),
-  yieldUnit: dimensionalUnit.optional(),
+  yieldUnit: recipeYieldUnit.optional(),
   components: z
     .array(
       z

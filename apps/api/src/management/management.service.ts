@@ -398,6 +398,12 @@ export class ManagementService {
     input: RecipeConfigurationInput,
   ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    if (input.yieldUnit !== undefined && input.yieldUnit !== "unit" && input.yieldUnit !== "dozen") {
+      throw new BadRequestException({
+        code: "RECIPE_YIELD_UNIT_INVALID",
+        message: "O rendimento da ficha técnica deve usar unit ou dozen.",
+      });
+    }
     const componentKeys = input.components.map(
       (component) => `${component.inventoryItemId}:${component.locationId}`,
     );
