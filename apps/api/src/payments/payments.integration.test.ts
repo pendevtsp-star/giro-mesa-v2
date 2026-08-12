@@ -232,8 +232,6 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
           uncertainPayments.handleProviderCallback(
             "api-simulator",
             "invalid-signature",
-            organization.id,
-            unit.id,
             callbackInput,
           ),
         hasCode("PAYMENT_CALLBACK_UNAUTHORIZED"),
@@ -247,8 +245,6 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
         uncertainPayments.handleProviderCallback(
           "api-simulator",
           process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET as string,
-          organization.id,
-          unit.id,
           callbackInput,
         ),
       );
@@ -287,15 +283,11 @@ it("persists a balanced append-only ledger with idempotency and tenant scope", a
       const applied = await uncertainPayments.handleProviderCallback(
         "api-simulator",
         process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
-        organization.id,
-        unit.id,
         successfulCallbackInput,
       );
       const replay = await uncertainPayments.handleProviderCallback(
         "api-simulator",
         process.env.PAYMENT_SIMULATOR_CALLBACK_SECRET,
-        organization.id,
-        unit.id,
         successfulCallbackInput,
       );
       assert.equal(applied.status, "authorized");

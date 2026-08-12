@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { DatabaseContext } from "../database/database-context.decorator.js";
 import {
   type PaymentAttemptInput,
   type PaymentIntentInput,
@@ -99,6 +100,7 @@ export class PaymentsController {
 }
 
 @Controller(["api/v1/payment-provider-callbacks", "v1/payment-provider-callbacks"])
+@DatabaseContext("internal")
 export class PaymentCallbacksController {
   constructor(private readonly payments: PaymentsService) {}
 
@@ -108,13 +110,6 @@ export class PaymentCallbacksController {
     @Headers("x-provider-signature") signature: string | undefined,
     @Body(new ZodPipe(paymentProviderCallbackSchema)) body: PaymentProviderCallbackInput,
   ) {
-    const { organizationId, unitId, ...payload } = body;
-    return this.payments.handleProviderCallback(
-      adapter,
-      signature,
-      organizationId,
-      unitId,
-      payload,
-    );
+    return this.payments.handleProviderCallback(adapter, signature, body);
   }
 }

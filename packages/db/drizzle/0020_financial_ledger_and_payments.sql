@@ -372,6 +372,23 @@ $$;
 CREATE TRIGGER "payment_attempts_state_machine"
 BEFORE INSERT OR UPDATE OR DELETE ON "payment_attempts"
 FOR EACH ROW EXECUTE FUNCTION public.giromesa_protect_payment_attempt();
+CREATE OR REPLACE FUNCTION public.giromesa_payment_callback_scope(
+  p_attempt_id uuid,
+  p_adapter varchar
+)
+RETURNS TABLE(organization_id uuid, unit_id uuid)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT attempt.organization_id, attempt.unit_id
+  FROM public.payment_attempts AS attempt
+  WHERE attempt.id = p_attempt_id
+    AND attempt.adapter = p_adapter
+  LIMIT 1
+$$;
+ALTER FUNCTION public.giromesa_payment_callback_scope(uuid, varchar) OWNER TO giromesa;
 --> statement-breakpoint
 ALTER TABLE "financial_ledger_transactions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "financial_ledger_transactions" FORCE ROW LEVEL SECURITY;
@@ -396,6 +413,8 @@ GRANT UPDATE (
   "last_lookup_at", "resolved_at", "version", "updated_at"
 ) ON "payment_attempts" TO giromesa_app;
 GRANT SELECT, INSERT ON "payment_provider_events" TO giromesa_app;
+REVOKE ALL ON FUNCTION public.giromesa_payment_callback_scope(uuid, varchar) FROM PUBLIC, giromesa_app, giromesa_worker, giromesa_identity, giromesa_public, giromesa_legacy_transition;
+GRANT EXECUTE ON FUNCTION public.giromesa_payment_callback_scope(uuid, varchar) TO giromesa_internal;
 --> statement-breakpoint
 CREATE POLICY "giromesa_tenant_scope" ON "financial_ledger_transactions" FOR ALL TO giromesa_app
   USING (organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid AND unit_id = nullif(current_setting('app.current_unit_id', true), '')::uuid AND public.giromesa_tenant_context_authorized(organization_id, unit_id))

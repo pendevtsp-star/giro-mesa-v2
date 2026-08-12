@@ -26,8 +26,6 @@ export const paymentManualReviewSchema = z
 
 export const paymentProviderCallbackSchema = z
   .object({
-    organizationId: z.uuid(),
-    unitId: z.uuid(),
     attemptId: z.uuid(),
     providerEventId: z.string().trim().min(1).max(160),
     status: z.enum(["authorized", "declined", "unknown"]),

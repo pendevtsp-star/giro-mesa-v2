@@ -408,8 +408,6 @@ export class PaymentsService {
   async handleProviderCallback(
     adapterName: string,
     signature: string | undefined,
-    organizationId: string,
-    unitId: string,
     input: {
       attemptId: string;
       providerEventId: string;
@@ -435,70 +433,101 @@ export class PaymentsService {
         message: "O callback exige identificador de evento do provedor.",
       });
     }
+    if (
+      input.amountCents !== undefined &&
+      (!Number.isSafeInteger(input.amountCents) ||
+        input.amountCents <= 0 ||
+        input.amountCents > POSTGRES_INT4_MAX)
+    )
+      throw new BadRequestException({
+        code: "INVALID_PROVIDER_AMOUNT",
+        message: "O valor informado pelo provedor excede o limite monetário permitido.",
+      });
+    const scope = await this.database.withRoleContext("internal", null, async (tx) => {
+      const rows = await tx.execute<{ organization_id: string; unit_id: string }>(sql`
+        select organization_id, unit_id
+        from public.giromesa_payment_callback_scope(
+          ${input.attemptId}::uuid,
+          ${adapterName}::varchar
+        )
+      `);
+      return [...rows][0];
+    });
+    if (!scope)
+      throw new NotFoundException({
+        code: "PAYMENT_ATTEMPT_NOT_FOUND",
+        message: "Tentativa de pagamento não encontrada para o provedor autenticado.",
+      });
+    const organizationId = scope.organization_id;
+    const unitId = scope.unit_id;
     const normalized = normalizeAdapterResult({
       status: input.status,
       ...(input.providerReference ? { providerReference: input.providerReference } : {}),
       ...(input.amountCents !== undefined ? { amountCents: input.amountCents } : {}),
     });
-    return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.attemptId}::uuid for update`,
-      );
-      const [attempt] = await tx
-        .select()
-        .from(paymentAttempts)
-        .where(
-          and(
-            eq(paymentAttempts.organizationId, organizationId),
-            eq(paymentAttempts.unitId, unitId),
-            eq(paymentAttempts.id, input.attemptId),
-          ),
-        )
-        .limit(1);
-      if (!attempt)
-        throw new NotFoundException({
-          code: "PAYMENT_ATTEMPT_NOT_FOUND",
-          message: "Tentativa de pagamento não encontrada nesta unidade.",
-        });
-      const [inserted] = await tx
-        .insert(paymentProviderEvents)
-        .values({
-          organizationId,
-          unitId,
-          attemptId: input.attemptId,
-          adapter: this.paymentAdapter.name,
-          providerEventId: input.providerEventId.trim(),
-          outcome: input.status,
-          safePayload: input.safePayload ?? {},
-        })
-        .onConflictDoNothing()
-        .returning({ id: paymentProviderEvents.id });
-      if (!inserted) {
-        const [intent] = await tx
-          .select({ status: paymentIntents.status })
-          .from(paymentIntents)
-          .where(eq(paymentIntents.id, attempt.intentId))
-          .limit(1);
-        return {
-          attemptId: attempt.id,
-          intentId: attempt.intentId,
-          status: attempt.status,
-          intentStatus: intent?.status ?? "pending",
-          amountCents: attempt.amountCents,
-          providerReference: attempt.providerReference,
-          reviewRequired: attempt.reviewRequired,
-          nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
-          idempotentReplay: true,
-        };
-      }
-      return this.applyAttemptResultInTransaction(
-        tx,
-        organizationId,
-        unitId,
-        input.attemptId,
-        normalized,
-      );
-    });
+    return this.database.withTenantContext(
+      { source: "internal", organizationId, unitId, actorIdentityId: null },
+      () =>
+        this.database.db.transaction(async (tx) => {
+          await tx.execute(
+            sql`select id from payment_attempts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.attemptId}::uuid for update`,
+          );
+          const [attempt] = await tx
+            .select()
+            .from(paymentAttempts)
+            .where(
+              and(
+                eq(paymentAttempts.organizationId, organizationId),
+                eq(paymentAttempts.unitId, unitId),
+                eq(paymentAttempts.id, input.attemptId),
+              ),
+            )
+            .limit(1);
+          if (!attempt)
+            throw new NotFoundException({
+              code: "PAYMENT_ATTEMPT_NOT_FOUND",
+              message: "Tentativa de pagamento não encontrada nesta unidade.",
+            });
+          const [inserted] = await tx
+            .insert(paymentProviderEvents)
+            .values({
+              organizationId,
+              unitId,
+              attemptId: input.attemptId,
+              adapter: this.paymentAdapter.name,
+              providerEventId: input.providerEventId.trim(),
+              outcome: input.status,
+              safePayload: input.safePayload ?? {},
+            })
+            .onConflictDoNothing()
+            .returning({ id: paymentProviderEvents.id });
+          if (!inserted) {
+            const [intent] = await tx
+              .select({ status: paymentIntents.status })
+              .from(paymentIntents)
+              .where(eq(paymentIntents.id, attempt.intentId))
+              .limit(1);
+            return {
+              attemptId: attempt.id,
+              intentId: attempt.intentId,
+              status: attempt.status,
+              intentStatus: intent?.status ?? "pending",
+              amountCents: attempt.amountCents,
+              providerReference: attempt.providerReference,
+              reviewRequired: attempt.reviewRequired,
+              nextAction: attempt.reviewRequired ? "lookup_or_reconcile" : "none",
+              idempotentReplay: true,
+            };
+          }
+          return this.applyAttemptResultInTransaction(
+            tx,
+            organizationId,
+            unitId,
+            input.attemptId,
+            normalized,
+          );
+        }),
+    );
   }
 
   private async describeAttempt(
