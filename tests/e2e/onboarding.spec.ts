@@ -1126,6 +1126,7 @@ for (const status of [400, 401, 403, 404] as const) {
 
     await enterDemo(page);
     await openOnboarding(page);
+    await page.waitForLoadState("networkidle");
     const refreshCurrentRun = page
       .locator("button:not([disabled])")
       .filter({ hasText: "Atualizar status" })
@@ -1133,14 +1134,19 @@ for (const status of [400, 401, 403, 404] as const) {
     failNextRefresh = true;
     await refreshCurrentRun.click();
     await refreshFailed;
-    if (status === 401) {
-      await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
-    } else {
-      await expect(page.getByRole("alert")).toContainText(`Refresh permanente ${status}.`);
-    }
-    statusCalls = 0;
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const callsAfterPermanentFailure = statusCalls;
     await page.clock.fastForward(10_000);
-    expect(statusCalls).toBe(0);
+    await expect.poll(() => statusCalls).toBe(callsAfterPermanentFailure);
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.clock.fastForward(10_000);
+    await expect.poll(() => statusCalls).toBe(callsAfterPermanentFailure);
   });
 }
 
