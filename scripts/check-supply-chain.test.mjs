@@ -26,6 +26,13 @@ run: >-
   assert.deepEqual(validateCosignImageSignatures(workflow.replace("-a role=recovery", "")), [
     "recovery image signature must bind role, source commit and main authorization",
   ]);
+  const combined = workflow
+    .replace('"$IMAGE"\nIMAGE:', "-a role=recovery\nIMAGE:")
+    .replace(/run: >-\n {2}cosign sign --yes -a role=recovery[\s\S]*?"\$IMAGE"/, "");
+  assert.match(
+    validateCosignImageSignatures(combined).join("\n"),
+    /exactly one target and one recovery signature/,
+  );
 });
 
 test("supply-chain configuration meets the local release contract", () => {
