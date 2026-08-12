@@ -1,4 +1,5 @@
 import { startTelemetryFromEnv, type TelemetryRuntime } from "@giromesa/observability";
+import { createWorkerHeartbeat, type WorkerHeartbeat } from "./worker-heartbeat.js";
 
 export type SupportedSignal = "SIGINT" | "SIGTERM";
 
@@ -15,6 +16,7 @@ interface WorkerProcessDependencies {
     env: Readonly<Record<string, string | undefined>>,
   ) => Promise<TelemetryRuntime>;
   readonly createWorker?: () => Promise<WorkerLoop>;
+  readonly createHeartbeat?: (env: Readonly<Record<string, string | undefined>>) => WorkerHeartbeat;
   readonly registerSignal?: (signal: SupportedSignal, handler: () => Promise<void>) => void;
   readonly sleep?: (durationMs: number) => Promise<void>;
   readonly now?: () => number;
@@ -42,6 +44,7 @@ export async function startWorkerProcess(
   const env = dependencies.env ?? process.env;
   const startTelemetry = dependencies.startTelemetry ?? startTelemetryFromEnv;
   const telemetry = await startTelemetry("giromesa.worker", env);
+  const heartbeat = (dependencies.createHeartbeat ?? createWorkerHeartbeat)(env);
   let worker: WorkerLoop;
   try {
     const createWorker =
@@ -69,9 +72,13 @@ export async function startWorkerProcess(
         await worker.close();
       } finally {
         try {
-          await telemetry.forceFlush();
+          await heartbeat.cleanup();
         } finally {
-          await telemetry.shutdown();
+          try {
+            await telemetry.forceFlush();
+          } finally {
+            await telemetry.shutdown();
+          }
         }
       }
     })();
@@ -93,6 +100,7 @@ export async function startWorkerProcess(
             nextMaintenanceAt = now() + 60_000;
           }
           const processed = await worker.runOnce();
+          if (!stopRequested) await heartbeat.recordSuccessfulCycle();
           if (processed === 0 && !stopRequested) await sleep(1_000);
         }
       } finally {

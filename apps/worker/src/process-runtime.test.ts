@@ -3,7 +3,11 @@ import { spawnSync } from "node:child_process";
 import { it } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { TelemetryRuntime } from "@giromesa/observability";
-import { type SupportedSignal, startWorkerProcess } from "./process-runtime.js";
+import {
+  type SupportedSignal,
+  startWorkerProcess,
+  type WorkerProcessRuntime,
+} from "./process-runtime.js";
 
 function fakeTelemetry(events: string[]): TelemetryRuntime {
   return {
@@ -100,6 +104,146 @@ it("starts telemetry before the worker and closes both once on a signal", async 
     "telemetry.start",
     "worker.create",
     "worker.close",
+    "telemetry.flush",
+    "telemetry.shutdown",
+  ]);
+});
+
+it("runs DoseClub reconciliation before the generic outbox cycle", async () => {
+  const events: string[] = [];
+  const telemetry = fakeTelemetry(events);
+  let processRuntime: WorkerProcessRuntime | undefined;
+  processRuntime = await startWorkerProcess({
+    env: {},
+    startTelemetry: async () => {
+      await telemetry.start();
+      return telemetry;
+    },
+    createWorker: async () => ({
+      async expireAccessWindows() {
+        events.push("worker.maintenance");
+      },
+      async reconcileDoseClub() {
+        events.push("worker.doseclub");
+      },
+      async runOnce() {
+        events.push("worker.run");
+        await processRuntime?.stop();
+        return 0;
+      },
+      async close() {
+        events.push("worker.close");
+      },
+    }),
+    registerSignal: () => undefined,
+    now: () => 1,
+    sleep: async () => {
+      throw new Error("sleep should not run after stop");
+    },
+  });
+
+  await processRuntime.run();
+  assert.deepEqual(events, [
+    "telemetry.start",
+    "worker.maintenance",
+    "worker.doseclub",
+    "worker.run",
+    "worker.close",
+    "telemetry.flush",
+    "telemetry.shutdown",
+  ]);
+});
+
+it("records a heartbeat only after a successful worker cycle", async () => {
+  const events: string[] = [];
+  const telemetry = fakeTelemetry(events);
+  let processRuntime: WorkerProcessRuntime | undefined;
+  processRuntime = await startWorkerProcess({
+    env: {},
+    startTelemetry: async () => {
+      await telemetry.start();
+      return telemetry;
+    },
+    createWorker: async () => ({
+      async expireAccessWindows() {
+        events.push("worker.maintenance");
+      },
+      async runOnce() {
+        events.push("worker.run");
+        return 0;
+      },
+      async close() {
+        events.push("worker.close");
+      },
+    }),
+    createHeartbeat: () => ({
+      async recordSuccessfulCycle() {
+        events.push("heartbeat.record");
+      },
+      async cleanup() {
+        events.push("heartbeat.cleanup");
+      },
+    }),
+    registerSignal: () => undefined,
+    now: () => 1,
+    sleep: async () => {
+      await processRuntime?.stop();
+    },
+  });
+
+  await processRuntime.run();
+  assert.deepEqual(events, [
+    "telemetry.start",
+    "worker.maintenance",
+    "worker.run",
+    "heartbeat.record",
+    "worker.close",
+    "heartbeat.cleanup",
+    "telemetry.flush",
+    "telemetry.shutdown",
+  ]);
+});
+
+it("does not update the heartbeat when a worker cycle fails", async () => {
+  const events: string[] = [];
+  const telemetry = fakeTelemetry(events);
+  const processRuntime = await startWorkerProcess({
+    env: {},
+    startTelemetry: async () => {
+      await telemetry.start();
+      return telemetry;
+    },
+    createWorker: async () => ({
+      async expireAccessWindows() {
+        events.push("worker.maintenance");
+      },
+      async runOnce() {
+        events.push("worker.run");
+        throw new Error("cycle failed");
+      },
+      async close() {
+        events.push("worker.close");
+      },
+    }),
+    createHeartbeat: () => ({
+      async recordSuccessfulCycle() {
+        events.push("heartbeat.record");
+      },
+      async cleanup() {
+        events.push("heartbeat.cleanup");
+      },
+    }),
+    registerSignal: () => undefined,
+    now: () => 1,
+  });
+
+  await assert.rejects(processRuntime.run(), /cycle failed/);
+  assert.deepEqual(events, [
+    "telemetry.start",
+    "worker.maintenance",
+    "worker.run",
+    "worker.close",
+    "heartbeat.cleanup",
     "telemetry.flush",
     "telemetry.shutdown",
   ]);
