@@ -1039,13 +1039,20 @@ test("retoma polling automático depois de refresh manual 503 sem timers duplica
 
   await enterDemo(page);
   await openOnboarding(page);
+  await expect(page.getByText("Publicando conclusão", { exact: true })).toBeVisible();
   const refreshCurrentRun = page
     .locator("button:not([disabled])")
     .filter({ hasText: "Atualizar status" })
     .first();
   failNextRefresh = true;
+  const refreshFailureResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/onboarding") && response.status() === 503,
+  );
   await refreshCurrentRun.click();
-  await expect.poll(() => failNextRefresh).toBe(false);
+  await refreshFailureResponse;
+  await expect(page.getByRole("alert")).toContainText(
+    "O servidor não concluiu a solicitação. A tentativa pode ser retomada com segurança.",
+  );
   await page.clock.runFor(1_600);
   await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
     timeout: 5_000,
@@ -1060,10 +1067,6 @@ for (const status of [400, 401, 403, 404] as const) {
   test(`não rearma polling depois de refresh permanente ${status}`, async ({ page }) => {
     let failNextRefresh = false;
     let statusCalls = 0;
-    let markRefreshFailed: (() => void) | undefined;
-    const refreshFailed = new Promise<void>((resolve) => {
-      markRefreshFailed = resolve;
-    });
     await page.clock.install();
     await page.clock.pauseAt(new Date(Date.now() + 1_000));
     await page.route(
@@ -1094,7 +1097,6 @@ for (const status of [400, 401, 403, 404] as const) {
                 message: `Refresh permanente ${status}.`,
               },
             });
-            markRefreshFailed?.();
             return;
           }
           await route.fulfill({
@@ -1126,14 +1128,22 @@ for (const status of [400, 401, 403, 404] as const) {
 
     await enterDemo(page);
     await openOnboarding(page);
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("Publicando conclusão", { exact: true })).toBeVisible();
     const refreshCurrentRun = page
       .locator("button:not([disabled])")
       .filter({ hasText: "Atualizar status" })
       .first();
     failNextRefresh = true;
+    const refreshFailureResponse = page.waitForResponse(
+      (response) => response.url().endsWith("/onboarding") && response.status() === status,
+    );
     await refreshCurrentRun.click();
-    await refreshFailed;
+    await refreshFailureResponse;
+    if (status === 401) {
+      await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
+    } else {
+      await expect(page.getByRole("alert")).toContainText(`Refresh permanente ${status}.`);
+    }
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
       document.dispatchEvent(new Event("visibilitychange"));
