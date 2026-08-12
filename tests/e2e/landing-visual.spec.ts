@@ -66,6 +66,7 @@ for (const viewport of viewports) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("http://localhost:3110");
     await expect(page.locator('[aria-roledescription="carrossel"]')).toBeVisible();
+    await expect(page.getByText("Movimento reduzido: avanço automático desativado.")).toBeVisible();
     await waitForStableVisualState(page);
     await expect(page).toHaveScreenshot(`landing-${viewport.name}.png`, {
       animations: "disabled",
