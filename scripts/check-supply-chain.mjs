@@ -66,6 +66,9 @@ export function validateCosignImageSignatures(workflow) {
     ...workflow.matchAll(/\bcosign\s+sign\s+--yes(?<arguments>[\s\S]*?)["']\$IMAGE["']/g),
   ].map((match) => match.groups.arguments.replace(/\s+/g, " ").trim());
   const errors = [];
+  if (commands.length !== 2) {
+    errors.push("image publication must contain exactly one target and one recovery signature");
+  }
   const digestBindings = workflow.match(
     /IMAGE:\s*ghcr\.io\/pendevtsp-star\/giro-mesa-v2-\$\{\{\s*matrix\.service\s*\}\}@\$\{\{\s*steps\.build\.outputs\.digest\s*\}\}/g,
   );
@@ -89,6 +92,7 @@ export function validateCosignImageSignatures(workflow) {
     const valid = commands.some(
       (command) =>
         command.includes(`-a role=${contract.role}`) &&
+        !command.includes(`-a role=${contract.role === "target" ? "recovery" : "target"}`) &&
         command.includes(`-a ${contract.source}`) &&
         command.includes(`-a ${contract.authorization}`),
     );
