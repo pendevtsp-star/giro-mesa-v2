@@ -354,7 +354,7 @@ jobs:
           cache-dependency-path: candidate/pnpm-lock.yaml
       - name: Reprove the authorized recovery with the shared unprivileged gate
         run: >-
-          ./scripts/validate-recovery-candidate.sh
+          bash ./scripts/validate-recovery-candidate.sh
           --candidate-directory candidate
           --recovery-sha "${{ needs.authorize-recovery.outputs.recovery_sha }}"
           --output-directory evidence

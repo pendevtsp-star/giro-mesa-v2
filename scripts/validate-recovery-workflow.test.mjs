@@ -18,7 +18,7 @@ test("manual recovery validation is non-privileged and bound to the default bran
   assert.match(workflow, /persist-credentials:\s*false/);
   assert.match(workflow, /ref:\s*\$\{\{ inputs\.recovery_sha \}\}/);
   assert.match(workflow, /path:\s*candidate/);
-  assert.match(workflow, /scripts\/validate-recovery-candidate\.sh/);
+  assert.match(workflow, /bash\s+\.\/scripts\/validate-recovery-candidate\.sh/);
   assert.match(workflow, /actions\/upload-artifact@[0-9a-f]{40}/);
   assert.doesNotMatch(workflow, /cosign\s+sign|docker\/login-action|docker\/build-push-action/);
 });
@@ -27,7 +27,7 @@ test("manual and privileged recovery gates execute the same validator", () => {
   const workflow = readFileSync(workflowPath, "utf8");
   const publish = readFileSync(publishPath, "utf8");
   const invocation =
-    /scripts\/validate-recovery-candidate\.sh[\s\S]*--candidate-directory[\s\\]+candidate[\s\S]*--recovery-sha/;
+    /bash\s+\.\/scripts\/validate-recovery-candidate\.sh[\s\S]*--candidate-directory[\s\\]+candidate[\s\S]*--recovery-sha/;
   assert.match(workflow, invocation);
   assert.match(publish, invocation);
   assert.doesNotMatch(publish, /Reprove recovery migrations on PostgreSQL 16 and 17/);
