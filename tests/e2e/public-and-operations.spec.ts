@@ -84,12 +84,12 @@ test("contact form posts consent to the internal commercial API", async ({ page 
   expect(body).not.toHaveProperty("consent");
 });
 
-test("public QR remains transparent about demo and provides table actions", async ({ page }) => {
+test("public demo remains transparent and hides unsigned table actions", async ({ page }) => {
   await page.goto("http://localhost:3111/m/demo");
   await expect(page.getByText(/cardápio com dados demonstrativos/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: /cardápio/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /chamar garçom/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /pedir a conta/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /chamar garçom/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /pedir a conta/i })).toHaveCount(0);
   await page.getByRole("button", { name: /bruschetta da casa/i }).click();
   await page.getByRole("button", { name: /^adicionar/i }).click();
   await page.getByRole("button", { name: /ver seleção/i }).click({ force: true });
