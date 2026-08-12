@@ -63,7 +63,13 @@ describe("finance generated OpenAPI contract", () => {
     const document = record(JSON.parse(await readFile(openApiUrl, "utf8")));
     const schemas = record(record(document.components).schemas);
     const intent = record(schemas.PaymentIntentResponse);
-    assert.deepEqual(intent.required, ["intentId", "amountCents", "capturedCents", "status", "idempotentReplay"]);
+    assert.deepEqual(intent.required, [
+      "intentId",
+      "amountCents",
+      "capturedCents",
+      "status",
+      "idempotentReplay",
+    ]);
     assert.equal(record(record(intent.properties).amountCents).maximum, 2_147_483_647);
     assert.equal(record(record(intent.properties).intentId).format, "uuid");
     const inventoryEvent = record(schemas.ManagementInventoryEventResponse);
@@ -77,9 +83,15 @@ describe("finance generated OpenAPI contract", () => {
       readFile(csharpIntentBuilderUrl, "utf8"),
       readFile(csharpInventoryEventBuilderUrl, "utf8"),
     ]);
-    assert.match(typescriptClient, /"application\/json": components\["schemas"\]\["PaymentIntentResponse"\]/);
+    assert.match(
+      typescriptClient,
+      /"application\/json": components\["schemas"\]\["PaymentIntentResponse"\]/,
+    );
     assert.match(typescriptClient, /intentId: string;[\s\S]{0,300}status: string;/);
-    assert.match(csharpIntentBuilder, /Task<global::GiroMesa\.ApiClient\.Models\.PaymentIntentResponse\?> PostAsync/);
+    assert.match(
+      csharpIntentBuilder,
+      /Task<global::GiroMesa\.ApiClient\.Models\.PaymentIntentResponse\?> PostAsync/,
+    );
     assert.doesNotMatch(csharpIntentBuilder, /SendNoContentAsync/);
     assert.match(
       csharpInventoryEventBuilder,

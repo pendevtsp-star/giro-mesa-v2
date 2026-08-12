@@ -319,7 +319,15 @@ const components: Record<string, SchemaObject> = {
   ReturnableAssetResponse: {
     type: "object",
     additionalProperties: false,
-    required: ["assetId", "sku", "name", "trackingMode", "depositCents", "serials", "idempotentReplay"],
+    required: [
+      "assetId",
+      "sku",
+      "name",
+      "trackingMode",
+      "depositCents",
+      "serials",
+      "idempotentReplay",
+    ],
     properties: {
       assetId: uuid,
       sku: text,
@@ -333,7 +341,14 @@ const components: Record<string, SchemaObject> = {
   ReturnableMovementResponse: {
     type: "object",
     additionalProperties: true,
-    required: ["movementId", "assetId", "movementType", "quantity", "occurredAt", "idempotentReplay"],
+    required: [
+      "movementId",
+      "assetId",
+      "movementType",
+      "quantity",
+      "occurredAt",
+      "idempotentReplay",
+    ],
     properties: {
       movementId: uuid,
       assetId: uuid,
@@ -346,7 +361,13 @@ const components: Record<string, SchemaObject> = {
   ReturnableReconciliationResponse: {
     type: "object",
     additionalProperties: false,
-    required: ["expectedQuantity", "physicalQuantity", "adjustmentQuantity", "movementId", "movementIds"],
+    required: [
+      "expectedQuantity",
+      "physicalQuantity",
+      "adjustmentQuantity",
+      "movementId",
+      "movementIds",
+    ],
     properties: {
       expectedQuantity: nonNegativeInt4,
       physicalQuantity: nonNegativeInt4,
@@ -440,7 +461,8 @@ export function addFinanceResponses(document: OpenAPIObject) {
       if (!responseName) continue;
       seen.add(handler);
       const response = operation.responses?.["200"] ?? operation.responses?.["201"];
-      if (!response || "$ref" in response) throw new Error(`Finance response missing for ${handler}.`);
+      if (!response || "$ref" in response)
+        throw new Error(`Finance response missing for ${handler}.`);
       response.content = {
         "application/json": { schema: { $ref: `#/components/schemas/${responseName}` } },
       };
@@ -448,5 +470,6 @@ export function addFinanceResponses(document: OpenAPIObject) {
   }
 
   const missing = Object.keys(responseByOperation).filter((handler) => !seen.has(handler));
-  if (missing.length > 0) throw new Error(`Finance OpenAPI handlers missing: ${missing.join(", ")}`);
+  if (missing.length > 0)
+    throw new Error(`Finance OpenAPI handlers missing: ${missing.join(", ")}`);
 }
