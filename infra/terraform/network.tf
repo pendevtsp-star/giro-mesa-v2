@@ -69,14 +69,6 @@ resource "aws_security_group" "database" {
   name_prefix = "giromesa-${var.environment}-db-"
   description = "PostgreSQL access from application tasks only."
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    protocol        = "tcp"
-    from_port       = 5432
-    to_port         = 5432
-    security_groups = [aws_security_group.application.id]
-  }
-
 }
 
 # Provider endpoints use rotating public addresses; egress remains limited to TLS port 443.
@@ -93,4 +85,22 @@ resource "aws_security_group" "application" {
     to_port     = 443
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "database_from_application" {
+  security_group_id            = aws_security_group.database.id
+  referenced_security_group_id = aws_security_group.application.id
+  description                  = "PostgreSQL from GiroMesa application tasks."
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+
+resource "aws_vpc_security_group_egress_rule" "application_to_database" {
+  security_group_id            = aws_security_group.application.id
+  referenced_security_group_id = aws_security_group.database.id
+  description                  = "PostgreSQL to the GiroMesa database security group."
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
 }
