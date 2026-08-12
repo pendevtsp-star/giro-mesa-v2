@@ -47,10 +47,12 @@ function isMenuItem(value: unknown): value is MenuItem {
 
 export function normalizePublicMenu(
   payload: unknown,
-): { items: MenuItem[]; branding: MenuBranding | null } | null {
+): { items: MenuItem[]; branding: MenuBranding | null } | MenuItem[] | null {
   if (!isRecord(payload) || !Array.isArray(payload.items) || !payload.items.every(isMenuItem)) {
     return null;
   }
+  const items = payload.items as MenuItem[];
+  if (!("branding" in payload)) return items;
   const branding = payload.branding;
   const validBranding =
     branding === null ||
@@ -65,18 +67,7 @@ export function normalizePublicMenu(
   if (!validBranding) return null;
   return {
     branding: branding as MenuBranding | null,
-    items: (payload.items as Array<Omit<MenuItem, "visual"> & { visual?: MenuItem["visual"] }>).map(
-      (item) => ({
-        ...item,
-        visual:
-          item.visual ??
-          (/bebida|drink|bar/i.test(item.category)
-            ? "drink"
-            : /sobremesa|doce|dessert/i.test(item.category)
-              ? "dessert"
-              : "plate"),
-      }),
-    ),
+    items,
   };
 }
 
@@ -105,7 +96,9 @@ export async function getPublicMenu(
     if (!response.ok) throw new Error("Menu indisponível");
     const menu = normalizePublicMenu(await response.json());
     if (!menu) throw new Error("Menu inválido");
-    return { ...menu, source: "api" };
+    return Array.isArray(menu)
+      ? { items: menu, branding: null, source: "api" }
+      : { ...menu, source: "api" };
   } catch {
     return { items: [], branding: null, source: "unavailable" };
   }

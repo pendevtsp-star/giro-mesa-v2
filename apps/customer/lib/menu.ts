@@ -56,7 +56,6 @@ export const demoMenu: MenuItem[] = [
     description: "Pão artesanal, tomates assados, manjericão e azeite.",
     priceCents: 2790,
     icon: "leaf",
-    visual: "plate",
     tags: ["vegetariano"],
     available: true,
   },
@@ -67,7 +66,6 @@ export const demoMenu: MenuItem[] = [
     description: "Quatro unidades, aioli defumado e picles da casa.",
     priceCents: 3490,
     icon: "dish",
-    visual: "plate",
     available: true,
   },
   {
@@ -77,7 +75,6 @@ export const demoMenu: MenuItem[] = [
     description: "Blend 180g, queijo, cebola tostada e molho da casa.",
     priceCents: 4890,
     icon: "burger",
-    visual: "plate",
     available: true,
     modifierGroups: [
       {
@@ -110,7 +107,6 @@ export const demoMenu: MenuItem[] = [
     description: "Manteiga de sálvia, castanhas e parmesão curado.",
     priceCents: 5590,
     icon: "dish",
-    visual: "plate",
     tags: ["vegetariano"],
     available: true,
   },
@@ -121,7 +117,6 @@ export const demoMenu: MenuItem[] = [
     description: "Purê de raízes, legumes grelhados e molho cítrico.",
     priceCents: 6890,
     icon: "fish",
-    visual: "plate",
     tags: ["sem glúten"],
     available: true,
   },
@@ -132,7 +127,6 @@ export const demoMenu: MenuItem[] = [
     description: "Corte alto, batatas rústicas e manteiga de ervas.",
     priceCents: 7990,
     icon: "steak",
-    visual: "plate",
     available: false,
   },
   {
@@ -142,7 +136,6 @@ export const demoMenu: MenuItem[] = [
     description: "Fatia cremosa com caramelo e flor de sal.",
     priceCents: 2190,
     icon: "dessert",
-    visual: "dessert",
     available: true,
   },
   {
@@ -152,7 +145,6 @@ export const demoMenu: MenuItem[] = [
     description: "Texturas de chocolate, café e creme fresco.",
     priceCents: 2990,
     icon: "sparkles",
-    visual: "dessert",
     available: true,
   },
   {
@@ -162,7 +154,6 @@ export const demoMenu: MenuItem[] = [
     description: "Com ou sem gás, 350 ml.",
     priceCents: 690,
     icon: "droplet",
-    visual: "drink",
     available: true,
     modifierGroups: [
       {
@@ -184,7 +175,6 @@ export const demoMenu: MenuItem[] = [
     description: "Limão siciliano, frutas vermelhas ou gengibre.",
     priceCents: 1690,
     icon: "glass",
-    visual: "drink",
     available: true,
   },
 ];
