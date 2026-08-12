@@ -333,6 +333,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.authorize-recovery.outputs.recovery_sha }}
+      - name: Reject secrets in the exact recovery checkout
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+          dir --redact --no-banner /repo
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 11.7.0

@@ -210,6 +210,12 @@ export function validateSupplyChain() {
   );
   requireText(
     publish,
+    /validate-recovery:[\s\S]*gitleaks:v8\.28\.0@sha256:[0-9a-f]{64}[\s\S]*dir --redact --no-banner \/repo/,
+    "recovery validation must scan the exact recovery checkout for secrets",
+    errors,
+  );
+  requireText(
+    publish,
     /postgresMajors.*\[16,17\]/,
     "recovery validation must cover PostgreSQL 16 and 17",
     errors,
