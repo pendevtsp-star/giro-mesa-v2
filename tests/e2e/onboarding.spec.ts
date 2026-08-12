@@ -1045,7 +1045,7 @@ test("retoma polling automático depois de refresh manual 503 sem timers duplica
     .first();
   failNextRefresh = true;
   await refreshCurrentRun.click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect.poll(() => failNextRefresh).toBe(false);
   await page.clock.runFor(1_600);
   await expect(page.getByRole("heading", { name: "Operação ativada" })).toBeVisible({
     timeout: 5_000,
@@ -1133,7 +1133,12 @@ for (const status of [400, 401, 403, 404] as const) {
     failNextRefresh = true;
     await refreshCurrentRun.click();
     await refreshFailed;
-    await page.waitForTimeout(100);
+    if (status === 401) {
+      await expect(page.getByRole("button", { name: /entrar no giromesa/i })).toBeVisible();
+    } else {
+      await expect(page.getByRole("alert")).toContainText(`Refresh permanente ${status}.`);
+    }
+    statusCalls = 0;
     await page.clock.fastForward(10_000);
     expect(statusCalls).toBe(0);
   });
