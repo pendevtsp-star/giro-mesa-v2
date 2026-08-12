@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
+  deviceEnrollments,
   dispatchDeadLetters,
   dispatchEffects,
-  deviceEnrollments,
   hubCommands,
   hubHeartbeats,
   identities,

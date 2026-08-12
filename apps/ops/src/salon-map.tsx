@@ -38,7 +38,13 @@ const statusLabels: Record<SalonTableStatus, string> = {
   paying: "Em pagamento",
 };
 
-const statusOrder: SalonTableStatus[] = ["available", "occupied", "reserved", "attention", "paying"];
+const statusOrder: SalonTableStatus[] = [
+  "available",
+  "occupied",
+  "reserved",
+  "attention",
+  "paying",
+];
 
 export function clampMapScale(value: number) {
   return Math.min(1.8, Math.max(0.65, Math.round(value * 20) / 20));
@@ -117,7 +123,13 @@ export function SalonMap({
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [mode, setMode] = useState<"operate" | "edit">("operate");
-  const dragRef = useRef<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const model = useMemo(
     () => buildSalonMapModel(tables, { query, statuses, allowedAreaIds }),
     [allowedAreaIds, query, statuses, tables],
@@ -132,13 +144,22 @@ export function SalonMap({
   function beginPan(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.target !== event.currentTarget) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: offset.x, originY: offset.y };
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+    };
   }
 
   function pan(event: ReactPointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    setOffset({ x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y });
+    setOffset({
+      x: drag.originX + event.clientX - drag.x,
+      y: drag.originY + event.clientY - drag.y,
+    });
   }
 
   function endPan(event: ReactPointerEvent<HTMLDivElement>) {
@@ -146,7 +167,12 @@ export function SalonMap({
   }
 
   function navigate(event: KeyboardEvent<HTMLButtonElement>, tableId: string) {
-    const directions = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" } as const;
+    const directions = {
+      ArrowUp: "up",
+      ArrowDown: "down",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+    } as const;
     const direction = directions[event.key as keyof typeof directions];
     if (!direction) return;
     event.preventDefault();
@@ -166,38 +192,91 @@ export function SalonMap({
           </div>
           <div className={`salon-connection salon-connection--${connectionState}`} role="status">
             <span aria-hidden="true" />
-            {connectionState === "online" ? "Sincronizado" : connectionState === "offline" ? "Modo offline" : "Sincronização lenta"}
+            {connectionState === "online"
+              ? "Sincronizado"
+              : connectionState === "offline"
+                ? "Modo offline"
+                : "Sincronização lenta"}
           </div>
           <label className="salon-search">
             <span className="sr-only">Buscar mesa</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar mesa" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar mesa"
+            />
           </label>
           <fieldset className="salon-map-tools">
             <legend className="sr-only">Ferramentas do mapa</legend>
-            <button type="button" onClick={() => setScale((value) => clampMapScale(value - 0.1))} aria-label="Diminuir zoom">−</button>
+            <button
+              type="button"
+              onClick={() => setScale((value) => clampMapScale(value - 0.1))}
+              aria-label="Diminuir zoom"
+            >
+              −
+            </button>
             <output aria-label="Zoom atual">{Math.round(scale * 100)}%</output>
-            <button type="button" onClick={() => setScale((value) => clampMapScale(value + 0.1))} aria-label="Aumentar zoom">+</button>
-            <button type="button" onClick={() => { setScale(1); setOffset({ x: 0, y: 0 }); }}>Centralizar</button>
-            <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode((value) => value === "operate" ? "edit" : "operate")}>{mode === "operate" ? "Editar mapa" : "Concluir edição"}</button>
+            <button
+              type="button"
+              onClick={() => setScale((value) => clampMapScale(value + 0.1))}
+              aria-label="Aumentar zoom"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setScale(1);
+                setOffset({ x: 0, y: 0 });
+              }}
+            >
+              Centralizar
+            </button>
+            <button
+              type="button"
+              aria-pressed={mode === "edit"}
+              onClick={() => setMode((value) => (value === "operate" ? "edit" : "operate"))}
+            >
+              {mode === "operate" ? "Editar mapa" : "Concluir edição"}
+            </button>
           </fieldset>
         </header>
 
         <fieldset className="salon-status-filters">
           <legend className="sr-only">Filtrar mesas por situação</legend>
           {statusOrder.map((status) => (
-            <button key={status} type="button" aria-pressed={statuses.includes(status)} onClick={() => toggleStatus(status)}>
+            <button
+              key={status}
+              type="button"
+              aria-pressed={statuses.includes(status)}
+              onClick={() => toggleStatus(status)}
+            >
               <span className={`salon-status-dot salon-status-dot--${status}`} aria-hidden="true" />
               {statusLabels[status]} <strong>{model.summary[status]}</strong>
             </button>
           ))}
         </fieldset>
 
-        <div className="salon-map-viewport" onPointerDown={beginPan} onPointerMove={pan} onPointerUp={endPan} onPointerCancel={endPan}>
+        <div
+          className="salon-map-viewport"
+          onPointerDown={beginPan}
+          onPointerMove={pan}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+        >
           {model.visible.length === 0 ? (
             <div className="salon-map-empty" role="status">
               <strong>Nenhuma mesa neste recorte</strong>
               <span>Limpe a busca ou os filtros para voltar à operação completa.</span>
-              <button type="button" onClick={() => { setQuery(""); setStatuses([]); }}>Limpar filtros</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setStatuses([]);
+                }}
+              >
+                Limpar filtros
+              </button>
             </div>
           ) : (
             <div
@@ -220,11 +299,22 @@ export function SalonMap({
                   aria-pressed={selectedTableId === table.id}
                   onClick={() => onSelect(table.id)}
                   onKeyDown={(event) => navigate(event, table.id)}
-                  style={{ left: table.x, top: table.y, width: table.width, minHeight: table.height }}
+                  style={{
+                    left: table.x,
+                    top: table.y,
+                    width: table.width,
+                    minHeight: table.height,
+                  }}
                   type="button"
                 >
-                  <span className="salon-map-table__top"><strong>{table.label}</strong><small>{table.seats} lugares</small></span>
-                  <span className="salon-map-table__status"><i aria-hidden="true" />{statusLabels[table.status]}</span>
+                  <span className="salon-map-table__top">
+                    <strong>{table.label}</strong>
+                    <small>{table.seats} lugares</small>
+                  </span>
+                  <span className="salon-map-table__status">
+                    <i aria-hidden="true" />
+                    {statusLabels[table.status]}
+                  </span>
                   {(table.totalCents !== undefined || table.elapsedMinutes !== undefined) && (
                     <span className="salon-map-table__meta">
                       {formatCents(table.totalCents)}
@@ -236,9 +326,13 @@ export function SalonMap({
             </div>
           )}
         </div>
-        <footer className="salon-map-hint">Arraste o fundo para mover · use as setas entre mesas · selecione para agir</footer>
+        <footer className="salon-map-hint">
+          Arraste o fundo para mover · use as setas entre mesas · selecione para agir
+        </footer>
       </section>
-      <aside className="salon-detail-panel" aria-label="Detalhes da mesa selecionada">{details}</aside>
+      <aside className="salon-detail-panel" aria-label="Detalhes da mesa selecionada">
+        {details}
+      </aside>
     </div>
   );
 }

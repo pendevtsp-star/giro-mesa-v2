@@ -52,10 +52,10 @@ it("gives public mutations a separate bounded bucket", () => {
   assert.equal(requestRateLimit("POST", "/public/v1/trial-applications").max, 20);
   assert.equal(requestRateLimit("POST", "/api/v1/public/contact").max, 20);
   assert.equal(requestRateLimit("GET", "/public/v1/menus/demo").max, 100);
-  assert.deepEqual(
-    requestRateLimit("POST", "/api/v1/integrations/club-whisky/dose-consumptions"),
-    { bucket: "integration:doseclub", max: 6_000 },
-  );
+  assert.deepEqual(requestRateLimit("POST", "/api/v1/integrations/club-whisky/dose-consumptions"), {
+    bucket: "integration:doseclub",
+    max: 6_000,
+  });
   assert.deepEqual(requestRateLimit("GET", "/v1/integrations/club-whisky/branches"), {
     bucket: "integration:doseclub",
     max: 6_000,

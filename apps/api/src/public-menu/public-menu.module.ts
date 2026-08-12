@@ -5,8 +5,8 @@ import { SyncModule } from "../sync/sync.module.js";
 import { PublicMenuAdminController, PublicMenuController } from "./public-menu.controller.js";
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
-import { TableSessionCodec, TableSessionService } from "./table-session.js";
 import { TableServiceService } from "./table-service.service.js";
+import { TableSessionCodec, TableSessionService } from "./table-session.js";
 
 @Module({
   imports: [AuthModule, OrganizationsModule, SyncModule],

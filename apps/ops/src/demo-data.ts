@@ -350,7 +350,12 @@ export function createDemoScenario() {
       { id: "demo-shift-lunch-1", unit: "[DEMO] Aurora Centro", name: "Almoço", state: "closed" },
       { id: "demo-shift-dinner-1", unit: "[DEMO] Aurora Centro", name: "Jantar", state: "open" },
       { id: "demo-shift-lunch-2", unit: "[DEMO] Aurora Lagoa", name: "Almoço", state: "closed" },
-      { id: "demo-shift-dinner-2", unit: "[DEMO] Aurora Lagoa", name: "Jantar", state: "scheduled" },
+      {
+        id: "demo-shift-dinner-2",
+        unit: "[DEMO] Aurora Lagoa",
+        name: "Jantar",
+        state: "scheduled",
+      },
     ],
     kdsTickets: initialTickets.map((ticket) => ({ ...ticket, items: [...ticket.items] })),
     inventory: {
@@ -361,22 +366,65 @@ export function createDemoScenario() {
       items: stock.map((item) => ({ ...item })),
     },
     returnables: [
-      { id: "demo-returnable-keg", name: "Barril retornável 30 L", tracking: "serialized", custody: "unit" },
-      { id: "demo-returnable-crate", name: "Engradado 24 unidades", tracking: "aggregate", custody: "supplier" },
-      { id: "demo-returnable-bottle", name: "Garrafa retornável 600 ml", tracking: "aggregate", custody: "table" },
+      {
+        id: "demo-returnable-keg",
+        name: "Barril retornável 30 L",
+        tracking: "serialized",
+        custody: "unit",
+      },
+      {
+        id: "demo-returnable-crate",
+        name: "Engradado 24 unidades",
+        tracking: "aggregate",
+        custody: "supplier",
+      },
+      {
+        id: "demo-returnable-bottle",
+        name: "Garrafa retornável 600 ml",
+        tracking: "aggregate",
+        custody: "table",
+      },
     ],
     incidents: [
-      { id: "demo-incident-breakage", kind: "breakage", summary: "Quebra registrada para análise gerencial", amountCents: 7_400 },
-      { id: "demo-incident-missing-returnable", kind: "missing_returnable", summary: "Vasilhame ausente aguardando conferência", amountCents: 12_000 },
+      {
+        id: "demo-incident-breakage",
+        kind: "breakage",
+        summary: "Quebra registrada para análise gerencial",
+        amountCents: 7_400,
+      },
+      {
+        id: "demo-incident-missing-returnable",
+        kind: "missing_returnable",
+        summary: "Vasilhame ausente aguardando conferência",
+        amountCents: 12_000,
+      },
     ],
     finance: {
       payments: [
         { id: "demo-payment-cash", method: "cash", amountCents: 14_680, state: "settled" },
-        { id: "demo-payment-debit", method: "debit_simulator", amountCents: 28_740, state: "settled" },
-        { id: "demo-payment-voucher", method: "voucher_simulator", amountCents: 9_230, state: "pending" },
+        {
+          id: "demo-payment-debit",
+          method: "debit_simulator",
+          amountCents: 28_740,
+          state: "settled",
+        },
+        {
+          id: "demo-payment-voucher",
+          method: "voucher_simulator",
+          amountCents: 9_230,
+          state: "pending",
+        },
       ],
-      payable: { id: "demo-payable-produce", description: "Compra demonstrativa de insumos", amountCents: 184_000 },
-      receivable: { id: "demo-receivable-event", description: "Evento demonstrativo", amountCents: 98_000 },
+      payable: {
+        id: "demo-payable-produce",
+        description: "Compra demonstrativa de insumos",
+        amountCents: 184_000,
+      },
+      receivable: {
+        id: "demo-receivable-event",
+        description: "Evento demonstrativo",
+        amountCents: 98_000,
+      },
     },
     doseClub: {
       provider: "doseclub",

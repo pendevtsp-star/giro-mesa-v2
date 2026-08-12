@@ -17,14 +17,19 @@ export type TableOccupancyCommand =
   | (OccupancyCas & { type: "reopen"; nextEpoch: string });
 
 export class TableOccupancyTransitionError extends Error {
-  constructor(readonly code: string, message: string) {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
     super(message);
     this.name = "TableOccupancyTransitionError";
   }
 }
 
 function targetState(state: TableOccupancyState, type: TableOccupancyCommand["type"]) {
-  const transitions: Readonly<Record<TableOccupancyState, Partial<Record<TableOccupancyCommand["type"], TableOccupancyState>>>> = {
+  const transitions: Readonly<
+    Record<TableOccupancyState, Partial<Record<TableOccupancyCommand["type"], TableOccupancyState>>>
+  > = {
     reserved: { seat: "open", cancel: "closed" },
     open: {
       begin_payment: "paying",

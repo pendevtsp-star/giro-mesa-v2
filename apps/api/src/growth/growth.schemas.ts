@@ -333,9 +333,7 @@ export const doseClubSchema = z.object({
 export type DoseClubInput = z.infer<typeof doseClubSchema>;
 
 export const doseClubReconciliationUnitSchema = z.object({ unitId: id }).strict();
-export type DoseClubReconciliationUnitInput = z.infer<
-  typeof doseClubReconciliationUnitSchema
->;
+export type DoseClubReconciliationUnitInput = z.infer<typeof doseClubReconciliationUnitSchema>;
 
 export const doseClubMappingCreateSchema = z
   .object({

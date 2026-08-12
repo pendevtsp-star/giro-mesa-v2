@@ -32,7 +32,10 @@ const DEFAULT_LIMITS: MediaLimits = {
 };
 
 export class MediaValidationError extends Error {
-  constructor(readonly code: string, message: string) {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
     super(message);
     this.name = "MediaValidationError";
   }
@@ -49,16 +52,16 @@ export async function inspectAndRecodeImage(
 
   let metadata: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
   try {
-    metadata = await sharp(bytes, { failOn: "error", limitInputPixels: limits.maxPixels }).metadata();
+    metadata = await sharp(bytes, {
+      failOn: "error",
+      limitInputPixels: limits.maxPixels,
+    }).metadata();
   } catch {
     throw new MediaValidationError("MEDIA_INVALID_BYTES", "Os bytes não formam uma imagem válida.");
   }
   const actualMimeType = metadata.format ? INPUT_MIME_BY_FORMAT[metadata.format] : undefined;
   if (!actualMimeType)
-    throw new MediaValidationError(
-      "MEDIA_FORMAT_NOT_ALLOWED",
-      "Use uma imagem PNG, JPEG ou WebP.",
-    );
+    throw new MediaValidationError("MEDIA_FORMAT_NOT_ALLOWED", "Use uma imagem PNG, JPEG ou WebP.");
   if (actualMimeType !== declaredMimeType)
     throw new MediaValidationError(
       "MEDIA_MIME_MISMATCH",
@@ -76,7 +79,10 @@ export async function inspectAndRecodeImage(
       "A imagem excede o limite de dimensões ou pixels.",
     );
   if ((metadata.pages ?? 1) !== 1)
-    throw new MediaValidationError("MEDIA_ANIMATION_NOT_ALLOWED", "Imagens animadas não são aceitas.");
+    throw new MediaValidationError(
+      "MEDIA_ANIMATION_NOT_ALLOWED",
+      "Imagens animadas não são aceitas.",
+    );
 
   const recoded = await sharp(bytes, { failOn: "error", limitInputPixels: limits.maxPixels })
     .rotate()

@@ -27,23 +27,50 @@ it("binds a signed public session to the current occupancy epoch", async (contex
   process.env.PUBLIC_TABLE_SESSION_SIGNING_KEY = "table-session-integration-key-32-bytes-minimum";
   const database = new DatabaseService();
   try {
-    const [organization] = await database.db.insert(organizations).values({
-      legalName: "QR Session Ltda",
-      tradeName: "QR Session",
-      document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)),
-      billingState: "active",
-    }).returning();
+    const [organization] = await database.db
+      .insert(organizations)
+      .values({
+        legalName: "QR Session Ltda",
+        tradeName: "QR Session",
+        document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)),
+        billingState: "active",
+      })
+      .returning();
     assert.ok(organization);
-    const [unit] = await database.db.insert(units).values({ organizationId: organization.id, name: "QR Unit" }).returning();
-    const [identity] = await database.db.insert(identities).values({ email: `qr-${randomUUID()}@example.test`, displayName: "Owner" }).returning();
+    const [unit] = await database.db
+      .insert(units)
+      .values({ organizationId: organization.id, name: "QR Unit" })
+      .returning();
+    const [identity] = await database.db
+      .insert(identities)
+      .values({ email: `qr-${randomUUID()}@example.test`, displayName: "Owner" })
+      .returning();
     assert.ok(unit && identity);
-    const [membership] = await database.db.insert(memberships).values({ organizationId: organization.id, identityId: identity.id, status: "active" }).returning();
+    const [membership] = await database.db
+      .insert(memberships)
+      .values({ organizationId: organization.id, identityId: identity.id, status: "active" })
+      .returning();
     assert.ok(membership);
     await database.db.insert(roleBindings).values({ membershipId: membership.id, role: "owner" });
-    const [room] = await database.db.insert(posDiningRooms).values({ organizationId: organization.id, unitId: unit.id, name: "Salão" }).returning();
+    const [room] = await database.db
+      .insert(posDiningRooms)
+      .values({ organizationId: organization.id, unitId: unit.id, name: "Salão" })
+      .returning();
     assert.ok(room);
-    const [table] = await database.db.insert(posDiningTables).values({ organizationId: organization.id, unitId: unit.id, roomId: room.id, label: "01" }).returning();
-    const [menu] = await database.db.insert(publicMenus).values({ organizationId: organization.id, unitId: unit.id, slug: `qr-${randomUUID()}`, active: true, publishedAt: new Date() }).returning();
+    const [table] = await database.db
+      .insert(posDiningTables)
+      .values({ organizationId: organization.id, unitId: unit.id, roomId: room.id, label: "01" })
+      .returning();
+    const [menu] = await database.db
+      .insert(publicMenus)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        slug: `qr-${randomUUID()}`,
+        active: true,
+        publishedAt: new Date(),
+      })
+      .returning();
     assert.ok(table && menu);
     await database.db.insert(publicTableServiceSettings).values({
       organizationId: organization.id,
@@ -53,15 +80,29 @@ it("binds a signed public session to the current occupancy epoch", async (contex
       viewPartialEnabled: true,
       updatedByIdentityId: identity.id,
     });
-    const opened = await new PilotPosService(database, new ScopeService(database)).openTab(identity.id, organization.id, unit.id, "qr-open-session", { tableId: table.id, guestCount: 2 });
+    const opened = await new PilotPosService(database, new ScopeService(database)).openTab(
+      identity.id,
+      organization.id,
+      unit.id,
+      "qr-open-session",
+      { tableId: table.id, guestCount: 2 },
+    );
     assert.ok(opened.occupancy);
 
     const codec = new TableSessionCodec(process.env.PUBLIC_TABLE_SESSION_SIGNING_KEY);
     const service = new TableSessionService(database, codec);
-    const qrToken = codec.issueTableQr({ organizationId: organization.id, unitId: unit.id, menuId: menu.id, tableId: table.id });
+    const qrToken = codec.issueTableQr({
+      organizationId: organization.id,
+      unitId: unit.id,
+      menuId: menu.id,
+      tableId: table.id,
+    });
     const issued = await service.issue(menu.slug, qrToken, "request-source-a");
     const claims = await service.validate(menu.slug, issued.token, "view_partial");
-    assert.equal(claims.occupancyEpoch, (opened.occupancy as { occupancyEpoch: string }).occupancyEpoch);
+    assert.equal(
+      claims.occupancyEpoch,
+      (opened.occupancy as { occupancyEpoch: string }).occupancyEpoch,
+    );
     await service.consumeRequestNonce(claims, "n".repeat(32), "partial");
     await assert.rejects(
       () => service.consumeRequestNonce(claims, "n".repeat(32), "partial"),
@@ -89,12 +130,22 @@ it("binds a signed public session to the current occupancy epoch", async (contex
       /Muitas tentativas/,
     );
 
-    await new PilotPosService(database, new ScopeService(database)).transitionOccupancy(identity.id, organization.id, unit.id, (opened.occupancy as { id: string }).id, "qr-close-session", {
-      type: "close",
-      occupancyEpoch: claims.occupancyEpoch,
-      expectedVersion: 0,
-    });
-    await assert.rejects(() => service.validate(menu.slug, issued.token, "view_partial"), /TABLE_SESSION_STALE/);
+    await new PilotPosService(database, new ScopeService(database)).transitionOccupancy(
+      identity.id,
+      organization.id,
+      unit.id,
+      (opened.occupancy as { id: string }).id,
+      "qr-close-session",
+      {
+        type: "close",
+        occupancyEpoch: claims.occupancyEpoch,
+        expectedVersion: 0,
+      },
+    );
+    await assert.rejects(
+      () => service.validate(menu.slug, issued.token, "view_partial"),
+      /TABLE_SESSION_STALE/,
+    );
   } finally {
     await database.onModuleDestroy();
   }

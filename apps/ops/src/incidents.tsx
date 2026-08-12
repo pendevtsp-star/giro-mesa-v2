@@ -35,7 +35,13 @@ export function parseIncidentReports(value: unknown): IncidentReportView[] {
 
 export function IncidentsReport({ incidents }: { incidents: IncidentReportView[] }) {
   if (incidents.length === 0)
-    return <EmptyState icon="-" title="Sem incidentes" description="Nenhum fato registrado no período." />;
+    return (
+      <EmptyState
+        icon="-"
+        title="Sem incidentes"
+        description="Nenhum fato registrado no período."
+      />
+    );
   return (
     <Card>
       <h2>Incidentes gerenciais</h2>

@@ -231,13 +231,17 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       .update(posProductPrices)
       .set({ priceCents: 3_000, updatedAt: new Date() })
       .where(eq(posProductPrices.productId, product.id));
-    const resource = (
-      type: "tab" | "table",
-      id: string,
-      epoch: string,
-      version: number,
-    ) => ({ type, id, occupancyEpoch: epoch, resourceVersion: version });
-    const orderedCommand = (commandId: string, aggregateSequence: number, resourceVersion: number) => ({
+    const resource = (type: "tab" | "table", id: string, epoch: string, version: number) => ({
+      type,
+      id,
+      occupancyEpoch: epoch,
+      resourceVersion: version,
+    });
+    const orderedCommand = (
+      commandId: string,
+      aggregateSequence: number,
+      resourceVersion: number,
+    ) => ({
       commandId,
       actorId: identity.id,
       deviceId: terminalId,
@@ -366,7 +370,9 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
             resource("tab", openId, occupancyEpoch, 4),
             resource("table", table.id, table.occupancyEpoch, 1),
             resource("table", transferTable.id, transferTable.occupancyEpoch, 0),
-          ].sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`)),
+          ].sort((left, right) =>
+            `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+          ),
           idempotencyKey: `offline-stale-target-${suffix}`,
           type: "pos.tab.transfer_requested",
           payload: {
@@ -396,7 +402,9 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
             resource("tab", openId, occupancyEpoch, 4),
             resource("table", table.id, table.occupancyEpoch, 1),
             resource("table", transferTable.id, transferTable.occupancyEpoch, 1),
-          ].sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`)),
+          ].sort((left, right) =>
+            `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+          ),
           idempotencyKey: `offline-transfer-${suffix}`,
           type: "pos.tab.transfer_requested",
           payload: {
@@ -413,7 +421,9 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           resourcePreconditions: [
             resource("tab", openId, occupancyEpoch, 5),
             resource("tab", splitId, stableOperationalId(splitId, "occupancy-epoch", splitId), 0),
-          ].sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`)),
+          ].sort((left, right) =>
+            `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+          ),
           idempotencyKey: `offline-split-${suffix}`,
           type: "pos.tab.split_requested",
           payload: {
@@ -434,7 +444,9 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
             resource("tab", openId, occupancyEpoch, 6),
             resource("tab", splitId, stableOperationalId(splitId, "occupancy-epoch", splitId), 1),
             resource("table", transferTable.id, transferTable.occupancyEpoch, 2),
-          ].sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`)),
+          ].sort((left, right) =>
+            `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`),
+          ),
           idempotencyKey: `offline-merge-${suffix}`,
           type: "pos.tabs.merge_requested",
           payload: {
@@ -546,14 +558,9 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       roles: ["owner"],
     });
 
-    await pos.setTip(
-      identity.id,
-      organizationA.id,
-      unitA.id,
-      openId,
-      `online-tip-${suffix}`,
-      { tipCents: 301 },
-    );
+    await pos.setTip(identity.id, organizationA.id, unitA.id, openId, `online-tip-${suffix}`, {
+      tipCents: 301,
+    });
     const staleAfterOnline = await sync.synchronize(keyA, {
       ...orderedBatchBase,
       events: [
@@ -639,10 +646,11 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           unitId: unitA.id,
           actorIdentityId: null,
         },
-        () => pilot.apply(concurrentTransfer(randomUUID(), currentOriginalTable), {
-          organizationId: organizationA.id,
-          unitId: unitA.id,
-        }),
+        () =>
+          pilot.apply(concurrentTransfer(randomUUID(), currentOriginalTable), {
+            organizationId: organizationA.id,
+            unitId: unitA.id,
+          }),
       ),
       database.withTenantContext(
         {
@@ -651,10 +659,11 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           unitId: unitA.id,
           actorIdentityId: null,
         },
-        () => pilot.apply(concurrentTransfer(randomUUID(), concurrentTarget), {
-          organizationId: organizationA.id,
-          unitId: unitA.id,
-        }),
+        () =>
+          pilot.apply(concurrentTransfer(randomUUID(), concurrentTarget), {
+            organizationId: organizationA.id,
+            unitId: unitA.id,
+          }),
       ),
     ]);
     assert.equal(concurrentResults.filter((result) => result.status === "fulfilled").length, 1);
@@ -671,8 +680,12 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     assert.ok(beforeOnlineRace);
     let signalOnlineLocked!: () => void;
     let releaseOnline!: () => void;
-    const onlineLocked = new Promise<void>((resolve) => { signalOnlineLocked = resolve; });
-    const onlineRelease = new Promise<void>((resolve) => { releaseOnline = resolve; });
+    const onlineLocked = new Promise<void>((resolve) => {
+      signalOnlineLocked = resolve;
+    });
+    const onlineRelease = new Promise<void>((resolve) => {
+      releaseOnline = resolve;
+    });
     const onlineRace = database.withTenantContext(
       {
         source: "internal",
@@ -703,28 +716,31 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
         unitId: unitA.id,
         actorIdentityId: null,
       },
-      () => pilot.apply(
-        {
-          ...orderedCommand(staleRaceId, 100, beforeOnlineRace.resourceVersion),
-          id: staleRaceId,
-          version: beforeOnlineRace.resourceVersion,
-          commandId: staleRaceId,
-          idempotencyKey: `sync-race-${suffix}`,
-          type: "pos.tab.service_charge_requested",
-          resourcePreconditions: [resource(
-            "tab",
-            openId,
-            beforeOnlineRace.occupancyEpoch,
-            beforeOnlineRace.resourceVersion,
-          )],
-          payload: {
-            kind: "pilot.mutation",
-            action: "service-charge",
-            data: { tabId: openId, basisPoints: 800 },
+      () =>
+        pilot.apply(
+          {
+            ...orderedCommand(staleRaceId, 100, beforeOnlineRace.resourceVersion),
+            id: staleRaceId,
+            version: beforeOnlineRace.resourceVersion,
+            commandId: staleRaceId,
+            idempotencyKey: `sync-race-${suffix}`,
+            type: "pos.tab.service_charge_requested",
+            resourcePreconditions: [
+              resource(
+                "tab",
+                openId,
+                beforeOnlineRace.occupancyEpoch,
+                beforeOnlineRace.resourceVersion,
+              ),
+            ],
+            payload: {
+              kind: "pilot.mutation",
+              action: "service-charge",
+              data: { tabId: openId, basisPoints: 800 },
+            },
           },
-        },
-        { organizationId: organizationA.id, unitId: unitA.id },
-      ),
+          { organizationId: organizationA.id, unitId: unitA.id },
+        ),
     );
     releaseOnline();
     const onlineRaceResult = await onlineRace;
@@ -735,7 +751,10 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
         error instanceof PilotConflictException &&
         error.decision.code === "RESOURCE_VERSION_CONFLICT",
     );
-    const [afterOnlineRace] = await database.db.select().from(posTabs).where(eq(posTabs.id, openId));
+    const [afterOnlineRace] = await database.db
+      .select()
+      .from(posTabs)
+      .where(eq(posTabs.id, openId));
     assert.equal(afterOnlineRace?.tipCents, 777);
     assert.equal(afterOnlineRace?.serviceChargeBasisPoints, 1_000);
 
@@ -856,14 +875,19 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
     await topologyWriter;
     assert.equal(observedAdvisoryWait, true);
     await assert.rejects(topologyRace, /PILOT_RESOURCE_TOPOLOGY_CHANGED/);
-    const [topologyTabAfter] = await database.db.select().from(posTabs).where(eq(posTabs.id, openId));
+    const [topologyTabAfter] = await database.db
+      .select()
+      .from(posTabs)
+      .where(eq(posTabs.id, openId));
     const topologyTablesAfter = await database.db
       .select()
       .from(posDiningTables)
       .where(eq(posDiningTables.organizationId, organizationA.id));
     assert.equal(topologyTabAfter?.tableId, topologyChangedTable.id);
     assert.equal(topologyTabAfter?.resourceVersion, topologyVersionsBefore.get(openId));
-    for (const tableRow of topologyTablesAfter.filter((row) => topologyVersionsBefore.has(row.id))) {
+    for (const tableRow of topologyTablesAfter.filter((row) =>
+      topologyVersionsBefore.has(row.id),
+    )) {
       assert.equal(tableRow.resourceVersion, topologyVersionsBefore.get(tableRow.id));
     }
 

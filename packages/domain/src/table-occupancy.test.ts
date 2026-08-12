@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { transitionTableOccupancy, type TableOccupancySnapshot } from "./table-occupancy.js";
+import { type TableOccupancySnapshot, transitionTableOccupancy } from "./table-occupancy.js";
 
 const open: TableOccupancySnapshot = {
   state: "open",
@@ -77,6 +77,9 @@ describe("table occupancy state machine", () => {
       tableId: "table-c",
       groupId: null,
     });
-    assert.deepEqual({ tableId: split.tableId, groupId: split.groupId }, { tableId: "table-c", groupId: null });
+    assert.deepEqual(
+      { tableId: split.tableId, groupId: split.groupId },
+      { tableId: "table-c", groupId: null },
+    );
   });
 });

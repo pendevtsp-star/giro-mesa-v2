@@ -114,7 +114,11 @@ export function RemunerationReport({
         <Card key={kind}>
           <h2>{labels[kind]}</h2>
           {portfolio.byKind[kind].length === 0 ? (
-            <EmptyState icon="-" title="Sem apuração" description="Nenhum cálculo persistido no período." />
+            <EmptyState
+              icon="-"
+              title="Sem apuração"
+              description="Nenhum cálculo persistido no período."
+            />
           ) : (
             <ul>
               {portfolio.byKind[kind].map((run) => (

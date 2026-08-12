@@ -62,10 +62,7 @@ function event(type: string, action: string, data: Record<string, unknown>): Syn
   };
 }
 
-function mockPilotConflict(
-  outcome: "reject" | "reconcile",
-  code: string,
-): PilotPosService {
+function mockPilotConflict(outcome: "reject" | "reconcile", code: string): PilotPosService {
   const pilot = mockPilot([]) as PilotPosService & {
     withSyncPreconditions: PilotPosService["withSyncPreconditions"];
   };
@@ -82,9 +79,10 @@ function orderedEvent(
   overrides: Partial<NormalizedSyncEventInput> = {},
 ): NormalizedSyncEventInput {
   const aggregateId = action === "open-tab" ? commandId : entityId;
-  const createItems = action === "create-order"
-    ? (data.body as { items: Array<{ productId: string; modifierOptionIds: string[] }> }).items
-    : [];
+  const createItems =
+    action === "create-order"
+      ? (data.body as { items: Array<{ productId: string; modifierOptionIds: string[] }> }).items
+      : [];
   const base = {
     commandId,
     id: commandId,
@@ -356,9 +354,14 @@ describe("offline pilot replay", () => {
     await assert.rejects(
       () =>
         service.apply(
-          orderedEvent("pos.future.magic_requested", "future-magic", {}, {
-            aggregate: { type: "tab", id: entityId },
-          }),
+          orderedEvent(
+            "pos.future.magic_requested",
+            "future-magic",
+            {},
+            {
+              aggregate: { type: "tab", id: entityId },
+            },
+          ),
           { organizationId, unitId },
         ),
       (error: unknown) =>

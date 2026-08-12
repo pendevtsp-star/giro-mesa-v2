@@ -552,9 +552,7 @@ export const privacyRequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("anonymization"), reason: privacyReasonSchema }).strict(),
   z.object({ type: z.literal("deletion"), reason: privacyReasonSchema }).strict(),
 ]);
-export const privacyDecisionSchema = z
-  .object({ reason: privacyReasonSchema.optional() })
-  .strict();
+export const privacyDecisionSchema = z.object({ reason: privacyReasonSchema.optional() }).strict();
 
 const publicOrderAddressSchema = z
   .object({

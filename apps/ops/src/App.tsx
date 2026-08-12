@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Icon,
-  Progress,
-  VisuallyHidden,
-} from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Icon, Progress, VisuallyHidden } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ApiClientError,

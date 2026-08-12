@@ -1,12 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import {
-  areaAssignmentSchema,
   type AreaAssignmentInput,
+  areaAssignmentSchema,
   expectedVersionSchema,
-  layoutNodesSchema,
   type LayoutNodesInput,
+  layoutNodesSchema,
   type PresenceLeaseInput,
   presenceAckSchema,
   presenceRenewSchema,
@@ -67,7 +77,13 @@ export class SalonController {
     @Param("layoutId", ParseUUIDPipe) layoutId: string,
     @Body(new ZodPipe(expectedVersionSchema)) body: { expectedVersion: number },
   ) {
-    return this.salon.publishLayout(request.auth.identityId, organizationId, unitId, layoutId, body.expectedVersion);
+    return this.salon.publishLayout(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      layoutId,
+      body.expectedVersion,
+    );
   }
 
   @Put("shifts/:shiftId/areas/:areaId")
@@ -79,7 +95,14 @@ export class SalonController {
     @Param("areaId", ParseUUIDPipe) areaId: string,
     @Body(new ZodPipe(areaAssignmentSchema)) body: AreaAssignmentInput,
   ) {
-    return this.salon.assignArea(request.auth.identityId, organizationId, unitId, shiftId, areaId, body);
+    return this.salon.assignArea(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      shiftId,
+      areaId,
+      body,
+    );
   }
 
   @Put("presence/:deviceId")
@@ -90,7 +113,13 @@ export class SalonController {
     @Param("deviceId", ParseUUIDPipe) deviceId: string,
     @Body(new ZodPipe(presenceRenewSchema)) body: { current: PresenceLeaseInput },
   ) {
-    return this.salon.renewPresence(request.auth.identityId, organizationId, unitId, deviceId, body.current);
+    return this.salon.renewPresence(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      deviceId,
+      body.current,
+    );
   }
 
   @Post("presence/:deviceId/ack")
@@ -127,6 +156,11 @@ export class SalonController {
     @Param("unitId", ParseUUIDPipe) unitId: string,
     @Param("exceptionId", ParseUUIDPipe) exceptionId: string,
   ) {
-    return this.salon.acknowledgeException(request.auth.identityId, organizationId, unitId, exceptionId);
+    return this.salon.acknowledgeException(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      exceptionId,
+    );
   }
 }

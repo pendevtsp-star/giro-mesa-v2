@@ -198,10 +198,7 @@ export const privacyRequests = pgTable(
   },
   (table) => [
     unique("privacy_requests_scope_id_unique").on(table.organizationId, table.id),
-    uniqueIndex("privacy_requests_org_key_unique").on(
-      table.organizationId,
-      table.idempotencyKey,
-    ),
+    uniqueIndex("privacy_requests_org_key_unique").on(table.organizationId, table.idempotencyKey),
     index("privacy_requests_subject_time_idx").on(
       table.organizationId,
       table.subjectIdentityId,

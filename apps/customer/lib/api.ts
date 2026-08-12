@@ -38,7 +38,9 @@ function isMenuItem(value: unknown): value is MenuItem {
     (value.priceCents as number) >= 0 &&
     (value.visual === undefined || typeof value.visual === "string") &&
     (value.icon === undefined || MENU_ICON_NAMES.some((icon) => icon === value.icon)) &&
-    (value.imageUrl === undefined || value.imageUrl === null || typeof value.imageUrl === "string") &&
+    (value.imageUrl === undefined ||
+      value.imageUrl === null ||
+      typeof value.imageUrl === "string") &&
     typeof value.available === "boolean" &&
     validTags &&
     validGroups
@@ -75,9 +77,7 @@ export function isDemoMenuSlug(slug: string, configuredQaSlug?: string): boolean
   return slug === "demo" || Boolean(configuredQaSlug && slug === configuredQaSlug);
 }
 
-export async function getPublicMenu(
-  slug: string,
-): Promise<{
+export async function getPublicMenu(slug: string): Promise<{
   items: MenuItem[];
   branding: MenuBranding | null;
   source: "api" | "demo" | "unavailable";

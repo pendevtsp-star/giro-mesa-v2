@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import type { TelemetryRuntime } from "@giromesa/observability";
 import {
   type SupportedSignal,
-  type WorkerProcessRuntime,
   startWorkerProcess,
+  type WorkerProcessRuntime,
 } from "./process-runtime.js";
 
 function fakeTelemetry(events: string[]): TelemetryRuntime {

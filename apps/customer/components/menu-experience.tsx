@@ -469,9 +469,7 @@ export function MenuExperience({
           <h2 id="table-actions-title">Atendimento na mesa</h2>
         </div>
         <div>
-          <a href={`/m/${menuSlug}/servicos#mesa`}>
-            Atendimento seguro pelo QR
-          </a>
+          <a href={`/m/${menuSlug}/servicos#mesa`}>Atendimento seguro pelo QR</a>
         </div>
       </section>
       <section className="public-services" aria-labelledby="public-services-title">

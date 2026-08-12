@@ -104,9 +104,7 @@ export class TenantContextInterceptor implements NestInterceptor {
         const keyHash = createHash("sha256").update(rawKey).digest("hex");
         return from(
           this.database
-            .withDoseClubContext({ keyHash, scope, branchId }, () =>
-              lastValueFrom(next.handle()),
-            )
+            .withDoseClubContext({ keyHash, scope, branchId }, () => lastValueFrom(next.handle()))
             .catch((error: unknown) => {
               if (error instanceof Error && error.message === "DOSECLUB_SCOPE_NOT_FOUND") {
                 throw new UnauthorizedException();

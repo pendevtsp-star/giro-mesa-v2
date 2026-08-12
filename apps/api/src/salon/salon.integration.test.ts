@@ -21,7 +21,11 @@ import { SalonService } from "./salon.service.js";
 function hasCode(code: string) {
   return (error: unknown) => {
     const response = (error as { getResponse?: () => unknown }).getResponse?.();
-    return typeof response === "object" && response !== null && (response as { code?: string }).code === code;
+    return (
+      typeof response === "object" &&
+      response !== null &&
+      (response as { code?: string }).code === code
+    );
   };
 }
 
@@ -37,8 +41,16 @@ it("publishes immutable layouts and maintains scoped assignments, presence and e
     const [organizationA, organizationB] = await database.db
       .insert(organizations)
       .values([
-        { legalName: "Salon A Ltda", tradeName: "Salon A", document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)) },
-        { legalName: "Salon B Ltda", tradeName: "Salon B", document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)) },
+        {
+          legalName: "Salon A Ltda",
+          tradeName: "Salon A",
+          document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)),
+        },
+        {
+          legalName: "Salon B Ltda",
+          tradeName: "Salon B",
+          document: String(randomInt(10_000_000_000_000, 99_999_999_999_999)),
+        },
       ])
       .returning();
     assert.ok(organizationA && organizationB);
@@ -80,18 +92,47 @@ it("publishes immutable layouts and maintains scoped assignments, presence and e
       .returning();
     const [area] = await database.db
       .insert(serviceAreas)
-      .values({ organizationId: organizationA.id, unitId: unitA.id, roomId: room.id, name: "Varanda", code: "varanda" })
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        roomId: room.id,
+        name: "Varanda",
+        code: "varanda",
+      })
       .returning();
     assert.ok(table && area);
     const salon = new SalonService(database, new ScopeService(database));
     const layout = await salon.createLayout(owner.id, organizationA.id, unitA.id, room.id);
     const edited = await salon.replaceNodes(owner.id, organizationA.id, unitA.id, layout.id, 0, [
-      { tableId: table.id, areaId: area.id, x: 500, y: 800, width: 1_800, height: 1_400, rotation: 0, zIndex: 1 },
+      {
+        tableId: table.id,
+        areaId: area.id,
+        x: 500,
+        y: 800,
+        width: 1_800,
+        height: 1_400,
+        rotation: 0,
+        zIndex: 1,
+      },
     ]);
-    const published = await salon.publishLayout(owner.id, organizationA.id, unitA.id, layout.id, edited.resourceVersion);
+    const published = await salon.publishLayout(
+      owner.id,
+      organizationA.id,
+      unitA.id,
+      layout.id,
+      edited.resourceVersion,
+    );
     assert.equal(published.state, "published");
     await assert.rejects(
-      () => salon.replaceNodes(owner.id, organizationA.id, unitA.id, layout.id, published.resourceVersion, []),
+      () =>
+        salon.replaceNodes(
+          owner.id,
+          organizationA.id,
+          unitA.id,
+          layout.id,
+          published.resourceVersion,
+          [],
+        ),
       hasCode("LAYOUT_IMMUTABLE"),
     );
     await assert.rejects(
@@ -101,7 +142,13 @@ it("publishes immutable layouts and maintains scoped assignments, presence and e
 
     const [shift] = await database.db
       .insert(serviceShifts)
-      .values({ organizationId: organizationA.id, unitId: unitA.id, state: "open", startsAt: new Date(), openedByIdentityId: owner.id })
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        state: "open",
+        startsAt: new Date(),
+        openedByIdentityId: owner.id,
+      })
       .returning();
     assert.ok(shift);
     await salon.assignArea(owner.id, organizationA.id, unitA.id, shift.id, area.id, {
@@ -115,17 +162,35 @@ it("publishes immutable layouts and maintains scoped assignments, presence and e
       .returning();
     assert.ok(device);
     const lease = await salon.renewPresence(waiter.id, organizationA.id, unitA.id, device.id, null);
-    const acknowledged = await salon.ackPresence(waiter.id, organizationA.id, unitA.id, device.id, lease.leaseEpoch, lease.resourceVersion);
+    const acknowledged = await salon.ackPresence(
+      waiter.id,
+      organizationA.id,
+      unitA.id,
+      device.id,
+      lease.leaseEpoch,
+      lease.resourceVersion,
+    );
     assert.ok(acknowledged.acknowledgedAt);
     const waiterMap = await salon.operationalMap(waiter.id, organizationA.id, unitA.id, room.id);
     assert.deepEqual(waiterMap.allowedAreaIds, [area.id]);
 
     const [exception] = await database.db
       .insert(salonExceptions)
-      .values({ organizationId: organizationA.id, unitId: unitA.id, tableId: table.id, code: "PAYMENT_UNCERTAIN", severity: "high" })
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tableId: table.id,
+        code: "PAYMENT_UNCERTAIN",
+        severity: "high",
+      })
       .returning();
     assert.ok(exception);
-    const acknowledgedException = await salon.acknowledgeException(owner.id, organizationA.id, unitA.id, exception.id);
+    const acknowledgedException = await salon.acknowledgeException(
+      owner.id,
+      organizationA.id,
+      unitA.id,
+      exception.id,
+    );
     assert.equal(acknowledgedException.state, "acknowledged");
   } finally {
     await database.onModuleDestroy();

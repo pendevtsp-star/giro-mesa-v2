@@ -4,11 +4,11 @@ import {
   hubHeartbeats,
   type PublicMenuBranding,
   type PublicMenuItemSnapshot,
+  posDiningTables,
   publicMenuDrafts,
   publicMenuMediaAssets,
-  publicMenuVersions,
   publicMenus,
-  posDiningTables,
+  publicMenuVersions,
 } from "@giromesa/db";
 import {
   BadRequestException,
@@ -137,7 +137,11 @@ export class PublicMenuService {
         ),
       )
       .limit(1);
-    if (!row) throw new NotFoundException({ code: "TABLE_QR_SCOPE_NOT_FOUND", message: "Mesa ou cardápio não encontrado." });
+    if (!row)
+      throw new NotFoundException({
+        code: "TABLE_QR_SCOPE_NOT_FOUND",
+        message: "Mesa ou cardápio não encontrado.",
+      });
     return {
       qrToken: new TableSessionCodec().issueTableQr({ organizationId, unitId, menuId, tableId }),
       tableId,
@@ -274,7 +278,10 @@ export class PublicMenuService {
       )
       .returning({ resourceVersion: publicMenuDrafts.resourceVersion });
     if (!draft)
-      throw menuError("PUBLIC_MENU_VERSION_CONFLICT", "A prévia não corresponde ao rascunho atual.");
+      throw menuError(
+        "PUBLIC_MENU_VERSION_CONFLICT",
+        "A prévia não corresponde ao rascunho atual.",
+      );
     return { token, expiresAt, resourceVersion: draft.resourceVersion };
   }
 
@@ -306,9 +313,7 @@ export class PublicMenuService {
       const [existing] = await tx
         .select()
         .from(publicMenuVersions)
-        .where(
-          and(eq(publicMenuVersions.menuId, menuId), eq(publicMenuVersions.checksum, digest)),
-        )
+        .where(and(eq(publicMenuVersions.menuId, menuId), eq(publicMenuVersions.checksum, digest)))
         .limit(1);
       if (existing) return existing;
       const [latest] = await tx

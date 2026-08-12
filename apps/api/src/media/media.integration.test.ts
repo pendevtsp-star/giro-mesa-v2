@@ -55,11 +55,17 @@ it("serializes media quota and exposes only assets referenced by the published s
 
     const sources = await Promise.all(
       ["#155e75", "#be123c"].map((background) =>
-        sharp({ create: { width: 64, height: 64, channels: 4, background } }).png().toBuffer(),
+        sharp({ create: { width: 64, height: 64, channels: 4, background } })
+          .png()
+          .toBuffer(),
       ),
     );
-    const recoded = await Promise.all(sources.map((source) => inspectAndRecodeImage(source, "image/png")));
-    process.env.PUBLIC_MEDIA_QUOTA_BYTES = String(Math.max(...recoded.map((image) => image.bytes.length)));
+    const recoded = await Promise.all(
+      sources.map((source) => inspectAndRecodeImage(source, "image/png")),
+    );
+    process.env.PUBLIC_MEDIA_QUOTA_BYTES = String(
+      Math.max(...recoded.map((image) => image.bytes.length)),
+    );
     const service = new MediaService(database, new ScopeService(database));
     const uploads = await Promise.allSettled(
       sources.map((source, index) =>

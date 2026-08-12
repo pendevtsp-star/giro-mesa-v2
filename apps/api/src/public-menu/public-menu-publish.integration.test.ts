@@ -5,8 +5,8 @@ import {
   identities,
   memberships,
   organizations,
-  publicMenuVersions,
   publicMenus,
+  publicMenuVersions,
   roleBindings,
   units,
 } from "@giromesa/db";
@@ -78,35 +78,29 @@ it("publishes an immutable, tenant-isolated menu version with CAS", async (conte
       .returning();
     assert.ok(menu);
 
-    const draft = await service.saveDraft(
-      identity.id,
-      organizationA.id,
-      unitA.id,
-      menu.id,
-      {
-        expectedVersion: 0,
-        branding: {
-          name: "Cozinha Horizonte",
-          description: "Cardápio do turno atual.",
-          primaryColor: "#155e75",
-          surfaceColor: "#ffffff",
-          textColor: "#102a2f",
-          logoAssetId: null,
-          coverAssetId: null,
-        },
-        items: [
-          {
-            id: "item-1",
-            category: "Pratos",
-            name: "Executivo",
-            description: "Arroz, feijão e acompanhamento.",
-            priceCents: 2_900,
-            available: true,
-            imageAssetId: null,
-          },
-        ],
+    const draft = await service.saveDraft(identity.id, organizationA.id, unitA.id, menu.id, {
+      expectedVersion: 0,
+      branding: {
+        name: "Cozinha Horizonte",
+        description: "Cardápio do turno atual.",
+        primaryColor: "#155e75",
+        surfaceColor: "#ffffff",
+        textColor: "#102a2f",
+        logoAssetId: null,
+        coverAssetId: null,
       },
-    );
+      items: [
+        {
+          id: "item-1",
+          category: "Pratos",
+          name: "Executivo",
+          description: "Arroz, feijão e acompanhamento.",
+          priceCents: 2_900,
+          available: true,
+          imageAssetId: null,
+        },
+      ],
+    });
     assert.equal(draft.resourceVersion, 1);
     await assert.rejects(
       () =>

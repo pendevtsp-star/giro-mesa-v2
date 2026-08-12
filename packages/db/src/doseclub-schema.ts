@@ -222,9 +222,7 @@ export const doseClubReconciliationRuns = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     unitId: uuid("unit_id").notNull(),
     runDate: date("run_date", { mode: "string" }).notNull(),
-    trigger: varchar("trigger", { length: 16 })
-      .$type<DoseClubReconciliationTrigger>()
-      .notNull(),
+    trigger: varchar("trigger", { length: 16 }).$type<DoseClubReconciliationTrigger>().notNull(),
     status: varchar("status", { length: 16 })
       .$type<DoseClubReconciliationRunStatus>()
       .notNull()
@@ -291,9 +289,7 @@ export const doseClubReconciliationFindings = pgTable(
     unitId: uuid("unit_id").notNull(),
     lastRunId: uuid("last_run_id").notNull(),
     fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
-    kind: varchar("kind", { length: 48 })
-      .$type<DoseClubReconciliationFindingKind>()
-      .notNull(),
+    kind: varchar("kind", { length: 48 }).$type<DoseClubReconciliationFindingKind>().notNull(),
     status: varchar("status", { length: 16 })
       .$type<DoseClubReconciliationFindingStatus>()
       .notNull()
@@ -303,12 +299,8 @@ export const doseClubReconciliationFindings = pgTable(
     entityId: varchar("entity_id", { length: 180 }).notNull(),
     summary: varchar("summary", { length: 300 }).notNull(),
     evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
-    firstDetectedAt: timestamp("first_detected_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    lastDetectedAt: timestamp("last_detected_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    firstDetectedAt: timestamp("first_detected_at", { withTimezone: true }).notNull().defaultNow(),
+    lastDetectedAt: timestamp("last_detected_at", { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     ...timestamps,

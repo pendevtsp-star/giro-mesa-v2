@@ -37,9 +37,9 @@ import {
 } from "./command-fingerprint.js";
 import { OperationalSnapshotService } from "./operational-snapshot.service.js";
 import {
+  type DispatchOutcomeBatchInput,
   type NormalizedSyncEventInput,
   normalizeSyncBatch,
-  type DispatchOutcomeBatchInput,
   type SyncBatchInput,
 } from "./sync.schemas.js";
 import { PilotConflictException, SyncPilotService } from "./sync-pilot.service.js";

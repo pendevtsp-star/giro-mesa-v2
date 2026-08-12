@@ -18,6 +18,7 @@ import {
 } from "@giromesa/db";
 import { decryptSecret, encryptionKey, type SecretEnvelope } from "@giromesa/domain";
 import { and, eq, sql } from "drizzle-orm";
+import { DoseClubReconciliationWorker } from "./doseclub-reconciliation.js";
 import {
   deliverEmail,
   EmailDeliveryError,
@@ -25,7 +26,6 @@ import {
   emailProviderConfiguration,
 } from "./email.js";
 import { consumeOrderSentInventory, InventoryConsumptionError } from "./inventory.js";
-import { DoseClubReconciliationWorker } from "./doseclub-reconciliation.js";
 import { WorkerObservability } from "./observability.js";
 import { failPrivacyRequest, processPrivacyRequest } from "./privacy.js";
 import { deliverWebhook, parseWebhookDeliveryRequest, WebhookDeliveryError } from "./webhook.js";

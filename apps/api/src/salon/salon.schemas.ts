@@ -2,18 +2,20 @@ import { z } from "zod";
 
 export const layoutNodesSchema = z.object({
   expectedVersion: z.number().int().nonnegative(),
-  nodes: z.array(
-    z.object({
-      tableId: z.uuid(),
-      areaId: z.uuid().nullable(),
-      x: z.number().int().min(0).max(9_999),
-      y: z.number().int().min(0).max(9_999),
-      width: z.number().int().min(1).max(10_000),
-      height: z.number().int().min(1).max(10_000),
-      rotation: z.number().int().min(-180).max(180),
-      zIndex: z.number().int().min(0).max(10_000),
-    }),
-  ).max(500),
+  nodes: z
+    .array(
+      z.object({
+        tableId: z.uuid(),
+        areaId: z.uuid().nullable(),
+        x: z.number().int().min(0).max(9_999),
+        y: z.number().int().min(0).max(9_999),
+        width: z.number().int().min(1).max(10_000),
+        height: z.number().int().min(1).max(10_000),
+        rotation: z.number().int().min(-180).max(180),
+        zIndex: z.number().int().min(0).max(10_000),
+      }),
+    )
+    .max(500),
 });
 export const expectedVersionSchema = z.object({ expectedVersion: z.number().int().nonnegative() });
 export const areaAssignmentSchema = z.object({

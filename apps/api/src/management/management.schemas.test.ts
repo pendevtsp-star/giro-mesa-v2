@@ -17,9 +17,21 @@ const recipe = {
 
 describe("management schemas", () => {
   it("accepts only count units for a recipe batch yield", () => {
-    assert.equal(recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "unit" }).success, true);
-    assert.equal(recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "dozen" }).success, true);
-    assert.equal(recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "kg" }).success, false);
-    assert.equal(recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "ml" }).success, false);
+    assert.equal(
+      recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "unit" }).success,
+      true,
+    );
+    assert.equal(
+      recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "dozen" }).success,
+      true,
+    );
+    assert.equal(
+      recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "kg" }).success,
+      false,
+    );
+    assert.equal(
+      recipeConfigurationSchema.safeParse({ ...recipe, yieldUnit: "ml" }).success,
+      false,
+    );
   });
 });

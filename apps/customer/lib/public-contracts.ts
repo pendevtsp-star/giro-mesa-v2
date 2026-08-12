@@ -68,7 +68,13 @@ export function readTableSession(payload: unknown): PublicTableSession | null {
 export interface PublicTablePartial {
   occupancyId: string;
   tab: { id: string; totalCents: number };
-  items: Array<{ id: string; productName: string; quantity: number; netCents: number; status: string }>;
+  items: Array<{
+    id: string;
+    productName: string;
+    quantity: number;
+    netCents: number;
+    status: string;
+  }>;
 }
 
 export function readTablePartial(payload: unknown): PublicTablePartial | null {
@@ -81,16 +87,33 @@ export function readTablePartial(payload: unknown): PublicTablePartial | null {
     typeof tab.id !== "string" ||
     !Number.isInteger(tab.totalCents) ||
     !Array.isArray(value.items)
-  ) return null;
+  )
+    return null;
   const items = value.items.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const item = entry as Record<string, unknown>;
-    return typeof item.id === "string" && typeof item.productName === "string" && Number.isInteger(item.quantity) && Number.isInteger(item.netCents) && typeof item.status === "string"
-      ? [{ id: item.id, productName: item.productName, quantity: item.quantity as number, netCents: item.netCents as number, status: item.status }]
+    return typeof item.id === "string" &&
+      typeof item.productName === "string" &&
+      Number.isInteger(item.quantity) &&
+      Number.isInteger(item.netCents) &&
+      typeof item.status === "string"
+      ? [
+          {
+            id: item.id,
+            productName: item.productName,
+            quantity: item.quantity as number,
+            netCents: item.netCents as number,
+            status: item.status,
+          },
+        ]
       : [];
   });
   if (items.length !== value.items.length) return null;
-  return { occupancyId: value.occupancyId, tab: { id: tab.id, totalCents: tab.totalCents as number }, items };
+  return {
+    occupancyId: value.occupancyId,
+    tab: { id: tab.id, totalCents: tab.totalCents as number },
+    items,
+  };
 }
 
 export function resolveMutationAttempt(

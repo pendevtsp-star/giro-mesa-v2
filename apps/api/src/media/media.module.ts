@@ -1,10 +1,9 @@
-import { Module } from "@nestjs/common";
 import { publicMenuSlugSchema } from "@giromesa/contracts";
-import { z } from "zod";
 import {
   Body,
   Controller,
   Get,
+  Module,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -14,6 +13,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
+import { z } from "zod";
 import { AuthModule } from "../auth/auth.module.js";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";

@@ -1555,7 +1555,9 @@ fieldset label input {
   margin-top: 1rem;
   padding: 1rem;
 }
-.public-service-partial h3 { margin: 0; }
+.public-service-partial h3 {
+  margin: 0;
+}
 .public-service-partial > div {
   align-items: center;
   border-top: 1px solid #dce4df;
@@ -1565,7 +1567,9 @@ fieldset label input {
   padding-top: 0.65rem;
 }
 @media (max-width: 560px) {
-  .public-service-table-actions { grid-template-columns: 1fr; }
+  .public-service-table-actions {
+    grid-template-columns: 1fr;
+  }
 }
 .public-service-dependencies {
   margin-top: 24px;

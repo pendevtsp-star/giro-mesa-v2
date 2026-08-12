@@ -74,7 +74,9 @@ export class SalonService {
     if (new Set(nodes.map((node) => node.tableId)).size !== nodes.length)
       throw conflict("LAYOUT_TABLE_DUPLICATED", "Cada mesa pode aparecer uma vez por versão.");
     return this.database.db.transaction(async (tx) => {
-      await tx.execute(sql`select id from ${tableLayoutVersions} where id = ${layoutId} for update`);
+      await tx.execute(
+        sql`select id from ${tableLayoutVersions} where id = ${layoutId} for update`,
+      );
       const [layout] = await tx
         .select()
         .from(tableLayoutVersions)
@@ -101,7 +103,10 @@ export class SalonService {
               eq(posDiningTables.organizationId, organizationId),
               eq(posDiningTables.unitId, unitId),
               eq(posDiningTables.roomId, layout.roomId),
-              inArray(posDiningTables.id, nodes.map((node) => node.tableId)),
+              inArray(
+                posDiningTables.id,
+                nodes.map((node) => node.tableId),
+              ),
             ),
           );
         if (tables.length !== nodes.length)
@@ -125,9 +130,11 @@ export class SalonService {
       }
       await tx.delete(tableLayoutNodes).where(eq(tableLayoutNodes.layoutVersionId, layoutId));
       if (nodes.length)
-        await tx.insert(tableLayoutNodes).values(
-          nodes.map((node) => ({ organizationId, unitId, layoutVersionId: layoutId, ...node })),
-        );
+        await tx
+          .insert(tableLayoutNodes)
+          .values(
+            nodes.map((node) => ({ organizationId, unitId, layoutVersionId: layoutId, ...node })),
+          );
       const [updated] = await tx
         .update(tableLayoutVersions)
         .set({ resourceVersion: expectedVersion + 1, updatedAt: new Date() })
@@ -155,7 +162,12 @@ export class SalonService {
     const now = new Date();
     const [published] = await this.database.db
       .update(tableLayoutVersions)
-      .set({ state: "published", resourceVersion: expectedVersion + 1, publishedAt: now, updatedAt: now })
+      .set({
+        state: "published",
+        resourceVersion: expectedVersion + 1,
+        publishedAt: now,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(tableLayoutVersions.organizationId, organizationId),
@@ -166,16 +178,12 @@ export class SalonService {
         ),
       )
       .returning();
-    if (!published) throw conflict("LAYOUT_VERSION_CONFLICT", "O mapa não pode mais ser publicado nesta versão.");
+    if (!published)
+      throw conflict("LAYOUT_VERSION_CONFLICT", "O mapa não pode mais ser publicado nesta versão.");
     return published;
   }
 
-  async operationalMap(
-    identityId: string,
-    organizationId: string,
-    unitId: string,
-    roomId: string,
-  ) {
+  async operationalMap(identityId: string, organizationId: string, unitId: string, roomId: string) {
     await this.scope.requireUnitAccess(identityId, organizationId, unitId);
     const roles = await this.scope.requireOrganizationRole(identityId, organizationId, [
       "owner",
@@ -199,7 +207,13 @@ export class SalonService {
       .orderBy(desc(tableLayoutVersions.version))
       .limit(1);
     if (!layout)
-      return { layout: null, nodes: [], occupancies: [], allowedAreaIds: [], state: "empty" as const };
+      return {
+        layout: null,
+        nodes: [],
+        occupancies: [],
+        allowedAreaIds: [],
+        state: "empty" as const,
+      };
     const assignments = fullFloor
       ? []
       : await this.database.db
@@ -252,25 +266,45 @@ export class SalonService {
   ) {
     await this.requireManager(identityId, organizationId, unitId);
     await this.requireStaff(organizationId, unitId, input.primaryIdentityId);
-    if (input.supportIdentityId) await this.requireStaff(organizationId, unitId, input.supportIdentityId);
+    if (input.supportIdentityId)
+      await this.requireStaff(organizationId, unitId, input.supportIdentityId);
     const [shift] = await this.database.db
       .select({ id: serviceShifts.id })
       .from(serviceShifts)
-      .where(and(eq(serviceShifts.id, shiftId), eq(serviceShifts.organizationId, organizationId), eq(serviceShifts.unitId, unitId)))
+      .where(
+        and(
+          eq(serviceShifts.id, shiftId),
+          eq(serviceShifts.organizationId, organizationId),
+          eq(serviceShifts.unitId, unitId),
+        ),
+      )
       .limit(1);
     const [area] = await this.database.db
       .select({ id: serviceAreas.id })
       .from(serviceAreas)
-      .where(and(eq(serviceAreas.id, areaId), eq(serviceAreas.organizationId, organizationId), eq(serviceAreas.unitId, unitId)))
+      .where(
+        and(
+          eq(serviceAreas.id, areaId),
+          eq(serviceAreas.organizationId, organizationId),
+          eq(serviceAreas.unitId, unitId),
+        ),
+      )
       .limit(1);
     if (!shift || !area)
-      throw new NotFoundException({ code: "AREA_ASSIGNMENT_SCOPE_INVALID", message: "Turno ou praça não encontrado." });
+      throw new NotFoundException({
+        code: "AREA_ASSIGNMENT_SCOPE_INVALID",
+        message: "Turno ou praça não encontrado.",
+      });
     const [assignment] = await this.database.db
       .insert(areaAssignments)
       .values({ organizationId, unitId, shiftId, areaId, ...input })
       .onConflictDoUpdate({
         target: [areaAssignments.shiftId, areaAssignments.areaId],
-        set: { ...input, resourceVersion: sql`${areaAssignments.resourceVersion} + 1`, updatedAt: new Date() },
+        set: {
+          ...input,
+          resourceVersion: sql`${areaAssignments.resourceVersion} + 1`,
+          updatedAt: new Date(),
+        },
       })
       .returning();
     return assignment;
@@ -322,7 +356,8 @@ export class SalonService {
         ),
       )
       .limit(1);
-    if (!existing) throw conflict("PRESENCE_LEASE_CONFLICT", "A presença mudou em outro dispositivo.");
+    if (!existing)
+      throw conflict("PRESENCE_LEASE_CONFLICT", "A presença mudou em outro dispositivo.");
     const rotate = existing.expiresAt <= now;
     const [renewed] = await this.database.db
       .update(staffPresenceLeases)
@@ -344,7 +379,8 @@ export class SalonService {
         ),
       )
       .returning();
-    if (!renewed) throw conflict("PRESENCE_LEASE_CONFLICT", "A presença mudou em outro dispositivo.");
+    if (!renewed)
+      throw conflict("PRESENCE_LEASE_CONFLICT", "A presença mudou em outro dispositivo.");
     return renewed;
   }
 
@@ -373,7 +409,8 @@ export class SalonService {
         ),
       )
       .returning();
-    if (!acknowledged) throw conflict("PRESENCE_LEASE_EXPIRED", "Renove a presença antes de confirmar.");
+    if (!acknowledged)
+      throw conflict("PRESENCE_LEASE_EXPIRED", "Renove a presença antes de confirmar.");
     return acknowledged;
   }
 
@@ -382,7 +419,13 @@ export class SalonService {
     return this.database.db
       .select()
       .from(salonExceptions)
-      .where(and(eq(salonExceptions.organizationId, organizationId), eq(salonExceptions.unitId, unitId), inArray(salonExceptions.state, ["open", "acknowledged"])))
+      .where(
+        and(
+          eq(salonExceptions.organizationId, organizationId),
+          eq(salonExceptions.unitId, unitId),
+          inArray(salonExceptions.state, ["open", "acknowledged"]),
+        ),
+      )
       .orderBy(desc(salonExceptions.createdAt));
   }
 
@@ -396,7 +439,12 @@ export class SalonService {
     const now = new Date();
     const [updated] = await this.database.db
       .update(salonExceptions)
-      .set({ state: "acknowledged", acknowledgedByIdentityId: identityId, acknowledgedAt: now, updatedAt: now })
+      .set({
+        state: "acknowledged",
+        acknowledgedByIdentityId: identityId,
+        acknowledgedAt: now,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(salonExceptions.organizationId, organizationId),
@@ -406,7 +454,8 @@ export class SalonService {
         ),
       )
       .returning();
-    if (!updated) throw conflict("SALON_EXCEPTION_CONFLICT", "A exceção já foi tratada ou não existe.");
+    if (!updated)
+      throw conflict("SALON_EXCEPTION_CONFLICT", "A exceção já foi tratada ou não existe.");
     return updated;
   }
 
@@ -419,9 +468,16 @@ export class SalonService {
     const [room] = await this.database.db
       .select({ id: posDiningRooms.id })
       .from(posDiningRooms)
-      .where(and(eq(posDiningRooms.id, roomId), eq(posDiningRooms.organizationId, organizationId), eq(posDiningRooms.unitId, unitId)))
+      .where(
+        and(
+          eq(posDiningRooms.id, roomId),
+          eq(posDiningRooms.organizationId, organizationId),
+          eq(posDiningRooms.unitId, unitId),
+        ),
+      )
       .limit(1);
-    if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND", message: "Salão não encontrado." });
+    if (!room)
+      throw new NotFoundException({ code: "ROOM_NOT_FOUND", message: "Salão não encontrado." });
     return room;
   }
 
@@ -439,6 +495,10 @@ export class SalonService {
         ),
       )
       .limit(1);
-    if (!staff) throw new NotFoundException({ code: "STAFF_SCOPE_INVALID", message: "Profissional não pertence à unidade." });
+    if (!staff)
+      throw new NotFoundException({
+        code: "STAFF_SCOPE_INVALID",
+        message: "Profissional não pertence à unidade.",
+      });
   }
 }

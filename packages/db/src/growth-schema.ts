@@ -81,11 +81,7 @@ export const transferStatus = pgEnum("growth_transfer_status", [
   "received",
   "canceled",
 ]);
-export const publicMenuAssetKind = pgEnum("public_menu_asset_kind", [
-  "logo",
-  "cover",
-  "product",
-]);
+export const publicMenuAssetKind = pgEnum("public_menu_asset_kind", ["logo", "cover", "product"]);
 export const tableServiceCallKind = pgEnum("table_service_call_kind", ["waiter", "bill"]);
 export const tableServiceCallState = pgEnum("table_service_call_state", [
   "received",
@@ -947,11 +943,7 @@ export const publicMenuVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    unique("public_menu_versions_scope_id_unique").on(
-      table.organizationId,
-      table.unitId,
-      table.id,
-    ),
+    unique("public_menu_versions_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     uniqueIndex("public_menu_versions_menu_version_unique").on(table.menuId, table.version),
     uniqueIndex("public_menu_versions_menu_checksum_unique").on(table.menuId, table.checksum),
     check("public_menu_versions_version_check", sql`${table.version} > 0`),
@@ -986,10 +978,7 @@ export const publicTableServiceSettings = pgTable(
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
-    check(
-      "public_table_service_settings_version_check",
-      sql`${table.resourceVersion} >= 0`,
-    ),
+    check("public_table_service_settings_version_check", sql`${table.resourceVersion} >= 0`),
   ],
 );
 
@@ -1117,7 +1106,9 @@ export const tableServiceCalls = pgTable(
     kind: tableServiceCallKind("kind").notNull(),
     state: tableServiceCallState("state").notNull().default("received"),
     routedIdentityId: uuid("routed_identity_id").references(() => identities.id),
-    routeSource: varchar("route_source", { length: 20 }).$type<"primary" | "support" | "fallback" | "unassigned">().notNull(),
+    routeSource: varchar("route_source", { length: 20 })
+      .$type<"primary" | "support" | "fallback" | "unassigned">()
+      .notNull(),
     attendedByIdentityId: uuid("attended_by_identity_id").references(() => identities.id),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     requestHash: varchar("request_hash", { length: 64 }).notNull(),
@@ -1129,16 +1120,29 @@ export const tableServiceCalls = pgTable(
   (table) => [
     unique("table_service_calls_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     uniqueIndex("table_service_calls_idempotency_unique").on(table.sessionId, table.idempotencyKey),
-    index("table_service_calls_open_idx").on(table.organizationId, table.unitId, table.state, table.createdAt),
+    index("table_service_calls_open_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.state,
+      table.createdAt,
+    ),
     foreignKey({
       name: "table_service_calls_session_scope_fk",
       columns: [table.organizationId, table.unitId, table.sessionId],
-      foreignColumns: [publicTableSessions.organizationId, publicTableSessions.unitId, publicTableSessions.id],
+      foreignColumns: [
+        publicTableSessions.organizationId,
+        publicTableSessions.unitId,
+        publicTableSessions.id,
+      ],
     }).onDelete("restrict"),
     foreignKey({
       name: "table_service_calls_occupancy_scope_fk",
       columns: [table.organizationId, table.unitId, table.occupancyId],
-      foreignColumns: [tableOccupancies.organizationId, tableOccupancies.unitId, tableOccupancies.id],
+      foreignColumns: [
+        tableOccupancies.organizationId,
+        tableOccupancies.unitId,
+        tableOccupancies.id,
+      ],
     }).onDelete("restrict"),
   ],
 );
@@ -1161,7 +1165,11 @@ export const tableServiceCallEvents = pgTable(
     foreignKey({
       name: "table_service_call_events_call_scope_fk",
       columns: [table.organizationId, table.unitId, table.callId],
-      foreignColumns: [tableServiceCalls.organizationId, tableServiceCalls.unitId, tableServiceCalls.id],
+      foreignColumns: [
+        tableServiceCalls.organizationId,
+        tableServiceCalls.unitId,
+        tableServiceCalls.id,
+      ],
     }).onDelete("restrict"),
   ],
 );

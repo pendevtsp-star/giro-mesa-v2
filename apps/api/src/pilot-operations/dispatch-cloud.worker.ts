@@ -85,7 +85,9 @@ export class DispatchCloudWorker implements OnModuleInit, OnModuleDestroy {
               resourceVersion: row.resource_version + 1,
               updatedAt: new Date(),
             })
-            .where(sql`${dispatchEffects.id} = ${row.effect_id} and ${dispatchEffects.state} = 'pending'`)
+            .where(
+              sql`${dispatchEffects.id} = ${row.effect_id} and ${dispatchEffects.state} = 'pending'`,
+            )
             .returning({ id: dispatchEffects.id });
           if (updated) recovered += 1;
         }
