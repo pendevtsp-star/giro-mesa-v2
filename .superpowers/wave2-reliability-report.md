@@ -100,7 +100,7 @@ Configuração ausente ou inválida impede o boot antes de criar a aplicação/w
 
 ## Gate consolidado
 
-- Testes focados: observability 6/6, lifecycle da API 9/9, worker 8/8 e load 12/12.
+- Testes focados: observability 6/6, lifecycle da API 9/9, worker 8/8 e load 15/15.
 - Regressão ampla: API 155 total (113 aprovados, 42 skips explícitos por banco ausente) e worker 24 total (21 aprovados, 3 skips explícitos por banco ausente), sem falhas.
 - Typecheck forçado de observability, API, worker e dependências: 10/10 tasks, sem cache.
 - Turbo `typecheck` + `build`: 15/15 tasks para API, worker, Ops, observability e dependências.
@@ -117,7 +117,9 @@ Configuração ausente ou inválida impede o boot antes de criar a aplicação/w
 
 - O SDK/provider passa a ser inicializado pelos próprios entrypoints. Ainda assim, sem endpoint OTLP válido o boot falha por desenho e nenhum monitoramento externo é declarado ativo neste trabalho.
 - Um receptor OTLP HTTP local confirmou payloads dos três sinais e a imagem oficial confirmou a configuração do Collector; não houve conexão com upstream/provider real.
-- `k6 inspect` valida parse, imports e opções; não faz request. Não houve API local com duas sessões/fixtures reais disponível para executar o smoke HTTP.
+- A validação final adicionou `pnpm test:load:smoke`: PostgreSQL 17 descartável, todas as migrations, API real, dois tenants, duas sessões e três execuções oficiais do k6. O executor `per-vu-iterations` aprovou 12/12 checks HTTP (6 operação, 2 QR e 4 multitenancy), erro 0%, breach 0% e os budgets p95 locais.
+- O smoke cobre deterministicamente os dois tenants; cada sessão leu seu próprio escopo, abriu sua mesa exclusiva e foi negada ao consultar o tenant estrangeiro. A prova pós-k6 confirmou no banco `tenantsVerified: 2` e `tablesVerified: 2`.
+- Fixture e resumos não contêm cookies. O status verde foi emitido somente após remover e confirmar a ausência do arquivo de ambiente, da fixture, dos containers k6 e do PostgreSQL; `SIGINT`/`SIGTERM` e falha de cleanup reprovam o gate.
 - `target`, `spike` e `soak` foram modelados e documentados, mas não executados. Nenhum resultado pesado é alegado.
 - O exemplo de fixture contém UUIDs deliberadamente não produtivos e precisa ser substituído por IDs de seed local descartável.
 - Cookies de carga ainda vêm de variáveis de ambiente por contrato do brief. Eles não são logados; um executor futuro pode adotar `k6/secrets` sem mudar a fixture.

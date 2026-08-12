@@ -35,8 +35,8 @@ it("builds a light smoke profile and explicit reliability thresholds", () => {
     discardResponseBodies: true,
     scenarios: {
       operational_smoke: {
-        executor: "shared-iterations",
-        vus: 1,
+        executor: "per-vu-iterations",
+        vus: 2,
         iterations: 1,
         maxDuration: "30s",
       },

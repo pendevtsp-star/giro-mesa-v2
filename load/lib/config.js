@@ -62,8 +62,8 @@ export function buildK6Options(kind, profile, tenantCount) {
       discardResponseBodies: true,
       scenarios: {
         [scenarioName]: {
-          executor: "shared-iterations",
-          vus: 1,
+          executor: "per-vu-iterations",
+          vus: tenantCount,
           iterations: 1,
           maxDuration: "30s",
         },

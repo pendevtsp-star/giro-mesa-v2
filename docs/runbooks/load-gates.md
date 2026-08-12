@@ -14,7 +14,7 @@ O alvo é por unidade: 500 mesas provisionadas, 50 terminais concorrentes e 2.00
 
 | Profile | Concorrência por unidade | Duração | Uso |
 | --- | --- | --- | --- |
-| `smoke` | 1 VU, 1 iteração | até 30 s | validação local leve |
+| `smoke` | 1 VU por tenant, 1 iteração por VU | até 30 s | validação local leve |
 | `target` | 50 terminais ou 2.000 QR | 10 min | gate no alvo |
 | `spike` | rampa até 100 terminais ou 4.000 QR | 10 min | duas vezes o alvo |
 | `soak` | 50 terminais ou 2.000 QR | 2 h | estabilidade sustentada |
@@ -41,6 +41,18 @@ Cada VU operacional mantém estado isolado, recebe uma mesa exclusiva pelo seu �
 6. Confirmar capacidade de reset/limpeza dos dados abertos pela jornada operacional.
 
 `load/fixtures/smoke.example.json` é apenas formato seguro de exemplo. Substitua seus IDs pelos do seed local antes de executar; ele não declara que os UUIDs existem em um ambiente ativo.
+
+### Smoke local descartável
+
+O gate abaixo constrói API e banco, sobe PostgreSQL 17 descartável, aplica todas as migrations, cria dois tenants e duas sessões efêmeras, e executa os três entrypoints na imagem oficial pinada do k6:
+
+```powershell
+rtk pnpm test:load:smoke
+```
+
+O orquestrador usa banco e role de login exclusivos, gera a fixture sem segredos e injeta cookies por arquivo de ambiente temporário. O executor `per-vu-iterations` obriga uma iteração para cada tenant. Depois do k6, uma consulta no PostgreSQL descartável exige exatamente uma comanda aberta na mesa esperada de cada tenant.
+
+Fixture, arquivo de ambiente e containers nomeados são removidos em sucesso ou falha. `SIGINT`/`SIGTERM` interrompem os processos filhos, executam o mesmo cleanup e fazem o gate falhar; falha ao confirmar a ausência de qualquer container também reprova. O JSON `status: passed` é emitido somente depois dessas confirmações. Os resumos sanitizados ficam no diretório temporário impresso ao final. Esse smoke comprova tráfego HTTP real leve e isolamento bidirecional; não substitui os perfis `target`, `spike` ou `soak`.
 
 ## Smoke local
 
@@ -94,4 +106,4 @@ Registrar por execução:
 - saturação, backlog e eventos operacionais;
 - limpeza/reconciliação dos dados de carga.
 
-Um smoke verde prova somente que o harness e a fixture alcançam o ambiente. `target`, `spike` e `soak` só podem ser declarados executados com artefato k6 e telemetria correspondentes. Nenhum desses perfis foi executado como parte da criação deste harness.
+Um smoke verde prova somente que o harness, as migrations e a fixture alcançam a API local descartável, que cada tenant executa sua jornada e que as duas mesas esperadas ficam abertas no tenant correto. `target`, `spike` e `soak` só podem ser declarados executados com artefato k6 e telemetria correspondentes. Nenhum desses perfis pesados foi executado como parte desta validação.
