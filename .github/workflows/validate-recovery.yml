@@ -49,7 +49,7 @@ jobs:
           cache-dependency-path: candidate/pnpm-lock.yaml
       - name: Prove PostgreSQL and runtime recovery compatibility
         run: >-
-          ./scripts/validate-recovery-candidate.sh
+          bash ./scripts/validate-recovery-candidate.sh
           --candidate-directory candidate
           --recovery-sha "${{ inputs.recovery_sha }}"
           --output-directory evidence
