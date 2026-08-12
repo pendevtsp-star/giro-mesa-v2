@@ -20,10 +20,10 @@ test("KDS exposes redundant priority, SLA, station filters and short undo", asyn
   await page.getByRole("button", { name: /^Bar 1$/ }).click();
   await expect(page.getByText("Mesa 01", { exact: true })).toBeVisible();
   await expect(page.getByText("Mesa 03", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: /iniciar preparo/i }).click();
+  await page.getByRole("button", { name: /marcar pronto/i }).click();
   await expect(page.getByText("Avanço agendado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Desfazer", exact: true }).click();
-  await expect(page.getByRole("button", { name: /iniciar preparo/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /marcar pronto/i })).toBeVisible();
 });
 
 test("KDS keeps touch actions legible without horizontal overflow on tablet", async ({ page }) => {

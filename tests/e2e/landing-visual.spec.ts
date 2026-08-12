@@ -61,6 +61,7 @@ async function waitForStableVisualState(page: Page) {
 
 for (const viewport of viewports) {
   test(`landing visual ${viewport.name}`, async ({ page }) => {
+    test.skip(test.info().project.name !== "desktop", "A matriz de viewports roda uma vez.");
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("http://localhost:3110");

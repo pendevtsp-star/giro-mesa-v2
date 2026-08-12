@@ -214,7 +214,7 @@ async function installPlatformFixture(
 }
 
 async function openTenant(page: Page) {
-  await page.goto("/#platform");
+  await page.goto("http://127.0.0.1:3213/#platform");
   await expect(page.getByRole("heading", { name: "Controle da plataforma" })).toBeVisible();
   await page.getByPlaceholder("UUID da organização").fill(organizationId);
   await page.getByRole("button", { name: "Carregar contexto" }).click();

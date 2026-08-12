@@ -8,7 +8,7 @@ import { createDatabase } from "./index.js";
 
 const integrationUrl =
   process.env.FINANCE_DATABASE_URL ?? process.env.TENANT_ISOLATION_DATABASE_URL;
-const migrationsDirectory = fileURLToPath(new URL("../drizzle/", import.meta.url));
+const migrationsDirectory = fileURLToPath(new URL("../../drizzle/", import.meta.url));
 
 type Database = ReturnType<typeof createDatabase>;
 type SqlTransaction = postgres.TransactionSql;

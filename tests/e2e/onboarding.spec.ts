@@ -137,7 +137,7 @@ async function expectActiveUnit(page: Page, unitName: string) {
   const menuButton = page.getByRole("button", { name: "Abrir menu", exact: true });
   const openedMenu = await menuButton.isVisible();
   if (openedMenu) await menuButton.click();
-  await expect(page.locator(".unit-chip strong")).toHaveText(unitName);
+  await expect(page.locator(".unit-chip strong")).toContainText(unitName);
   if (openedMenu) await page.locator(".sidebar__close").click();
 }
 

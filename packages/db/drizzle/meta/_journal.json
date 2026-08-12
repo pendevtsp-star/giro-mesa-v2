@@ -192,6 +192,8 @@
       "breakpoints": true
     },
     {
+      "idx": 27,
+      "version": "7",
       "when": 1786501200000,
       "tag": "0028_privacy_domain_processors",
       "breakpoints": true

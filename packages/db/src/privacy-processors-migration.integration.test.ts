@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createDatabase } from "./index.js";
 
 const integrationUrl = process.env.TENANT_ISOLATION_DATABASE_URL;
-const migrationsDirectory = fileURLToPath(new URL("../drizzle/", import.meta.url));
+const migrationsDirectory = fileURLToPath(new URL("../../drizzle/", import.meta.url));
 
 async function applyMigration(client: ReturnType<typeof createDatabase>["client"], file: string) {
   const source = await readFile(`${migrationsDirectory}${file}`, "utf8");

@@ -6,6 +6,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
+    baseURL: "http://127.0.0.1:3112",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -36,6 +37,13 @@ export default defineConfig({
       command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3112",
       env: { VITE_DEMO_MODE: "true" },
       url: "http://127.0.0.1:3112",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3213",
+      env: { VITE_DEMO_MODE: "false" },
+      url: "http://127.0.0.1:3213",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
