@@ -384,7 +384,12 @@ it("routes idempotent calls and exposes only the current occupancy partial", asy
     const closingOccupancy = database.db.transaction(async (tx) => {
       await tx
         .update(tableOccupancies)
-        .set({ state: "closed", closedAt: new Date() })
+        .set({
+          state: "closed",
+          closedAt: new Date(),
+          resourceVersion: sql`${tableOccupancies.resourceVersion} + 1`,
+          updatedAt: new Date(),
+        })
         .where(eq(tableOccupancies.id, (opened.occupancy as { id: string }).id));
       occupancyLocked();
       await occupancyRelease;

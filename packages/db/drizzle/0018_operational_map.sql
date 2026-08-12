@@ -321,6 +321,76 @@ CREATE TRIGGER table_service_call_receipts_append_only
 BEFORE UPDATE OR DELETE ON public.table_service_call_receipts FOR EACH ROW
 EXECUTE FUNCTION public.giromesa_append_only_service_call_event();--> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION public.giromesa_guard_table_occupancy_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['state','occupancy_epoch','resource_version','table_id','group_id','opened_at','closed_at','updated_at'])
+     <> (to_jsonb(OLD) - ARRAY['state','occupancy_epoch','resource_version','table_id','group_id','opened_at','closed_at','updated_at']) THEN
+    RAISE EXCEPTION 'table occupancy immutable fields changed' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.resource_version <> OLD.resource_version + 1 THEN
+    RAISE EXCEPTION 'table occupancy resource version must advance by one' USING ERRCODE = '40001';
+  END IF;
+  IF NOT (
+    (OLD.state = 'reserved' AND NEW.state IN ('open','closed')) OR
+    (OLD.state = 'open' AND NEW.state IN ('open','paying','closed')) OR
+    (OLD.state = 'paying' AND NEW.state IN ('open','closed')) OR
+    (OLD.state = 'closed' AND NEW.state = 'open')
+  ) THEN
+    RAISE EXCEPTION 'invalid table occupancy transition' USING ERRCODE = '55000';
+  END IF;
+  IF OLD.state = 'closed' AND NEW.state = 'open' THEN
+    IF NEW.occupancy_epoch = OLD.occupancy_epoch THEN
+      RAISE EXCEPTION 'reopened occupancy requires a new epoch' USING ERRCODE = '55000';
+    END IF;
+  ELSIF NEW.occupancy_epoch <> OLD.occupancy_epoch THEN
+    RAISE EXCEPTION 'occupancy epoch may only change on reopen' USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END $$;--> statement-breakpoint
+CREATE TRIGGER table_occupancies_state_machine
+BEFORE UPDATE ON public.table_occupancies FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_table_occupancy_update();--> statement-breakpoint
+
+CREATE OR REPLACE FUNCTION public.giromesa_guard_public_table_session_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['revoked_at','revoke_reason','resource_version'])
+     <> (to_jsonb(OLD) - ARRAY['revoked_at','revoke_reason','resource_version']) THEN
+    RAISE EXCEPTION 'public table session immutable fields changed' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.resource_version <> OLD.resource_version + 1 THEN
+    RAISE EXCEPTION 'public table session resource version must advance by one' USING ERRCODE = '40001';
+  END IF;
+  IF OLD.revoked_at IS NOT NULL OR NEW.revoked_at IS NULL OR NEW.revoke_reason IS NULL THEN
+    RAISE EXCEPTION 'public table session revocation is terminal' USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END $$;--> statement-breakpoint
+CREATE TRIGGER public_table_sessions_state_machine
+BEFORE UPDATE ON public.public_table_sessions FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_public_table_session_update();--> statement-breakpoint
+
+CREATE OR REPLACE FUNCTION public.giromesa_guard_table_service_call_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['state','attended_by_identity_id','attended_at','resource_version','updated_at'])
+     <> (to_jsonb(OLD) - ARRAY['state','attended_by_identity_id','attended_at','resource_version','updated_at']) THEN
+    RAISE EXCEPTION 'table service call immutable fields changed' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.resource_version <> OLD.resource_version + 1 THEN
+    RAISE EXCEPTION 'table service call resource version must advance by one' USING ERRCODE = '40001';
+  END IF;
+  IF OLD.state NOT IN ('received','routed') OR NEW.state <> 'attended'
+     OR NEW.attended_by_identity_id IS NULL OR NEW.attended_at IS NULL THEN
+    RAISE EXCEPTION 'invalid table service call transition' USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END $$;--> statement-breakpoint
+CREATE TRIGGER table_service_calls_state_machine
+BEFORE UPDATE ON public.table_service_calls FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_table_service_call_update();--> statement-breakpoint
+
 DO $$
 DECLARE tenant_table text;
 BEGIN
@@ -356,12 +426,18 @@ GRANT INSERT, UPDATE ON public.service_areas TO giromesa_app, giromesa_legacy_tr
 GRANT INSERT, UPDATE ON public.table_layout_versions TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT, DELETE ON public.table_layout_nodes TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT ON public.service_shifts, public.area_assignments TO giromesa_app, giromesa_legacy_transition;
-GRANT INSERT, UPDATE ON public.table_occupancies TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.table_occupancies TO giromesa_app, giromesa_legacy_transition;
+GRANT UPDATE (state, occupancy_epoch, resource_version, table_id, group_id, opened_at, closed_at, updated_at)
+  ON public.table_occupancies TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT ON public.table_occupancy_events TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT, UPDATE ON public.staff_presence_leases, public.salon_exceptions TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT, UPDATE ON public.public_table_service_settings TO giromesa_app, giromesa_legacy_transition;
-GRANT INSERT, UPDATE ON public.public_table_sessions TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.public_table_sessions TO giromesa_app, giromesa_legacy_transition;
+GRANT UPDATE (revoked_at, revoke_reason, resource_version)
+  ON public.public_table_sessions TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT ON public.public_table_session_nonces TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT, UPDATE ON public.public_table_session_rate_limits TO giromesa_app, giromesa_legacy_transition;
-GRANT INSERT, UPDATE ON public.table_service_calls TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.table_service_calls TO giromesa_app, giromesa_legacy_transition;
+GRANT UPDATE (state, attended_by_identity_id, attended_at, resource_version, updated_at)
+  ON public.table_service_calls TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT ON public.table_service_call_events, public.table_service_call_receipts TO giromesa_app, giromesa_legacy_transition;

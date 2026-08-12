@@ -106,6 +106,60 @@ CREATE TRIGGER dispatch_acknowledgements_append_only BEFORE UPDATE OR DELETE ON 
 CREATE TRIGGER dispatch_outcomes_append_only BEFORE UPDATE OR DELETE ON public.dispatch_outcomes
   FOR EACH ROW EXECUTE FUNCTION public.giromesa_append_only_dispatch_record();--> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION public.giromesa_guard_dispatch_effect_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['state','attempt_count','resource_version','next_attempt_at','delivered_at','acknowledged_at','canceled_at','last_error','updated_at'])
+     <> (to_jsonb(OLD) - ARRAY['state','attempt_count','resource_version','next_attempt_at','delivered_at','acknowledged_at','canceled_at','last_error','updated_at']) THEN
+    RAISE EXCEPTION 'dispatch effect immutable fields changed' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.resource_version <> OLD.resource_version + 1 THEN
+    RAISE EXCEPTION 'dispatch effect resource version must advance by one' USING ERRCODE = '40001';
+  END IF;
+  IF NEW.attempt_count < OLD.attempt_count THEN
+    RAISE EXCEPTION 'dispatch attempt count is monotonic' USING ERRCODE = '55000';
+  END IF;
+  IF NOT (
+    (OLD.state = 'pending' AND NEW.state IN ('pending','delivered','acked','canceled','dlq')) OR
+    (OLD.state = 'delivered' AND NEW.state IN ('pending','acked','canceled','dlq')) OR
+    (OLD.state = 'dlq' AND NEW.state IN ('pending','canceled'))
+  ) THEN
+    RAISE EXCEPTION 'invalid dispatch effect transition' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.state = 'delivered' AND NEW.delivered_at IS NULL THEN
+    RAISE EXCEPTION 'delivered dispatch requires timestamp' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.state = 'acked' AND NEW.acknowledged_at IS NULL THEN
+    RAISE EXCEPTION 'acknowledged dispatch requires timestamp' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.state = 'canceled' AND NEW.canceled_at IS NULL THEN
+    RAISE EXCEPTION 'canceled dispatch requires timestamp' USING ERRCODE = '55000';
+  END IF;
+  IF NEW.state = 'dlq' AND NEW.last_error IS NULL THEN
+    RAISE EXCEPTION 'dead-letter dispatch requires an error' USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END $$;--> statement-breakpoint
+CREATE TRIGGER dispatch_effects_state_machine
+BEFORE UPDATE ON public.dispatch_effects FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_dispatch_effect_update();--> statement-breakpoint
+
+CREATE OR REPLACE FUNCTION public.giromesa_guard_dispatch_dead_letter_update()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['resolved_by_identity_id','resolved_at'])
+     <> (to_jsonb(OLD) - ARRAY['resolved_by_identity_id','resolved_at']) THEN
+    RAISE EXCEPTION 'dispatch dead letter immutable fields changed' USING ERRCODE = '55000';
+  END IF;
+  IF OLD.resolved_at IS NOT NULL OR NEW.resolved_at IS NULL OR NEW.resolved_by_identity_id IS NULL THEN
+    RAISE EXCEPTION 'dispatch dead letter resolution is terminal' USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END $$;--> statement-breakpoint
+CREATE TRIGGER dispatch_dead_letters_state_machine
+BEFORE UPDATE ON public.dispatch_dead_letters FOR EACH ROW
+EXECUTE FUNCTION public.giromesa_guard_dispatch_dead_letter_update();--> statement-breakpoint
+
 DO $$
 DECLARE tenant_table text;
 BEGIN
@@ -135,7 +189,11 @@ BEGIN
 END $$;
 --> statement-breakpoint
 GRANT INSERT, UPDATE ON public.production_station_routes TO giromesa_app, giromesa_legacy_transition;
-GRANT INSERT, UPDATE ON public.dispatch_effects TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.dispatch_effects TO giromesa_app, giromesa_legacy_transition;
+GRANT UPDATE (state, attempt_count, resource_version, next_attempt_at, delivered_at, acknowledged_at, canceled_at, last_error, updated_at)
+  ON public.dispatch_effects TO giromesa_app, giromesa_legacy_transition;
 GRANT INSERT ON public.dispatch_attempts, public.dispatch_acknowledgements, public.dispatch_outcomes
   TO giromesa_app, giromesa_legacy_transition;
-GRANT INSERT, UPDATE ON public.dispatch_dead_letters TO giromesa_app, giromesa_legacy_transition;
+GRANT INSERT ON public.dispatch_dead_letters TO giromesa_app, giromesa_legacy_transition;
+GRANT UPDATE (resolved_by_identity_id, resolved_at)
+  ON public.dispatch_dead_letters TO giromesa_app, giromesa_legacy_transition;
