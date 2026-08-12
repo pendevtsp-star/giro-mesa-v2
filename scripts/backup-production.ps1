@@ -12,10 +12,15 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$OutputDirectory,
   [Parameter(Mandatory = $true)]
-  [string]$Artifact,
+  [string]$SourceArtifact,
   [Parameter(Mandatory = $true)]
   [ValidatePattern('^[0-9]{4}_[A-Za-z0-9_.-]+$')]
-  [string]$MigrationId,
+  [string]$SourceMigrationId,
+  [Parameter(Mandatory = $true)]
+  [string]$TargetArtifact,
+  [Parameter(Mandatory = $true)]
+  [ValidatePattern('^[0-9]{4}_[A-Za-z0-9_.-]+$')]
+  [string]$TargetMigrationId,
   [string]$ObjectDirectory,
   [string]$EncryptedConfigArchive,
   [ValidateRange(1, 5)]
@@ -24,6 +29,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+Add-Type -AssemblyName System.IO.Compression
 
 function Invoke-CheckedDocker {
   param([Parameter(Mandatory = $true)][string[]]$Arguments)
@@ -49,17 +56,164 @@ function Assert-ImmutableArtifact {
   }
 }
 
+function Test-IsReparsePoint {
+  param([IO.FileSystemInfo]$Item)
+  return ($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+}
+
+function Assert-NoReparsePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$ErrorCode,
+    [switch]$AllowMissing
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path)
+  $probe = $fullPath
+  $isFirst = $true
+  while (-not [string]::IsNullOrWhiteSpace($probe)) {
+    if (Test-Path -LiteralPath $probe) {
+      $item = Get-Item -LiteralPath $probe -Force
+      if (Test-IsReparsePoint -Item $item) { throw $ErrorCode }
+    } elseif ($isFirst -and -not $AllowMissing) {
+      throw $ErrorCode
+    }
+    $parent = [IO.Path]::GetDirectoryName($probe)
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $probe) { break }
+    $probe = $parent
+    $isFirst = $false
+  }
+  return $fullPath
+}
+
 function Get-Sha256Hex {
   param([string]$Path)
-  $stream = [IO.File]::OpenRead($Path)
+  $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
   $sha = [Security.Cryptography.SHA256]::Create()
   try { return ($sha.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) -join '' }
   finally { $sha.Dispose(); $stream.Dispose() }
 }
 
+function Get-ObjectTreeState {
+  param([Parameter(Mandatory = $true)][string]$Root)
+  $rootPath = Assert-NoReparsePath -Path $Root -ErrorCode 'BACKUP_OBJECT_REPARSE_POINT_FORBIDDEN'
+  $rootItem = Get-Item -LiteralPath $rootPath -Force
+  if (-not $rootItem.PSIsContainer) { throw 'BACKUP_OBJECT_DIRECTORY_INVALID' }
+  $rootPrefix = $rootItem.FullName.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+  $pending = [Collections.Queue]::new()
+  $pending.Enqueue($rootItem.FullName)
+  $entries = [System.Collections.ArrayList]::new()
+
+  while ($pending.Count -gt 0) {
+    $directory = [string]$pending.Dequeue()
+    [void](Assert-NoReparsePath -Path $directory -ErrorCode 'BACKUP_OBJECT_REPARSE_POINT_FORBIDDEN')
+    foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force)) {
+      if (Test-IsReparsePoint -Item $item) { throw 'BACKUP_OBJECT_REPARSE_POINT_FORBIDDEN' }
+      $relative = $item.FullName.Substring($rootPrefix.Length) -replace '\\', '/'
+      if ($item.PSIsContainer) {
+        [void]$entries.Add([pscustomobject]@{
+          FullName = $item.FullName; RelativePath = "$relative/"; IsDirectory = $true
+          Length = 0L; LastWriteTicks = 0L; Sha256 = $null
+        })
+        $pending.Enqueue($item.FullName)
+      } else {
+        [void]$entries.Add([pscustomobject]@{
+          FullName = $item.FullName; RelativePath = $relative; IsDirectory = $false
+          Length = [long]$item.Length; LastWriteTicks = $item.LastWriteTimeUtc.Ticks
+          Sha256 = Get-Sha256Hex -Path $item.FullName
+        })
+      }
+    }
+  }
+  return @($entries | Sort-Object RelativePath)
+}
+
+function Convert-ObjectTreeStateToJson {
+  param([object[]]$Entries)
+  return @($Entries | ForEach-Object {
+    [ordered]@{
+      path = $_.RelativePath; directory = $_.IsDirectory
+      length = $_.Length; lastWriteTicks = $_.LastWriteTicks; sha256 = $_.Sha256
+    }
+  }) | ConvertTo-Json -Depth 4 -Compress
+}
+
+function Write-ObjectArchive {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Entries,
+    [Parameter(Mandatory = $true)][string]$Destination
+  )
+  $archiveStream = [IO.File]::Open($Destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+  $archive = [IO.Compression.ZipArchive]::new($archiveStream, [IO.Compression.ZipArchiveMode]::Create, $false)
+  try {
+    foreach ($item in $Entries) {
+      if ($item.IsDirectory) {
+        [void]$archive.CreateEntry([string]$item.RelativePath)
+        continue
+      }
+      [void](Assert-NoReparsePath -Path $item.FullName -ErrorCode 'BACKUP_OBJECT_REPARSE_POINT_FORBIDDEN')
+      $sourceItem = Get-Item -LiteralPath $item.FullName -Force
+      if ($sourceItem.PSIsContainer -or $sourceItem.Length -ne $item.Length -or $sourceItem.LastWriteTimeUtc.Ticks -ne $item.LastWriteTicks) {
+        throw 'BACKUP_OBJECT_TREE_CHANGED'
+      }
+      $sourceStream = [IO.File]::Open($item.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+      try {
+        $currentItem = Get-Item -LiteralPath $item.FullName -Force
+        if ((Test-IsReparsePoint -Item $currentItem) -or $sourceStream.Length -ne $item.Length) {
+          throw 'BACKUP_OBJECT_TREE_CHANGED'
+        }
+        $entry = $archive.CreateEntry([string]$item.RelativePath, [IO.Compression.CompressionLevel]::Optimal)
+        $entryStream = $entry.Open()
+        try { $sourceStream.CopyTo($entryStream) } finally { $entryStream.Dispose() }
+      } finally {
+        $sourceStream.Dispose()
+      }
+    }
+  } finally {
+    $archive.Dispose()
+    $archiveStream.Dispose()
+  }
+}
+
+function Get-SafeConfigState {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $fullPath = Assert-NoReparsePath -Path $Path -ErrorCode 'CONFIG_ARCHIVE_REPARSE_POINT_FORBIDDEN'
+  $item = Get-Item -LiteralPath $fullPath -Force
+  if ($item.PSIsContainer) { throw 'CONFIG_ARCHIVE_INVALID' }
+  if ($item.Extension -notin @('.age', '.gpg', '.enc')) { throw 'CONFIG_ARCHIVE_MUST_BE_ENCRYPTED' }
+  return [pscustomobject]@{
+    FullName = $item.FullName; Extension = $item.Extension; Length = [long]$item.Length
+    LastWriteTicks = $item.LastWriteTimeUtc.Ticks; Sha256 = Get-Sha256Hex -Path $item.FullName
+  }
+}
+
+function Copy-SafeConfigFile {
+  param([Parameter(Mandatory = $true)][object]$State, [Parameter(Mandatory = $true)][string]$Destination)
+  [void](Assert-NoReparsePath -Path $State.FullName -ErrorCode 'CONFIG_ARCHIVE_REPARSE_POINT_FORBIDDEN')
+  $source = [IO.File]::Open($State.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  $target = $null
+  try {
+    $current = Get-Item -LiteralPath $State.FullName -Force
+    if ((Test-IsReparsePoint -Item $current) -or $source.Length -ne $State.Length -or $current.LastWriteTimeUtc.Ticks -ne $State.LastWriteTicks) {
+      throw 'CONFIG_ARCHIVE_CHANGED'
+    }
+    $target = [IO.File]::Open($Destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $source.CopyTo($target)
+    $target.Flush($true)
+  } finally {
+    if ($null -ne $target) { $target.Dispose() }
+    $source.Dispose()
+  }
+  $after = Get-SafeConfigState -Path $State.FullName
+  if ($after.Length -ne $State.Length -or $after.LastWriteTicks -ne $State.LastWriteTicks -or $after.Sha256 -ne $State.Sha256) {
+    throw 'CONFIG_ARCHIVE_CHANGED'
+  }
+  if ((Get-Sha256Hex -Path $Destination) -ne $State.Sha256) { throw 'CONFIG_ARCHIVE_COPY_HASH_MISMATCH' }
+}
+
 function Add-BackupFile {
   param([System.Collections.ArrayList]$Files, [string]$Root, [string]$Path, [string]$Kind)
-  $item = Get-Item -LiteralPath $Path
+  $item = Get-Item -LiteralPath $Path -Force
+  if (Test-IsReparsePoint -Item $item) { throw 'BACKUP_OUTPUT_REPARSE_POINT_FORBIDDEN' }
   $relative = $item.FullName.Substring($Root.Length).TrimStart('\', '/') -replace '\\', '/'
   [void]$Files.Add([ordered]@{
     path = $relative
@@ -69,28 +223,53 @@ function Add-BackupFile {
   })
 }
 
-Assert-ImmutableArtifact -Value $Artifact
+Assert-ImmutableArtifact -Value $SourceArtifact
+Assert-ImmutableArtifact -Value $TargetArtifact
 $manifestKey = Get-ManifestKey
+$objectState = $null
+$objectStateJson = $null
+$configState = $null
+$hasObjectInput = -not [string]::IsNullOrWhiteSpace($ObjectDirectory)
+
+if ($hasObjectInput) {
+  $objectState = @(Get-ObjectTreeState -Root $ObjectDirectory)
+  $objectStateJson = Convert-ObjectTreeStateToJson -Entries $objectState
+}
+if (-not [string]::IsNullOrWhiteSpace($EncryptedConfigArchive)) {
+  $configState = Get-SafeConfigState -Path $EncryptedConfigArchive
+}
+
+$root = [IO.Path]::GetFullPath($OutputDirectory)
+[IO.Directory]::CreateDirectory($root) | Out-Null
+[void](Assert-NoReparsePath -Path $root -ErrorCode 'BACKUP_OUTPUT_REPARSE_POINT_FORBIDDEN')
 $startedAt = [DateTimeOffset]::UtcNow
 $backupId = '{0}-{1}' -f $startedAt.ToString('yyyyMMddTHHmmssZ'), ([Guid]::NewGuid().ToString('N'))
-$root = [IO.Path]::GetFullPath($OutputDirectory)
 $backupDirectory = Join-Path $root $backupId
 $containerDump = "/tmp/giromesa-$backupId.dump"
+$dockerTouched = $false
 
 try {
-  New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+  [IO.Directory]::CreateDirectory($backupDirectory) | Out-Null
   $databaseDump = Join-Path $backupDirectory 'database.dump'
+  $dockerTouched = $true
   Invoke-CheckedDocker -Arguments @('exec', $DatabaseContainer, 'pg_dump', '--format=custom', '--compress=6', '--no-owner', '--no-acl', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--file', $containerDump)
   Invoke-CheckedDocker -Arguments @('cp', "${DatabaseContainer}:${containerDump}", $databaseDump)
 
-  if (-not [string]::IsNullOrWhiteSpace($ObjectDirectory)) {
-    $resolvedObjects = (Resolve-Path -LiteralPath $ObjectDirectory).Path
-    Compress-Archive -Path (Join-Path $resolvedObjects '*') -DestinationPath (Join-Path $backupDirectory 'objects.zip') -CompressionLevel Optimal
+  if ($hasObjectInput) {
+    $objectState = @(Get-ObjectTreeState -Root $ObjectDirectory)
+    if ((Convert-ObjectTreeStateToJson -Entries $objectState) -ne $objectStateJson) { throw 'BACKUP_OBJECT_TREE_CHANGED' }
+    $objectArchive = Join-Path $backupDirectory 'objects.zip'
+    Write-ObjectArchive -Entries $objectState -Destination $objectArchive
+    if ((Convert-ObjectTreeStateToJson -Entries (Get-ObjectTreeState -Root $ObjectDirectory)) -ne $objectStateJson) {
+      throw 'BACKUP_OBJECT_TREE_CHANGED'
+    }
   }
-  if (-not [string]::IsNullOrWhiteSpace($EncryptedConfigArchive)) {
-    $resolvedConfig = (Resolve-Path -LiteralPath $EncryptedConfigArchive).Path
-    if ([IO.Path]::GetExtension($resolvedConfig) -notin @('.age', '.gpg', '.enc')) { throw 'CONFIG_ARCHIVE_MUST_BE_ENCRYPTED' }
-    Copy-Item -LiteralPath $resolvedConfig -Destination (Join-Path $backupDirectory ("configuration" + [IO.Path]::GetExtension($resolvedConfig)))
+  if ($null -ne $configState) {
+    $currentConfig = Get-SafeConfigState -Path $EncryptedConfigArchive
+    if ($currentConfig.Length -ne $configState.Length -or $currentConfig.LastWriteTicks -ne $configState.LastWriteTicks -or $currentConfig.Sha256 -ne $configState.Sha256) {
+      throw 'CONFIG_ARCHIVE_CHANGED'
+    }
+    Copy-SafeConfigFile -State $configState -Destination (Join-Path $backupDirectory ("configuration" + $configState.Extension))
   }
 
   $files = [System.Collections.ArrayList]::new()
@@ -105,7 +284,9 @@ try {
   $durationSeconds = [Math]::Ceiling(($finishedAt - $startedAt).TotalSeconds)
   if ($durationSeconds -gt ($MaxRpoMinutes * 60)) { throw 'BACKUP_WINDOW_EXCEEDED' }
   $payload = [ordered]@{
-    schemaVersion = 1; backupId = $backupId; artifact = $Artifact; migrationId = $MigrationId
+    schemaVersion = 2; backupId = $backupId
+    sourceArtifact = $SourceArtifact; sourceMigrationId = $SourceMigrationId
+    targetArtifact = $TargetArtifact; targetMigrationId = $TargetMigrationId
     sourceDatabaseContainer = $DatabaseContainer; databaseName = $DatabaseName
     createdAt = $startedAt.ToString('o'); completedAt = $finishedAt.ToString('o')
     durationSeconds = [int]$durationSeconds; declaredRpoMinutes = $MaxRpoMinutes; files = @($files)
@@ -115,13 +296,18 @@ try {
   $payloadBytes = $utf8.GetBytes($payloadJson)
   $hmac = [Security.Cryptography.HMACSHA256]::new($manifestKey)
   try { $signature = ($hmac.ComputeHash($payloadBytes) | ForEach-Object { $_.ToString('x2') }) -join '' } finally { $hmac.Dispose() }
-  $manifest = [ordered]@{ schemaVersion = 1; signedPayloadBase64 = [Convert]::ToBase64String($payloadBytes); hmacSha256 = $signature }
+  $manifest = [ordered]@{ schemaVersion = 2; signedPayloadBase64 = [Convert]::ToBase64String($payloadBytes); hmacSha256 = $signature }
   [IO.File]::WriteAllText((Join-Path $backupDirectory 'manifest.json'), ($manifest | ConvertTo-Json -Depth 4), $utf8)
   Write-Output $backupDirectory
 } catch {
-  if (Test-Path -LiteralPath $backupDirectory) { Remove-Item -LiteralPath $backupDirectory -Recurse -Force }
+  if (Test-Path -LiteralPath $backupDirectory) {
+    $backupItem = Get-Item -LiteralPath $backupDirectory -Force
+    if (-not (Test-IsReparsePoint -Item $backupItem)) { Remove-Item -LiteralPath $backupDirectory -Recurse -Force }
+  }
   throw
 } finally {
-  try { & docker exec $DatabaseContainer rm -f $containerDump *>$null } catch { }
+  if ($dockerTouched) {
+    try { & docker exec $DatabaseContainer rm -f $containerDump *>$null } catch { }
+  }
   [Array]::Clear($manifestKey, 0, $manifestKey.Length)
 }
