@@ -4,7 +4,6 @@ import {
   publicMenuSlugSchema,
   publicOrderSchema,
 } from "@giromesa/contracts";
-import { z } from "zod";
 import {
   Body,
   Controller,
@@ -17,13 +16,15 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { ApiHeader } from "@nestjs/swagger";
+import { z } from "zod";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { DatabaseContext } from "../database/database-context.decorator.js";
 import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
-import { TableSessionService } from "./table-session.js";
 import { TableServiceService } from "./table-service.service.js";
+import { TableSessionService } from "./table-session.js";
 
 const publicMenuDraftSchema = z.object({
   expectedVersion: z.number().int().nonnegative(),
@@ -133,6 +134,21 @@ export class PublicMenuController {
   }
 
   @Post(":slug/table-calls")
+  @ApiHeader({
+    name: "Authorization",
+    required: true,
+    schema: { type: "string", pattern: "^Bearer " },
+  })
+  @ApiHeader({
+    name: "X-Request-Nonce",
+    required: true,
+    schema: { type: "string", minLength: 24, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" },
+  })
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
   tableCall(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
     @Headers("authorization") authorization: string | undefined,
@@ -151,6 +167,11 @@ export class PublicMenuController {
   }
 
   @Get(":slug/table-partial")
+  @ApiHeader({
+    name: "Authorization",
+    required: true,
+    schema: { type: "string", pattern: "^Bearer " },
+  })
   tablePartial(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
     @Headers("authorization") authorization: string | undefined,
@@ -168,7 +189,6 @@ export class PublicMenuController {
     const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
     return this.publicOrderService.place(slug, idempotencyKey, body);
   }
-
 }
 
 @UseGuards(SessionGuard)

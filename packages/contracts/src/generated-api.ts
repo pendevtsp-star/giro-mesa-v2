@@ -13077,7 +13077,11 @@ export interface operations {
   "PublicMenuController_tableCall[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "Idempotency-Key": string;
+        "X-Request-Nonce": string;
+        Authorization: string;
+      };
       path: {
         slug: string;
       };
@@ -13103,7 +13107,11 @@ export interface operations {
   "PublicMenuController_tableCall[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "Idempotency-Key": string;
+        "X-Request-Nonce": string;
+        Authorization: string;
+      };
       path: {
         slug: string;
       };
@@ -13129,7 +13137,9 @@ export interface operations {
   "PublicMenuController_tablePartial[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        Authorization: string;
+      };
       path: {
         slug: string;
       };
@@ -13148,7 +13158,9 @@ export interface operations {
   "PublicMenuController_tablePartial[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        Authorization: string;
+      };
       path: {
         slug: string;
       };
@@ -14295,7 +14307,9 @@ export interface operations {
   "SyncController_dispatchOutcomes[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        Authorization: string;
+      };
       path?: never;
       cookie?: never;
     };
@@ -14328,7 +14342,9 @@ export interface operations {
   "SyncController_dispatchOutcomes[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        Authorization: string;
+      };
       path?: never;
       cookie?: never;
     };

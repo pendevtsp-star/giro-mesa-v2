@@ -10520,6 +10520,36 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "X-Request-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer "
+            }
           }
         ],
         "responses": {
@@ -10564,6 +10594,36 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "X-Request-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer "
             }
           }
         ],
@@ -10610,6 +10670,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer "
+            }
           }
         ],
         "responses": {
@@ -10632,6 +10701,15 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer "
             }
           }
         ],
@@ -13964,7 +14042,17 @@
     "/api/v1/sync/dispatch-outcomes": {
       "post": {
         "operationId": "SyncController_dispatchOutcomes[0]",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^GiroMesaHub "
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Idempotent dispatch outcomes accepted from the authenticated Hub."
@@ -14052,7 +14140,17 @@
     "/v1/sync/dispatch-outcomes": {
       "post": {
         "operationId": "SyncController_dispatchOutcomes[1]",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^GiroMesaHub "
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Idempotent dispatch outcomes accepted from the authenticated Hub."

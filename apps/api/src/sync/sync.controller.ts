@@ -2,6 +2,7 @@ import { MAX_SYNC_BATCH_EVENTS } from "@giromesa/domain";
 import { Body, Controller, Headers, HttpCode, Post } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiResponse,
   type OpenAPIObject,
@@ -252,6 +253,11 @@ export class SyncController {
 
   @HttpCode(200)
   @Post("dispatch-outcomes")
+  @ApiHeader({
+    name: "Authorization",
+    required: true,
+    schema: { type: "string", pattern: "^GiroMesaHub " },
+  })
   @ApiOkResponse({
     description: "Idempotent dispatch outcomes accepted from the authenticated Hub.",
   })

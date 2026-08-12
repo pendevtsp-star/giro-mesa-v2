@@ -59,4 +59,20 @@ describe("generated sync OpenAPI contract", () => {
       responseSchema(path, "422");
     });
   }
+
+  for (const path of ["/api/v1/sync/dispatch-outcomes", "/v1/sync/dispatch-outcomes"]) {
+    it(`${path} types the authenticated Hub authorization header`, () => {
+      const operation = document.paths[path]?.post;
+      assert.ok(operation);
+      const authorization = operation.parameters?.find(
+        (parameter) =>
+          "in" in parameter && parameter.in === "header" && parameter.name === "Authorization",
+      );
+      assert.ok(authorization && "schema" in authorization);
+      assert.equal(authorization.required, true);
+      assert.ok(authorization.schema && !("$ref" in authorization.schema));
+      assert.equal(authorization.schema?.type, "string");
+      assert.equal(authorization.schema?.pattern, "^GiroMesaHub ");
+    });
+  }
 });
