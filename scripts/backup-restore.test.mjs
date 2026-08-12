@@ -92,6 +92,12 @@ test("scripts and runbook bind RPO, RTO, objects, encrypted config and immutable
   assert.match(restore, /MANIFEST_SIGNATURE_INVALID/);
   assert.match(restore, /BACKUP_FILE_HASH_MISMATCH/);
   assert.match(restore, /BACKUP_DATABASE_FILE_INVALID/);
+  assert.match(restore, /RESTORE_OBJECT_TARGET_NOT_EMPTY/);
+  assert.match(restore, /RESTORE_CONFIG_TARGET_NOT_EMPTY/);
+  assert.match(restore, /SmokeSqlFile/);
+  assert.match(restore, /smokeSqlSha256/);
+  assert.match(restore, /objectsRestored/);
+  assert.match(restore, /encryptedConfigurationRestored/);
   assert.ok(restore.indexOf("RESTORE_OBJECT_DIRECTORY_REQUIRED") < restore.indexOf("'pg_restore'"));
   assert.match(restore, /ExpectedArtifact/);
   assert.match(runbook, /RPO[^\n]*5 min/i);

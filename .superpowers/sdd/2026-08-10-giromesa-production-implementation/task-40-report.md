@@ -26,3 +26,15 @@ GREEN:
 ## Limite da evidência
 
 O ensaio local prova o mecanismo, não RPO/RTO operacional. Object storage com object-lock, cofre/rotação da chave HMAC, agenda a cada 5 minutos, alertas, cópia multizona, dados/objetos completos e execução na VPS dependem de infraestrutura externa. Até esses itens serem homologados, o nível máximo não pode alegar `pilot-approved` ou `production-approved` pelo gate de restore.
+
+## Fechamento local do round-trip integral
+
+Em 2026-08-12, um novo gate opt-in executou dois containers PostgreSQL 17 descartáveis e comprovou, em uma única jornada:
+
+- dump custom e restauração da linha funcional `giromesa-dr-ok`;
+- compactação e restauração byte a byte de objetos em diretórios aninhados;
+- cópia byte a byte da configuração `.enc`, sem descriptografá-la;
+- smoke SQL versionável executado somente após banco, objetos e configuração, com SHA-256 gravado na evidência;
+- rejeição de diretórios de destino não vazios e limpeza dos containers/artefatos temporários.
+
+Gate: `DISASTER_RECOVERY_DOCKER_TEST=1 pnpm test:disaster-recovery` — 4/4 verde. Esta prova fecha o round-trip local, mas não altera o limite externo de RPO/RTO nem promove a release acima do nível efetivamente homologado.

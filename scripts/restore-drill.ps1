@@ -7,6 +7,7 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedArtifact,
   [string]$RestoreObjectDirectory,
   [string]$RestoreEncryptedConfigDirectory,
+  [string]$SmokeSqlFile,
   [ValidateRange(1, 30)][int]$MaxRtoMinutes = 30
 )
 
@@ -63,6 +64,7 @@ $root = (Resolve-Path -LiteralPath $BackupDirectory).Path
 $manifestPath = Join-Path $root 'manifest.json'
 $manifestKey = Get-ManifestKey
 $containerDump = "/tmp/giromesa-restore-$([Guid]::NewGuid().ToString('N')).dump"
+$containerSmoke = "/tmp/giromesa-smoke-$([Guid]::NewGuid().ToString('N')).sql"
 
 try {
   if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'BACKUP_MANIFEST_MISSING' }
@@ -103,12 +105,29 @@ try {
   if (Test-Path -LiteralPath $objects) {
     if (-not $seenPaths.ContainsKey('objects.zip')) { throw 'BACKUP_OBJECT_FILE_UNSIGNED' }
     if ([string]::IsNullOrWhiteSpace($RestoreObjectDirectory)) { throw 'RESTORE_OBJECT_DIRECTORY_REQUIRED' }
+    if ((Test-Path -LiteralPath $RestoreObjectDirectory) -and @(Get-ChildItem -LiteralPath $RestoreObjectDirectory -Force).Count -gt 0) {
+      throw 'RESTORE_OBJECT_TARGET_NOT_EMPTY'
+    }
   }
   $encryptedConfig = Get-ChildItem -LiteralPath $root -File -Filter 'configuration.*' | Select-Object -First 1
   if ($null -ne $encryptedConfig) {
     if (-not $seenPaths.ContainsKey($encryptedConfig.Name)) { throw 'BACKUP_CONFIG_FILE_UNSIGNED' }
     if ($encryptedConfig.Extension -notin @('.age', '.gpg', '.enc')) { throw 'BACKUP_CONFIG_NOT_ENCRYPTED' }
     if ([string]::IsNullOrWhiteSpace($RestoreEncryptedConfigDirectory)) { throw 'RESTORE_CONFIG_DIRECTORY_REQUIRED' }
+    if ((Test-Path -LiteralPath $RestoreEncryptedConfigDirectory) -and @(Get-ChildItem -LiteralPath $RestoreEncryptedConfigDirectory -Force).Count -gt 0) {
+      throw 'RESTORE_CONFIG_TARGET_NOT_EMPTY'
+    }
+  }
+
+  $resolvedSmokeSql = $null
+  $smokeSqlSha256 = $null
+  if (-not [string]::IsNullOrWhiteSpace($SmokeSqlFile)) {
+    $resolvedSmokeSql = (Resolve-Path -LiteralPath $SmokeSqlFile).Path
+    $smokeItem = Get-Item -LiteralPath $resolvedSmokeSql
+    if ($smokeItem.Extension -ne '.sql' -or $smokeItem.Length -lt 1 -or $smokeItem.Length -gt 65536) {
+      throw 'RESTORE_SMOKE_SQL_INVALID'
+    }
+    $smokeSqlSha256 = Get-Sha256Hex -Path $resolvedSmokeSql
   }
 
   $databaseDump = Join-Path $root 'database.dump'
@@ -122,7 +141,15 @@ try {
   }
   if ($null -ne $encryptedConfig) {
     New-Item -ItemType Directory -Path $RestoreEncryptedConfigDirectory -Force | Out-Null
-    Copy-Item -LiteralPath $encryptedConfig.FullName -Destination $RestoreEncryptedConfigDirectory
+    $restoredConfigPath = Join-Path $RestoreEncryptedConfigDirectory $encryptedConfig.Name
+    Copy-Item -LiteralPath $encryptedConfig.FullName -Destination $restoredConfigPath
+    if ((Get-Sha256Hex -Path $restoredConfigPath) -ne (Get-Sha256Hex -Path $encryptedConfig.FullName)) {
+      throw 'RESTORE_CONFIG_COPY_HASH_MISMATCH'
+    }
+  }
+  if ($null -ne $resolvedSmokeSql) {
+    Invoke-CheckedDocker -Arguments @('cp', $resolvedSmokeSql, "${TargetDatabaseContainer}:${containerSmoke}")
+    Invoke-CheckedDocker -Arguments @('exec', $TargetDatabaseContainer, 'psql', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--set', 'ON_ERROR_STOP=1', '--file', $containerSmoke)
   }
 
   $finishedAt = [DateTimeOffset]::UtcNow
@@ -132,12 +159,13 @@ try {
     schemaVersion = 1; backupId = [string]$payload.backupId; artifact = [string]$payload.artifact
     migrationId = [string]$payload.migrationId; targetDatabaseContainer = $TargetDatabaseContainer
     restoredAt = $finishedAt.ToString('o'); durationSeconds = [int]$durationSeconds
-    declaredRtoMinutes = $MaxRtoMinutes; smoke = 'passed'
+    declaredRtoMinutes = $MaxRtoMinutes; smoke = 'passed'; smokeSqlSha256 = $smokeSqlSha256
+    objectsRestored = (Test-Path -LiteralPath $objects); encryptedConfigurationRestored = ($null -ne $encryptedConfig)
   }
   $evidencePath = Join-Path $root 'restore-evidence.json'
   [IO.File]::WriteAllText($evidencePath, ($evidence | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
   Write-Output $evidencePath
 } finally {
-  try { & docker exec $TargetDatabaseContainer rm -f $containerDump *>$null } catch { }
+  try { & docker exec $TargetDatabaseContainer rm -f $containerDump $containerSmoke *>$null } catch { }
   [Array]::Clear($manifestKey, 0, $manifestKey.Length)
 }

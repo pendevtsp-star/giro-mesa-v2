@@ -24,10 +24,12 @@ O manifesto usa HMAC-SHA-256 com chave de ao menos 32 bytes fornecida exclusivam
 ## Ensaio de restauração
 
 1. Crie banco/container descartável, isolado e diferente da origem.
-2. Execute `scripts/restore-drill.ps1` com o artefato esperado.
-3. O script valida HMAC, hashes e caminhos antes de tocar no destino; depois restaura e executa `SELECT 1` com `ON_ERROR_STOP`.
-4. Valide migrations, RLS negativo, ledgers, leitura de objetos e configuração ainda criptografada.
-5. Registre `restore-evidence.json`, duração, artefato, migration, data e aprovadores; destrua o ambiente descartável.
+2. Prepare diretórios de destino vazios para objetos e configuração e um arquivo SQL de smoke funcional, versionado junto da release.
+3. Execute `scripts/restore-drill.ps1` com o artefato esperado e `-SmokeSqlFile`; o script registra o SHA-256 desse smoke na evidência.
+4. O script valida HMAC, hashes, caminhos e destinos vazios antes de tocar no banco; depois restaura banco, objetos e configuração criptografada.
+5. O smoke funcional roda por último, com `ON_ERROR_STOP`; ele deve validar migrations, RLS negativo e invariantes de ledger aplicáveis à release.
+6. Confirme a leitura dos objetos e que a configuração restaurada continua criptografada.
+7. Registre `restore-evidence.json`, duração, artefato, migration, hashes e aprovadores; destrua o ambiente descartável.
 
 Falha de assinatura/hash, versão divergente, RTO acima de 30 minutos ou teste funcional incompleto invalida o ensaio. Não repare o backup durante uma restauração real; escolha uma geração íntegra anterior e registre a perda efetiva.
 
