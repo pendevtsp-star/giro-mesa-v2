@@ -417,6 +417,8 @@ test("pre-migration backup binds the migration actually applied in the source da
       recoveryArtifact: "git:e73f407b7ab900cf4e321aae4ca3800383e554e0",
       testedUpgrade: true,
       evidence: {
+        path: "docs/evidence/recovery/e73f407-validation.json",
+        sha256: "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f",
         workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/31651582729",
         testReportDigest: "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f",
       },

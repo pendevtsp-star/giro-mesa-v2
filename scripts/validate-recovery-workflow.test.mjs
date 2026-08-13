@@ -7,6 +7,7 @@ const root = process.cwd();
 const workflowPath = join(root, ".github", "workflows", "validate-recovery.yml");
 const publishPath = join(root, ".github", "workflows", "publish-images.yml");
 const validatorPath = join(root, "scripts", "validate-recovery-candidate.sh");
+const recoveryMatrixPath = join(root, "deploy", "vps", "recovery-compatibility.json");
 
 test("manual recovery validation is non-privileged and bound to the default branch", () => {
   const workflow = readFileSync(workflowPath, "utf8");
@@ -54,4 +55,17 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /recovery-validation\.json/);
   assert.match(script, /recovery-validation\.json\.sha256/);
   assert.match(script, /json\.dumps\(value, sort_keys=True, separators=\(",", ":"\)\)/);
+});
+
+test("privileged recovery authorization binds the versioned evidence file", () => {
+  const publish = readFileSync(publishPath, "utf8");
+  const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
+  const evidence = matrix.transitions[0]?.evidence;
+  assert.equal(evidence?.path, "docs/evidence/recovery/e73f407-validation.json");
+  assert.equal(
+    evidence?.sha256,
+    "sha256:d3289e587f71d3145f00473606bf3cc82a47713a2782cbdf0ded039eee57bb0f",
+  );
+  assert.match(publish, /docs\/evidence\/recovery\//);
+  assert.match(publish, /recovery evidence hash mismatch/);
 });
