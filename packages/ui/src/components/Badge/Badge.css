@@ -1,0 +1,29 @@
+.gm-badge {
+  align-items: center;
+  background: var(--gm-surface-soft);
+  border: 1px solid transparent;
+  border-radius: var(--gm-radius-full, 999px);
+  color: var(--gm-muted);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 0.3rem;
+  line-height: 1;
+  padding: 0.38rem 0.55rem;
+}
+.gm-badge--success {
+  background: var(--gm-brand-soft);
+  color: var(--gm-success);
+}
+.gm-badge--warning {
+  background: var(--gm-warning-soft);
+  color: var(--gm-warning);
+}
+.gm-badge--danger {
+  background: var(--gm-danger-soft);
+  color: color-mix(in srgb, var(--gm-danger) 88%, black);
+}
+.gm-badge--info {
+  background: var(--gm-info-soft);
+  color: var(--gm-info);
+}

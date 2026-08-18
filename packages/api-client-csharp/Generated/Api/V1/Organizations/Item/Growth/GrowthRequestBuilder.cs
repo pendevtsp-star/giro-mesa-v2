@@ -4,6 +4,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.ApiKeys;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Campaigns;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Coupons;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Customers;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryCouriers;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations;
@@ -47,6 +48,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Customers.CustomersRequestBuilder Customers
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Customers.CustomersRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The deliveryCouriers property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryCouriers.DeliveryCouriersRequestBuilder DeliveryCouriers
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryCouriers.DeliveryCouriersRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The deliveryOrders property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersRequestBuilder DeliveryOrders

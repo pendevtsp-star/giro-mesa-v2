@@ -4,14 +4,78 @@
  */
 
 export interface paths {
-  "/api/v1/health": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/profile": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["HealthController_health[0]"];
+    get: operations["FiscalController_profile[0]"];
+    put: operations["FiscalController_updateProfile[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/profile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_profile[1]"];
+    put: operations["FiscalController_updateProfile[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_taxRevisions[0]"];
+    put?: never;
+    post: operations["FiscalController_createTaxRevision[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_taxRevisions[1]"];
+    put?: never;
+    post: operations["FiscalController_createTaxRevision[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/dashboard": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_dashboard[0]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -20,14 +84,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/health": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/dashboard": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["HealthController_health[1]"];
+    get: operations["FiscalController_dashboard[1]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -36,14 +100,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/metrics": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["MetricsController_metricsText[0]"];
+    get: operations["FiscalController_documents[0]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -52,14 +116,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/metrics": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["MetricsController_metricsText[1]"];
+    get: operations["FiscalController_documents[1]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -68,14 +132,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/commercial-catalog": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["CatalogController_catalog[0]"];
+    get: operations["FiscalController_document[0]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -84,14 +148,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/public/v1/commercial-catalog": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations["CatalogController_catalog[1]"];
+    get: operations["FiscalController_document[1]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -100,7 +164,39 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/trial-applications": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_periods[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_periods[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods/{competence}/close": {
     parameters: {
       query?: never;
       header?: never;
@@ -109,14 +205,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[0]"];
+    post: operations["FiscalController_closePeriod[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/trial-applications": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods/{competence}/close": {
     parameters: {
       query?: never;
       header?: never;
@@ -125,14 +221,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_trialApplication[1]"];
+    post: operations["FiscalController_closePeriod[1]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/v1/public/contact": {
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods/{competence}/reopen": {
     parameters: {
       query?: never;
       header?: never;
@@ -141,14 +237,14 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[0]"];
+    post: operations["FiscalController_reopenPeriod[0]"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/public/v1/contact": {
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/periods/{competence}/reopen": {
     parameters: {
       query?: never;
       header?: never;
@@ -157,7 +253,103 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post: operations["CatalogController_contact[1]"];
+    post: operations["FiscalController_reopenPeriod[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/package": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantPackage[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/package": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantPackage[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantRequests[0]"];
+    put?: never;
+    post: operations["FiscalController_createAccountantRequest[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantRequests[1]"];
+    put?: never;
+    post: operations["FiscalController_createAccountantRequest[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_resolveAccountantRequest[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_resolveAccountantRequest[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1140,6 +1332,166 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["HealthController_health[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["MetricsController_metricsText[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/commercial-catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["CatalogController_catalog[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/trial-applications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_trialApplication[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_contact[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/onboarding": {
     parameters: {
       query?: never;
@@ -1492,6 +1844,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/public/media/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMediaController_media[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/media/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMediaController_media[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/sync/batches": {
     parameters: {
       query?: never;
@@ -1582,6 +1966,70 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotCatalogController_createCategory[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/{categoryId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateCategory[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveCategory[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/{categoryId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateCategory[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveCategory[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createCombo[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createCombo[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1748,6 +2196,710 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateProduct[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveProduct[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateProduct[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveProduct[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}/aggregate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateProductAggregate[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}/aggregate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateProductAggregate[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/reorder": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_reorderCategories[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/reorder": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_reorderCategories[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/reorder": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_reorderProducts[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/reorder": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_reorderProducts[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/{categoryId}/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_setCategoryAvailability[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/categories/{categoryId}/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_setCategoryAvailability[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/prices/bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_bulkPrices[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/prices/bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_bulkPrices[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/allergens/{allergenId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateAllergen[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveAllergen[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/allergens/{allergenId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateAllergen[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveAllergen[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/stations/{stationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateStation[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveStation[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/stations/{stationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateStation[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveStation[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-groups/{groupId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateModifierGroup[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveModifierGroup[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-groups/{groupId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateModifierGroup[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveModifierGroup[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-groups/{groupId}/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createModifierOption[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-groups/{groupId}/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createModifierOption[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-options/{optionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateModifierOption[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveModifierOption[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/modifier-options/{optionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateModifierOption[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveModifierOption[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos/{comboId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateCombo[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveCombo[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos/{comboId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updateCombo[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archiveCombo[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/promotions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createPromotion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/promotions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createPromotion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/promotions/{promotionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updatePromotion[0]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archivePromotion[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/promotions/{promotionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_updatePromotion[1]"];
+    post?: never;
+    delete: operations["PilotCatalogController_archivePromotion[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/branding": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_getBranding[0]"];
+    put: operations["PilotCatalogController_updateBranding[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/branding": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_getBranding[1]"];
+    put: operations["PilotCatalogController_updateBranding[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_importCatalog[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_importCatalog[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/publication": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_getPublication[0]"];
+    put: operations["PilotCatalogController_publish[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/publication": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_getPublication[1]"];
+    put: operations["PilotCatalogController_publish[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/analytics/bcg": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_analyticsBcg[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/analytics/bcg": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_analyticsBcg[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_uploadMedia[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_uploadMedia[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}/daily-stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_setDailyStock[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}/daily-stock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotCatalogController_setDailyStock[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQr[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQr[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/{tableId}/qr/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_rotateTableQr[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/{tableId}/qr/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_rotateTableQr[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/floor": {
     parameters: {
       query?: never;
@@ -1773,6 +2925,38 @@ export interface paths {
     };
     get: operations["PilotPosController_floor[1]"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/floor/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateFloorLayout[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/floor/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateFloorLayout[1]"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1838,6 +3022,294 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_createTable[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}/turnover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateTableTurnover[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}/turnover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateTableTurnover[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/service-sections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createServiceSection[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/service-sections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createServiceSection[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/open": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_openOperationalShift[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/open": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_openOperationalShift[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections/{shiftSectionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionAssignment[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections/{shiftSectionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionAssignment[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections/{shiftSectionId}/coverage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionCoverage[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections/{shiftSectionId}/coverage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionCoverage[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_closeOperationalShift[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_closeOperationalShift[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/tables/{tableId}/transfer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_transferShiftTable[0]"];
+    delete: operations["PilotPosController_endShiftTableTransfer[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/tables/{tableId}/transfer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_transferShiftTable[1]"];
+    delete: operations["PilotPosController_endShiftTableTransfer[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftLayout[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftLayout[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/rooms/{roomId}/tables/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createTables[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/rooms/{roomId}/tables/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createTables[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1916,7 +3388,7 @@ export interface paths {
       cookie?: never;
     };
     get: operations["PilotPosController_getTab[0]"];
-    put?: never;
+    put: operations["PilotPosController_updateTab[0]"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1932,7 +3404,71 @@ export interface paths {
       cookie?: never;
     };
     get: operations["PilotPosController_getTab[1]"];
+    put: operations["PilotPosController_updateTab[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
     put?: never;
+    post: operations["PilotPosController_claimTab[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_claimTab[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/presence": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_touchPresence[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/presence": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_touchPresence[1]"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1998,6 +3534,550 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_createOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/items/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_moveItems[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/items/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_moveItems[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/payments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recordPayment[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/payments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recordPayment[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPrintJob[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPrintJob[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPrintJobs[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPrintJobs[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updatePrintJobStatus[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updatePrintJobStatus[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_retryPrintJob[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_retryPrintJob[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintJob[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs/{printJobId}/reprint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reprintJob[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_closeTab[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_closeTab[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/reopen": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reopenTab[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/reopen": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_reopenTab[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/approval-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_requestApproval[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/approval-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_requestApproval[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_approvalRequests[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_approvalRequests[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_approveRequest[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests/{requestId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_approveRequest[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rejectRequest[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/approval-requests/{requestId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rejectRequest[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/notify-ready": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_notifyReady[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/notify-ready": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_notifyReady[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}/calls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createServiceCall[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}/calls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createServiceCall[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/calls/{callId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeServiceCall[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/calls/{callId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeServiceCall[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/calls/{callId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_resolveServiceCall[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/calls/{callId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_resolveServiceCall[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2094,6 +4174,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_merge[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_groupTables[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_groupTables[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups/{groupId}/detach": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_detachTableGroup[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups/{groupId}/detach": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_detachTableGroup[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups/{groupId}/dissolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_dissolveTableGroup[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/table-groups/{groupId}/dissolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_dissolveTableGroup[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2292,6 +4468,198 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/analytics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_kdsAnalytics[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/analytics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_kdsAnalytics[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/products/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listKdsProductAvailability[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/products/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listKdsProductAvailability[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getKdsTerminalProfile[0]"];
+    put: operations["PilotPosController_putKdsTerminalProfile[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getKdsTerminalProfile[1]"];
+    put: operations["PilotPosController_putKdsTerminalProfile[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createKdsBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createKdsBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches/{batchId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_completeKdsBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches/{batchId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_completeKdsBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches/{batchId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelKdsBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/batches/{batchId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelKdsBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/state": {
     parameters: {
       query?: never;
@@ -2324,6 +4692,422 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/state": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_transitionKdsItem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/state": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_transitionKdsItem[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/block": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_blockKdsItem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/block": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_blockKdsItem[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/unblock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_unblockKdsItem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/unblock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_unblockKdsItem[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/attention/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeKdsAttention[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/attention/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeKdsAttention[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/reroute": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rerouteKdsItem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/reroute": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rerouteKdsItem[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelKdsTicket[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelKdsTicket[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/recall": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recallKdsTicket[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/recall": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recallKdsTicket[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/refire": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_refireKdsItem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/refire": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_refireKdsItem[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/priority": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsPriority[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/priority": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsPriority[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/course": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_setKdsCourseState[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/course": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_setKdsCourseState[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/handoff": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_handoffKdsOrder[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/handoff": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_handoffKdsOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/priority": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsOrderPriority[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/priority": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsOrderPriority[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/products/{productId}/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsProductAvailability[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/products/{productId}/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_setKdsProductAvailability[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/overview": {
     parameters: {
       query?: never;
@@ -2350,6 +5134,134 @@ export interface paths {
     get: operations["PlatformController_overview[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_overview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_overview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/overview/priorities/{priorityId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_overviewPriorityAction[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/overview/priorities/{priorityId}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_overviewPriorityAction[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/overview/preferences": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_overviewPreferences[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/overview/preferences": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_overviewPreferences[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/overview/visit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_overviewVisit[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/overview/visit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_overviewVisit[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2420,6 +5332,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/locations/{locationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateLocation[0]"];
+    post?: never;
+    delete: operations["ManagementController_archiveLocation[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/locations/{locationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateLocation[1]"];
+    post?: never;
+    delete: operations["ManagementController_archiveLocation[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/items": {
     parameters: {
       query?: never;
@@ -2452,6 +5396,230 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_returnables[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_returnables[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/configurations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_configureReturnable[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/configurations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_configureReturnable[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmReturnableCustody[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmReturnableCustody[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createReturnableIncident[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createReturnableIncident[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewReturnableIncident[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/incidents/{incidentId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewReturnableIncident[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/supplier-exchanges": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_exchangeReturnablesWithSupplier[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/supplier-exchanges": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_exchangeReturnablesWithSupplier[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/items/{inventoryItemId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateItem[0]"];
+    post?: never;
+    delete: operations["ManagementController_archiveItem[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/items/{inventoryItemId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateItem[1]"];
+    post?: never;
+    delete: operations["ManagementController_archiveItem[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/events": {
     parameters: {
       query?: never;
@@ -2478,6 +5646,550 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createInventoryEvent[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/events/reviews/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewInventoryEvent[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/events/reviews/{requestId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewInventoryEvent[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferInventory[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferInventory[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/{transferId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveInventoryTransfer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/{transferId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveInventoryTransfer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryReservation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryReservation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/reservations/{reservationId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveInventoryReservation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/reservations/{reservationId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveInventoryReservation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/cycle-count-plan/generate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_generateCycleCountPlan[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/cycle-count-plan/generate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_generateCycleCountPlan[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createProductionBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createProductionBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches/{batchId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_completeProductionBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches/{batchId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_completeProductionBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches/{batchId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelProductionBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/production-batches/{batchId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelProductionBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInterunitTransfer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInterunitTransfer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers/{transferId}/receive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_receiveInterunitTransfer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers/{transferId}/receive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_receiveInterunitTransfer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers/{transferId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelInterunitTransfer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/interunit-transfers/{transferId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelInterunitTransfer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/closings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeInventoryPeriod[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/closings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeInventoryPeriod[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryAsset[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryAsset[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/assets/{assetId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateInventoryAsset[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/assets/{assetId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateInventoryAsset[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/lots": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryLot[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/lots": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createInventoryLot[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/lots/{lotId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateInventoryLot[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/lots/{lotId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateInventoryLot[1]"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2548,6 +6260,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/suppliers/{supplierId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateSupplier[0]"];
+    post?: never;
+    delete: operations["ManagementController_archiveSupplier[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/suppliers/{supplierId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updateSupplier[1]"];
+    post?: never;
+    delete: operations["ManagementController_archiveSupplier[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases": {
     parameters: {
       query?: never;
@@ -2574,6 +6318,198 @@ export interface paths {
     get: operations["ManagementController_purchases[1]"];
     put?: never;
     post: operations["ManagementController_createPurchaseOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_importNfe[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_importNfe[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports/{importId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_reviewNfeImport[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports/{importId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_reviewNfeImport[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports/{importId}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmNfeImport[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/nfe-imports/{importId}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmNfeImport[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updatePurchaseOrder[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_updatePurchaseOrder[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPurchaseOrder[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPurchaseOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_rejectPurchaseOrder[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_rejectPurchaseOrder[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2638,6 +6574,166 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_receivePurchaseOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/receipts/{receiptId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reversePurchaseReceipt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/receipts/{receiptId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reversePurchaseReceipt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/invoices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createSupplierInvoice[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/{purchaseOrderId}/invoices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createSupplierInvoice[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reconcileSupplierInvoice[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reconcileSupplierInvoice[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmSupplierInvoice[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmSupplierInvoice[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelSupplierInvoice[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/purchases/invoices/{invoiceId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelSupplierInvoice[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2964,6 +7060,230 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/drill-down": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportDrillDown[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/drill-down": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportDrillDown[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/budgets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportBudgets[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/budgets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportBudgets[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/budgets/{month}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportBudgetMonth[0]"];
+    put: operations["ManagementController_putReportBudget[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/budgets/{month}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportBudgetMonth[1]"];
+    put: operations["ManagementController_putReportBudget[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/exports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportExports[0]"];
+    put?: never;
+    post: operations["ManagementController_createReportExport[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/exports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportExports[1]"];
+    put?: never;
+    post: operations["ManagementController_createReportExport[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/exports/{exportId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportExportContent[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/exports/{exportId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportExportContent[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/schedules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportSchedules[0]"];
+    put?: never;
+    post: operations["ManagementController_createReportSchedule[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/schedules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportSchedules[1]"];
+    put?: never;
+    post: operations["ManagementController_createReportSchedule[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/schedules/{scheduleId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_deleteReportSchedule[0]"];
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportSchedule[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/schedules/{scheduleId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_deleteReportSchedule[1]"];
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportSchedule[1]"];
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/people": {
     parameters: {
       query?: never;
@@ -2996,6 +7316,646 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/directory": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleDirectory[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/directory": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleDirectory[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleCapabilities[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleCapabilities[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_selfTimeTracking[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_selfTimeTracking[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingSettings[0]"];
+    put: operations["ManagementController_updateTimeTrackingSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingSettings[1]"];
+    put: operations["ManagementController_updateTimeTrackingSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/closures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeTimeTrackingPeriod[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/closures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeTimeTrackingPeriod[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/closures/{closureId}/reopen": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reopenTimeTrackingPeriod[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/closures/{closureId}/reopen": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reopenTimeTrackingPeriod[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingReport[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingReport[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self/clock-in": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfClockIn[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self/clock-in": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfClockIn[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self/time-corrections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_requestTimeCorrection[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self/time-corrections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_requestTimeCorrection[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self/breaks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfStartBreak[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self/breaks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfStartBreak[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self/breaks/{breakId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfCompleteBreak[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self/breaks/{breakId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfCompleteBreak[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/self/clock-out": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfClockOut[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/self/clock-out": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_selfClockOut[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-corrections/{correctionId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideTimeCorrection[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-corrections/{correctionId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideTimeCorrection[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePerson[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePerson[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/inactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_inactivatePerson[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/inactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_inactivatePerson[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/reactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reactivatePerson[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/reactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reactivatePerson[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/timeline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personTimeline[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/timeline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personTimeline[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/indicators/operational": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleIndicators[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/indicators/operational": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleIndicators[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_exportPeople[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_exportPeople[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/assignments/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_assignPeopleTimeTracking[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/assignments/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_assignPeopleTimeTracking[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules": {
     parameters: {
       query?: never;
@@ -3022,6 +7982,134 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createSchedule[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/{scheduleId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePeopleSchedule[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/{scheduleId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePeopleSchedule[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/{scheduleId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPeopleSchedule[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/{scheduleId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPeopleSchedule[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/batch/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_previewPeopleSchedules[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/batch/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_previewPeopleSchedules[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createPeopleSchedulesBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/schedules/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createPeopleSchedulesBatch[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3150,6 +8238,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createCommission[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/commissions/{commissionId}/transition": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transitionCommission[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/commissions/{commissionId}/transition": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transitionCommission[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3828,6 +8948,230 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/growth/delivery-zones/{zoneId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryZone[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-zones/{zoneId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryZone[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-zones/{zoneId}/validate-address": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_validateDeliveryAddress[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-zones/{zoneId}/validate-address": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_validateDeliveryAddress[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-couriers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listDeliveryCouriers[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-couriers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listDeliveryCouriers[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-couriers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_createDeliveryCourier[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-couriers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_createDeliveryCourier[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-couriers/{courierId}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryCourierStatus[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-couriers/{courierId}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryCourierStatus[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-couriers/{courierId}/position": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryCourierPosition[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-couriers/{courierId}/position": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateDeliveryCourierPosition[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listDeliveryOrders[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listDeliveryOrders[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/growth/delivery-orders": {
     parameters: {
       query?: never;
@@ -3854,6 +9198,70 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["GrowthController_createDeliveryOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-orders/{orderId}/assign": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_assignDeliveryCourier[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-orders/{orderId}/assign": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_assignDeliveryCourier[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/delivery-orders/{orderId}/notifications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_requestDeliveryNotification[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/delivery-orders/{orderId}/notifications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_requestDeliveryNotification[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -4343,7 +9751,510 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: never;
+  schemas: {
+    ManagementReportsResponse: {
+      timezone: string;
+      period: {
+        /** Format: date */
+        from: string;
+        /** Format: date */
+        to: string;
+      };
+      previousPeriod: {
+        /** Format: date */
+        from: string;
+        /** Format: date */
+        to: string;
+      } | null;
+      cashFlow: {
+        /** Format: int64 */
+        inflowsCents: number;
+        /** Format: int64 */
+        outflowsCents: number;
+        /** Format: int64 */
+        netCents: number;
+        /** @enum {string} */
+        basis: "realized_payments_unit_timezone";
+      };
+      incomeStatement: {
+        /** Format: int64 */
+        revenueCents: number;
+        /** Format: int64 */
+        cmvCents: number | null;
+        /** Format: int64 */
+        grossMarginCents: number | null;
+        /** Format: int64 */
+        operatingExpensesCents: number | null;
+        /** Format: int64 */
+        operatingResultCents: number | null;
+        costCoverage: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          /** Format: int64 */
+          revenueCents: number;
+          /** Format: int64 */
+          coveredRevenueCents: number;
+          missingCostLines: number;
+          /** Format: int64 */
+          cmvCents: number | null;
+          /** Format: int64 */
+          grossMarginCents: number | null;
+          completeForRevenue: boolean;
+        };
+        /** @enum {string} */
+        basis: "competence";
+      };
+      comparison: {
+        /** @enum {string} */
+        mode: "previous_period" | "previous_year" | "none";
+        period: {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+        } | null;
+        /** Format: int64 */
+        revenueCents: number;
+        /** Format: int64 */
+        previousRevenueCents: number | null;
+        /** Format: int64 */
+        changeCents: number | null;
+        changePercent: number | null;
+      };
+      dailySeries: {
+        /** Format: date */
+        date: string;
+        /** Format: int64 */
+        revenueCents: number;
+        /** Format: int64 */
+        previousRevenueCents: number | null;
+      }[];
+      breakdowns: {
+        products: {
+          key: string;
+          label: string;
+          /** Format: int64 */
+          revenueCents: number;
+          quantity: number;
+        }[];
+        categories: {
+          key: string;
+          label: string;
+          /** Format: int64 */
+          revenueCents: number;
+          quantity: number;
+        }[];
+        channels: {
+          key: string;
+          label: string;
+          /** Format: int64 */
+          revenueCents: number;
+          quantity: number;
+        }[];
+        paymentMethods: {
+          key: string;
+          label: string;
+          /** Format: int64 */
+          revenueCents: number;
+          quantity: number;
+        }[];
+      };
+      reportFamilies: {
+        sales: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          closedTabs: number;
+          /** Format: int64 */
+          subtotalCents: number;
+          /** Format: int64 */
+          discountsCents: number;
+          /** Format: int64 */
+          netRevenueCents: number;
+          /** Format: int64 */
+          averageTicketCents: number | null;
+          guests: number;
+          /** Format: int64 */
+          averageSpendPerGuestCents: number | null;
+          hourly: {
+            hour: number;
+            closedTabs: number;
+            /** Format: int64 */
+            revenueCents: number;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        exceptions: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          canceledItems: number;
+          /** Format: int64 */
+          canceledValueCents: number;
+          discountedItems: number;
+          /** Format: int64 */
+          itemDiscountCents: number;
+          /** Format: int64 */
+          tabDiscountCents: number;
+          cancellationReasons: {
+            label: string;
+            quantity: number;
+            /** Format: int64 */
+            amountCents: number;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        inventory: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          basis: "period_events_and_current_balance";
+          lossEvents: number;
+          lossQuantity: number;
+          /** Format: int64 */
+          lossValueCents: number | null;
+          stockoutItems: number;
+          lowStockItems: number;
+          /** Format: int64 */
+          currentInventoryValueCents: number | null;
+          analysis: {
+            /** Format: uuid */
+            key: string;
+            label: string;
+            /** @enum {string|null} */
+            abcClass: "A" | "B" | "C" | null;
+            consumedQuantity: number;
+            /** Format: int64 */
+            consumedValueCents: number | null;
+            currentQuantity: number;
+            coverageDays: number | null;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        purchasing: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          orderCount: number;
+          /** Format: int64 */
+          orderedCents: number | null;
+          canceledOrders: number;
+          receiptCount: number;
+          /** Format: int64 */
+          receivedCents: number | null;
+          suppliers: {
+            /** Format: uuid */
+            key: string;
+            label: string;
+            orderCount: number;
+            /** Format: int64 */
+            orderedCents: number | null;
+            receiptCount: number;
+            /** Format: int64 */
+            receivedCents: number | null;
+          }[];
+          supplierPerformance: {
+            /** Format: uuid */
+            key: string;
+            label: string;
+            orderCount: number;
+            receiptCount: number;
+            onTimeRatePercent: number | null;
+            averageLeadDays: number | null;
+            priceVariancePercent: number | null;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        operations: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          closedTabs: number;
+          dineInTabs: number;
+          tableTurnovers: number;
+          guests: number;
+          averageGuestsPerTab: number | null;
+          averageServiceMinutes: number | null;
+          shifts: {
+            key: string;
+            label: string;
+            closedTabs: number;
+            guests: number;
+            /** Format: int64 */
+            revenueCents: number;
+            averageServiceMinutes: number | null;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        profitability: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          grossMarginPercent: number | null;
+          /** @enum {string} */
+          productProfitabilityCoverage: "complete" | "partial" | "unavailable";
+          products: {
+            /** Format: uuid */
+            key: string;
+            label: string;
+            quantity: number;
+            /** Format: int64 */
+            revenueCents: number;
+            /** Format: int64 */
+            costCents: number | null;
+            /** Format: int64 */
+            grossMarginCents: number | null;
+            grossMarginPercent: number | null;
+          }[];
+          comparison: {
+            [key: string]: {
+              current: number | null;
+              previous: number | null;
+              change: number | null;
+              changePercent: number | null;
+            };
+          };
+        };
+        multiunit: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          units: {
+            /** Format: uuid */
+            key: string;
+            label: string;
+            closedTabs: number;
+            /** Format: int64 */
+            revenueCents: number;
+            /** Format: int64 */
+            averageTicketCents: number | null;
+            changePercent: number | null;
+          }[];
+        };
+        quality: {
+          scorePercent: number;
+          issues: {
+            key: string;
+            label: string;
+            count: number;
+            /** @enum {string} */
+            severity: "info" | "warning" | "critical";
+          }[];
+        };
+      };
+      meta: {
+        /** Format: date-time */
+        generatedAt: string;
+        /** Format: date */
+        dataThrough: string | null;
+        sourceCounts: {
+          posSales: number;
+          receivablePayments: number;
+          payablePayments: number;
+          receivables: number;
+          payables: number;
+          costLines: number;
+        };
+        coverage: {
+          /** @enum {string} */
+          sales: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          cashFlow: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          costs: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          budget: "complete" | "partial" | "unavailable";
+        };
+      };
+      budget: {
+        /** @enum {string} */
+        coverage: "complete" | "partial" | "unavailable";
+        /** @enum {string} */
+        basis: "calendar_month_prorated_by_days";
+        targets: {
+          /** Format: int64 */
+          posRevenueCents: number | null;
+          /** Format: int64 */
+          cashInflowsCents: number | null;
+          /** Format: int64 */
+          cashOutflowsCents: number | null;
+          /** Format: int64 */
+          competenceRevenueCents: number | null;
+          /** Format: int64 */
+          competenceExpensesCents: number | null;
+          /** Format: int64 */
+          averageTicketCents: number | null;
+          /** Format: int64 */
+          grossMarginCents: number | null;
+          /** Format: int64 */
+          inventoryLossCents: number | null;
+          /** Format: int64 */
+          canceledValueCents: number | null;
+        };
+        alerts: {
+          key: string;
+          /** Format: int64 */
+          actualCents: number;
+          /** Format: int64 */
+          targetCents: number;
+          /** Format: int64 */
+          differenceCents: number;
+          /** @enum {string} */
+          status: "on_track" | "attention";
+          /** @enum {string} */
+          direction: "minimum" | "maximum";
+        }[];
+      } | null;
+      capabilities: {
+        viewCosts: boolean;
+        drillDown: boolean;
+        export: boolean;
+        manageBudget: boolean;
+        manageSchedules: boolean;
+        emailDeliveryConfigured: boolean;
+      };
+    };
+    ManagementReportDrillDownResponse: {
+      timezone: string;
+      period: {
+        /** Format: date */
+        from: string;
+        /** Format: date */
+        to: string;
+      };
+      /** @enum {string} */
+      dimension:
+        | "metric"
+        | "product"
+        | "category"
+        | "channel"
+        | "payment_method"
+        | "exception"
+        | "inventory"
+        | "purchase"
+        | "operation";
+      key: string;
+      totals: {
+        /** Format: int64 */
+        amountCents: number;
+        quantity: number;
+      };
+      rows: {
+        /** Format: uuid */
+        referenceId: string;
+        /** Format: date-time */
+        occurredAt: string | null;
+        /** Format: date */
+        localDate: string;
+        referenceType: string;
+        label: string;
+        /** Format: int64 */
+        amountCents: number;
+        quantity: number;
+      }[];
+      page: {
+        nextCursor: string | null;
+      };
+    };
+    ManagementReportExport: {
+      /** Format: uuid */
+      id: string;
+      /** @enum {string} */
+      status: "ready" | "failed";
+      /** @enum {string} */
+      format: "csv";
+      filename: string;
+      sha256: string | null;
+      rowCount: number;
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      expiresAt: string;
+      idempotentReplay?: boolean;
+    };
+    ManagementReportExportContent: {
+      filename: string;
+      content: string;
+      sha256: string;
+    };
+    ManagementReportBudgetMonths: {
+      months: {
+        month: string;
+        items: {
+          metric: string;
+          /** Format: int64 */
+          targetCents: number;
+          version: number;
+          /** Format: date-time */
+          updatedAt: string;
+        }[];
+      }[];
+    };
+    ManagementReportSchedule: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** @enum {string} */
+      frequency: "weekly" | "monthly";
+      weekday?: number | null;
+      dayOfMonth?: number | null;
+      localTime: string;
+      /** @enum {string} */
+      range: "previous_week" | "previous_month";
+      /** @enum {string} */
+      comparisonMode: "previous_period" | "previous_year" | "none";
+      /** @enum {string} */
+      family:
+        | "overview"
+        | "sales"
+        | "exceptions"
+        | "inventory"
+        | "purchasing"
+        | "operations"
+        | "profitability"
+        | "multiunit"
+        | "quality";
+      /** @enum {string} */
+      delivery: "in_app" | "email";
+      enabled: boolean;
+      /** Format: date-time */
+      nextRunAt: string;
+      /** Format: date-time */
+      lastRunAt?: string | null;
+      version: number;
+    };
+  };
   responses: never;
   parameters: never;
   requestBodies: never;
@@ -4352,11 +10263,14 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  "HealthController_health[0]": {
+  "FiscalController_profile[0]": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
       cookie?: never;
     };
     requestBody?: never;
@@ -4369,195 +10283,174 @@ export interface operations {
       };
     };
   };
-  "HealthController_health[1]": {
+  "FiscalController_updateProfile[0]": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
       };
-    };
-  };
-  "MetricsController_metricsText[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "MetricsController_metricsText[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_catalog[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_trialApplication[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json":
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment?: string;
-              /** @enum {string} */
-              planSlug: "operacao" | "crescimento" | "rede";
-              /** @enum {boolean} */
-              consent: true;
-            }
-          | {
-              name: string;
-              /** Format: email */
-              email: string;
-              phone: string;
-              businessName: string;
-              segment: string;
-              /** @enum {string} */
-              plan: "Operação" | "Crescimento" | "Rede";
-              privacyAccepted: true | "true";
-            };
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "CatalogController_contact[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          /** Format: uuid */
+          legalEntityId: string;
+          /** @enum {string} */
+          taxRegime: "simples_nacional" | "simples_excesso" | "lucro_presumido" | "lucro_real";
+          crt: string;
+          municipalRegistration?: string;
+          cnae?: string;
+          stateCode: string;
+          cityCode: string;
+          /**
+           * @default homologation
+           * @enum {string}
+           */
+          environment?: "homologation" | "production";
+          provider?: "focus" | null;
+          /** @default {} */
+          series?: {
+            nfce?: string;
+            nfe?: string;
+            nfse?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_profile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_updateProfile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          legalEntityId: string;
+          /** @enum {string} */
+          taxRegime: "simples_nacional" | "simples_excesso" | "lucro_presumido" | "lucro_real";
+          crt: string;
+          municipalRegistration?: string;
+          cnae?: string;
+          stateCode: string;
+          cityCode: string;
+          /**
+           * @default homologation
+           * @enum {string}
+           */
+          environment?: "homologation" | "production";
+          provider?: "focus" | null;
+          /** @default {} */
+          series?: {
+            nfce?: string;
+            nfe?: string;
+            nfse?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_taxRevisions[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createTaxRevision[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          productId: string;
+          /**
+           * @default draft
+           * @enum {string}
+           */
+          status?: "draft" | "active";
+          effectiveFrom: string;
+          effectiveUntil?: string;
+          classification: {
+            ncm: string;
+            cfop: string;
+            cest?: string;
+            origin: number;
+            cstIcms?: string;
+            csosn?: string;
+            cstPis?: string;
+            cstCofins?: string;
+            cstIbsCbs?: string;
+            cClassTrib?: string;
+          } & {
+            [key: string]: unknown;
+          };
         };
       };
     };
@@ -4570,22 +10463,528 @@ export interface operations {
       };
     };
   };
-  "CatalogController_contact[1]": {
+  "FiscalController_taxRevisions[1]": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createTaxRevision[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
       cookie?: never;
     };
     requestBody: {
       content: {
         "application/json": {
-          name: string;
-          /** Format: email */
-          email: string;
-          phone: string;
-          message: string;
-          privacyAccepted: true | "true";
+          /** Format: uuid */
+          productId: string;
+          /**
+           * @default draft
+           * @enum {string}
+           */
+          status?: "draft" | "active";
+          effectiveFrom: string;
+          effectiveUntil?: string;
+          classification: {
+            ncm: string;
+            cfop: string;
+            cest?: string;
+            origin: number;
+            cstIcms?: string;
+            csosn?: string;
+            cstPis?: string;
+            cstCofins?: string;
+            cstIbsCbs?: string;
+            cClassTrib?: string;
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_dashboard[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_dashboard[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_documents[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_documents[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_document[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_document[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_periods[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_periods[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_closePeriod[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        competence: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_closePeriod[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        competence: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_reopenPeriod[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        competence: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_reopenPeriod[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        competence: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantPackage[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantPackage[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantRequests[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createAccountantRequest[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          competence: string;
+          title: string;
+          description: string;
+          dueDate?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            storageKey: string;
+            sha256?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantRequests[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createAccountantRequest[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          competence: string;
+          title: string;
+          description: string;
+          dueDate?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            storageKey: string;
+            sha256?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_resolveAccountantRequest[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resolution: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_resolveAccountantRequest[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resolution: string;
         };
       };
     };
@@ -5906,7 +12305,18 @@ export interface operations {
           /** Format: email */
           email: string;
           /** @enum {string} */
-          role: "owner" | "manager" | "waiter" | "cashier" | "kds" | "inventory" | "finance";
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
           unitId: string | null;
         };
       };
@@ -5935,7 +12345,18 @@ export interface operations {
           /** Format: email */
           email: string;
           /** @enum {string} */
-          role: "owner" | "manager" | "waiter" | "cashier" | "kds" | "inventory" | "finance";
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
           unitId: string | null;
         };
       };
@@ -5983,6 +12404,252 @@ export interface operations {
       content: {
         "application/json": {
           token: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "HealthController_health[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "HealthController_health[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "MetricsController_metricsText[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_catalog[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_trialApplication[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment?: string;
+              /** @enum {string} */
+              planSlug: "operacao" | "crescimento" | "rede";
+              /** @enum {boolean} */
+              consent: true;
+            }
+          | {
+              name: string;
+              /** Format: email */
+              email: string;
+              phone: string;
+              businessName: string;
+              segment: string;
+              /** @enum {string} */
+              plan: "Operação" | "Crescimento" | "Rede";
+              privacyAccepted: true | "true";
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_contact[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          message: string;
+          privacyAccepted: true | "true";
         };
       };
     };
@@ -6520,6 +13187,8 @@ export interface operations {
             city: string;
             state: string;
             postalCode: string;
+            latitude?: number;
+            longitude?: number;
           };
           /** @enum {string} */
           paymentMethod: "pay_on_fulfillment";
@@ -6573,6 +13242,8 @@ export interface operations {
             city: string;
             state: string;
             postalCode: string;
+            latitude?: number;
+            longitude?: number;
           };
           /** @enum {string} */
           paymentMethod: "pay_on_fulfillment";
@@ -6644,6 +13315,44 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMediaController_media[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PublicMediaController_media[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -6790,7 +13499,9 @@ export interface operations {
   "PilotCatalogController_createCategory[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6819,7 +13530,9 @@ export interface operations {
   "PilotCatalogController_createCategory[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6845,10 +13558,210 @@ export interface operations {
       };
     };
   };
-  "PilotCatalogController_createAllergen[0]": {
+  "PilotCatalogController_updateCategory[0]": {
     parameters: {
       query?: never;
       header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          description?: string | null;
+          sortOrder?: number;
+          active?: boolean;
+          channels?: ("salon" | "delivery" | "qr" | "pickup")[];
+          schedule?: {
+            windows: {
+              dayOfWeek: number;
+              start: string;
+              end: string;
+            }[];
+          } | null;
+          defaultStationId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveCategory[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateCategory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          description?: string | null;
+          sortOrder?: number;
+          active?: boolean;
+          channels?: ("salon" | "delivery" | "qr" | "pickup")[];
+          schedule?: {
+            windows: {
+              dayOfWeek: number;
+              start: string;
+              end: string;
+            }[];
+          } | null;
+          defaultStationId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveCategory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createCombo[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          priceCents: number;
+          /** @default true */
+          active?: boolean;
+          items: {
+            /** Format: uuid */
+            productId: string;
+            /** @default 1 */
+            quantity?: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createCombo[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          priceCents: number;
+          /** @default true */
+          active?: boolean;
+          items: {
+            /** Format: uuid */
+            productId: string;
+            /** @default 1 */
+            quantity?: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createAllergen[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6875,7 +13788,9 @@ export interface operations {
   "PilotCatalogController_createAllergen[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6902,7 +13817,9 @@ export interface operations {
   "PilotCatalogController_createModifierGroup[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6939,7 +13856,9 @@ export interface operations {
   "PilotCatalogController_createModifierGroup[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -6976,7 +13895,9 @@ export interface operations {
   "PilotCatalogController_createStation[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -7003,7 +13924,9 @@ export interface operations {
   "PilotCatalogController_createStation[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -7030,7 +13953,9 @@ export interface operations {
   "PilotCatalogController_createProduct[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -7043,8 +13968,14 @@ export interface operations {
           /** Format: uuid */
           categoryId: string;
           sku?: string;
+          ean?: string;
+          /** @enum {string} */
+          productType?: "prepared" | "resale";
+          sortOrder?: number;
           name: string;
           description?: string;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number;
           /** @default [] */
           allergenIds?: string[];
           /** @default [] */
@@ -7059,6 +13990,8 @@ export interface operations {
             lossBasisPoints?: number;
           }[];
           priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
           /** @default true */
           available?: boolean;
           availabilitySchedule?: {
@@ -7067,6 +14000,30 @@ export interface operations {
               start: string;
               end: string;
             }[];
+          } | null;
+          dailyStock?: number | null;
+          autoDeductStock?: boolean;
+          tags?: string[];
+          dietaryFlags?: string[];
+          spiciness?: number | null;
+          pairing?: string | null;
+          suggestedProductIds?: string[];
+          sizes?: {
+            code: string;
+            name: string;
+            priceCents: number;
+          }[];
+          translations?: {
+            [key: string]: {
+              name: string;
+              description?: string;
+            };
+          };
+          fiscal?: {
+            ncm?: string;
+            cfop?: string;
+            cest?: string;
+            origin?: number;
           };
         };
       };
@@ -7083,7 +14040,9 @@ export interface operations {
   "PilotCatalogController_createProduct[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -7096,8 +14055,14 @@ export interface operations {
           /** Format: uuid */
           categoryId: string;
           sku?: string;
+          ean?: string;
+          /** @enum {string} */
+          productType?: "prepared" | "resale";
+          sortOrder?: number;
           name: string;
           description?: string;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number;
           /** @default [] */
           allergenIds?: string[];
           /** @default [] */
@@ -7112,6 +14077,8 @@ export interface operations {
             lossBasisPoints?: number;
           }[];
           priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
           /** @default true */
           available?: boolean;
           availabilitySchedule?: {
@@ -7120,6 +14087,30 @@ export interface operations {
               start: string;
               end: string;
             }[];
+          } | null;
+          dailyStock?: number | null;
+          autoDeductStock?: boolean;
+          tags?: string[];
+          dietaryFlags?: string[];
+          spiciness?: number | null;
+          pairing?: string | null;
+          suggestedProductIds?: string[];
+          sizes?: {
+            code: string;
+            name: string;
+            priceCents: number;
+          }[];
+          translations?: {
+            [key: string]: {
+              name: string;
+              description?: string;
+            };
+          };
+          fiscal?: {
+            ncm?: string;
+            cfop?: string;
+            cest?: string;
+            origin?: number;
           };
         };
       };
@@ -7148,6 +14139,8 @@ export interface operations {
       content: {
         "application/json": {
           priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
           available: boolean;
           availabilitySchedule?: {
             windows: {
@@ -7157,6 +14150,9 @@ export interface operations {
             }[];
           } | null;
           stationIds: string[];
+          dailyStock?: number | null;
+          /** @default false */
+          autoDeductStock?: boolean;
         };
       };
     };
@@ -7184,6 +14180,8 @@ export interface operations {
       content: {
         "application/json": {
           priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
           available: boolean;
           availabilitySchedule?: {
             windows: {
@@ -7193,11 +14191,2012 @@ export interface operations {
             }[];
           } | null;
           stationIds: string[];
+          dailyStock?: number | null;
+          /** @default false */
+          autoDeductStock?: boolean;
         };
       };
     };
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateProduct[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          categoryId?: string;
+          name?: string;
+          description?: string | null;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveProduct[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateProduct[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          categoryId?: string;
+          name?: string;
+          description?: string | null;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveProduct[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateProductAggregate[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          categoryId: string;
+          sku?: string;
+          ean?: string;
+          /** @enum {string} */
+          productType?: "prepared" | "resale";
+          sortOrder?: number;
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number;
+          /** @default [] */
+          allergenIds?: string[];
+          /** @default [] */
+          modifierGroupIds?: string[];
+          stationIds: string[];
+          /** @default [] */
+          recipe?: {
+            ingredientName: string;
+            quantityMilli: number;
+            unit: string;
+            /** @default 0 */
+            lossBasisPoints?: number;
+          }[];
+          priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
+          /** @default true */
+          available?: boolean;
+          availabilitySchedule?: {
+            windows: {
+              dayOfWeek: number;
+              start: string;
+              end: string;
+            }[];
+          } | null;
+          dailyStock?: number | null;
+          autoDeductStock?: boolean;
+          tags?: string[];
+          dietaryFlags?: string[];
+          spiciness?: number | null;
+          pairing?: string | null;
+          suggestedProductIds?: string[];
+          sizes?: {
+            code: string;
+            name: string;
+            priceCents: number;
+          }[];
+          translations?: {
+            [key: string]: {
+              name: string;
+              description?: string;
+            };
+          };
+          fiscal?: {
+            ncm?: string;
+            cfop?: string;
+            cest?: string;
+            origin?: number;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateProductAggregate[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          categoryId: string;
+          sku?: string;
+          ean?: string;
+          /** @enum {string} */
+          productType?: "prepared" | "resale";
+          sortOrder?: number;
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          estimatedPrepTimeMinutes?: number;
+          /** @default [] */
+          allergenIds?: string[];
+          /** @default [] */
+          modifierGroupIds?: string[];
+          stationIds: string[];
+          /** @default [] */
+          recipe?: {
+            ingredientName: string;
+            quantityMilli: number;
+            unit: string;
+            /** @default 0 */
+            lossBasisPoints?: number;
+          }[];
+          priceCents: number;
+          deliveryPriceCents?: number | null;
+          costCents?: number | null;
+          /** @default true */
+          available?: boolean;
+          availabilitySchedule?: {
+            windows: {
+              dayOfWeek: number;
+              start: string;
+              end: string;
+            }[];
+          } | null;
+          dailyStock?: number | null;
+          autoDeductStock?: boolean;
+          tags?: string[];
+          dietaryFlags?: string[];
+          spiciness?: number | null;
+          pairing?: string | null;
+          suggestedProductIds?: string[];
+          sizes?: {
+            code: string;
+            name: string;
+            priceCents: number;
+          }[];
+          translations?: {
+            [key: string]: {
+              name: string;
+              description?: string;
+            };
+          };
+          fiscal?: {
+            ncm?: string;
+            cfop?: string;
+            cest?: string;
+            origin?: number;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_reorderCategories[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            id: string;
+            sortOrder: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_reorderCategories[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            id: string;
+            sortOrder: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_reorderProducts[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            id: string;
+            sortOrder: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_reorderProducts[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            id: string;
+            sortOrder: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_setCategoryAvailability[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          available: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_setCategoryAvailability[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        categoryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          available: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_bulkPrices[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default [] */
+          productIds?: string[];
+          /** @default [] */
+          categoryIds?: string[];
+          /** @enum {string} */
+          mode: "percentage" | "fixed";
+          value: number;
+          /** @enum {string} */
+          channel: "salon" | "delivery" | "both";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_bulkPrices[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default [] */
+          productIds?: string[];
+          /** @default [] */
+          categoryIds?: string[];
+          /** @enum {string} */
+          mode: "percentage" | "fixed";
+          value: number;
+          /** @enum {string} */
+          channel: "salon" | "delivery" | "both";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateAllergen[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        allergenId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code?: string;
+          name?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveAllergen[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        allergenId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateAllergen[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        allergenId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code?: string;
+          name?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveAllergen[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        allergenId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateStation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          code?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveStation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateStation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          code?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveStation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateModifierGroup[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          minimumSelections?: number;
+          maximumSelections?: number;
+          options?: {
+            name: string;
+            /** @default 0 */
+            priceDeltaCents?: number;
+            /** @default 0 */
+            sortOrder?: number;
+          }[];
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveModifierGroup[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateModifierGroup[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          minimumSelections?: number;
+          maximumSelections?: number;
+          options?: {
+            name: string;
+            /** @default 0 */
+            priceDeltaCents?: number;
+            /** @default 0 */
+            sortOrder?: number;
+          }[];
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveModifierGroup[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createModifierOption[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @default 0 */
+          priceDeltaCents?: number;
+          /** @default 0 */
+          sortOrder?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createModifierOption[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @default 0 */
+          priceDeltaCents?: number;
+          /** @default 0 */
+          sortOrder?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateModifierOption[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        optionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          /** @default 0 */
+          priceDeltaCents?: number;
+          /** @default 0 */
+          sortOrder?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveModifierOption[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        optionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateModifierOption[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        optionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          /** @default 0 */
+          priceDeltaCents?: number;
+          /** @default 0 */
+          sortOrder?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveModifierOption[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        optionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateCombo[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        comboId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          priceCents: number;
+          /** @default true */
+          active?: boolean;
+          items: {
+            /** Format: uuid */
+            productId: string;
+            /** @default 1 */
+            quantity?: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveCombo[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        comboId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateCombo[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        comboId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          imageUrl?: string | null;
+          priceCents: number;
+          /** @default true */
+          active?: boolean;
+          items: {
+            /** Format: uuid */
+            productId: string;
+            /** @default 1 */
+            quantity?: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archiveCombo[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        comboId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createPromotion[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          /** @enum {string} */
+          discountType: "percentage" | "fixed_price";
+          discountValue: number;
+          /** @default [] */
+          productIds?: string[];
+          /** @default [] */
+          comboIds?: string[];
+          /** @default [] */
+          categoryIds?: string[];
+          channels: ("salon" | "delivery" | "qr" | "pickup")[];
+          /** @default [] */
+          daysOfWeek?: number[];
+          startTime?: string | null;
+          endTime?: string | null;
+          startsAt?: string | null;
+          endsAt?: string | null;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createPromotion[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          description?: string;
+          /** @enum {string} */
+          discountType: "percentage" | "fixed_price";
+          discountValue: number;
+          /** @default [] */
+          productIds?: string[];
+          /** @default [] */
+          comboIds?: string[];
+          /** @default [] */
+          categoryIds?: string[];
+          channels: ("salon" | "delivery" | "qr" | "pickup")[];
+          /** @default [] */
+          daysOfWeek?: number[];
+          startTime?: string | null;
+          endTime?: string | null;
+          startsAt?: string | null;
+          endsAt?: string | null;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updatePromotion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        promotionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          description?: string | null;
+          /** @enum {string} */
+          discountType?: "percentage" | "fixed_price";
+          discountValue?: number;
+          productIds?: string[];
+          comboIds?: string[];
+          categoryIds?: string[];
+          channels?: ("salon" | "delivery" | "qr" | "pickup")[];
+          daysOfWeek?: number[];
+          startTime?: string | null;
+          endTime?: string | null;
+          startsAt?: string | null;
+          endsAt?: string | null;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archivePromotion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        promotionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updatePromotion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        promotionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          description?: string | null;
+          /** @enum {string} */
+          discountType?: "percentage" | "fixed_price";
+          discountValue?: number;
+          productIds?: string[];
+          comboIds?: string[];
+          categoryIds?: string[];
+          channels?: ("salon" | "delivery" | "qr" | "pickup")[];
+          daysOfWeek?: number[];
+          startTime?: string | null;
+          endTime?: string | null;
+          startsAt?: string | null;
+          endsAt?: string | null;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_archivePromotion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        promotionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_getBranding[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateBranding[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          displayName: string;
+          slogan?: string | null;
+          logoUrl?: string | null;
+          primaryColor: string;
+          accentColor: string;
+          notice?: string | null;
+          address?: string | null;
+          phone?: string | null;
+          instagram?: string | null;
+          openingHours?: string | null;
+          serviceTaxNotice?: string | null;
+          corkageFeeNotice?: string | null;
+          wifi?: {
+            ssid: string;
+            password: string;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_getBranding[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateBranding[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          displayName: string;
+          slogan?: string | null;
+          logoUrl?: string | null;
+          primaryColor: string;
+          accentColor: string;
+          notice?: string | null;
+          address?: string | null;
+          phone?: string | null;
+          instagram?: string | null;
+          openingHours?: string | null;
+          serviceTaxNotice?: string | null;
+          corkageFeeNotice?: string | null;
+          wifi?: {
+            ssid: string;
+            password: string;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_importCatalog[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          rows: {
+            sku?: string;
+            ean?: string;
+            /** @enum {string} */
+            productType?: "prepared" | "resale";
+            sortOrder?: number;
+            name: string;
+            description?: string;
+            imageUrl?: string | null;
+            estimatedPrepTimeMinutes?: number;
+            /** @default [] */
+            allergenIds?: string[];
+            /** @default [] */
+            modifierGroupIds?: string[];
+            stationIds: string[];
+            /** @default [] */
+            recipe?: {
+              ingredientName: string;
+              quantityMilli: number;
+              unit: string;
+              /** @default 0 */
+              lossBasisPoints?: number;
+            }[];
+            priceCents: number;
+            deliveryPriceCents?: number | null;
+            costCents?: number | null;
+            /** @default true */
+            available?: boolean;
+            availabilitySchedule?: {
+              windows: {
+                dayOfWeek: number;
+                start: string;
+                end: string;
+              }[];
+            } | null;
+            dailyStock?: number | null;
+            autoDeductStock?: boolean;
+            tags?: string[];
+            dietaryFlags?: string[];
+            spiciness?: number | null;
+            pairing?: string | null;
+            suggestedProductIds?: string[];
+            sizes?: {
+              code: string;
+              name: string;
+              priceCents: number;
+            }[];
+            translations?: {
+              [key: string]: {
+                name: string;
+                description?: string;
+              };
+            };
+            fiscal?: {
+              ncm?: string;
+              cfop?: string;
+              cest?: string;
+              origin?: number;
+            };
+            /** Format: uuid */
+            productId?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            categoryName?: string;
+          }[];
+          /** @default false */
+          dryRun?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_importCatalog[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          rows: {
+            sku?: string;
+            ean?: string;
+            /** @enum {string} */
+            productType?: "prepared" | "resale";
+            sortOrder?: number;
+            name: string;
+            description?: string;
+            imageUrl?: string | null;
+            estimatedPrepTimeMinutes?: number;
+            /** @default [] */
+            allergenIds?: string[];
+            /** @default [] */
+            modifierGroupIds?: string[];
+            stationIds: string[];
+            /** @default [] */
+            recipe?: {
+              ingredientName: string;
+              quantityMilli: number;
+              unit: string;
+              /** @default 0 */
+              lossBasisPoints?: number;
+            }[];
+            priceCents: number;
+            deliveryPriceCents?: number | null;
+            costCents?: number | null;
+            /** @default true */
+            available?: boolean;
+            availabilitySchedule?: {
+              windows: {
+                dayOfWeek: number;
+                start: string;
+                end: string;
+              }[];
+            } | null;
+            dailyStock?: number | null;
+            autoDeductStock?: boolean;
+            tags?: string[];
+            dietaryFlags?: string[];
+            spiciness?: number | null;
+            pairing?: string | null;
+            suggestedProductIds?: string[];
+            sizes?: {
+              code: string;
+              name: string;
+              priceCents: number;
+            }[];
+            translations?: {
+              [key: string]: {
+                name: string;
+                description?: string;
+              };
+            };
+            fiscal?: {
+              ncm?: string;
+              cfop?: string;
+              cest?: string;
+              origin?: number;
+            };
+            /** Format: uuid */
+            productId?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            categoryName?: string;
+          }[];
+          /** @default false */
+          dryRun?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_getPublication[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_publish[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          slug: string;
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_getPublication[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_publish[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          slug: string;
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_analyticsBcg[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_analyticsBcg[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_uploadMedia[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          mimeType: "image/jpeg" | "image/png" | "image/webp";
+          base64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_uploadMedia[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          mimeType: "image/jpeg" | "image/png" | "image/webp";
+          base64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_setDailyStock[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          remaining: number | null;
+          autoDeductStock?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_setDailyStock[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          remaining: number | null;
+          autoDeductStock?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_tableQr[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_tableQr[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_rotateTableQr[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_rotateTableQr[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };
@@ -7236,6 +16235,88 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateFloorLayout[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default [] */
+          tables?: {
+            /** Format: uuid */
+            tableId: string;
+            x: number;
+            y: number;
+          }[];
+          /** @default [] */
+          rooms?: {
+            /** Format: uuid */
+            roomId: string;
+            points: {
+              x: number;
+              y: number;
+            }[];
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateFloorLayout[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default [] */
+          tables?: {
+            /** Format: uuid */
+            tableId: string;
+            x: number;
+            y: number;
+          }[];
+          /** @default [] */
+          rooms?: {
+            /** Format: uuid */
+            roomId: string;
+            points: {
+              x: number;
+              y: number;
+            }[];
+          }[];
+        };
+      };
+    };
     responses: {
       200: {
         headers: {
@@ -7347,6 +16428,624 @@ export interface operations {
           label: string;
           /** @default 4 */
           seats?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateTableTurnover[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "cleaning" | "available";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateTableTurnover[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "cleaning" | "available";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createServiceSection[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          color: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          tableIds: string[];
+          defaultResponsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createServiceSection[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          color: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          tableIds: string[];
+          defaultResponsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_openOperationalShift[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label?: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          /** @default true */
+          copyPreviousAssignments?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_openOperationalShift[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label?: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          /** @default true */
+          copyPreviousAssignments?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionAssignment[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        shiftSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tableIds: string[];
+          primaryIdentityId: string | null;
+          /** @default [] */
+          supportIdentityIds?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionAssignment[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        shiftSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tableIds: string[];
+          primaryIdentityId: string | null;
+          /** @default [] */
+          supportIdentityIds?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionCoverage[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        shiftSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionCoverage[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        shiftSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_closeOperationalShift[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default false */
+          acknowledgeOpenTabs?: boolean;
+          handoverIdentityId?: string | null;
+          handoverAssignments?: {
+            sourceResponsibleIdentityId: string | null;
+            /** Format: uuid */
+            targetResponsibleIdentityId: string;
+          }[];
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_closeOperationalShift[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default false */
+          acknowledgeOpenTabs?: boolean;
+          handoverIdentityId?: string | null;
+          handoverAssignments?: {
+            sourceResponsibleIdentityId: string | null;
+            /** Format: uuid */
+            targetResponsibleIdentityId: string;
+          }[];
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_transferShiftTable[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          targetShiftSectionId: string;
+          durationMinutes: number;
+          /** @default true */
+          transferOpenTab?: boolean;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_endShiftTableTransfer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_transferShiftTable[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          targetShiftSectionId: string;
+          durationMinutes: number;
+          /** @default true */
+          transferOpenTab?: boolean;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_endShiftTableTransfer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftLayout[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tables: {
+            /** Format: uuid */
+            tableId: string;
+            x: number;
+            y: number;
+            /** Format: uuid */
+            roomId: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftLayout[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tables: {
+            /** Format: uuid */
+            tableId: string;
+            x: number;
+            y: number;
+            /** Format: uuid */
+            roomId: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createTables[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tables: {
+            label: string;
+            /** @default 4 */
+            seats?: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createTables[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tables: {
+            label: string;
+            /** @default 4 */
+            seats?: number;
+          }[];
         };
       };
     };
@@ -7472,7 +17171,185 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_updateTab[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          label?: string | null;
+          /** @enum {string} */
+          fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          customerName?: string | null;
+          customerPhone?: string | null;
+          readyNotificationConsent?: boolean;
+          serviceNotes?: string | null;
+          deliveryAddress?: string | null;
+          promisedAt?: string | null;
+          guestCount?: number;
+          responsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotPosController_getTab[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateTab[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          label?: string | null;
+          /** @enum {string} */
+          fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          customerName?: string | null;
+          customerPhone?: string | null;
+          readyNotificationConsent?: boolean;
+          serviceNotes?: string | null;
+          deliveryAddress?: string | null;
+          promisedAt?: string | null;
+          guestCount?: number;
+          responsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_claimTab[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          /** Format: uuid */
+          responsibleIdentityId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_claimTab[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedVersion: number;
+          /** Format: uuid */
+          responsibleIdentityId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_touchPresence[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_touchPresence[1]": {
     parameters: {
       query?: never;
       header?: never;
@@ -7511,6 +17388,21 @@ export interface operations {
           /** Format: uuid */
           tableId?: string;
           label?: string;
+          /** @enum {string} */
+          fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          customerName?: string;
+          customerPhone?: string;
+          readyNotificationConsent?: boolean;
+          serviceNotes?: string;
+          deliveryAddress?: string;
+          /** Format: date-time */
+          promisedAt?: string;
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+          /** Format: uuid */
+          reservationId?: string;
+          /** Format: uuid */
+          waitlistEntryId?: string;
           /** @default 1 */
           guestCount?: number;
         };
@@ -7543,6 +17435,21 @@ export interface operations {
           /** Format: uuid */
           tableId?: string;
           label?: string;
+          /** @enum {string} */
+          fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          customerName?: string;
+          customerPhone?: string;
+          readyNotificationConsent?: boolean;
+          serviceNotes?: string;
+          deliveryAddress?: string;
+          /** Format: date-time */
+          promisedAt?: string;
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+          /** Format: uuid */
+          reservationId?: string;
+          /** Format: uuid */
+          waitlistEntryId?: string;
           /** @default 1 */
           guestCount?: number;
         };
@@ -7580,6 +17487,10 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            seatNumber?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            allergyNote?: string;
           }[];
         };
       };
@@ -7616,10 +17527,1016 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            seatNumber?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            allergyNote?: string;
           }[];
         };
       };
     };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_moveItems[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          targetTabId: string;
+          items: {
+            /** Format: uuid */
+            orderItemId: string;
+            quantity: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_moveItems[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          targetTabId: string;
+          items: {
+            /** Format: uuid */
+            orderItemId: string;
+            quantity: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_recordPayment[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
+          amountCents: number;
+          reference?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_recordPayment[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
+          amountCents: number;
+          reference?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createPrintJob[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          /** @default 1 */
+          copies?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createPrintJob[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          /** @default 1 */
+          copies?: number;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_listPrintJobs[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_listPrintJobs[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updatePrintJobStatus[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          status: "printing" | "printed" | "failed";
+          error?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updatePrintJobStatus[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          status: "printing" | "printed" | "failed";
+          error?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_retryPrintJob[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_retryPrintJob[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintJob[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          copies?: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reprintJob[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          terminalId?: string;
+          printerId?: string;
+          copies?: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_closeTab[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default false */
+          printRequested?: boolean;
+          printOptions?: {
+            terminalId?: string;
+            printerId?: string;
+            /** @default 1 */
+            copies?: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_closeTab[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default false */
+          printRequested?: boolean;
+          printOptions?: {
+            terminalId?: string;
+            printerId?: string;
+            /** @default 1 */
+            copies?: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reopenTab[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_reopenTab[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_requestApproval[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          itemId: string;
+          /** @enum {string} */
+          action: "discount" | "cancel";
+          discountCents?: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_requestApproval[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          itemId: string;
+          /** @enum {string} */
+          action: "discount" | "cancel";
+          discountCents?: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_approvalRequests[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_approvalRequests[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_approveRequest[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_approveRequest[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_rejectRequest[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_rejectRequest[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_notifyReady[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_notifyReady[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createServiceCall[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default assistance
+           * @enum {string}
+           */
+          kind?: "assistance" | "bill" | "water" | "other";
+          /** Format: uuid */
+          tabId?: string;
+          /** @default 3 */
+          slaMinutes?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createServiceCall[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default assistance
+           * @enum {string}
+           */
+          kind?: "assistance" | "bill" | "water" | "other";
+          /** Format: uuid */
+          tabId?: string;
+          /** @default 3 */
+          slaMinutes?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeServiceCall[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeServiceCall[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_resolveServiceCall[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_resolveServiceCall[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       201: {
         headers: {
@@ -7788,6 +18705,184 @@ export interface operations {
         };
       };
     };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_groupTables[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tableIds: string[];
+          /** Format: uuid */
+          anchorTableId: string;
+          /** @enum {string} */
+          mode: "physical_only" | "single_tab";
+          /** Format: uuid */
+          targetTabId?: string;
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_groupTables[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tableIds: string[];
+          /** Format: uuid */
+          anchorTableId: string;
+          /** @enum {string} */
+          mode: "physical_only" | "single_tab";
+          /** Format: uuid */
+          targetTabId?: string;
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_detachTableGroup[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          tableId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_detachTableGroup[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          tableId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_dissolveTableGroup[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_dissolveTableGroup[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       201: {
         headers: {
@@ -8125,8 +19220,8 @@ export interface operations {
   };
   "PilotPosController_kds[0]": {
     parameters: {
-      query: {
-        stationId: string;
+      query?: {
+        stationId?: string;
       };
       header?: never;
       path: {
@@ -8141,14 +19236,544 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            /** Format: date-time */
+            serverTime: string;
+            revision: string;
+            operationServiceMode: ("full_service" | "quick_service" | "bar" | "hybrid") | null;
+            serviceMode: ("full_service" | "quick_service" | "bar" | "hybrid") | null;
+            stations: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              capacity: {
+                activeAssignments: number;
+                blockedAssignments: number;
+                queuedQuantity: number;
+                preparingQuantity: number;
+                sampleSize: number;
+                p50PrepMinutes: number | null;
+                p90PrepMinutes: number | null;
+                estimatedUnitsPerHour: number | null;
+                recommendation: {
+                  /** @enum {string} */
+                  state: "normal" | "strained" | "overloaded";
+                  suggestedDelayMinutes: number | null;
+                  reasons: (
+                    | "queue_depth"
+                    | "blocked_items"
+                    | "slow_history"
+                    | "insufficient_history"
+                  )[];
+                };
+              };
+            }[];
+            capabilities: {
+              ticketTransition: boolean;
+              itemTransition: boolean;
+              partialReady: boolean;
+              authorizedCancellation: boolean;
+              courseHold: boolean;
+              priority: boolean;
+              orderPriority: boolean;
+              /** @enum {boolean} */
+              orderPriorityOffline: false;
+              recall: boolean;
+              refire: boolean;
+              orderHandoff: boolean;
+              availability: boolean;
+              block: boolean;
+              attentionAcknowledgement: boolean;
+              reroute: boolean;
+              batches: boolean;
+              history: boolean;
+              capacity: boolean;
+              recommendation: boolean;
+              /** @enum {boolean} */
+              automaticThrottling: false;
+              terminalProfileRead: boolean;
+              terminalProfileManage: boolean;
+            };
+            tickets: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              orderId: string;
+              /** Format: uuid */
+              stationId: string;
+              /** @enum {string} */
+              status: "pending" | "preparing" | "ready" | "done" | "canceled";
+              priority: number;
+              rush: boolean;
+              dueAt: string | null;
+              startedAt: string | null;
+              readyAt: string | null;
+              handedOffAt: string | null;
+              servedAt: string | null;
+              completedAt: string | null;
+              recallCount: number;
+              refireCount: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+              blocked: boolean;
+              predictedReadyAt: string | null;
+              eta: {
+                predictedReadyAt: string | null;
+                p50Minutes: number | null;
+                p90Minutes: number | null;
+                sampleSize: number;
+                /** @enum {string} */
+                source: "product" | "station" | "configured" | "none";
+              };
+              station: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                code: string;
+                capacity: {
+                  activeAssignments: number;
+                  blockedAssignments: number;
+                  queuedQuantity: number;
+                  preparingQuantity: number;
+                  sampleSize: number;
+                  p50PrepMinutes: number | null;
+                  p90PrepMinutes: number | null;
+                  estimatedUnitsPerHour: number | null;
+                  recommendation: {
+                    /** @enum {string} */
+                    state: "normal" | "strained" | "overloaded";
+                    suggestedDelayMinutes: number | null;
+                    reasons: (
+                      | "queue_depth"
+                      | "blocked_items"
+                      | "slow_history"
+                      | "insufficient_history"
+                    )[];
+                  };
+                };
+              };
+              order: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                status: "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+                readyNotifiedAt: string | null;
+                priority: number;
+                priorityReason: string | null;
+                priorityUpdatedAt: string | null;
+                priorityUpdatedByIdentityId: string | null;
+              };
+              tab: {
+                /** Format: uuid */
+                id: string;
+                label: string | null;
+                /** @enum {string} */
+                fulfillmentType: "dine_in" | "pickup" | "delivery";
+                customerName: string | null;
+                promisedAt: string | null;
+                readyNotifiedAt: string | null;
+              };
+              table: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+              } | null;
+              sla: {
+                elapsedMinutes: number;
+                targetMinutes: number | null;
+                overdueMinutes: number;
+                isOverdue: boolean;
+              };
+            }[];
+            items: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              productId: string;
+              item: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                orderId: string;
+                /** Format: uuid */
+                productId: string;
+                stationId: string | null;
+                productName: string;
+                quantity: number;
+                unitPriceCents: number;
+                modifiersCents: number;
+                grossCents: number;
+                discountCents: number;
+                netCents: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                seatNumber: number | null;
+                /** @enum {string} */
+                course: "anytime" | "starter" | "main" | "dessert";
+                estimatedPrepTimeMinutes: number | null;
+                allergyNote: string | null;
+                notes: string | null;
+                canceledAt: string | null;
+                canceledReason: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              kds: {
+                quantity: number;
+                readyQuantity: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                held: boolean;
+                heldAt: string | null;
+                firedAt: string | null;
+                startedAt: string | null;
+                readyAt: string | null;
+                completedAt: string | null;
+                blocked: {
+                  active: boolean;
+                  code:
+                    | (
+                        | "missing_ingredient"
+                        | "equipment_issue"
+                        | "quality_check"
+                        | "dependency"
+                        | "other"
+                      )
+                    | null;
+                  reason: string | null;
+                  blockedAt: string | null;
+                  blockedByIdentityId: string | null;
+                  unblockedAt: string | null;
+                  unblockedByIdentityId: string | null;
+                  count: number;
+                };
+              };
+              attention: {
+                /** @enum {string} */
+                id: "allergy" | "notes";
+                revision: string;
+                /** @enum {string} */
+                kind: "allergy" | "note";
+                text: string;
+                /** @enum {boolean} */
+                required: true;
+                acknowledged: boolean;
+                acknowledgedAt: string | null;
+                acknowledgedByIdentityId: string | null;
+              }[];
+              modifiers: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                quantity: number;
+                unitDeltaCents: number;
+                totalDeltaCents: number;
+              }[];
+            }[];
+            alerts: {
+              ticket: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                orderId: string;
+                /** Format: uuid */
+                stationId: string;
+                /** @enum {string} */
+                status: "pending" | "preparing" | "ready" | "done" | "canceled";
+                priority: number;
+                rush: boolean;
+                dueAt: string | null;
+                startedAt: string | null;
+                readyAt: string | null;
+                handedOffAt: string | null;
+                servedAt: string | null;
+                completedAt: string | null;
+                recallCount: number;
+                refireCount: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                blocked: boolean;
+                predictedReadyAt: string | null;
+                eta: {
+                  predictedReadyAt: string | null;
+                  p50Minutes: number | null;
+                  p90Minutes: number | null;
+                  sampleSize: number;
+                  /** @enum {string} */
+                  source: "product" | "station" | "configured" | "none";
+                };
+                station: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  code: string;
+                  capacity: {
+                    activeAssignments: number;
+                    blockedAssignments: number;
+                    queuedQuantity: number;
+                    preparingQuantity: number;
+                    sampleSize: number;
+                    p50PrepMinutes: number | null;
+                    p90PrepMinutes: number | null;
+                    estimatedUnitsPerHour: number | null;
+                    recommendation: {
+                      /** @enum {string} */
+                      state: "normal" | "strained" | "overloaded";
+                      suggestedDelayMinutes: number | null;
+                      reasons: (
+                        | "queue_depth"
+                        | "blocked_items"
+                        | "slow_history"
+                        | "insufficient_history"
+                      )[];
+                    };
+                  };
+                };
+                order: {
+                  /** Format: uuid */
+                  id: string;
+                  /** @enum {string} */
+                  status: "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+                  readyNotifiedAt: string | null;
+                  priority: number;
+                  priorityReason: string | null;
+                  priorityUpdatedAt: string | null;
+                  priorityUpdatedByIdentityId: string | null;
+                };
+                tab: {
+                  /** Format: uuid */
+                  id: string;
+                  label: string | null;
+                  /** @enum {string} */
+                  fulfillmentType: "dine_in" | "pickup" | "delivery";
+                  customerName: string | null;
+                  promisedAt: string | null;
+                  readyNotifiedAt: string | null;
+                };
+                table: {
+                  /** Format: uuid */
+                  id: string;
+                  label: string;
+                } | null;
+                sla: {
+                  elapsedMinutes: number;
+                  targetMinutes: number | null;
+                  overdueMinutes: number;
+                  isOverdue: boolean;
+                };
+              };
+              reason: string;
+              items: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                productId: string;
+                item: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  organizationId: string;
+                  /** Format: uuid */
+                  unitId: string;
+                  /** Format: uuid */
+                  orderId: string;
+                  /** Format: uuid */
+                  productId: string;
+                  stationId: string | null;
+                  productName: string;
+                  quantity: number;
+                  unitPriceCents: number;
+                  modifiersCents: number;
+                  grossCents: number;
+                  discountCents: number;
+                  netCents: number;
+                  /** @enum {string} */
+                  status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                  seatNumber: number | null;
+                  /** @enum {string} */
+                  course: "anytime" | "starter" | "main" | "dessert";
+                  estimatedPrepTimeMinutes: number | null;
+                  allergyNote: string | null;
+                  notes: string | null;
+                  canceledAt: string | null;
+                  canceledReason: string | null;
+                  /** Format: date-time */
+                  createdAt: string;
+                  /** Format: date-time */
+                  updatedAt: string;
+                };
+                kds: {
+                  quantity: number;
+                  readyQuantity: number;
+                  /** @enum {string} */
+                  status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                  held: boolean;
+                  heldAt: string | null;
+                  firedAt: string | null;
+                  startedAt: string | null;
+                  readyAt: string | null;
+                  completedAt: string | null;
+                  blocked: {
+                    active: boolean;
+                    code:
+                      | (
+                          | "missing_ingredient"
+                          | "equipment_issue"
+                          | "quality_check"
+                          | "dependency"
+                          | "other"
+                        )
+                      | null;
+                    reason: string | null;
+                    blockedAt: string | null;
+                    blockedByIdentityId: string | null;
+                    unblockedAt: string | null;
+                    unblockedByIdentityId: string | null;
+                    count: number;
+                  };
+                };
+                attention: {
+                  /** @enum {string} */
+                  id: "allergy" | "notes";
+                  revision: string;
+                  /** @enum {string} */
+                  kind: "allergy" | "note";
+                  text: string;
+                  /** @enum {boolean} */
+                  required: true;
+                  acknowledged: boolean;
+                  acknowledgedAt: string | null;
+                  acknowledgedByIdentityId: string | null;
+                }[];
+                modifiers: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  quantity: number;
+                  unitDeltaCents: number;
+                  totalDeltaCents: number;
+                }[];
+              }[];
+            }[];
+            metrics: {
+              window: {
+                /** Format: date-time */
+                from: string;
+                /** Format: date-time */
+                to: string;
+                /** @enum {string} */
+                source: "active_shift" | "rolling_12h";
+              };
+              total: number;
+              pending: number;
+              preparing: number;
+              ready: number;
+              expedition: number;
+              overdue: number;
+              rush: number;
+              blockedItems: number;
+              averageWaitMinutes: number;
+              averagePrepMinutes: number;
+              medianPrepMinutes: number;
+              p90PrepMinutes: number;
+              sampleSize: number;
+            };
+            productAvailability: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              /** @enum {string} */
+              status: "available" | "limited" | "unavailable";
+              available: boolean;
+              dailyStock: number | null;
+              soldToday: number;
+              remainingQuantity: number | null;
+              autoDeductStock: boolean;
+              reason: string | null;
+              updatedByIdentityId: string | null;
+              /** Format: date-time */
+              updatedAt: string;
+              resetAt: string | null;
+            }[];
+            allDay: {
+              /** Format: uuid */
+              stationId: string;
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              totalQuantity: number;
+              queuedQuantity: number;
+              preparingQuantity: number;
+              readyQuantity: number;
+              heldQuantity: number;
+            }[];
+            batches: {
+              /** Format: uuid */
+              batchId: string;
+              /** Format: uuid */
+              stationId: string;
+              productId: string | null;
+              /** @enum {string} */
+              state: "active" | "completed" | "canceled";
+              assignmentCount: number;
+              totalQuantity: number;
+              assignments: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                quantity: number;
+                position: number;
+              }[];
+              /** Format: date-time */
+              createdAt: string;
+              completedAt: string | null;
+              canceledAt: string | null;
+              idempotentReplay?: boolean;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
       };
     };
   };
   "PilotPosController_kds[1]": {
     parameters: {
-      query: {
-        stationId: string;
+      query?: {
+        stationId?: string;
       };
       header?: never;
       path: {
@@ -8163,7 +19788,1523 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            /** Format: date-time */
+            serverTime: string;
+            revision: string;
+            operationServiceMode: ("full_service" | "quick_service" | "bar" | "hybrid") | null;
+            serviceMode: ("full_service" | "quick_service" | "bar" | "hybrid") | null;
+            stations: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              capacity: {
+                activeAssignments: number;
+                blockedAssignments: number;
+                queuedQuantity: number;
+                preparingQuantity: number;
+                sampleSize: number;
+                p50PrepMinutes: number | null;
+                p90PrepMinutes: number | null;
+                estimatedUnitsPerHour: number | null;
+                recommendation: {
+                  /** @enum {string} */
+                  state: "normal" | "strained" | "overloaded";
+                  suggestedDelayMinutes: number | null;
+                  reasons: (
+                    | "queue_depth"
+                    | "blocked_items"
+                    | "slow_history"
+                    | "insufficient_history"
+                  )[];
+                };
+              };
+            }[];
+            capabilities: {
+              ticketTransition: boolean;
+              itemTransition: boolean;
+              partialReady: boolean;
+              authorizedCancellation: boolean;
+              courseHold: boolean;
+              priority: boolean;
+              orderPriority: boolean;
+              /** @enum {boolean} */
+              orderPriorityOffline: false;
+              recall: boolean;
+              refire: boolean;
+              orderHandoff: boolean;
+              availability: boolean;
+              block: boolean;
+              attentionAcknowledgement: boolean;
+              reroute: boolean;
+              batches: boolean;
+              history: boolean;
+              capacity: boolean;
+              recommendation: boolean;
+              /** @enum {boolean} */
+              automaticThrottling: false;
+              terminalProfileRead: boolean;
+              terminalProfileManage: boolean;
+            };
+            tickets: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              orderId: string;
+              /** Format: uuid */
+              stationId: string;
+              /** @enum {string} */
+              status: "pending" | "preparing" | "ready" | "done" | "canceled";
+              priority: number;
+              rush: boolean;
+              dueAt: string | null;
+              startedAt: string | null;
+              readyAt: string | null;
+              handedOffAt: string | null;
+              servedAt: string | null;
+              completedAt: string | null;
+              recallCount: number;
+              refireCount: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+              blocked: boolean;
+              predictedReadyAt: string | null;
+              eta: {
+                predictedReadyAt: string | null;
+                p50Minutes: number | null;
+                p90Minutes: number | null;
+                sampleSize: number;
+                /** @enum {string} */
+                source: "product" | "station" | "configured" | "none";
+              };
+              station: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                code: string;
+                capacity: {
+                  activeAssignments: number;
+                  blockedAssignments: number;
+                  queuedQuantity: number;
+                  preparingQuantity: number;
+                  sampleSize: number;
+                  p50PrepMinutes: number | null;
+                  p90PrepMinutes: number | null;
+                  estimatedUnitsPerHour: number | null;
+                  recommendation: {
+                    /** @enum {string} */
+                    state: "normal" | "strained" | "overloaded";
+                    suggestedDelayMinutes: number | null;
+                    reasons: (
+                      | "queue_depth"
+                      | "blocked_items"
+                      | "slow_history"
+                      | "insufficient_history"
+                    )[];
+                  };
+                };
+              };
+              order: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                status: "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+                readyNotifiedAt: string | null;
+                priority: number;
+                priorityReason: string | null;
+                priorityUpdatedAt: string | null;
+                priorityUpdatedByIdentityId: string | null;
+              };
+              tab: {
+                /** Format: uuid */
+                id: string;
+                label: string | null;
+                /** @enum {string} */
+                fulfillmentType: "dine_in" | "pickup" | "delivery";
+                customerName: string | null;
+                promisedAt: string | null;
+                readyNotifiedAt: string | null;
+              };
+              table: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+              } | null;
+              sla: {
+                elapsedMinutes: number;
+                targetMinutes: number | null;
+                overdueMinutes: number;
+                isOverdue: boolean;
+              };
+            }[];
+            items: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              productId: string;
+              item: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                orderId: string;
+                /** Format: uuid */
+                productId: string;
+                stationId: string | null;
+                productName: string;
+                quantity: number;
+                unitPriceCents: number;
+                modifiersCents: number;
+                grossCents: number;
+                discountCents: number;
+                netCents: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                seatNumber: number | null;
+                /** @enum {string} */
+                course: "anytime" | "starter" | "main" | "dessert";
+                estimatedPrepTimeMinutes: number | null;
+                allergyNote: string | null;
+                notes: string | null;
+                canceledAt: string | null;
+                canceledReason: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              kds: {
+                quantity: number;
+                readyQuantity: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                held: boolean;
+                heldAt: string | null;
+                firedAt: string | null;
+                startedAt: string | null;
+                readyAt: string | null;
+                completedAt: string | null;
+                blocked: {
+                  active: boolean;
+                  code:
+                    | (
+                        | "missing_ingredient"
+                        | "equipment_issue"
+                        | "quality_check"
+                        | "dependency"
+                        | "other"
+                      )
+                    | null;
+                  reason: string | null;
+                  blockedAt: string | null;
+                  blockedByIdentityId: string | null;
+                  unblockedAt: string | null;
+                  unblockedByIdentityId: string | null;
+                  count: number;
+                };
+              };
+              attention: {
+                /** @enum {string} */
+                id: "allergy" | "notes";
+                revision: string;
+                /** @enum {string} */
+                kind: "allergy" | "note";
+                text: string;
+                /** @enum {boolean} */
+                required: true;
+                acknowledged: boolean;
+                acknowledgedAt: string | null;
+                acknowledgedByIdentityId: string | null;
+              }[];
+              modifiers: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                quantity: number;
+                unitDeltaCents: number;
+                totalDeltaCents: number;
+              }[];
+            }[];
+            alerts: {
+              ticket: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                orderId: string;
+                /** Format: uuid */
+                stationId: string;
+                /** @enum {string} */
+                status: "pending" | "preparing" | "ready" | "done" | "canceled";
+                priority: number;
+                rush: boolean;
+                dueAt: string | null;
+                startedAt: string | null;
+                readyAt: string | null;
+                handedOffAt: string | null;
+                servedAt: string | null;
+                completedAt: string | null;
+                recallCount: number;
+                refireCount: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                blocked: boolean;
+                predictedReadyAt: string | null;
+                eta: {
+                  predictedReadyAt: string | null;
+                  p50Minutes: number | null;
+                  p90Minutes: number | null;
+                  sampleSize: number;
+                  /** @enum {string} */
+                  source: "product" | "station" | "configured" | "none";
+                };
+                station: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  code: string;
+                  capacity: {
+                    activeAssignments: number;
+                    blockedAssignments: number;
+                    queuedQuantity: number;
+                    preparingQuantity: number;
+                    sampleSize: number;
+                    p50PrepMinutes: number | null;
+                    p90PrepMinutes: number | null;
+                    estimatedUnitsPerHour: number | null;
+                    recommendation: {
+                      /** @enum {string} */
+                      state: "normal" | "strained" | "overloaded";
+                      suggestedDelayMinutes: number | null;
+                      reasons: (
+                        | "queue_depth"
+                        | "blocked_items"
+                        | "slow_history"
+                        | "insufficient_history"
+                      )[];
+                    };
+                  };
+                };
+                order: {
+                  /** Format: uuid */
+                  id: string;
+                  /** @enum {string} */
+                  status: "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+                  readyNotifiedAt: string | null;
+                  priority: number;
+                  priorityReason: string | null;
+                  priorityUpdatedAt: string | null;
+                  priorityUpdatedByIdentityId: string | null;
+                };
+                tab: {
+                  /** Format: uuid */
+                  id: string;
+                  label: string | null;
+                  /** @enum {string} */
+                  fulfillmentType: "dine_in" | "pickup" | "delivery";
+                  customerName: string | null;
+                  promisedAt: string | null;
+                  readyNotifiedAt: string | null;
+                };
+                table: {
+                  /** Format: uuid */
+                  id: string;
+                  label: string;
+                } | null;
+                sla: {
+                  elapsedMinutes: number;
+                  targetMinutes: number | null;
+                  overdueMinutes: number;
+                  isOverdue: boolean;
+                };
+              };
+              reason: string;
+              items: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                productId: string;
+                item: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  organizationId: string;
+                  /** Format: uuid */
+                  unitId: string;
+                  /** Format: uuid */
+                  orderId: string;
+                  /** Format: uuid */
+                  productId: string;
+                  stationId: string | null;
+                  productName: string;
+                  quantity: number;
+                  unitPriceCents: number;
+                  modifiersCents: number;
+                  grossCents: number;
+                  discountCents: number;
+                  netCents: number;
+                  /** @enum {string} */
+                  status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                  seatNumber: number | null;
+                  /** @enum {string} */
+                  course: "anytime" | "starter" | "main" | "dessert";
+                  estimatedPrepTimeMinutes: number | null;
+                  allergyNote: string | null;
+                  notes: string | null;
+                  canceledAt: string | null;
+                  canceledReason: string | null;
+                  /** Format: date-time */
+                  createdAt: string;
+                  /** Format: date-time */
+                  updatedAt: string;
+                };
+                kds: {
+                  quantity: number;
+                  readyQuantity: number;
+                  /** @enum {string} */
+                  status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                  held: boolean;
+                  heldAt: string | null;
+                  firedAt: string | null;
+                  startedAt: string | null;
+                  readyAt: string | null;
+                  completedAt: string | null;
+                  blocked: {
+                    active: boolean;
+                    code:
+                      | (
+                          | "missing_ingredient"
+                          | "equipment_issue"
+                          | "quality_check"
+                          | "dependency"
+                          | "other"
+                        )
+                      | null;
+                    reason: string | null;
+                    blockedAt: string | null;
+                    blockedByIdentityId: string | null;
+                    unblockedAt: string | null;
+                    unblockedByIdentityId: string | null;
+                    count: number;
+                  };
+                };
+                attention: {
+                  /** @enum {string} */
+                  id: "allergy" | "notes";
+                  revision: string;
+                  /** @enum {string} */
+                  kind: "allergy" | "note";
+                  text: string;
+                  /** @enum {boolean} */
+                  required: true;
+                  acknowledged: boolean;
+                  acknowledgedAt: string | null;
+                  acknowledgedByIdentityId: string | null;
+                }[];
+                modifiers: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  quantity: number;
+                  unitDeltaCents: number;
+                  totalDeltaCents: number;
+                }[];
+              }[];
+            }[];
+            metrics: {
+              window: {
+                /** Format: date-time */
+                from: string;
+                /** Format: date-time */
+                to: string;
+                /** @enum {string} */
+                source: "active_shift" | "rolling_12h";
+              };
+              total: number;
+              pending: number;
+              preparing: number;
+              ready: number;
+              expedition: number;
+              overdue: number;
+              rush: number;
+              blockedItems: number;
+              averageWaitMinutes: number;
+              averagePrepMinutes: number;
+              medianPrepMinutes: number;
+              p90PrepMinutes: number;
+              sampleSize: number;
+            };
+            productAvailability: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              /** @enum {string} */
+              status: "available" | "limited" | "unavailable";
+              available: boolean;
+              dailyStock: number | null;
+              soldToday: number;
+              remainingQuantity: number | null;
+              autoDeductStock: boolean;
+              reason: string | null;
+              updatedByIdentityId: string | null;
+              /** Format: date-time */
+              updatedAt: string;
+              resetAt: string | null;
+            }[];
+            allDay: {
+              /** Format: uuid */
+              stationId: string;
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              totalQuantity: number;
+              queuedQuantity: number;
+              preparingQuantity: number;
+              readyQuantity: number;
+              heldQuantity: number;
+            }[];
+            batches: {
+              /** Format: uuid */
+              batchId: string;
+              /** Format: uuid */
+              stationId: string;
+              productId: string | null;
+              /** @enum {string} */
+              state: "active" | "completed" | "canceled";
+              assignmentCount: number;
+              totalQuantity: number;
+              assignments: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                quantity: number;
+                position: number;
+              }[];
+              /** Format: date-time */
+              createdAt: string;
+              completedAt: string | null;
+              canceledAt: string | null;
+              idempotentReplay?: boolean;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_kdsAnalytics[0]": {
+    parameters: {
+      query?: {
+        windowHours?: number;
+        stationId?: unknown;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            window: {
+              /** Format: date-time */
+              from: string;
+              /** Format: date-time */
+              to: string;
+              hours: number;
+            };
+            sampleSize: number;
+            prep: {
+              p50Minutes: number | null;
+              p90Minutes: number | null;
+            };
+            counts: {
+              blocked: number;
+              refired: number;
+              canceled: number;
+              availability86: number;
+            };
+            slowProducts: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              sampleSize: number;
+              p50Minutes: number;
+              p90Minutes: number;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_kdsAnalytics[1]": {
+    parameters: {
+      query?: {
+        windowHours?: number;
+        stationId?: unknown;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            window: {
+              /** Format: date-time */
+              from: string;
+              /** Format: date-time */
+              to: string;
+              hours: number;
+            };
+            sampleSize: number;
+            prep: {
+              p50Minutes: number | null;
+              p90Minutes: number | null;
+            };
+            counts: {
+              blocked: number;
+              refired: number;
+              canceled: number;
+              availability86: number;
+            };
+            slowProducts: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              sampleSize: number;
+              p50Minutes: number;
+              p90Minutes: number;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listKdsProductAvailability[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            products: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              /** @enum {string} */
+              status: "available" | "limited" | "unavailable";
+              available: boolean;
+              dailyStock: number | null;
+              soldToday: number;
+              remainingQuantity: number | null;
+              autoDeductStock: boolean;
+              reason: string | null;
+              updatedByIdentityId: string | null;
+              /** Format: date-time */
+              updatedAt: string;
+              resetAt: string | null;
+              idempotentReplay?: boolean;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listKdsProductAvailability[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            capturedAt: string;
+            products: {
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              /** @enum {string} */
+              status: "available" | "limited" | "unavailable";
+              available: boolean;
+              dailyStock: number | null;
+              soldToday: number;
+              remainingQuantity: number | null;
+              autoDeductStock: boolean;
+              reason: string | null;
+              updatedByIdentityId: string | null;
+              /** Format: date-time */
+              updatedAt: string;
+              resetAt: string | null;
+              idempotentReplay?: boolean;
+            }[];
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getKdsTerminalProfile[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            /** @enum {string} */
+            mode: "station" | "pass";
+            stationId: string | null;
+            label: string;
+            soundEnabled: boolean;
+            fullscreenPreferred: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_putKdsTerminalProfile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "station" | "pass";
+          stationId: string | null;
+          label: string;
+          soundEnabled: boolean;
+          fullscreenPreferred: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            /** @enum {string} */
+            mode: "station" | "pass";
+            stationId: string | null;
+            label: string;
+            soundEnabled: boolean;
+            fullscreenPreferred: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getKdsTerminalProfile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            /** @enum {string} */
+            mode: "station" | "pass";
+            stationId: string | null;
+            label: string;
+            soundEnabled: boolean;
+            fullscreenPreferred: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_putKdsTerminalProfile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "station" | "pass";
+          stationId: string | null;
+          label: string;
+          soundEnabled: boolean;
+          fullscreenPreferred: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            /** @enum {string} */
+            mode: "station" | "pass";
+            stationId: string | null;
+            label: string;
+            soundEnabled: boolean;
+            fullscreenPreferred: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createKdsBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          stationId: string;
+          /** Format: uuid */
+          productId?: string;
+          maxAssignments: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createKdsBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          stationId: string;
+          /** Format: uuid */
+          productId?: string;
+          maxAssignments: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_completeKdsBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_completeKdsBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelKdsBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelKdsBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            stationId: string;
+            productId: string | null;
+            /** @enum {string} */
+            state: "active" | "completed" | "canceled";
+            assignmentCount: number;
+            totalQuantity: number;
+            assignments: {
+              /** Format: uuid */
+              ticketId: string;
+              /** Format: uuid */
+              orderItemId: string;
+              quantity: number;
+              position: number;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            completedAt: string | null;
+            canceledAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
       };
     };
   };
@@ -8184,16 +21325,88 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          state: "preparing" | "ready" | "done" | "canceled";
+          state: "preparing" | "ready";
         };
       };
     };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
       };
     };
   };
@@ -8214,16 +21427,2420 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          state: "preparing" | "ready" | "done" | "canceled";
+          state: "preparing" | "ready";
         };
       };
     };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_transitionKdsItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              state: "preparing";
+            }
+          | {
+              /** @enum {string} */
+              state: "ready";
+              quantity?: number;
+            };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_transitionKdsItem[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              state: "preparing";
+            }
+          | {
+              /** @enum {string} */
+              state: "ready";
+              quantity?: number;
+            };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_blockKdsItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          code: "missing_ingredient" | "equipment_issue" | "quality_check" | "dependency" | "other";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            blocked: boolean;
+            /** @enum {string} */
+            code?:
+              | "missing_ingredient"
+              | "equipment_issue"
+              | "quality_check"
+              | "dependency"
+              | "other";
+            reason?: string;
+            /** Format: date-time */
+            blockedAt?: string;
+            /** Format: date-time */
+            unblockedAt?: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_blockKdsItem[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          code: "missing_ingredient" | "equipment_issue" | "quality_check" | "dependency" | "other";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            blocked: boolean;
+            /** @enum {string} */
+            code?:
+              | "missing_ingredient"
+              | "equipment_issue"
+              | "quality_check"
+              | "dependency"
+              | "other";
+            reason?: string;
+            /** Format: date-time */
+            blockedAt?: string;
+            /** Format: date-time */
+            unblockedAt?: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_unblockKdsItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            blocked: boolean;
+            /** @enum {string} */
+            code?:
+              | "missing_ingredient"
+              | "equipment_issue"
+              | "quality_check"
+              | "dependency"
+              | "other";
+            reason?: string;
+            /** Format: date-time */
+            blockedAt?: string;
+            /** Format: date-time */
+            unblockedAt?: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_unblockKdsItem[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            blocked: boolean;
+            /** @enum {string} */
+            code?:
+              | "missing_ingredient"
+              | "equipment_issue"
+              | "quality_check"
+              | "dependency"
+              | "other";
+            reason?: string;
+            /** Format: date-time */
+            blockedAt?: string;
+            /** Format: date-time */
+            unblockedAt?: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_acknowledgeKdsAttention[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          noteId: "allergy" | "notes";
+          revision: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            /** @enum {string} */
+            noteId: "allergy" | "notes";
+            revision: string;
+            /** Format: date-time */
+            acknowledgedAt: string;
+            /** Format: uuid */
+            acknowledgedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_acknowledgeKdsAttention[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          noteId: "allergy" | "notes";
+          revision: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            /** @enum {string} */
+            noteId: "allergy" | "notes";
+            revision: string;
+            /** Format: date-time */
+            acknowledgedAt: string;
+            /** Format: uuid */
+            acknowledgedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_rerouteKdsItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          stationId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            sourceTicketId: string;
+            /** Format: uuid */
+            targetTicketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            /** Format: uuid */
+            sourceStationId: string;
+            /** Format: uuid */
+            targetStationId: string;
+            /** @enum {string} */
+            state: "pending" | "preparing" | "ready" | "done" | "canceled";
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_rerouteKdsItem[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          stationId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            sourceTicketId: string;
+            /** Format: uuid */
+            targetTicketId: string;
+            /** Format: uuid */
+            orderItemId: string;
+            /** Format: uuid */
+            sourceStationId: string;
+            /** Format: uuid */
+            targetStationId: string;
+            /** @enum {string} */
+            state: "pending" | "preparing" | "ready" | "done" | "canceled";
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelKdsTicket[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelKdsTicket[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recallKdsTicket[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recallKdsTicket[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_refireKdsItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_refireKdsItem[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        orderItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsPriority[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          priority: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsPriority[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          priority: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsCourseState[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          course: "anytime" | "starter" | "main" | "dessert";
+          /** @enum {string} */
+          state: "held" | "fired";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsCourseState[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          course: "anytime" | "starter" | "main" | "dessert";
+          /** @enum {string} */
+          state: "held" | "fired";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_handoffKdsOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          target: "expedition" | "served";
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_handoffKdsOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          target: "expedition" | "served";
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsOrderPriority[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          priority: number;
+          reason: string;
+          /** Format: uuid */
+          installationId?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            ticketIds: string[];
+            priority: number;
+            reason: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsOrderPriority[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          priority: number;
+          reason: string;
+          /** Format: uuid */
+          installationId?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            ticketIds: string[];
+            priority: number;
+            reason: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsProductAvailability[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          available: boolean;
+          reason: string;
+          resetAt?: string | null;
+          dailyStock?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            /** @enum {string} */
+            status: "available" | "limited" | "unavailable";
+            available: boolean;
+            dailyStock: number | null;
+            soldToday: number;
+            remainingQuantity: number | null;
+            autoDeductStock: boolean;
+            reason: string | null;
+            updatedByIdentityId: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            resetAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_setKdsProductAvailability[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          available: boolean;
+          reason: string;
+          resetAt?: string | null;
+          dailyStock?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            /** @enum {string} */
+            status: "available" | "limited" | "unavailable";
+            available: boolean;
+            dailyStock: number | null;
+            soldToday: number;
+            remainingQuantity: number | null;
+            autoDeductStock: boolean;
+            reason: string | null;
+            updatedByIdentityId: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            resetAt: string | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message: string;
+          };
+        };
       };
     };
   };
@@ -8254,6 +23871,236 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewPriorityAction[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        priorityId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          occurrenceKey: string;
+          /** @enum {string} */
+          action: "claim" | "snooze" | "resolve";
+          snoozeMinutes?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewPriorityAction[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        priorityId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          occurrenceKey: string;
+          /** @enum {string} */
+          action: "claim" | "snooze" | "resolve";
+          snoozeMinutes?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewPreferences[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          alertsEnabled: boolean;
+          /** @enum {string} */
+          minimumTone: "info" | "warning" | "danger";
+          digestMinutes: number;
+          thresholds: {
+            kdsDelayMinutes: number;
+            stockCoverageDays: number;
+            deliveryRiskMinutes: number;
+            salesGoalCents: number;
+            maxKdsDelayed: number;
+            maxStockouts: number;
+            maxDeliveryDelayed: number;
+            maxReconciliations: number;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewPreferences[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          alertsEnabled: boolean;
+          /** @enum {string} */
+          minimumTone: "info" | "warning" | "danger";
+          digestMinutes: number;
+          thresholds: {
+            kdsDelayMinutes: number;
+            stockCoverageDays: number;
+            deliveryRiskMinutes: number;
+            salesGoalCents: number;
+            maxKdsDelayed: number;
+            maxStockouts: number;
+            maxDeliveryDelayed: number;
+            maxReconciliations: number;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewVisit[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_overviewVisit[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };
@@ -8304,7 +24151,9 @@ export interface operations {
   "ManagementController_createLocation[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8331,7 +24180,9 @@ export interface operations {
   "ManagementController_createLocation[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8355,10 +24206,112 @@ export interface operations {
       };
     };
   };
-  "ManagementController_createItem[0]": {
+  "ManagementController_updateLocation[0]": {
     parameters: {
       query?: never;
       header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          code?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveLocation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateLocation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          code?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveLocation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createItem[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8370,11 +24323,26 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId?: string;
+          /** Format: uuid */
+          preferredSupplierId?: string;
           name: string;
+          /**
+           * @default ingredient
+           * @enum {string}
+           */
+          kind?: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
           sku?: string;
+          barcode?: string;
           unit: string;
+          purchaseUnit?: string;
+          /** @default 1 */
+          purchaseToStockFactor?: string | number;
           /** @default 0 */
           minimumQuantity?: string | number;
+          /** @default 0 */
+          reorderQuantity?: string | number;
+          /** @default 0 */
+          leadTimeDays?: number;
           /** @default false */
           allowNegative?: boolean;
         };
@@ -8392,7 +24360,9 @@ export interface operations {
   "ManagementController_createItem[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8404,11 +24374,26 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           productId?: string;
+          /** Format: uuid */
+          preferredSupplierId?: string;
           name: string;
+          /**
+           * @default ingredient
+           * @enum {string}
+           */
+          kind?: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
           sku?: string;
+          barcode?: string;
           unit: string;
+          purchaseUnit?: string;
+          /** @default 1 */
+          purchaseToStockFactor?: string | number;
           /** @default 0 */
           minimumQuantity?: string | number;
+          /** @default 0 */
+          reorderQuantity?: string | number;
+          /** @default 0 */
+          leadTimeDays?: number;
           /** @default false */
           allowNegative?: boolean;
         };
@@ -8416,6 +24401,544 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_returnables[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_returnables[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureReturnable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** @default 1 */
+          quantityPerUnit?: string | number;
+          /** @default 0 */
+          depositCents?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureReturnable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** @default 1 */
+          quantityPerUnit?: string | number;
+          /** @default 0 */
+          depositCents?: number;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmReturnableCustody[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          quantity: string | number;
+          /** Format: uuid */
+          orderId?: string;
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmReturnableCustody[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          quantity: string | number;
+          /** Format: uuid */
+          orderId?: string;
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createReturnableIncident[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          movementId?: string;
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId?: string;
+          /** Format: uuid */
+          orderId?: string;
+          /** @enum {string} */
+          type: "breakage" | "loss" | "suspected_theft" | "recording_error" | "other";
+          quantity: string | number;
+          note: string;
+          /** @default [] */
+          evidence?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createReturnableIncident[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          movementId?: string;
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId?: string;
+          /** Format: uuid */
+          orderId?: string;
+          /** @enum {string} */
+          type: "breakage" | "loss" | "suspected_theft" | "recording_error" | "other";
+          quantity: string | number;
+          note: string;
+          /** @default [] */
+          evidence?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewReturnableIncident[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewReturnableIncident[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        incidentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exchangeReturnablesWithSupplier[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          /** Format: uuid */
+          supplierId: string;
+          quantity: string | number;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exchangeReturnablesWithSupplier[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          containerInventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          /** Format: uuid */
+          supplierId: string;
+          quantity: string | number;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateItem[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        inventoryItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          productId?: string | null;
+          preferredSupplierId?: string | null;
+          name?: string;
+          /**
+           * @default ingredient
+           * @enum {string}
+           */
+          kind?: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
+          sku?: string;
+          barcode?: string;
+          unit?: string;
+          purchaseUnit?: string;
+          /** @default 1 */
+          purchaseToStockFactor?: string | number;
+          /** @default 0 */
+          minimumQuantity?: string | number;
+          /** @default 0 */
+          reorderQuantity?: string | number;
+          /** @default 0 */
+          leadTimeDays?: number;
+          /** @default false */
+          allowNegative?: boolean;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveItem[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        inventoryItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateItem[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        inventoryItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          productId?: string | null;
+          preferredSupplierId?: string | null;
+          name?: string;
+          /**
+           * @default ingredient
+           * @enum {string}
+           */
+          kind?: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
+          sku?: string;
+          barcode?: string;
+          unit?: string;
+          purchaseUnit?: string;
+          /** @default 1 */
+          purchaseToStockFactor?: string | number;
+          /** @default 0 */
+          minimumQuantity?: string | number;
+          /** @default 0 */
+          reorderQuantity?: string | number;
+          /** @default 0 */
+          leadTimeDays?: number;
+          /** @default false */
+          allowNegative?: boolean;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveItem[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        inventoryItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -8448,7 +24971,10 @@ export interface operations {
             locationId: string;
             /** Format: uuid */
             inventoryItemId: string;
+            /** Format: uuid */
+            lotId?: string;
             quantity: string | number;
+            expectedPreviousQuantity?: string | number;
           }[];
         };
       };
@@ -8487,6 +25013,652 @@ export interface operations {
             locationId: string;
             /** Format: uuid */
             inventoryItemId: string;
+            /** Format: uuid */
+            lotId?: string;
+            quantity: string | number;
+            expectedPreviousQuantity?: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewInventoryEvent[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewInventoryEvent[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transferInventory[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          sourceLocationId: string;
+          /** Format: uuid */
+          destinationLocationId: string;
+          quantity: string | number;
+          reason: string;
+          /** Format: uuid */
+          lotId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transferInventory[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          sourceLocationId: string;
+          /** Format: uuid */
+          destinationLocationId: string;
+          quantity: string | number;
+          reason: string;
+          /** Format: uuid */
+          lotId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveInventoryTransfer[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "received" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveInventoryTransfer[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "received" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryReservation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          quantity: string | number;
+          /** @enum {string} */
+          sourceType: "order" | "scheduled_order" | "event" | "manual";
+          sourceId: string;
+          reason: string;
+          /** Format: date-time */
+          expiresAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryReservation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          quantity: string | number;
+          /** @enum {string} */
+          sourceType: "order" | "scheduled_order" | "event" | "manual";
+          sourceId: string;
+          reason: string;
+          /** Format: date-time */
+          expiresAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveInventoryReservation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        reservationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "consumed" | "released" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveInventoryReservation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        reservationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "consumed" | "released" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_generateCycleCountPlan[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_generateCycleCountPlan[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createProductionBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          outputInventoryItemId: string;
+          /** Format: uuid */
+          outputLocationId: string;
+          batchCode: string;
+          plannedQuantity: string | number;
+          /** Format: date-time */
+          expiresAt?: string;
+          notes?: string;
+          inputs: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            lotId?: string;
+            plannedQuantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createProductionBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          outputInventoryItemId: string;
+          /** Format: uuid */
+          outputLocationId: string;
+          batchCode: string;
+          plannedQuantity: string | number;
+          /** Format: date-time */
+          expiresAt?: string;
+          notes?: string;
+          inputs: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            lotId?: string;
+            plannedQuantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_completeProductionBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          actualQuantity: string | number;
+          /** Format: date-time */
+          expiresAt?: string;
+          inputs: {
+            /** Format: uuid */
+            inputId: string;
+            actualQuantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_completeProductionBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          actualQuantity: string | number;
+          /** Format: date-time */
+          expiresAt?: string;
+          inputs: {
+            /** Format: uuid */
+            inputId: string;
+            actualQuantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelProductionBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelProductionBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInterunitTransfer[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          destinationUnitId: string;
+          reason: string;
+          lines: {
+            /** Format: uuid */
+            sourceInventoryItemId: string;
+            /** Format: uuid */
+            destinationInventoryItemId: string;
+            /** Format: uuid */
+            sourceLocationId: string;
+            /** Format: uuid */
+            destinationLocationId: string;
+            /** Format: uuid */
+            sourceLotId?: string;
             quantity: string | number;
           }[];
         };
@@ -8494,6 +25666,557 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInterunitTransfer[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          destinationUnitId: string;
+          reason: string;
+          lines: {
+            /** Format: uuid */
+            sourceInventoryItemId: string;
+            /** Format: uuid */
+            destinationInventoryItemId: string;
+            /** Format: uuid */
+            sourceLocationId: string;
+            /** Format: uuid */
+            destinationLocationId: string;
+            /** Format: uuid */
+            sourceLotId?: string;
+            quantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_receiveInterunitTransfer[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          note: string;
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            quantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_receiveInterunitTransfer[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          note: string;
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            quantity: string | number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelInterunitTransfer[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelInterunitTransfer[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        transferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_closeInventoryPeriod[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          period: string;
+          notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_closeInventoryPeriod[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          period: string;
+          notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryAsset[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          assetTag: string;
+          /**
+           * @default in_use
+           * @enum {string}
+           */
+          status?: "in_use" | "maintenance" | "damaged" | "retired";
+          /**
+           * @default good
+           * @enum {string}
+           */
+          condition?: "good" | "fair" | "poor" | "unusable";
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+          /** Format: date-time */
+          acquiredAt?: string;
+          /** Format: date-time */
+          lastMaintenanceAt?: string;
+          notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryAsset[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          assetTag: string;
+          /**
+           * @default in_use
+           * @enum {string}
+           */
+          status?: "in_use" | "maintenance" | "damaged" | "retired";
+          /**
+           * @default good
+           * @enum {string}
+           */
+          condition?: "good" | "fair" | "poor" | "unusable";
+          /** Format: uuid */
+          responsibleIdentityId?: string;
+          /** Format: date-time */
+          acquiredAt?: string;
+          /** Format: date-time */
+          lastMaintenanceAt?: string;
+          notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateInventoryAsset[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId?: string;
+          /** Format: uuid */
+          locationId?: string;
+          assetTag?: string;
+          /**
+           * @default in_use
+           * @enum {string}
+           */
+          status?: "in_use" | "maintenance" | "damaged" | "retired";
+          /**
+           * @default good
+           * @enum {string}
+           */
+          condition?: "good" | "fair" | "poor" | "unusable";
+          responsibleIdentityId?: string | null;
+          /** Format: date-time */
+          acquiredAt?: string;
+          /** Format: date-time */
+          lastMaintenanceAt?: string;
+          notes?: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateInventoryAsset[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId?: string;
+          /** Format: uuid */
+          locationId?: string;
+          assetTag?: string;
+          /**
+           * @default in_use
+           * @enum {string}
+           */
+          status?: "in_use" | "maintenance" | "damaged" | "retired";
+          /**
+           * @default good
+           * @enum {string}
+           */
+          condition?: "good" | "fair" | "poor" | "unusable";
+          responsibleIdentityId?: string | null;
+          /** Format: date-time */
+          acquiredAt?: string;
+          /** Format: date-time */
+          lastMaintenanceAt?: string;
+          notes?: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryLot[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          batchCode: string;
+          /** Format: date-time */
+          expiresAt?: string;
+          quantity: string | number;
+          unitCostCents?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createInventoryLot[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** Format: uuid */
+          locationId: string;
+          batchCode: string;
+          /** Format: date-time */
+          expiresAt?: string;
+          quantity: string | number;
+          unitCostCents?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateInventoryLot[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          batchCode?: string;
+          expiresAt?: string | null;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateInventoryLot[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          batchCode?: string;
+          expiresAt?: string | null;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -8640,7 +26363,9 @@ export interface operations {
   "ManagementController_createSupplier[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8656,6 +26381,8 @@ export interface operations {
           /** Format: email */
           email?: string;
           phone?: string;
+          address?: string;
+          notes?: string;
         };
       };
     };
@@ -8691,7 +26418,9 @@ export interface operations {
   "ManagementController_createSupplier[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "idempotency-key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -8707,11 +26436,147 @@ export interface operations {
           /** Format: email */
           email?: string;
           phone?: string;
+          address?: string;
+          notes?: string;
         };
       };
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateSupplier[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        supplierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          document?: string;
+          contactName?: string;
+          /** Format: email */
+          email?: string;
+          phone?: string;
+          address?: string;
+          notes?: string;
+          active?: boolean;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveSupplier[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        supplierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateSupplier[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        supplierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          document?: string;
+          contactName?: string;
+          /** Format: email */
+          email?: string;
+          phone?: string;
+          address?: string;
+          notes?: string;
+          active?: boolean;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_archiveSupplier[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        supplierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -8833,6 +26698,436 @@ export interface operations {
       };
     };
   };
+  "ManagementController_importNfe[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          xml: string;
+          /** Format: uuid */
+          supplierId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_importNfe[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          xml: string;
+          /** Format: uuid */
+          supplierId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewNfeImport[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        importId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          supplierId?: string;
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            /** @enum {string} */
+            status: "matched" | "new" | "ignored";
+            /** Format: uuid */
+            inventoryItemId?: string;
+            newItem?: {
+              /** Format: uuid */
+              productId?: string;
+              name: string;
+              /** @enum {string} */
+              kind: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
+              unit: string;
+              sku?: string;
+              barcode?: string;
+              purchaseUnit?: string;
+              /** @default 1 */
+              purchaseToStockFactor?: string | number;
+            };
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewNfeImport[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        importId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          supplierId?: string;
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            /** @enum {string} */
+            status: "matched" | "new" | "ignored";
+            /** Format: uuid */
+            inventoryItemId?: string;
+            newItem?: {
+              /** Format: uuid */
+              productId?: string;
+              name: string;
+              /** @enum {string} */
+              kind: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
+              unit: string;
+              sku?: string;
+              barcode?: string;
+              purchaseUnit?: string;
+              /** @default 1 */
+              purchaseToStockFactor?: string | number;
+            };
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmNfeImport[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        importId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          /** Format: date-time */
+          receivedAt?: string;
+          /** @default false */
+          acceptTotalDivergence?: boolean;
+          divergenceReason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmNfeImport[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        importId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          /** Format: date-time */
+          receivedAt?: string;
+          /** @default false */
+          acceptTotalDivergence?: boolean;
+          divergenceReason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePurchaseOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          supplierId?: string;
+          /** Format: date-time */
+          expectedAt?: string;
+          items?: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            quantity: string | number;
+            unitCostCents: number;
+          }[];
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePurchaseOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          supplierId?: string;
+          /** Format: date-time */
+          expectedAt?: string;
+          items?: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            quantity: string | number;
+            unitCostCents: number;
+          }[];
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPurchaseOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPurchaseOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_rejectPurchaseOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_rejectPurchaseOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_approvePurchaseOrder[0]": {
     parameters: {
       query?: never;
@@ -8846,7 +27141,13 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          version: number;
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -8869,7 +27170,13 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          version: number;
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -8897,14 +27204,18 @@ export interface operations {
         "application/json": {
           /** Format: date-time */
           receivedAt?: string;
-          competenceDate: string;
-          dueDate: string;
+          competenceDate?: string;
+          dueDate?: string;
           lines: {
             /** Format: uuid */
             purchaseOrderItemId: string;
             /** Format: uuid */
             locationId: string;
             quantity: string | number;
+            batchCode?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            unitCostCents?: number;
           }[];
         };
       };
@@ -8936,15 +27247,365 @@ export interface operations {
         "application/json": {
           /** Format: date-time */
           receivedAt?: string;
-          competenceDate: string;
-          dueDate: string;
+          competenceDate?: string;
+          dueDate?: string;
           lines: {
             /** Format: uuid */
             purchaseOrderItemId: string;
             /** Format: uuid */
             locationId: string;
             quantity: string | number;
+            batchCode?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            unitCostCents?: number;
           }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reversePurchaseReceipt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receiptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reversePurchaseReceipt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receiptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createSupplierInvoice[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          documentNumber: string;
+          issuedAt: string;
+          competenceDate: string;
+          dueDate: string;
+          totalCents: number;
+          accessKey?: string;
+          xmlContent?: string;
+          series?: string;
+          /** @enum {string} */
+          model?: "55" | "65";
+          taxTotalCents?: number;
+          /** @default 0 */
+          toleranceCents?: number;
+          /** @default false */
+          confirmIfMatched?: boolean;
+          lines: {
+            /** Format: uuid */
+            purchaseOrderItemId: string;
+            quantity: string | number;
+            unitCostCents: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createSupplierInvoice[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        purchaseOrderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          documentNumber: string;
+          issuedAt: string;
+          competenceDate: string;
+          dueDate: string;
+          totalCents: number;
+          accessKey?: string;
+          xmlContent?: string;
+          series?: string;
+          /** @enum {string} */
+          model?: "55" | "65";
+          taxTotalCents?: number;
+          /** @default 0 */
+          toleranceCents?: number;
+          /** @default false */
+          confirmIfMatched?: boolean;
+          lines: {
+            /** Format: uuid */
+            purchaseOrderItemId: string;
+            quantity: string | number;
+            unitCostCents: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reconcileSupplierInvoice[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default 0 */
+          toleranceCents?: number;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reconcileSupplierInvoice[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default 0 */
+          toleranceCents?: number;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmSupplierInvoice[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          toleranceCents?: number;
+          /** @default false */
+          acceptDivergence?: boolean;
+          reason?: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmSupplierInvoice[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          toleranceCents?: number;
+          /** @default false */
+          acceptDivergence?: boolean;
+          reason?: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelSupplierInvoice[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelSupplierInvoice[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        invoiceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
         };
       };
     };
@@ -9595,7 +28256,11 @@ export interface operations {
   };
   "ManagementController_reports[0]": {
     parameters: {
-      query?: never;
+      query: {
+        from: string;
+        to: string;
+        comparisonMode?: "previous_period" | "previous_year" | "none";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -9605,15 +28270,45 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Relatório gerencial do período e comparação anterior equivalente. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportsResponse"];
+        };
       };
     };
   };
   "ManagementController_reports[1]": {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+        comparisonMode?: "previous_period" | "previous_year" | "none";
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Relatório gerencial do período e comparação anterior equivalente. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportsResponse"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportDrillDown[0]": {
     parameters: {
       query?: never;
       header?: never;
@@ -9625,11 +28320,769 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Operação de relatório concluída. */
       200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["ManagementReportDrillDownResponse"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportDrillDown[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportDrillDownResponse"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportBudgets[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportBudgetMonths"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportBudgets[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportBudgetMonths"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportBudgetMonth[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        month: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_putReportBudget[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        month: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          metric:
+            | "pos_revenue"
+            | "cash_inflows"
+            | "cash_outflows"
+            | "competence_revenue"
+            | "competence_expenses"
+            | "average_ticket"
+            | "gross_margin"
+            | "inventory_loss"
+            | "canceled_value";
+          targetCents: number;
+          version?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_reportBudgetMonth[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        month: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_putReportBudget[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        month: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          metric:
+            | "pos_revenue"
+            | "cash_inflows"
+            | "cash_outflows"
+            | "competence_revenue"
+            | "competence_expenses"
+            | "average_ticket"
+            | "gross_margin"
+            | "inventory_loss"
+            | "canceled_value";
+          targetCents: number;
+          version?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_reportExports[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_createReportExport[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /**
+           * @default previous_period
+           * @enum {string}
+           */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportExport"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportExports[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_createReportExport[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /**
+           * @default previous_period
+           * @enum {string}
+           */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportExport"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportExportContent[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        exportId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportExportContent"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportExportContent[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        exportId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportExportContent"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportSchedules[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_createReportSchedule[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @enum {string} */
+          frequency: "weekly" | "monthly";
+          /** @default null */
+          weekday?: number | null;
+          /** @default null */
+          dayOfMonth?: number | null;
+          localTime: string;
+          /** @enum {string} */
+          range: "previous_week" | "previous_month";
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+          /**
+           * @default in_app
+           * @enum {string}
+           */
+          delivery?: "in_app" | "email";
+          /** @default true */
+          enabled?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportSchedule"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportSchedules[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_createReportSchedule[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @enum {string} */
+          frequency: "weekly" | "monthly";
+          /** @default null */
+          weekday?: number | null;
+          /** @default null */
+          dayOfMonth?: number | null;
+          localTime: string;
+          /** @enum {string} */
+          range: "previous_week" | "previous_month";
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+          /**
+           * @default in_app
+           * @enum {string}
+           */
+          delivery?: "in_app" | "email";
+          /** @default true */
+          enabled?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportSchedule"];
+        };
+      };
+    };
+  };
+  "ManagementController_deleteReportSchedule[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportSchedule[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @enum {string} */
+          frequency: "weekly" | "monthly";
+          /** @default null */
+          weekday?: number | null;
+          /** @default null */
+          dayOfMonth?: number | null;
+          localTime: string;
+          /** @enum {string} */
+          range: "previous_week" | "previous_month";
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+          /**
+           * @default in_app
+           * @enum {string}
+           */
+          delivery?: "in_app" | "email";
+          /** @default true */
+          enabled?: boolean;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportSchedule"];
+        };
+      };
+    };
+  };
+  "ManagementController_deleteReportSchedule[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportSchedule[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @enum {string} */
+          frequency: "weekly" | "monthly";
+          /** @default null */
+          weekday?: number | null;
+          /** @default null */
+          dayOfMonth?: number | null;
+          localTime: string;
+          /** @enum {string} */
+          range: "previous_week" | "previous_month";
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /**
+           * @default overview
+           * @enum {string}
+           */
+          family?:
+            | "overview"
+            | "sales"
+            | "exceptions"
+            | "inventory"
+            | "purchasing"
+            | "operations"
+            | "profitability"
+            | "multiunit"
+            | "quality";
+          /**
+           * @default in_app
+           * @enum {string}
+           */
+          delivery?: "in_app" | "email";
+          /** @default true */
+          enabled?: boolean;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportSchedule"];
+        };
       };
     };
   };
@@ -9737,6 +29190,1226 @@ export interface operations {
       };
     };
   };
+  "ManagementController_peopleDirectory[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleDirectory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleCapabilities[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfTimeTracking[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfTimeTracking[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateTimeTrackingSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "off" | "all" | "selected";
+          /** @default true */
+          geofenceEnabled?: boolean;
+          locationLabel?: string;
+          latitude?: number;
+          longitude?: number;
+          radiusMeters: number;
+          accuracyToleranceMeters: number;
+          /** @default false */
+          managerCanView?: boolean;
+          /** @default false */
+          financeCanView?: boolean;
+          /** @default true */
+          antiFraudEnabled?: boolean;
+          /** @default true */
+          offlineEnabled?: boolean;
+          /** @default true */
+          notificationsEnabled?: boolean;
+          /** @default true */
+          managerAlertOnAnomaly?: boolean;
+          /** @default 15 */
+          lateToleranceMinutes?: number;
+          /** @default 0 */
+          minimumBreakMinutes?: number;
+          /** @default 120 */
+          maxOvertimeMinutes?: number;
+          /** @default 720 */
+          longShiftAlertMinutes?: number;
+          /** @default 15 */
+          reminderBeforeShiftMinutes?: number;
+          /** @default 15 */
+          reminderAfterShiftMinutes?: number;
+          /** @default [] */
+          selectedPersonIds?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateTimeTrackingSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "off" | "all" | "selected";
+          /** @default true */
+          geofenceEnabled?: boolean;
+          locationLabel?: string;
+          latitude?: number;
+          longitude?: number;
+          radiusMeters: number;
+          accuracyToleranceMeters: number;
+          /** @default false */
+          managerCanView?: boolean;
+          /** @default false */
+          financeCanView?: boolean;
+          /** @default true */
+          antiFraudEnabled?: boolean;
+          /** @default true */
+          offlineEnabled?: boolean;
+          /** @default true */
+          notificationsEnabled?: boolean;
+          /** @default true */
+          managerAlertOnAnomaly?: boolean;
+          /** @default 15 */
+          lateToleranceMinutes?: number;
+          /** @default 0 */
+          minimumBreakMinutes?: number;
+          /** @default 120 */
+          maxOvertimeMinutes?: number;
+          /** @default 720 */
+          longShiftAlertMinutes?: number;
+          /** @default 15 */
+          reminderBeforeShiftMinutes?: number;
+          /** @default 15 */
+          reminderAfterShiftMinutes?: number;
+          /** @default [] */
+          selectedPersonIds?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_closeTimeTrackingPeriod[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_closeTimeTrackingPeriod[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reopenTimeTrackingPeriod[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        closureId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reopenTimeTrackingPeriod[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        closureId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingReport[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingReport[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfClockIn[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfClockIn[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_requestTimeCorrection[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          timeEntryId: string;
+          /** Format: date-time */
+          clockedInAt: string;
+          /** Format: date-time */
+          clockedOutAt?: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_requestTimeCorrection[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          timeEntryId: string;
+          /** Format: date-time */
+          clockedInAt: string;
+          /** Format: date-time */
+          clockedOutAt?: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfStartBreak[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** @enum {string} */
+          type: "meal" | "temporary";
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfStartBreak[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** @enum {string} */
+          type: "meal" | "temporary";
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfCompleteBreak[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        breakId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfCompleteBreak[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        breakId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfClockOut[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_selfClockOut[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          accuracyMeters?: number;
+          deviceId?: string;
+          mockLocationDetected?: boolean;
+          /** Format: date-time */
+          capturedAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideTimeCorrection[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        correctionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          reviewNote?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideTimeCorrection[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        correctionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          reviewNote?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePerson[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          identityId?: string | null;
+          name?: string;
+          employmentCode?: string | null;
+          roleLabel?: string;
+          hourlyRateCents?: number | null;
+          hiredAt?: string | null;
+          /** Format: date-time */
+          expectedUpdatedAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePerson[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          identityId?: string | null;
+          name?: string;
+          employmentCode?: string | null;
+          roleLabel?: string;
+          hourlyRateCents?: number | null;
+          hiredAt?: string | null;
+          /** Format: date-time */
+          expectedUpdatedAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_inactivatePerson[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_inactivatePerson[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reactivatePerson[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reactivatePerson[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personTimeline[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personTimeline[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleIndicators[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleIndicators[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportPeople[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          personIds: string[];
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "json" | "csv";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportPeople[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          personIds: string[];
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "json" | "csv";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_assignPeopleTimeTracking[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          personIds: string[];
+          enabled: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_assignPeopleTimeTracking[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          personIds: string[];
+          enabled: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_createSchedule[0]": {
     parameters: {
       query?: never;
@@ -9793,6 +30466,278 @@ export interface operations {
           /** @default 0 */
           breakMinutes?: number;
           notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePeopleSchedule[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+          /** @default 0 */
+          breakMinutes?: number;
+          notes?: string | null;
+          /** Format: date-time */
+          expectedUpdatedAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePeopleSchedule[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+          /** @default 0 */
+          breakMinutes?: number;
+          notes?: string | null;
+          /** Format: date-time */
+          expectedUpdatedAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPeopleSchedule[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPeopleSchedule[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        scheduleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_previewPeopleSchedules[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          schedules: {
+            /** Format: uuid */
+            personId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 0 */
+            breakMinutes?: number;
+            notes?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_previewPeopleSchedules[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          schedules: {
+            /** Format: uuid */
+            personId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 0 */
+            breakMinutes?: number;
+            notes?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createPeopleSchedulesBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          schedules: {
+            /** Format: uuid */
+            personId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 0 */
+            breakMinutes?: number;
+            notes?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createPeopleSchedulesBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          schedules: {
+            /** Format: uuid */
+            personId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 0 */
+            breakMinutes?: number;
+            notes?: string;
+          }[];
         };
       };
     };
@@ -9954,14 +30899,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          /** Format: uuid */
-          personId: string;
-          /** Format: uuid */
-          ruleId?: string;
-          /** Format: uuid */
-          sourceOrderId?: string;
-          baseCents: number;
-          amountCents?: number;
+          name: string;
+          basisPoints: number;
         };
       };
     };
@@ -9987,14 +30926,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          /** Format: uuid */
-          personId: string;
-          /** Format: uuid */
-          ruleId?: string;
-          /** Format: uuid */
-          sourceOrderId?: string;
-          baseCents: number;
-          amountCents?: number;
+          name: string;
+          basisPoints: number;
         };
       };
     };
@@ -10065,6 +30998,68 @@ export interface operations {
           sourceOrderId?: string;
           baseCents: number;
           amountCents?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transitionCommission[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        commissionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "reject" | "pay" | "cancel";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transitionCommission[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        commissionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "reject" | "pay" | "cancel";
+          note: string;
         };
       };
     };
@@ -11015,7 +32010,13 @@ export interface operations {
   };
   "GrowthController_listReservations[0]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+        to?: string;
+        from?: string;
+        scope?: "active" | "history" | "all";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -11035,7 +32036,13 @@ export interface operations {
   };
   "GrowthController_listReservations[1]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+        to?: string;
+        from?: string;
+        scope?: "active" | "history" | "all";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -11181,7 +32188,11 @@ export interface operations {
   };
   "GrowthController_listWaitlist[0]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+        scope?: "active" | "history" | "all";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -11201,7 +32212,11 @@ export interface operations {
   };
   "GrowthController_listWaitlist[1]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+        scope?: "active" | "history" | "all";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -11395,6 +32410,8 @@ export interface operations {
           feeCents: number;
           /** @default 0 */
           minimumOrderCents?: number;
+          /** @default 45 */
+          estimatedDeliveryMinutes?: number;
           geometry: {
             [key: string]: unknown;
           };
@@ -11430,6 +32447,8 @@ export interface operations {
           feeCents: number;
           /** @default 0 */
           minimumOrderCents?: number;
+          /** @default 45 */
+          estimatedDeliveryMinutes?: number;
           geometry: {
             [key: string]: unknown;
           };
@@ -11440,6 +32459,426 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryZone[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        zoneId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          feeCents?: number;
+          minimumOrderCents?: number;
+          estimatedDeliveryMinutes?: number;
+          geometry?: {
+            [key: string]: unknown;
+          };
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryZone[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        zoneId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          feeCents?: number;
+          minimumOrderCents?: number;
+          estimatedDeliveryMinutes?: number;
+          geometry?: {
+            [key: string]: unknown;
+          };
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_validateDeliveryAddress[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        zoneId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          street: string;
+          number: string;
+          complement?: string;
+          neighborhood: string;
+          city: string;
+          state: string;
+          postalCode: string;
+          latitude?: number;
+          longitude?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_validateDeliveryAddress[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        zoneId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          street: string;
+          number: string;
+          complement?: string;
+          neighborhood: string;
+          city: string;
+          state: string;
+          postalCode: string;
+          latitude?: number;
+          longitude?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listDeliveryCouriers[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listDeliveryCouriers[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_createDeliveryCourier[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          reference: string;
+          name: string;
+          phone?: string | null;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_createDeliveryCourier[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          reference: string;
+          name: string;
+          phone?: string | null;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryCourierStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        courierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "available" | "offline";
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryCourierStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        courierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "available" | "offline";
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryCourierPosition[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        courierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          /** Format: date-time */
+          recordedAt?: string;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateDeliveryCourierPosition[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        courierId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          latitude: number;
+          longitude: number;
+          /** Format: date-time */
+          recordedAt?: string;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listDeliveryOrders[0]": {
+    parameters: {
+      query?: {
+        sla?: "overdue" | "on_time" | "unset";
+        scheduled?: boolean;
+        query?: string;
+        limit?: number;
+        updatedSince?: string;
+        status?:
+          | "draft"
+          | "placed"
+          | "confirmed"
+          | "preparing"
+          | "ready"
+          | "dispatched"
+          | "completed"
+          | "canceled";
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listDeliveryOrders[1]": {
+    parameters: {
+      query?: {
+        sla?: "overdue" | "on_time" | "unset";
+        scheduled?: boolean;
+        query?: string;
+        limit?: number;
+        updatedSince?: string;
+        status?:
+          | "draft"
+          | "placed"
+          | "confirmed"
+          | "preparing"
+          | "ready"
+          | "dispatched"
+          | "completed"
+          | "canceled";
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -11468,9 +32907,18 @@ export interface operations {
           /** @enum {string} */
           fulfillment: "delivery" | "pickup";
           address?: {
-            [key: string]: unknown;
+            street: string;
+            number: string;
+            complement?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
           } | null;
           scheduledFor?: string | null;
+          promisedAt?: string | null;
           idempotencyKey: string;
         };
       };
@@ -11505,9 +32953,134 @@ export interface operations {
           /** @enum {string} */
           fulfillment: "delivery" | "pickup";
           address?: {
-            [key: string]: unknown;
+            street: string;
+            number: string;
+            complement?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
           } | null;
           scheduledFor?: string | null;
+          promisedAt?: string | null;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_assignDeliveryCourier[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          courierId: string;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_assignDeliveryCourier[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          courierId: string;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_requestDeliveryNotification[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          audience: "operations" | "customer";
+          /** @enum {string} */
+          type: "status_update" | "courier_assigned" | "courier_arriving";
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_requestDeliveryNotification[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          audience: "operations" | "customer";
+          /** @enum {string} */
+          type: "status_update" | "courier_assigned" | "courier_arriving";
           idempotencyKey: string;
         };
       };

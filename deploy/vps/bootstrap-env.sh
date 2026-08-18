@@ -64,6 +64,7 @@ whatsapp_number=${WHATSAPP_NUMBER_OVERRIDE:-}
 
 postgres_password=$(openssl rand -hex 24)
 session_secret=$(openssl rand -hex 48)
+qr_table_token_secret=$(openssl rand -hex 48)
 mfa_key=$(openssl rand -base64 32)
 outbox_key=$(openssl rand -base64 32)
 internal_key=$(openssl rand -hex 32)
@@ -89,15 +90,14 @@ write_key NEXT_PUBLIC_GOOGLE_AUTH_ENABLED true
 write_key NEXT_PUBLIC_WHATSAPP_NUMBER "$whatsapp_number"
 write_key NEXT_PUBLIC_CUSTOMER_API_URL https://api.giromesa.com.br
 write_key NEXT_PUBLIC_CUSTOMER_API_ENABLED true
-write_key NEXT_PUBLIC_DEMO_HUB_ACK false
-write_key CUSTOMER_QA_DEMO_SLUG demo
 write_key VITE_API_URL https://api.giromesa.com.br
 write_key VITE_SITE_URL https://giromesa.com.br
-write_key VITE_DEMO_MODE false
 write_key LOG_LEVEL info
 write_key TRUST_PROXY 1
 write_key CORS_ORIGINS https://giromesa.com.br,https://www.giromesa.com.br,https://menu.giromesa.com.br,https://app.giromesa.com.br
 write_key SESSION_SECRET "$session_secret"
+write_key QR_TABLE_TOKEN_SECRET "$qr_table_token_secret"
+write_key MEDIA_ROOT /app/data/media
 write_key MFA_ENCRYPTION_KEY "$mfa_key"
 write_key OUTBOX_ENCRYPTION_KEY "$outbox_key"
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"

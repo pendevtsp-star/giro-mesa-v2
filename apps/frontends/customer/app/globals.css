@@ -1,0 +1,7 @@
+@import "@giromesa/ui/styles.css";
+@import "../styles/base.css";
+@import "../styles/menu.css";
+@import "../styles/preferences.css";
+@import "../styles/order.css";
+@import "../styles/services.css";
+@import "../styles/responsive.css";

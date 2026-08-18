@@ -1,0 +1,3 @@
+ALTER TABLE "pos_dining_tables" ADD COLUMN "layout_x" integer;--> statement-breakpoint
+ALTER TABLE "pos_dining_tables" ADD COLUMN "layout_y" integer;--> statement-breakpoint
+ALTER TABLE "pos_dining_tables" ADD CONSTRAINT "pos_tables_layout_check" CHECK (("pos_dining_tables"."layout_x" IS NULL AND "pos_dining_tables"."layout_y" IS NULL) OR ("pos_dining_tables"."layout_x" BETWEEN 0 AND 1000 AND "pos_dining_tables"."layout_y" BETWEEN 0 AND 620));

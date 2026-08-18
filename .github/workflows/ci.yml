@@ -76,7 +76,7 @@ jobs:
         run: |
           DATABASE_URL="postgresql://giromesa:giromesa@localhost:5432/giromesa_ci" SESSION_SECRET="ci-session-secret-at-least-32-characters" pnpm openapi:generate
           pnpm clients:generate:ts
-          git diff --exit-code -- apps/api/openapi packages/contracts/src/generated-api.ts
+          git diff --exit-code -- apps/backends/api/openapi packages/contracts/src/generated-api.ts
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
 
@@ -97,9 +97,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm clients:generate:csharp
       - run: git diff --exit-code -- packages/api-client-csharp/Generated
-      - run: dotnet restore apps/edge-hub/GiroMesa.EdgeHub.csproj
-      - run: dotnet build apps/edge-hub/GiroMesa.EdgeHub.csproj --configuration Release --no-restore
-      - run: dotnet test apps/edge-hub.tests/GiroMesa.EdgeHub.Tests.csproj --configuration Release
+      - run: dotnet restore apps/backends/edge-hub/GiroMesa.EdgeHub.csproj
+      - run: dotnet build apps/backends/edge-hub/GiroMesa.EdgeHub.csproj --configuration Release --no-restore
+      - run: dotnet test apps/backends/edge-hub.tests/GiroMesa.EdgeHub.Tests.csproj --configuration Release
       - run: dotnet build packages/api-client-csharp/GiroMesa.ApiClient.csproj --configuration Release
 
   terraform:

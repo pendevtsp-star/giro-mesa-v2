@@ -1,0 +1,108 @@
+.gm-toast {
+  align-items: start;
+  --gm-toast-accent: var(--gm-info);
+  --gm-toast-accent-soft: var(--gm-info-soft);
+  animation: gm-toast-in var(--gm-duration-base) var(--gm-ease);
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-left: 3px solid var(--gm-toast-accent);
+  border-radius: var(--gm-radius);
+  box-shadow: var(--gm-shadow-md);
+  color: var(--gm-ink);
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  max-width: min(390px, calc(100vw - 2rem));
+  padding: 0.8rem;
+  position: fixed;
+  right: 1rem;
+  top: max(82px, calc(var(--gm-space-4) + env(safe-area-inset-top)));
+  width: max-content;
+  z-index: 1000;
+}
+.gm-toast--info {
+  --gm-toast-accent: var(--gm-info);
+  --gm-toast-accent-soft: var(--gm-info-soft);
+}
+.gm-toast--success {
+  --gm-toast-accent: var(--gm-success);
+  --gm-toast-accent-soft: var(--gm-success-soft);
+}
+.gm-toast--danger {
+  --gm-toast-accent: var(--gm-danger);
+  --gm-toast-accent-soft: var(--gm-danger-soft);
+}
+.gm-toast__icon {
+  align-items: center;
+  background: var(--gm-toast-accent-soft);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-toast-accent);
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+.gm-toast__content {
+  display: grid;
+  gap: 0.15rem;
+}
+.gm-toast__content small {
+  color: var(--gm-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.gm-toast .gm-toast__action {
+  background: var(--gm-toast-accent-soft);
+  border-radius: var(--gm-radius-xs);
+  color: var(--gm-toast-accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  height: auto;
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  width: max-content;
+}
+.gm-toast button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--gm-radius-xs);
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  opacity: 0.72;
+  width: 30px;
+}
+.gm-toast button:hover,
+.gm-toast button:focus-visible {
+  background: var(--gm-surface-soft);
+  opacity: 1;
+}
+@keyframes gm-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .gm-toast {
+    bottom: max(74px, calc(var(--gm-space-4) + env(safe-area-inset-bottom)));
+    left: var(--gm-space-4);
+    right: var(--gm-space-4);
+    top: auto;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-toast {
+    animation: none;
+  }
+}

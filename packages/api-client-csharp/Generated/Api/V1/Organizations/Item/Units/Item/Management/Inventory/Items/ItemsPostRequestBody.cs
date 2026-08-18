@@ -16,6 +16,18 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The allowNegative property</summary>
         public bool? AllowNegative { get; set; }
+        /// <summary>The barcode property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Barcode { get; set; }
+#nullable restore
+#else
+        public string Barcode { get; set; }
+#endif
+        /// <summary>The kind property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_kind? Kind { get; set; }
+        /// <summary>The leadTimeDays property</summary>
+        public int? LeadTimeDays { get; set; }
         /// <summary>The minimumQuantity property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -32,8 +44,34 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
 #else
         public string Name { get; set; }
 #endif
+        /// <summary>The preferredSupplierId property</summary>
+        public Guid? PreferredSupplierId { get; set; }
         /// <summary>The productId property</summary>
         public Guid? ProductId { get; set; }
+        /// <summary>The purchaseToStockFactor property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor? PurchaseToStockFactor { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor PurchaseToStockFactor { get; set; }
+#endif
+        /// <summary>The purchaseUnit property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? PurchaseUnit { get; set; }
+#nullable restore
+#else
+        public string PurchaseUnit { get; set; }
+#endif
+        /// <summary>The reorderQuantity property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity? ReorderQuantity { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity ReorderQuantity { get; set; }
+#endif
         /// <summary>The sku property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -57,6 +95,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         {
             AdditionalData = new Dictionary<string, object>();
             AllowNegative = false;
+            Kind = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_kind.Ingredient;
+            LeadTimeDays = 0;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -77,9 +117,16 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "allowNegative", n => { AllowNegative = n.GetBoolValue(); } },
+                { "barcode", n => { Barcode = n.GetStringValue(); } },
+                { "kind", n => { Kind = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_kind>(); } },
+                { "leadTimeDays", n => { LeadTimeDays = n.GetIntValue(); } },
                 { "minimumQuantity", n => { MinimumQuantity = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity.CreateFromDiscriminatorValue); } },
                 { "name", n => { Name = n.GetStringValue(); } },
+                { "preferredSupplierId", n => { PreferredSupplierId = n.GetGuidValue(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
+                { "purchaseToStockFactor", n => { PurchaseToStockFactor = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor.CreateFromDiscriminatorValue); } },
+                { "purchaseUnit", n => { PurchaseUnit = n.GetStringValue(); } },
+                { "reorderQuantity", n => { ReorderQuantity = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity.CreateFromDiscriminatorValue); } },
                 { "sku", n => { Sku = n.GetStringValue(); } },
                 { "unit", n => { Unit = n.GetStringValue(); } },
             };
@@ -92,9 +139,16 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteBoolValue("allowNegative", AllowNegative);
+            writer.WriteStringValue("barcode", Barcode);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody_kind>("kind", Kind);
+            writer.WriteIntValue("leadTimeDays", LeadTimeDays);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity>("minimumQuantity", MinimumQuantity);
             writer.WriteStringValue("name", Name);
+            writer.WriteGuidValue("preferredSupplierId", PreferredSupplierId);
             writer.WriteGuidValue("productId", ProductId);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor>("purchaseToStockFactor", PurchaseToStockFactor);
+            writer.WriteStringValue("purchaseUnit", PurchaseUnit);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity>("reorderQuantity", ReorderQuantity);
             writer.WriteStringValue("sku", Sku);
             writer.WriteStringValue("unit", Unit);
             writer.WriteAdditionalData(AdditionalData);
@@ -124,6 +178,126 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
             {
                 if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
                 var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_minimumQuantity();
+                if(parseNode.GetDoubleValue() is double doubleValue)
+                {
+                    result.Double = doubleValue;
+                }
+                else if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Double != null)
+                {
+                    writer.WriteDoubleValue(null, Double);
+                }
+                else if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="double"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ItemsPostRequestBody_purchaseToStockFactor : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="double"/></summary>
+            public double? Double { get; set; }
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_purchaseToStockFactor();
+                if(parseNode.GetDoubleValue() is double doubleValue)
+                {
+                    result.Double = doubleValue;
+                }
+                else if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Double != null)
+                {
+                    writer.WriteDoubleValue(null, Double);
+                }
+                else if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="double"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ItemsPostRequestBody_reorderQuantity : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="double"/></summary>
+            public double? Double { get; set; }
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsPostRequestBody.ItemsPostRequestBody_reorderQuantity();
                 if(parseNode.GetDoubleValue() is double doubleValue)
                 {
                     result.Double = doubleValue;

@@ -17,9 +17,12 @@ test-results/
 .DS_Store
 Thumbs.db
 .vs/
+.worktrees/
 bin/
 obj/
+data/
 *.user
 *.suo
-apps/edge-hub/data/
-apps/ops-shell/Platforms/**/bin/
+apps/backends/edge-hub/data/
+apps/native/ops-shell/Platforms/**/bin/
+.vscode/

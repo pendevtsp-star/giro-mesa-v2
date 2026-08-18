@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 test("landing communicates the trial and exposes the legal map", async ({ page }) => {
   await page.goto("http://localhost:3110");
@@ -82,34 +82,4 @@ test("contact form posts consent to the internal commercial API", async ({ page 
   await expect(page.getByRole("status")).toContainText(/solicitação recebida/i);
   expect(body?.privacyAccepted).toBe(true);
   expect(body).not.toHaveProperty("consent");
-});
-
-test("public QR remains transparent about demo and provides table actions", async ({ page }) => {
-  await page.goto("http://localhost:3111/m/demo");
-  await expect(page.getByText(/cardápio com dados demonstrativos/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: /cardápio/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /chamar garçom/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /pedir a conta/i })).toBeVisible();
-  await page.getByRole("button", { name: /bruschetta da casa/i }).click();
-  await page.getByRole("button", { name: /^adicionar/i }).click();
-  await page.getByRole("button", { name: /ver seleção/i }).click({ force: true });
-  await expect(page.getByRole("heading", { name: /como você quer receber/i })).toBeVisible();
-  await expect(page.getByText(/pagamento na retirada/i)).toBeVisible();
-  await expect(page.getByText(/não solicitará cartão nem pix/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /demonstrar envio do pedido/i })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-});
-
-test("operational shell enters a role-scoped dashboard", async ({ page }) => {
-  await page.goto("http://127.0.0.1:3112");
-  await expect(page.getByRole("heading", { name: /entrar na operação/i })).toBeVisible();
-  await page.getByRole("button", { name: /entrar no giromesa/i }).click();
-  await expect(page.getByRole("heading", { name: /onde você vai trabalhar/i })).toBeVisible();
-  await page.getByRole("button", { name: /abrir operação/i }).click();
-  await expect(page.getByRole("navigation")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
 });

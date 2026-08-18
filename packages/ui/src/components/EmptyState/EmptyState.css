@@ -1,0 +1,25 @@
+.gm-empty {
+  align-items: center;
+  color: var(--gm-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+.gm-empty strong {
+  color: var(--gm-ink);
+}
+.gm-empty p {
+  margin: 0;
+  max-width: 36ch;
+}
+.gm-empty__icon {
+  background: var(--gm-brand-soft);
+  border-radius: 50%;
+  display: grid;
+  font-size: 1.4rem;
+  height: 48px;
+  place-items: center;
+  width: 48px;
+}

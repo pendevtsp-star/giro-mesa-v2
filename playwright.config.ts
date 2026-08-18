@@ -28,14 +28,7 @@ export default defineConfig({
     },
     {
       command: "pnpm --filter @giromesa/customer exec next dev -p 3111",
-      url: "http://localhost:3111/m/demo",
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3112",
-      env: { VITE_DEMO_MODE: "true" },
-      url: "http://127.0.0.1:3112",
+      url: "http://localhost:3111",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },

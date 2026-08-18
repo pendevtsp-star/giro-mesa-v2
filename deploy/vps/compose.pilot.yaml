@@ -46,6 +46,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3200
+      MEDIA_ROOT: /app/data/media
+    volumes:
+      - media_data:/app/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,8 +92,6 @@ services:
     environment:
       NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-https://api.giromesa.com.br}
       NEXT_PUBLIC_CUSTOMER_API_ENABLED: ${NEXT_PUBLIC_CUSTOMER_API_ENABLED:-true}
-      NEXT_PUBLIC_DEMO_HUB_ACK: ${NEXT_PUBLIC_DEMO_HUB_ACK:-false}
-      CUSTOMER_QA_DEMO_SLUG: ${CUSTOMER_QA_DEMO_SLUG:-demo}
     depends_on:
       api:
         condition: service_healthy
@@ -112,6 +113,7 @@ services:
 
 volumes:
   postgres_data:
+  media_data:
 
 networks:
   giromesa-v2:

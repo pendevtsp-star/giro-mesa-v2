@@ -1,0 +1,59 @@
+.gm-button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--gm-radius-xs);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: var(--gm-space-2);
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 40px;
+  padding: 0.58rem 0.85rem;
+  transition:
+    background-color var(--gm-duration-fast) var(--gm-ease-out),
+    border-color var(--gm-duration-fast) var(--gm-ease-out),
+    color var(--gm-duration-fast) var(--gm-ease-out),
+    transform var(--gm-duration-fast) var(--gm-ease-out);
+  white-space: nowrap;
+}
+.gm-button:not(:disabled):active {
+  transform: translateY(1px);
+}
+.gm-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.gm-button--primary {
+  background: var(--gm-action);
+  color: var(--gm-on-action);
+}
+.gm-button--primary:hover:not(:disabled) {
+  background: var(--gm-action-hover);
+}
+.gm-button--secondary {
+  background: var(--gm-surface);
+  border-color: var(--gm-border);
+  color: var(--gm-ink);
+}
+.gm-button--secondary:hover:not(:disabled),
+.gm-button--ghost:hover:not(:disabled) {
+  background: var(--gm-surface-soft);
+  border-color: color-mix(in srgb, var(--gm-border) 55%, var(--gm-muted));
+}
+.gm-button--ghost {
+  background: transparent;
+  color: var(--gm-ink);
+}
+.gm-button--danger {
+  background: var(--gm-danger-action);
+  color: var(--gm-on-action);
+}
+.gm-button--danger:hover:not(:disabled) {
+  background: var(--gm-danger-action-hover);
+}
+.gm-button--sm {
+  min-height: 34px;
+  padding: 0.4rem 0.65rem;
+}

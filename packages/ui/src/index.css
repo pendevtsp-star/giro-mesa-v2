@@ -1,0 +1,39 @@
+/* GiroMesa Design System — Barrel CSS */
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radii.css";
+@import "./tokens/shadows.css";
+@import "./tokens/motion.css";
+@import "./tokens/breakpoints.css";
+@import "./themes/light.css";
+@import "./themes/dark.css";
+@import "./reset.css";
+@import "./utilities.css";
+@import "./patterns.css";
+
+/* Component styles */
+@import "./components/Icon/Icon.css";
+@import "./components/Button/Button.css";
+@import "./components/Card/Card.css";
+@import "./components/DataTable/DataTable.css";
+@import "./components/Badge/Badge.css";
+@import "./components/StatCard/StatCard.css";
+@import "./components/SegmentedTabs/SegmentedTabs.css";
+@import "./components/StatusDot/StatusDot.css";
+@import "./components/Progress/Progress.css";
+@import "./components/EmptyState/EmptyState.css";
+@import "./components/Drawer/Drawer.css";
+@import "./components/Modal/Modal.css";
+@import "./components/SearchField/SearchField.css";
+@import "./components/FormField/FormField.css";
+@import "./components/Avatar/Avatar.css";
+@import "./components/Callout/Callout.css";
+@import "./components/Skeleton/Skeleton.css";
+@import "./components/Toast/Toast.css";
+@import "./components/Tooltip/Tooltip.css";
+
+/* Layout styles */
+@import "./layouts/AppShell/AppShell.css";
+@import "./layouts/SplitLayout/SplitLayout.css";
+@import "./layouts/KanbanBoard/KanbanBoard.css";

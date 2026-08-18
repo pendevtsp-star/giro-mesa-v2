@@ -25,9 +25,13 @@ export const roleName = pgEnum("role_name", [
   "manager",
   "waiter",
   "cashier",
+  "receptionist",
+  "busser",
   "kds",
+  "delivery",
   "inventory",
   "finance",
+  "accountant",
 ]);
 export const catalogStatus = pgEnum("catalog_status", ["draft", "published", "discontinued"]);
 export const billingState = pgEnum("billing_state", [
@@ -396,6 +400,8 @@ export const publicMenus = pgTable(
     unitId: uuid("unit_id").notNull(),
     slug: varchar("slug", { length: 100 }).notNull(),
     items: jsonb("items").$type<Record<string, unknown>[]>().notNull().default([]),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    version: integer("version").notNull().default(1),
     active: boolean("active").notNull().default(false),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     ...timestamps,

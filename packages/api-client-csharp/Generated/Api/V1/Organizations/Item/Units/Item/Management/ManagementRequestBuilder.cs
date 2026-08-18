@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.CashShifts;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Overview;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Purchases;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reconciliations;
@@ -36,6 +37,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.InventoryRequestBuilder Inventory
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.InventoryRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The overview property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Overview.OverviewRequestBuilder Overview
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Overview.OverviewRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The people property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeopleRequestBuilder People

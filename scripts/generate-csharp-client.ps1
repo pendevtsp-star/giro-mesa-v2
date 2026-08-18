@@ -16,7 +16,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   --language CSharp `
   --class-name GiroMesaApiClient `
   --namespace-name GiroMesa.ApiClient `
-  --openapi apps/api/openapi/openapi.json `
+  --openapi apps/backends/api/openapi/openapi.json `
   --output packages/api-client-csharp/Generated `
   --clean-output
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

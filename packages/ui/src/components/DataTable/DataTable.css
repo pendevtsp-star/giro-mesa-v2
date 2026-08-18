@@ -1,0 +1,23 @@
+.gm-data-table__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.gm-data-table {
+  border-collapse: collapse;
+  min-width: 42rem;
+  width: 100%;
+}
+
+.gm-data-table :is(th, td) {
+  border-bottom: 1px solid var(--gm-border);
+  padding: var(--gm-space-3) var(--gm-space-4);
+  text-align: left;
+}
+
+.gm-data-table th {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

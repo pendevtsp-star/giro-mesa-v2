@@ -1,0 +1,181 @@
+﻿/* Delivery, platform, alerts */
+.channel-notice {
+  align-items: center;
+  background: #e3eef8;
+  border-radius: var(--gm-radius);
+  color: var(--gm-info);
+  display: flex;
+  font-size: 0.74rem;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+}
+.delivery-board {
+  grid-template-columns: repeat(4, 1fr);
+}
+.delivery-column {
+  background: rgba(238, 238, 231, 0.65);
+  border-radius: var(--gm-radius);
+  min-height: 470px;
+  padding: 0.7rem;
+}
+.delivery-order {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+  padding: 0.85rem;
+}
+.delivery-order > div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.delivery-order > div > strong {
+  color: var(--gm-muted);
+  font-size: 0.67rem;
+}
+.delivery-order h3,
+.delivery-order p {
+  margin: 0;
+}
+.delivery-order p {
+  color: var(--gm-muted);
+  font-size: 0.72rem;
+}
+.delivery-order .gm-button {
+  width: 100%;
+}
+.tenant-list {
+  margin-top: 1rem;
+}
+.tenant-row {
+  align-items: center;
+  border-top: 1px solid var(--gm-border);
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto 1fr auto auto auto;
+  min-height: 72px;
+}
+.tenant-row > span:nth-child(2) {
+  display: grid;
+  gap: 0.18rem;
+}
+.tenant-logo {
+  background: var(--gm-brand-soft);
+  border-radius: 12px;
+  color: var(--gm-brand);
+  display: grid;
+  font-family: var(--gm-display);
+  font-size: 1.2rem;
+  height: 42px;
+  place-items: center;
+  width: 42px;
+}
+.alerts-layout {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 310px;
+}
+.alert-row {
+  align-items: center;
+  border-top: 1px solid var(--gm-border);
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto 1fr auto;
+  min-height: 82px;
+}
+.alert-row > span:nth-child(2) {
+  display: grid;
+  gap: 0.2rem;
+}
+.alert-row--resolved {
+  opacity: 0.5;
+}
+.alert-settings {
+  display: grid;
+  gap: 1rem;
+}
+.health-score {
+  align-items: baseline;
+  display: flex;
+  gap: 0.3rem;
+}
+.alerts-layout .health-score strong {
+  color: var(--gm-brand);
+  font-family: var(--gm-display);
+  font-size: 3.4rem;
+}
+.health-score span {
+  color: var(--gm-muted);
+}
+.dialog--pin {
+  max-width: 440px;
+}
+.pin-field {
+  margin-top: 1rem;
+  text-align: center;
+}
+.pin-field input {
+  font-size: 1.8rem;
+  letter-spacing: 0.7rem;
+  text-align: center;
+}
+.field-error {
+  color: var(--gm-danger);
+  font-size: 0.72rem;
+  text-align: center;
+}
+.nav-backdrop {
+  display: none;
+}
+.mobile-bottom-nav {
+  align-items: center;
+  background: var(--gm-surface);
+  border-top: 1px solid var(--gm-border);
+  bottom: 0;
+  box-shadow: 0 -4px 16px rgba(20, 30, 25, 0.06);
+  display: none;
+  height: 64px;
+  justify-content: space-around;
+  left: 0;
+  position: fixed;
+  right: 0;
+  z-index: 30;
+}
+.app-shell .mobile-bottom-nav :is(a, button) {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--gm-muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.68rem;
+  font-weight: 700;
+  gap: 0.2rem;
+  justify-content: center;
+  padding: 0.4rem;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+.app-shell .mobile-bottom-nav :is(a, button):hover,
+.app-shell .mobile-bottom-nav :is(a, button).active {
+  color: var(--gm-brand);
+}
+
+.app-shell .mobile-bottom-nav button {
+  position: relative;
+}
+
+.app-shell .mobile-bottom-nav button > small {
+  background: var(--gm-accent);
+  border-radius: 999px;
+  color: var(--gm-on-accent, white);
+  font-size: 0.58rem;
+  line-height: 1;
+  padding: 0.2rem 0.32rem;
+  position: absolute;
+  right: 0;
+  top: 0;
+}

@@ -1,0 +1,6 @@
+ALTER TABLE "management_report_budgets" DROP CONSTRAINT "management_report_budgets_metric_check";--> statement-breakpoint
+ALTER TABLE "management_report_schedules" ADD COLUMN "family" varchar(32) DEFAULT 'overview' NOT NULL;--> statement-breakpoint
+ALTER TABLE "pos_order_items" ADD COLUMN "cost_cents" integer;--> statement-breakpoint
+ALTER TABLE "management_report_budgets" ADD CONSTRAINT "management_report_budgets_metric_check" CHECK ("management_report_budgets"."metric" in ('pos_revenue', 'cash_inflows', 'cash_outflows', 'competence_revenue', 'competence_expenses', 'average_ticket', 'gross_margin', 'inventory_loss', 'canceled_value'));--> statement-breakpoint
+ALTER TABLE "management_report_schedules" ADD CONSTRAINT "management_report_schedules_family_check" CHECK ("management_report_schedules"."family" in ('overview', 'sales', 'exceptions', 'inventory', 'purchasing', 'operations', 'profitability', 'multiunit', 'quality'));--> statement-breakpoint
+ALTER TABLE "pos_order_items" ADD CONSTRAINT "pos_order_items_cost_check" CHECK ("pos_order_items"."cost_cents" is null or "pos_order_items"."cost_cents" >= 0);

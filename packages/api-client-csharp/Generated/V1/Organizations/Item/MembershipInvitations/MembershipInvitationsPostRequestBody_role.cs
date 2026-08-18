@@ -24,9 +24,21 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.MembershipInvitations
         #pragma warning disable CS1591
         Cashier,
         #pragma warning restore CS1591
+        [EnumMember(Value = "receptionist")]
+        #pragma warning disable CS1591
+        Receptionist,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "busser")]
+        #pragma warning disable CS1591
+        Busser,
+        #pragma warning restore CS1591
         [EnumMember(Value = "kds")]
         #pragma warning disable CS1591
         Kds,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "delivery")]
+        #pragma warning disable CS1591
+        Delivery,
         #pragma warning restore CS1591
         [EnumMember(Value = "inventory")]
         #pragma warning disable CS1591
@@ -35,6 +47,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.MembershipInvitations
         [EnumMember(Value = "finance")]
         #pragma warning disable CS1591
         Finance,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "accountant")]
+        #pragma warning disable CS1591
+        Accountant,
         #pragma warning restore CS1591
     }
 }

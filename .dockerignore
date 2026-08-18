@@ -9,10 +9,10 @@
 **/dist
 **/node_modules
 **/obj
-apps/edge-hub/data
-apps/edge-hub
-apps/edge-hub.tests
-apps/ops-shell
+apps/backends/edge-hub/data
+apps/backends/edge-hub
+apps/backends/edge-hub.tests
+apps/native/ops-shell
 infra
 node_modules
 packages/api-client-csharp

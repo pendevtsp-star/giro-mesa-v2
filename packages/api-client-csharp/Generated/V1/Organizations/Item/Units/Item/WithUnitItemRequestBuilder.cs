@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -27,6 +28,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder Devices
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The fiscal property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The management property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder Management

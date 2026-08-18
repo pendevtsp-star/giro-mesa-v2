@@ -32,21 +32,54 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Sta
         public StateRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/state", rawUrl)
         {
         }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostResponse"/></returns>
         /// <param name="body">The request body</param>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
+        /// <exception cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State409Error">When receiving a 409 status code</exception>
+        /// <exception cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State503Error">When receiving a 503 status code</exception>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostResponse?> PostAsStatePostResponseAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostResponse> PostAsStatePostResponseAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = ToPostRequestInformation(body, requestConfiguration);
-            await RequestAdapter.SendNoContentAsync(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            var errorMapping = new Dictionary<string, ParsableFactory<IParsable>>
+            {
+                { "409", global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State409Error.CreateFromDiscriminatorValue },
+                { "503", global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State503Error.CreateFromDiscriminatorValue },
+            };
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostResponse>(requestInfo, global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
+        }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StateResponse"/></returns>
+        /// <param name="body">The request body</param>
+        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
+        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
+        /// <exception cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State409Error">When receiving a 409 status code</exception>
+        /// <exception cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State503Error">When receiving a 503 status code</exception>
+        [Obsolete("This method is obsolete. Use PostAsStatePostResponseAsync instead.")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StateResponse?> PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#nullable restore
+#else
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StateResponse> PostAsync(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StatePostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#endif
+            if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
+            var requestInfo = ToPostRequestInformation(body, requestConfiguration);
+            var errorMapping = new Dictionary<string, ParsableFactory<IParsable>>
+            {
+                { "409", global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State409Error.CreateFromDiscriminatorValue },
+                { "503", global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.State503Error.CreateFromDiscriminatorValue },
+            };
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StateResponse>(requestInfo, global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State.StateResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="body">The request body</param>
@@ -63,6 +96,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Sta
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = new RequestInformation(Method.POST, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             requestInfo.SetContentFromParsable(RequestAdapter, "application/json", body);
             return requestInfo;
         }

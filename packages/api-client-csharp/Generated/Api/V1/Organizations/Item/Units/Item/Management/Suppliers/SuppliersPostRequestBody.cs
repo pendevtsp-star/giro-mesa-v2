@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Sup
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The address property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Address { get; set; }
+#nullable restore
+#else
+        public string Address { get; set; }
+#endif
         /// <summary>The contactName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -45,6 +53,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Sup
 #nullable restore
 #else
         public string Name { get; set; }
+#endif
+        /// <summary>The notes property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Notes { get; set; }
+#nullable restore
+#else
+        public string Notes { get; set; }
 #endif
         /// <summary>The phone property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -79,10 +95,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Sup
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "address", n => { Address = n.GetStringValue(); } },
                 { "contactName", n => { ContactName = n.GetStringValue(); } },
                 { "document", n => { Document = n.GetStringValue(); } },
                 { "email", n => { Email = n.GetStringValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
+                { "notes", n => { Notes = n.GetStringValue(); } },
                 { "phone", n => { Phone = n.GetStringValue(); } },
             };
         }
@@ -93,10 +111,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Sup
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("address", Address);
             writer.WriteStringValue("contactName", ContactName);
             writer.WriteStringValue("document", Document);
             writer.WriteStringValue("email", Email);
             writer.WriteStringValue("name", Name);
+            writer.WriteStringValue("notes", Notes);
             writer.WriteStringValue("phone", Phone);
             writer.WriteAdditionalData(AdditionalData);
         }

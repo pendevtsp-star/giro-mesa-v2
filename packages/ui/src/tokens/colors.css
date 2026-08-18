@@ -1,0 +1,43 @@
+:root {
+  /* Brand */
+  --gm-brand: hsl(155, 68%, 25%);
+  --gm-brand-strong: hsl(155, 70%, 17%);
+  --gm-brand-soft: hsl(155, 40%, 89%);
+  --gm-action: var(--gm-brand);
+  --gm-action-hover: var(--gm-brand-strong);
+  --gm-on-action: hsl(0, 0%, 100%);
+  /* Accent */
+  --gm-accent: hsl(18, 75%, 37%);
+  --gm-accent-soft: hsl(20, 92%, 93%);
+  /* Feedback */
+  --gm-danger: hsl(0, 52%, 48%);
+  --gm-danger-on-soft: hsl(0, 58%, 40%);
+  --gm-danger-action: hsl(0, 58%, 43%);
+  --gm-danger-action-hover: hsl(0, 62%, 35%);
+  --gm-warning: hsl(37, 82%, 27%);
+  --gm-success: hsl(155, 73%, 27%);
+  --gm-info: hsl(210, 62%, 34%);
+  /* Surfaces */
+  --gm-ink: hsl(160, 15%, 11%);
+  --gm-muted: hsl(155, 8%, 34%);
+  --gm-paper: hsl(48, 28%, 97%);
+  --gm-surface: hsl(0, 0%, 100%);
+  --gm-surface-soft: hsl(55, 14%, 92%);
+  --gm-surface-sunken: hsl(55, 14%, 96%);
+  --gm-border: hsl(72, 8%, 85%);
+  /* Feedback surfaces */
+  --gm-warning-soft: #fff0ce;
+  --gm-danger-soft: #fbe1e1;
+  --gm-success-soft: var(--gm-brand-soft);
+  --gm-info-soft: #e3eef8;
+  /* Interaction */
+  --gm-focus: var(--gm-brand);
+  --gm-overlay: rgb(14 25 20 / 64%);
+  /* Operational shell */
+  --gm-shell: hsl(158, 29%, 10%);
+  --gm-shell-raised: hsl(157, 22%, 15%);
+  --gm-shell-border: hsl(157, 14%, 24%);
+  --gm-shell-text: hsl(150, 18%, 96%);
+  --gm-shell-muted: hsl(154, 13%, 72%);
+  --gm-topbar: color-mix(in srgb, var(--gm-paper) 92%, transparent);
+}

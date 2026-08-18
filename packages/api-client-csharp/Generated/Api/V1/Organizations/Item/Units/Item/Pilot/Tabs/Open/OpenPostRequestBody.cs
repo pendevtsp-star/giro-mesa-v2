@@ -14,6 +14,32 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ope
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The customerName property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? CustomerName { get; set; }
+#nullable restore
+#else
+        public string CustomerName { get; set; }
+#endif
+        /// <summary>The customerPhone property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? CustomerPhone { get; set; }
+#nullable restore
+#else
+        public string CustomerPhone { get; set; }
+#endif
+        /// <summary>The deliveryAddress property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? DeliveryAddress { get; set; }
+#nullable restore
+#else
+        public string DeliveryAddress { get; set; }
+#endif
+        /// <summary>The fulfillmentType property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Open.OpenPostRequestBody_fulfillmentType? FulfillmentType { get; set; }
         /// <summary>The guestCount property</summary>
         public int? GuestCount { get; set; }
         /// <summary>The label property</summary>
@@ -24,8 +50,26 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ope
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The promisedAt property</summary>
+        public DateTimeOffset? PromisedAt { get; set; }
+        /// <summary>The readyNotificationConsent property</summary>
+        public bool? ReadyNotificationConsent { get; set; }
+        /// <summary>The reservationId property</summary>
+        public Guid? ReservationId { get; set; }
+        /// <summary>The responsibleIdentityId property</summary>
+        public Guid? ResponsibleIdentityId { get; set; }
+        /// <summary>The serviceNotes property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ServiceNotes { get; set; }
+#nullable restore
+#else
+        public string ServiceNotes { get; set; }
+#endif
         /// <summary>The tableId property</summary>
         public Guid? TableId { get; set; }
+        /// <summary>The waitlistEntryId property</summary>
+        public Guid? WaitlistEntryId { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Open.OpenPostRequestBody"/> and sets the default values.
         /// </summary>
@@ -52,9 +96,19 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ope
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "customerName", n => { CustomerName = n.GetStringValue(); } },
+                { "customerPhone", n => { CustomerPhone = n.GetStringValue(); } },
+                { "deliveryAddress", n => { DeliveryAddress = n.GetStringValue(); } },
+                { "fulfillmentType", n => { FulfillmentType = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Open.OpenPostRequestBody_fulfillmentType>(); } },
                 { "guestCount", n => { GuestCount = n.GetIntValue(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "promisedAt", n => { PromisedAt = n.GetDateTimeOffsetValue(); } },
+                { "readyNotificationConsent", n => { ReadyNotificationConsent = n.GetBoolValue(); } },
+                { "reservationId", n => { ReservationId = n.GetGuidValue(); } },
+                { "responsibleIdentityId", n => { ResponsibleIdentityId = n.GetGuidValue(); } },
+                { "serviceNotes", n => { ServiceNotes = n.GetStringValue(); } },
                 { "tableId", n => { TableId = n.GetGuidValue(); } },
+                { "waitlistEntryId", n => { WaitlistEntryId = n.GetGuidValue(); } },
             };
         }
         /// <summary>
@@ -64,9 +118,19 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ope
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("customerName", CustomerName);
+            writer.WriteStringValue("customerPhone", CustomerPhone);
+            writer.WriteStringValue("deliveryAddress", DeliveryAddress);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Open.OpenPostRequestBody_fulfillmentType>("fulfillmentType", FulfillmentType);
             writer.WriteIntValue("guestCount", GuestCount);
             writer.WriteStringValue("label", Label);
+            writer.WriteDateTimeOffsetValue("promisedAt", PromisedAt);
+            writer.WriteBoolValue("readyNotificationConsent", ReadyNotificationConsent);
+            writer.WriteGuidValue("reservationId", ReservationId);
+            writer.WriteGuidValue("responsibleIdentityId", ResponsibleIdentityId);
+            writer.WriteStringValue("serviceNotes", ServiceNotes);
             writer.WriteGuidValue("tableId", TableId);
+            writer.WriteGuidValue("waitlistEntryId", WaitlistEntryId);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

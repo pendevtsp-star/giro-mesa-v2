@@ -1,0 +1,50 @@
+.gm-drawer-overlay {
+  animation: gm-fade-in var(--gm-duration-base) ease;
+  background: rgba(15, 23, 20, 0.45);
+  backdrop-filter: blur(4px);
+  inset: 0;
+  position: fixed;
+  z-index: 100;
+}
+.gm-drawer {
+  animation: gm-slide-left 250ms var(--gm-ease);
+  background: var(--gm-surface);
+  bottom: 0;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  max-width: 520px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100%;
+  z-index: 101;
+}
+.gm-drawer__header {
+  align-items: center;
+  border-bottom: 1px solid var(--gm-border);
+  display: flex;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+}
+.gm-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+@keyframes gm-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes gm-slide-left {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

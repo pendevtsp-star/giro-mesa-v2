@@ -16,13 +16,5 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Sta
         #pragma warning disable CS1591
         Ready,
         #pragma warning restore CS1591
-        [EnumMember(Value = "done")]
-        #pragma warning disable CS1591
-        Done,
-        #pragma warning restore CS1591
-        [EnumMember(Value = "canceled")]
-        #pragma warning disable CS1591
-        Canceled,
-        #pragma warning restore CS1591
     }
 }

@@ -1,0 +1,23 @@
+:root {
+  --gm-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --gm-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --gm-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --gm-duration-fast: 140ms;
+  --gm-duration-base: 200ms;
+  --gm-duration-slow: 350ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: The user's reduced-motion preference must win over component animation. */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user's reduced-motion preference must win over component animation. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user's reduced-motion preference must win over component transitions. */
+    transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user's reduced-motion preference must win over smooth scrolling. */
+    scroll-behavior: auto !important;
+  }
+}

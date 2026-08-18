@@ -28,6 +28,10 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Orders
 #else
         public string Complement { get; set; }
 #endif
+        /// <summary>The latitude property</summary>
+        public double? Latitude { get; set; }
+        /// <summary>The longitude property</summary>
+        public double? Longitude { get; set; }
         /// <summary>The neighborhood property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -88,6 +92,8 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Orders
             {
                 { "city", n => { City = n.GetStringValue(); } },
                 { "complement", n => { Complement = n.GetStringValue(); } },
+                { "latitude", n => { Latitude = n.GetDoubleValue(); } },
+                { "longitude", n => { Longitude = n.GetDoubleValue(); } },
                 { "neighborhood", n => { Neighborhood = n.GetStringValue(); } },
                 { "number", n => { Number = n.GetStringValue(); } },
                 { "postalCode", n => { PostalCode = n.GetStringValue(); } },
@@ -104,6 +110,8 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.Orders
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("city", City);
             writer.WriteStringValue("complement", Complement);
+            writer.WriteDoubleValue("latitude", Latitude);
+            writer.WriteDoubleValue("longitude", Longitude);
             writer.WriteStringValue("neighborhood", Neighborhood);
             writer.WriteStringValue("number", Number);
             writer.WriteStringValue("postalCode", PostalCode);

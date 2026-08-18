@@ -1,0 +1,119 @@
+/* Direção editorial do Cardápio aplicada à operação inteira. */
+.main-content {
+  padding-block: 1.5rem 2.5rem;
+}
+
+.page-heading {
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-heading > div {
+  min-width: 0;
+}
+
+.page-heading h1,
+.main-content--salon .page-heading h1 {
+  font-family: var(--gm-display);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.page-heading p {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-width: 68ch;
+}
+
+:where(.card-header, .section-title, .ops-board__header) h2 {
+  font-family: var(--gm-display);
+  font-size: 1.3rem;
+  letter-spacing: -0.025em;
+}
+
+.gm-card,
+.action-panel {
+  box-shadow: none;
+}
+
+.ops-board,
+.ops-panel,
+.growth-stack {
+  gap: 0.85rem;
+}
+
+:where(.growth-stack, .ops-grid, .quick-actions-grid, .inventory-layout, .inventory-side) > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ops-grid,
+.metrics-grid,
+.metric-strip,
+.quick-actions-grid {
+  gap: 0.85rem;
+}
+
+.metric-card {
+  min-height: 120px;
+  padding: 1rem;
+}
+
+.metric-card p {
+  margin-bottom: 0.6rem;
+}
+
+.metric-card.metric-card > a {
+  display: block;
+  margin-top: 0.45rem;
+  width: fit-content;
+}
+
+.action-panel summary {
+  min-height: 3.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.action-form {
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 1rem;
+}
+
+.gm-empty {
+  padding: 2rem 1rem;
+}
+
+.data-table {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    padding-block: 1rem 5rem;
+  }
+
+  .page-heading {
+    margin-bottom: 1rem;
+  }
+
+  .page-heading h1,
+  .main-content--salon .page-heading h1 {
+    font-size: 1.75rem;
+  }
+
+  .page-heading p {
+    font-size: 0.78rem;
+  }
+
+  .metrics-grid,
+  .metrics-grid--three {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    min-height: 104px;
+  }
+}

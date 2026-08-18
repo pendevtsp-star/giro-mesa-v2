@@ -1,0 +1,1 @@
+ALTER TABLE "pos_dining_rooms" ADD COLUMN "layout_polygon" jsonb;

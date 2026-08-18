@@ -1,0 +1,37 @@
+.gm-tooltip {
+  display: inline-flex;
+  position: relative;
+}
+
+.gm-tooltip__trigger {
+  border-radius: var(--gm-radius-xs);
+  display: inline-flex;
+}
+
+.gm-tooltip__content {
+  background: var(--gm-ink);
+  border-radius: var(--gm-radius-sm);
+  bottom: calc(100% + var(--gm-space-2));
+  color: var(--gm-paper);
+  font-size: var(--gm-font-xs);
+  left: 50%;
+  max-width: 16rem;
+  opacity: 0;
+  padding: var(--gm-space-2) var(--gm-space-3);
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, var(--gm-space-1));
+  transition:
+    opacity var(--gm-duration-fast) var(--gm-ease),
+    transform var(--gm-duration-fast) var(--gm-ease);
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 50;
+}
+
+.gm-tooltip:has(.gm-tooltip__trigger:is(:hover, :focus-visible)) .gm-tooltip__content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}

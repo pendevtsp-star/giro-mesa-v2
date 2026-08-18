@@ -1,0 +1,107 @@
+@media (max-width: 520px) {
+  html {
+    background: var(--paper);
+  }
+  .menu-app {
+    box-shadow: none;
+  }
+  .restaurant-header {
+    min-height: 116px;
+    padding: 20px 18px;
+  }
+  .restaurant-mark {
+    width: 52px;
+    height: 52px;
+  }
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+  .menu-card {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    min-height: 153px;
+  }
+  .food-visual {
+    height: 100%;
+    font-size: 48px;
+  }
+  .menu-card-copy {
+    min-height: 153px;
+  }
+  .product-hero {
+    height: 210px;
+  }
+  .table-actions {
+    padding: 20px;
+  }
+  .public-services {
+    padding: 20px;
+  }
+  .service-grid {
+    grid-template-columns: 1fr;
+  }
+  .public-state > h1,
+  .preference-page > h1 {
+    font-size: 39px;
+  }
+  .preference-card {
+    padding: 22px;
+  }
+  .public-service-page {
+    padding: 44px 14px 70px;
+    box-shadow: none;
+  }
+  .public-service-page > h1 {
+    font-size: 39px;
+  }
+  .public-service-card {
+    padding: 21px;
+  }
+  .public-service-fields {
+    grid-template-columns: 1fr;
+  }
+  .cart-dialog {
+    width: 100%;
+    max-height: 94dvh;
+    margin: 6dvh 0 0;
+    border-radius: 22px 22px 0 0;
+  }
+  .checkout-form {
+    margin-inline: 14px;
+    padding: 16px;
+  }
+  .fulfillment-options,
+  .checkout-grid-two,
+  .checkout-grid-address {
+    grid-template-columns: 1fr;
+  }
+  .checkout-street {
+    grid-column: auto;
+  }
+  .order-receipt {
+    margin-inline: 14px;
+    padding: 22px 18px;
+  }
+  .cart-bar {
+    bottom: 12px;
+  }
+  .cart-lines article {
+    grid-template-columns: 46px 1fr;
+  }
+  .cart-lines article > .quantity {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .cart-visual {
+    width: 46px;
+    height: 46px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .menu-card {
+    transition: none;
+  }
+}

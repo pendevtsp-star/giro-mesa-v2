@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -85,6 +86,8 @@ export const growthCustomers = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     email: varchar("email", { length: 254 }),
     phone: varchar("phone", { length: 40 }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     birthDate: varchar("birth_date", { length: 10 }),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -516,6 +519,7 @@ export const deliveryZones = pgTable(
     name: varchar("name", { length: 120 }).notNull(),
     feeCents: integer("fee_cents").notNull(),
     minimumOrderCents: integer("minimum_order_cents").notNull().default(0),
+    estimatedDeliveryMinutes: integer("estimated_delivery_minutes").notNull().default(45),
     geometry: jsonb("geometry").$type<Record<string, unknown>>().notNull(),
     active: boolean("active").notNull().default(true),
     ...timestamps,
@@ -523,8 +527,56 @@ export const deliveryZones = pgTable(
   (table) => [
     unique("growth_delivery_zone_org_id_unique").on(table.organizationId, table.id),
     uniqueIndex("growth_delivery_zone_unit_name_unique").on(table.unitId, table.name),
+    check(
+      "growth_delivery_zone_estimated_minutes_check",
+      sql`${table.estimatedDeliveryMinutes} between 5 and 240`,
+    ),
     foreignKey({
       name: "growth_delivery_zone_org_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const deliveryCouriers = pgTable(
+  "growth_delivery_couriers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    reference: varchar("reference", { length: 80 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    phone: varchar("phone", { length: 40 }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    status: varchar("status", { length: 20 })
+      .$type<"available" | "assigned" | "delivering" | "offline">()
+      .notNull()
+      .default("available"),
+    active: boolean("active").notNull().default(true),
+    lastLatitude: doublePrecision("last_latitude"),
+    lastLongitude: doublePrecision("last_longitude"),
+    lastPositionAt: timestamp("last_position_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("growth_delivery_courier_org_id_unique").on(table.organizationId, table.id),
+    uniqueIndex("growth_delivery_courier_unit_reference_unique").on(table.unitId, table.reference),
+    uniqueIndex("growth_delivery_courier_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    check(
+      "growth_delivery_courier_status_check",
+      sql`${table.status} in ('available', 'assigned', 'delivering', 'offline')`,
+    ),
+    check(
+      "growth_delivery_courier_position_check",
+      sql`(${table.lastLatitude} is null and ${table.lastLongitude} is null and ${table.lastPositionAt} is null) or (${table.lastLatitude} between -90 and 90 and ${table.lastLongitude} between -180 and 180 and ${table.lastPositionAt} is not null)`,
+    ),
+    foreignKey({
+      name: "growth_delivery_courier_org_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
@@ -539,6 +591,8 @@ export const deliveryOrders = pgTable(
     unitId: uuid("unit_id").notNull(),
     customerId: uuid("customer_id").references(() => growthCustomers.id),
     zoneId: uuid("zone_id").references(() => deliveryZones.id),
+    courierId: uuid("courier_id").references(() => deliveryCouriers.id),
+    courierAssignedAt: timestamp("courier_assigned_at", { withTimezone: true }),
     orderRef: uuid("order_ref").notNull(),
     publicProtocol: varchar("public_protocol", { length: 40 }),
     customerName: varchar("customer_name", { length: 120 }),
@@ -557,7 +611,12 @@ export const deliveryOrders = pgTable(
       .notNull()
       .default("awaiting_payment"),
     address: jsonb("address").$type<Record<string, unknown>>(),
+    addressValidationStatus: varchar("address_validation_status", { length: 20 })
+      .$type<"covered" | "unchecked" | "unavailable">()
+      .notNull()
+      .default("unchecked"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    promisedAt: timestamp("promised_at", { withTimezone: true }),
     idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     ...timestamps,
@@ -571,6 +630,11 @@ export const deliveryOrders = pgTable(
       table.idempotencyKey,
     ),
     index("growth_delivery_unit_status_idx").on(table.unitId, table.status),
+    index("growth_delivery_unit_promised_idx").on(table.unitId, table.promisedAt),
+    check(
+      "growth_delivery_order_address_validation_check",
+      sql`${table.addressValidationStatus} in ('covered', 'unchecked', 'unavailable')`,
+    ),
     foreignKey({
       name: "growth_delivery_order_org_unit_fk",
       columns: [table.organizationId, table.unitId],
@@ -587,10 +651,154 @@ export const deliveryOrders = pgTable(
       foreignColumns: [deliveryZones.organizationId, deliveryZones.id],
     }).onDelete("restrict"),
     foreignKey({
+      name: "growth_delivery_order_courier_tenant_fk",
+      columns: [table.organizationId, table.courierId],
+      foreignColumns: [deliveryCouriers.organizationId, deliveryCouriers.id],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "growth_delivery_order_tab_fk",
       columns: [table.organizationId, table.unitId, table.orderRef],
       foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
     }).onDelete("restrict"),
+  ],
+);
+
+export const deliveryOrderStatusHistory = pgTable(
+  "growth_delivery_order_status_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    deliveryOrderId: uuid("delivery_order_id").notNull(),
+    fromStatus: deliveryStatus("from_status"),
+    toStatus: deliveryStatus("to_status").notNull(),
+    actorIdentityId: uuid("actor_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("growth_delivery_history_order_time_idx").on(table.deliveryOrderId, table.occurredAt),
+    foreignKey({
+      name: "growth_delivery_history_order_tenant_fk",
+      columns: [table.organizationId, table.deliveryOrderId],
+      foreignColumns: [deliveryOrders.organizationId, deliveryOrders.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_delivery_history_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const deliveryCourierAssignments = pgTable(
+  "growth_delivery_courier_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    deliveryOrderId: uuid("delivery_order_id").notNull(),
+    courierId: uuid("courier_id").notNull(),
+    assignedByIdentityId: uuid("assigned_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("growth_delivery_assignment_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    index("growth_delivery_assignment_order_time_idx").on(table.deliveryOrderId, table.assignedAt),
+    foreignKey({
+      name: "growth_delivery_assignment_order_tenant_fk",
+      columns: [table.organizationId, table.deliveryOrderId],
+      foreignColumns: [deliveryOrders.organizationId, deliveryOrders.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_delivery_assignment_courier_tenant_fk",
+      columns: [table.organizationId, table.courierId],
+      foreignColumns: [deliveryCouriers.organizationId, deliveryCouriers.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const deliveryCourierEvents = pgTable(
+  "growth_delivery_courier_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    courierId: uuid("courier_id").notNull(),
+    eventType: varchar("event_type", { length: 20 }).$type<"status" | "position">().notNull(),
+    status: varchar("status", { length: 20 }).$type<
+      "available" | "assigned" | "delivering" | "offline"
+    >(),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    actorIdentityId: uuid("actor_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("growth_delivery_courier_event_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    index("growth_delivery_courier_event_time_idx").on(table.courierId, table.occurredAt),
+    check(
+      "growth_delivery_courier_event_shape_check",
+      sql`(${table.eventType} = 'status' and ${table.status} is not null and ${table.latitude} is null and ${table.longitude} is null) or (${table.eventType} = 'position' and ${table.status} is null and ${table.latitude} between -90 and 90 and ${table.longitude} between -180 and 180)`,
+    ),
+    foreignKey({
+      name: "growth_delivery_courier_event_courier_tenant_fk",
+      columns: [table.organizationId, table.courierId],
+      foreignColumns: [deliveryCouriers.organizationId, deliveryCouriers.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const deliveryNotifications = pgTable(
+  "growth_delivery_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    deliveryOrderId: uuid("delivery_order_id").notNull(),
+    audience: varchar("audience", { length: 20 }).$type<"operations" | "customer">().notNull(),
+    type: varchar("type", { length: 40 })
+      .$type<"status_update" | "courier_assigned" | "courier_arriving">()
+      .notNull(),
+    status: varchar("status", { length: 30 })
+      .$type<"pending_provider">()
+      .notNull()
+      .default("pending_provider"),
+    requestedByIdentityId: uuid("requested_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("growth_delivery_notification_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    index("growth_delivery_notification_order_time_idx").on(table.deliveryOrderId, table.createdAt),
+    check("growth_delivery_notification_status_check", sql`${table.status} = 'pending_provider'`),
+    foreignKey({
+      name: "growth_delivery_notification_order_tenant_fk",
+      columns: [table.organizationId, table.deliveryOrderId],
+      foreignColumns: [deliveryOrders.organizationId, deliveryOrders.id],
+    }).onDelete("cascade"),
   ],
 );
 

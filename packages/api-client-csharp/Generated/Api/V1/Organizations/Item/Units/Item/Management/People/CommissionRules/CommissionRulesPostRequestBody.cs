@@ -14,16 +14,16 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
-        /// <summary>The amountCents property</summary>
-        public int? AmountCents { get; set; }
-        /// <summary>The baseCents property</summary>
-        public int? BaseCents { get; set; }
-        /// <summary>The personId property</summary>
-        public Guid? PersonId { get; set; }
-        /// <summary>The ruleId property</summary>
-        public Guid? RuleId { get; set; }
-        /// <summary>The sourceOrderId property</summary>
-        public Guid? SourceOrderId { get; set; }
+        /// <summary>The basisPoints property</summary>
+        public int? BasisPoints { get; set; }
+        /// <summary>The name property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Name { get; set; }
+#nullable restore
+#else
+        public string Name { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.CommissionRules.CommissionRulesPostRequestBody"/> and sets the default values.
         /// </summary>
@@ -49,11 +49,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "amountCents", n => { AmountCents = n.GetIntValue(); } },
-                { "baseCents", n => { BaseCents = n.GetIntValue(); } },
-                { "personId", n => { PersonId = n.GetGuidValue(); } },
-                { "ruleId", n => { RuleId = n.GetGuidValue(); } },
-                { "sourceOrderId", n => { SourceOrderId = n.GetGuidValue(); } },
+                { "basisPoints", n => { BasisPoints = n.GetIntValue(); } },
+                { "name", n => { Name = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -63,11 +60,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteIntValue("amountCents", AmountCents);
-            writer.WriteIntValue("baseCents", BaseCents);
-            writer.WriteGuidValue("personId", PersonId);
-            writer.WriteGuidValue("ruleId", RuleId);
-            writer.WriteGuidValue("sourceOrderId", SourceOrderId);
+            writer.WriteIntValue("basisPoints", BasisPoints);
+            writer.WriteStringValue("name", Name);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

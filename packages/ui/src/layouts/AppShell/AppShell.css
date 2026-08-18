@@ -1,0 +1,51 @@
+.gm-app-shell {
+  min-height: 100vh;
+}
+.gm-app-shell__sidebar {
+  background: #14231d;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  inset: 0 auto 0 0;
+  overflow-y: auto;
+  padding: 1.3rem 1rem;
+  position: fixed;
+  width: 252px;
+  z-index: 20;
+}
+.gm-app-shell__main {
+  margin-left: 252px;
+  min-height: 100vh;
+}
+.gm-app-shell__topbar {
+  align-items: center;
+  background: rgba(247, 246, 241, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--gm-border);
+  display: flex;
+  height: 76px;
+  justify-content: space-between;
+  padding: 0 clamp(1rem, 3vw, 2.4rem);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.gm-app-shell__content {
+  margin: 0 auto;
+  max-width: 1620px;
+  padding: 1.8rem clamp(1rem, 3vw, 2.4rem) 3rem;
+}
+
+@media (max-width: 1180px) {
+  .gm-app-shell__sidebar {
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+  }
+  .gm-app-shell__sidebar--open {
+    box-shadow: var(--gm-shadow-lg);
+    transform: translateX(0);
+  }
+  .gm-app-shell__main {
+    margin-left: 0;
+  }
+}

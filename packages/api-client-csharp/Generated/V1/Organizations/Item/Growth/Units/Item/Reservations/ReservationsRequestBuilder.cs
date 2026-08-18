@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservation
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ReservationsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/growth/units/{unitId}/reservations", pathParameters)
+        public ReservationsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/growth/units/{unitId}/reservations{?from*,limit*,offset*,scope*,to*}", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservation
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ReservationsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/growth/units/{unitId}/reservations", rawUrl)
+        public ReservationsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/growth/units/{unitId}/reservations{?from*,limit*,offset*,scope*,to*}", rawUrl)
         {
         }
         /// <returns>A <see cref="Stream"/></returns>
@@ -37,11 +37,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservation
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<Stream?> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder.ReservationsRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<Stream> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder.ReservationsRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
@@ -51,11 +51,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservation
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder.ReservationsRequestBuilderGetQueryParameters>>? requestConfiguration = default)
         {
 #nullable restore
 #else
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder.ReservationsRequestBuilderGetQueryParameters>> requestConfiguration = default)
         {
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
@@ -71,12 +71,38 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservation
         {
             return new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder(rawUrl, RequestAdapter);
         }
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        #pragma warning disable CS1591
+        public partial class ReservationsRequestBuilderGetQueryParameters
+        #pragma warning restore CS1591
+        {
+            [QueryParameter("from")]
+            public DateTimeOffset? From { get; set; }
+            [QueryParameter("limit")]
+            public int? Limit { get; set; }
+            [QueryParameter("offset")]
+            public int? Offset { get; set; }
+            [Obsolete("This property is deprecated, use ScopeAsGetScopeQueryParameterType instead")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("scope")]
+            public string? Scope { get; set; }
+#nullable restore
+#else
+            [QueryParameter("scope")]
+            public string Scope { get; set; }
+#endif
+            [QueryParameter("scope")]
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.GetScopeQueryParameterType? ScopeAsGetScopeQueryParameterType { get; set; }
+            [QueryParameter("to")]
+            public DateTimeOffset? To { get; set; }
+        }
         /// <summary>
         /// Configuration for the request such as headers, query parameters, and middleware options.
         /// </summary>
         [Obsolete("This class is deprecated. Please use the generic RequestConfiguration class generated by the generator.")]
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class ReservationsRequestBuilderGetRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
+        public partial class ReservationsRequestBuilderGetRequestConfiguration : RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units.Item.Reservations.ReservationsRequestBuilder.ReservationsRequestBuilderGetQueryParameters>
         {
         }
     }

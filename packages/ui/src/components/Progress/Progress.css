@@ -1,0 +1,20 @@
+.gm-progress__meta {
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: 700;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+.gm-progress__track {
+  background: var(--gm-surface-soft);
+  border-radius: var(--gm-radius-full);
+  display: block;
+  height: 7px;
+  overflow: hidden;
+}
+.gm-progress__track span {
+  background: var(--gm-brand);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}

@@ -14,6 +14,16 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The allergyNote property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? AllergyNote { get; set; }
+#nullable restore
+#else
+        public string AllergyNote { get; set; }
+#endif
+        /// <summary>The course property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course? Course { get; set; }
         /// <summary>The modifierOptionIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -34,6 +44,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public Guid? ProductId { get; set; }
         /// <summary>The quantity property</summary>
         public int? Quantity { get; set; }
+        /// <summary>The seatNumber property</summary>
+        public int? SeatNumber { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items"/> and sets the default values.
         /// </summary>
@@ -59,10 +71,13 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "allergyNote", n => { AllergyNote = n.GetStringValue(); } },
+                { "course", n => { Course = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course>(); } },
                 { "modifierOptionIds", n => { ModifierOptionIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "notes", n => { Notes = n.GetStringValue(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
                 { "quantity", n => { Quantity = n.GetIntValue(); } },
+                { "seatNumber", n => { SeatNumber = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -72,10 +87,13 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("allergyNote", AllergyNote);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course>("course", Course);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("modifierOptionIds", ModifierOptionIds);
             writer.WriteStringValue("notes", Notes);
             writer.WriteGuidValue("productId", ProductId);
             writer.WriteIntValue("quantity", Quantity);
+            writer.WriteIntValue("seatNumber", SeatNumber);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

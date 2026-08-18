@@ -1,0 +1,175 @@
+@media (max-width: 960px) {
+  .desktop-nav {
+    display: none;
+  }
+  .hero {
+    padding-top: 60px;
+  }
+  .hero-grid,
+  .two-column,
+  .trust-grid,
+  .inner-hero {
+    grid-template-columns: 1fr;
+  }
+  .segment-strip {
+    flex-wrap: wrap;
+    padding: 25px 0;
+  }
+  .segment-strip span {
+    width: 100%;
+  }
+  .capability-grid,
+  .plan-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .plan:last-child {
+    grid-column: 1 / -1;
+  }
+  .two-column,
+  .trust-grid {
+    gap: 30px;
+  }
+  .footer-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+  .auth-page {
+    grid-template-columns: 1fr;
+  }
+  .auth-story {
+    min-height: auto;
+    padding: 70px 40px;
+    gap: 80px;
+  }
+  .security-card {
+    padding: 25px;
+  }
+  .recovery-panel ul {
+    columns: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: min(100% - 28px, 1180px);
+  }
+  .header-inner {
+    height: 66px;
+  }
+  .header-actions .button-ghost {
+    display: none;
+  }
+  .header-trial {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .hero-copy h1 {
+    font-size: 50px;
+  }
+  .hero-actions,
+  .final-cta .container > div {
+    flex-direction: column;
+  }
+  .hero-actions .button {
+    width: 100%;
+  }
+  .segment-name {
+    flex-basis: 45%;
+  }
+  .section {
+    padding: 75px 0;
+  }
+  .section-heading h2 {
+    font-size: 41px;
+  }
+  .hero-product-frame {
+    border-width: 4px;
+    border-bottom-width: 8px;
+    border-radius: 16px;
+    transform: none;
+  }
+  .hero-product figcaption {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .product-gallery {
+    grid-template-columns: 1fr;
+  }
+  .product-shot:first-child {
+    grid-column: auto;
+  }
+  .product-shot figcaption {
+    grid-template-columns: 1fr;
+  }
+  .product-shot-badge {
+    grid-row: auto;
+    justify-self: start;
+  }
+  .capability-grid,
+  .plan-grid,
+  .trust-cards,
+  .support-grid,
+  .field-row,
+  .contact-cards {
+    grid-template-columns: 1fr;
+  }
+  .plan:last-child {
+    grid-column: auto;
+  }
+  .capability-grid article {
+    min-height: 220px;
+  }
+  .inner-page {
+    padding-top: 35px;
+  }
+  .inner-hero {
+    gap: 30px;
+  }
+  .inner-hero-copy {
+    padding-top: 10px;
+  }
+  .inner-hero aside {
+    padding: 22px 18px;
+  }
+  .auth-story {
+    padding: 55px 25px;
+  }
+  .auth-story h1 {
+    font-size: 46px;
+  }
+  .auth-panel {
+    padding: 55px 22px;
+  }
+  .auth-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .whatsapp-label {
+    display: none;
+  }
+  .whatsapp {
+    padding: 11px 15px;
+  }
+  .plan ul {
+    min-height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .button.button {
+    transition: none;
+  }
+}

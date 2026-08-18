@@ -17,10 +17,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders
         /// <summary>The address property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public UntypedNode? Address { get; set; }
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address? Address { get; set; }
 #nullable restore
 #else
-        public UntypedNode Address { get; set; }
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address Address { get; set; }
 #endif
         /// <summary>The customerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -42,6 +42,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders
 #endif
         /// <summary>The orderRef property</summary>
         public Guid? OrderRef { get; set; }
+        /// <summary>The promisedAt property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt? PromisedAt { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt PromisedAt { get; set; }
+#endif
         /// <summary>The scheduledFor property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -85,11 +93,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "address", n => { Address = n.GetObjectValue<UntypedNode>(UntypedNode.CreateFromDiscriminatorValue); } },
+                { "address", n => { Address = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address.CreateFromDiscriminatorValue); } },
                 { "customerId", n => { CustomerId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_customerId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_customerId.CreateFromDiscriminatorValue); } },
                 { "fulfillment", n => { Fulfillment = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_fulfillment>(); } },
                 { "idempotencyKey", n => { IdempotencyKey = n.GetStringValue(); } },
                 { "orderRef", n => { OrderRef = n.GetGuidValue(); } },
+                { "promisedAt", n => { PromisedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt.CreateFromDiscriminatorValue); } },
                 { "scheduledFor", n => { ScheduledFor = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_scheduledFor>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_scheduledFor.CreateFromDiscriminatorValue); } },
                 { "unitId", n => { UnitId = n.GetGuidValue(); } },
                 { "zoneId", n => { ZoneId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_zoneId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_zoneId.CreateFromDiscriminatorValue); } },
@@ -102,15 +111,73 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteObjectValue<UntypedNode>("address", Address);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address>("address", Address);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_customerId>("customerId", CustomerId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_fulfillment>("fulfillment", Fulfillment);
             writer.WriteStringValue("idempotencyKey", IdempotencyKey);
             writer.WriteGuidValue("orderRef", OrderRef);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt>("promisedAt", PromisedAt);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_scheduledFor>("scheduledFor", ScheduledFor);
             writer.WriteGuidValue("unitId", UnitId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_zoneId>("zoneId", ZoneId);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1"/>, <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class DeliveryOrdersPostRequestBody_address : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1? DeliveryOrdersPostRequestBodyAddressMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1 DeliveryOrdersPostRequestBodyAddressMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember2? DeliveryOrdersPostRequestBodyAddressMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember2 DeliveryOrdersPostRequestBodyAddressMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_address();
+                result.DeliveryOrdersPostRequestBodyAddressMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1();
+                result.DeliveryOrdersPostRequestBodyAddressMember2 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(DeliveryOrdersPostRequestBodyAddressMember1 != null || DeliveryOrdersPostRequestBodyAddressMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(DeliveryOrdersPostRequestBodyAddressMember1, DeliveryOrdersPostRequestBodyAddressMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_addressMember1>(null, DeliveryOrdersPostRequestBodyAddressMember1, DeliveryOrdersPostRequestBodyAddressMember2);
+            }
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_customerIdMember1"/>, <see cref="Guid"/>
@@ -171,6 +238,68 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders
                 }
                 else {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_customerIdMember1>(null, DeliveryOrdersPostRequestBodyCustomerIdMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="DateTimeOffset"/>, <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class DeliveryOrdersPostRequestBody_promisedAt : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="DateTimeOffset"/></summary>
+            public DateTimeOffset? DateTimeOffset { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1? DeliveryOrdersPostRequestBodyPromisedAtMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1 DeliveryOrdersPostRequestBodyPromisedAtMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody.DeliveryOrdersPostRequestBody_promisedAt();
+                if(parseNode.GetDateTimeOffsetValue() is DateTimeOffset dateTimeOffsetValue)
+                {
+                    result.DateTimeOffset = dateTimeOffsetValue;
+                }
+                else {
+                    result.DeliveryOrdersPostRequestBodyPromisedAtMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(DeliveryOrdersPostRequestBodyPromisedAtMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(DeliveryOrdersPostRequestBodyPromisedAtMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(DateTimeOffset != null)
+                {
+                    writer.WriteDateTimeOffsetValue(null, DateTimeOffset);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryOrders.DeliveryOrdersPostRequestBody_promisedAtMember1>(null, DeliveryOrdersPostRequestBodyPromisedAtMember1);
                 }
             }
         }

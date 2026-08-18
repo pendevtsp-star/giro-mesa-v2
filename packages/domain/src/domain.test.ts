@@ -49,5 +49,11 @@ describe("critical domain rules", () => {
     assert.equal(hasPermission("owner", "billing:write"), true);
     assert.equal(hasPermission("waiter", "orders:write"), true);
     assert.equal(hasPermission("waiter", "finance:write"), false);
+    assert.equal(hasPermission("delivery", "orders:write"), true);
+    assert.equal(hasPermission("delivery", "finance:write"), false);
+    assert.equal(hasPermission("accountant", "fiscal:documents:read"), true);
+    assert.equal(hasPermission("accountant", "fiscal:periods:write"), false);
+    assert.equal(hasPermission("manager", "fiscal:configuration:write"), true);
+    assert.equal(hasPermission("finance", "fiscal:configuration:write"), true);
   });
 });

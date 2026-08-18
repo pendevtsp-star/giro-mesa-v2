@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones
         public bool? Active { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The estimatedDeliveryMinutes property</summary>
+        public int? EstimatedDeliveryMinutes { get; set; }
         /// <summary>The feeCents property</summary>
         public int? FeeCents { get; set; }
         /// <summary>The geometry property</summary>
@@ -45,6 +47,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones
         {
             AdditionalData = new Dictionary<string, object>();
             Active = true;
+            EstimatedDeliveryMinutes = 45;
             MinimumOrderCents = 0;
         }
         /// <summary>
@@ -66,6 +69,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "active", n => { Active = n.GetBoolValue(); } },
+                { "estimatedDeliveryMinutes", n => { EstimatedDeliveryMinutes = n.GetIntValue(); } },
                 { "feeCents", n => { FeeCents = n.GetIntValue(); } },
                 { "geometry", n => { Geometry = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.DeliveryZonesPostRequestBody_geometry>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.DeliveryZonesPostRequestBody_geometry.CreateFromDiscriminatorValue); } },
                 { "minimumOrderCents", n => { MinimumOrderCents = n.GetIntValue(); } },
@@ -81,6 +85,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteBoolValue("active", Active);
+            writer.WriteIntValue("estimatedDeliveryMinutes", EstimatedDeliveryMinutes);
             writer.WriteIntValue("feeCents", FeeCents);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.DeliveryZonesPostRequestBody_geometry>("geometry", Geometry);
             writer.WriteIntValue("minimumOrderCents", MinimumOrderCents);

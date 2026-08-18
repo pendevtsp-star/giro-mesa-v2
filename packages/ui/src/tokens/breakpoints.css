@@ -1,0 +1,6 @@
+:root {
+  --gm-breakpoint-sm: 40rem;
+  --gm-breakpoint-md: 56.25rem;
+  --gm-breakpoint-lg: 73.75rem;
+  --gm-breakpoint-xl: 90rem;
+}

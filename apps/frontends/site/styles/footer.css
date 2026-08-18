@@ -1,0 +1,74 @@
+.site-footer {
+  padding: 75px 0 25px;
+  background: #101c16;
+  color: #f5f6f3;
+}
+.site-footer .logo-mark {
+  background: var(--lime);
+  color: var(--forest);
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, 1fr);
+  gap: 38px;
+}
+.footer-brand > p {
+  color: #b7c2bc;
+}
+.footer-note {
+  color: #839189;
+  font-size: 11px;
+}
+.site-footer h2 {
+  margin: 4px 0 18px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8fa098;
+}
+.site-footer ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer li {
+  margin: 10px 0;
+}
+.site-footer li a {
+  color: #d0d8d4;
+  text-decoration: none;
+  font-size: 13px;
+}
+.site-footer li a:hover {
+  color: var(--lime);
+}
+.footer-bottom {
+  margin-top: 60px;
+  padding-top: 22px;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #829088;
+  font-size: 11px;
+}
+.whatsapp {
+  position: fixed;
+  z-index: 80;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 16px;
+  border-radius: 30px;
+  background: #116b3d;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(14, 75, 43, 0.32);
+}
+.whatsapp span {
+  font-size: 20px;
+}
+.whatsapp-label {
+  font-size: 12px;
+}

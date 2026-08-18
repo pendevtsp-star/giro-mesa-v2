@@ -22,18 +22,44 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #else
         public List<Guid?> AllergenIds { get; set; }
 #endif
+        /// <summary>The autoDeductStock property</summary>
+        public bool? AutoDeductStock { get; set; }
         /// <summary>The availabilitySchedule property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilitySchedule? AvailabilitySchedule { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule? AvailabilitySchedule { get; set; }
 #nullable restore
 #else
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilitySchedule AvailabilitySchedule { get; set; }
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule AvailabilitySchedule { get; set; }
 #endif
         /// <summary>The available property</summary>
         public bool? Available { get; set; }
         /// <summary>The categoryId property</summary>
         public Guid? CategoryId { get; set; }
+        /// <summary>The costCents property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents? CostCents { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents CostCents { get; set; }
+#endif
+        /// <summary>The dailyStock property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock? DailyStock { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock DailyStock { get; set; }
+#endif
+        /// <summary>The deliveryPriceCents property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents? DeliveryPriceCents { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents DeliveryPriceCents { get; set; }
+#endif
         /// <summary>The description property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -41,6 +67,40 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #nullable restore
 #else
         public string Description { get; set; }
+#endif
+        /// <summary>The dietaryFlags property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<string>? DietaryFlags { get; set; }
+#nullable restore
+#else
+        public List<string> DietaryFlags { get; set; }
+#endif
+        /// <summary>The ean property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Ean { get; set; }
+#nullable restore
+#else
+        public string Ean { get; set; }
+#endif
+        /// <summary>The estimatedPrepTimeMinutes property</summary>
+        public int? EstimatedPrepTimeMinutes { get; set; }
+        /// <summary>The fiscal property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal? Fiscal { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal Fiscal { get; set; }
+#endif
+        /// <summary>The imageUrl property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl? ImageUrl { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl ImageUrl { get; set; }
 #endif
         /// <summary>The modifierGroupIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -58,8 +118,18 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #else
         public string Name { get; set; }
 #endif
+        /// <summary>The pairing property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing? Pairing { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing Pairing { get; set; }
+#endif
         /// <summary>The priceCents property</summary>
         public int? PriceCents { get; set; }
+        /// <summary>The productType property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_productType? ProductType { get; set; }
         /// <summary>The recipe property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -67,6 +137,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #nullable restore
 #else
         public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_recipe> Recipe { get; set; }
+#endif
+        /// <summary>The sizes property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_sizes>? Sizes { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_sizes> Sizes { get; set; }
 #endif
         /// <summary>The sku property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -76,6 +154,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #else
         public string Sku { get; set; }
 #endif
+        /// <summary>The sortOrder property</summary>
+        public int? SortOrder { get; set; }
+        /// <summary>The spiciness property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness? Spiciness { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness Spiciness { get; set; }
+#endif
         /// <summary>The stationIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -83,6 +171,30 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #nullable restore
 #else
         public List<Guid?> StationIds { get; set; }
+#endif
+        /// <summary>The suggestedProductIds property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<Guid?>? SuggestedProductIds { get; set; }
+#nullable restore
+#else
+        public List<Guid?> SuggestedProductIds { get; set; }
+#endif
+        /// <summary>The tags property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<string>? Tags { get; set; }
+#nullable restore
+#else
+        public List<string> Tags { get; set; }
+#endif
+        /// <summary>The translations property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_translations? Translations { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_translations Translations { get; set; }
 #endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody"/> and sets the default values.
@@ -111,16 +223,33 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "allergenIds", n => { AllergenIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
-                { "availabilitySchedule", n => { AvailabilitySchedule = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilitySchedule>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilitySchedule.CreateFromDiscriminatorValue); } },
+                { "autoDeductStock", n => { AutoDeductStock = n.GetBoolValue(); } },
+                { "availabilitySchedule", n => { AvailabilitySchedule = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule.CreateFromDiscriminatorValue); } },
                 { "available", n => { Available = n.GetBoolValue(); } },
                 { "categoryId", n => { CategoryId = n.GetGuidValue(); } },
+                { "costCents", n => { CostCents = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents.CreateFromDiscriminatorValue); } },
+                { "dailyStock", n => { DailyStock = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock.CreateFromDiscriminatorValue); } },
+                { "deliveryPriceCents", n => { DeliveryPriceCents = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents.CreateFromDiscriminatorValue); } },
                 { "description", n => { Description = n.GetStringValue(); } },
+                { "dietaryFlags", n => { DietaryFlags = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
+                { "ean", n => { Ean = n.GetStringValue(); } },
+                { "estimatedPrepTimeMinutes", n => { EstimatedPrepTimeMinutes = n.GetIntValue(); } },
+                { "fiscal", n => { Fiscal = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal.CreateFromDiscriminatorValue); } },
+                { "imageUrl", n => { ImageUrl = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl.CreateFromDiscriminatorValue); } },
                 { "modifierGroupIds", n => { ModifierGroupIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
+                { "pairing", n => { Pairing = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing.CreateFromDiscriminatorValue); } },
                 { "priceCents", n => { PriceCents = n.GetIntValue(); } },
+                { "productType", n => { ProductType = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_productType>(); } },
                 { "recipe", n => { Recipe = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_recipe>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_recipe.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "sizes", n => { Sizes = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_sizes>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_sizes.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "sku", n => { Sku = n.GetStringValue(); } },
+                { "sortOrder", n => { SortOrder = n.GetIntValue(); } },
+                { "spiciness", n => { Spiciness = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness.CreateFromDiscriminatorValue); } },
                 { "stationIds", n => { StationIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
+                { "suggestedProductIds", n => { SuggestedProductIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
+                { "tags", n => { Tags = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
+                { "translations", n => { Translations = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_translations>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_translations.CreateFromDiscriminatorValue); } },
             };
         }
         /// <summary>
@@ -131,17 +260,475 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteCollectionOfPrimitiveValues<Guid?>("allergenIds", AllergenIds);
-            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilitySchedule>("availabilitySchedule", AvailabilitySchedule);
+            writer.WriteBoolValue("autoDeductStock", AutoDeductStock);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule>("availabilitySchedule", AvailabilitySchedule);
             writer.WriteBoolValue("available", Available);
             writer.WriteGuidValue("categoryId", CategoryId);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents>("costCents", CostCents);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock>("dailyStock", DailyStock);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents>("deliveryPriceCents", DeliveryPriceCents);
             writer.WriteStringValue("description", Description);
+            writer.WriteCollectionOfPrimitiveValues<string>("dietaryFlags", DietaryFlags);
+            writer.WriteStringValue("ean", Ean);
+            writer.WriteIntValue("estimatedPrepTimeMinutes", EstimatedPrepTimeMinutes);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal>("fiscal", Fiscal);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl>("imageUrl", ImageUrl);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("modifierGroupIds", ModifierGroupIds);
             writer.WriteStringValue("name", Name);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing>("pairing", Pairing);
             writer.WriteIntValue("priceCents", PriceCents);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_productType>("productType", ProductType);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_recipe>("recipe", Recipe);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_sizes>("sizes", Sizes);
             writer.WriteStringValue("sku", Sku);
+            writer.WriteIntValue("sortOrder", SortOrder);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness>("spiciness", Spiciness);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("stationIds", StationIds);
+            writer.WriteCollectionOfPrimitiveValues<Guid?>("suggestedProductIds", SuggestedProductIds);
+            writer.WriteCollectionOfPrimitiveValues<string>("tags", Tags);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_translations>("translations", Translations);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_availabilitySchedule : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1? ProductsPostRequestBodyAvailabilityScheduleMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1 ProductsPostRequestBodyAvailabilityScheduleMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember2? ProductsPostRequestBodyAvailabilityScheduleMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember2 ProductsPostRequestBodyAvailabilityScheduleMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_availabilitySchedule();
+                result.ProductsPostRequestBodyAvailabilityScheduleMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1();
+                result.ProductsPostRequestBodyAvailabilityScheduleMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyAvailabilityScheduleMember1 != null || ProductsPostRequestBodyAvailabilityScheduleMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyAvailabilityScheduleMember1, ProductsPostRequestBodyAvailabilityScheduleMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_availabilityScheduleMember1>(null, ProductsPostRequestBodyAvailabilityScheduleMember1, ProductsPostRequestBodyAvailabilityScheduleMember2);
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1"/>, <see cref="int"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_costCents : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="int"/></summary>
+            public int? Integer { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1? ProductsPostRequestBodyCostCentsMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1 ProductsPostRequestBodyCostCentsMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_costCents();
+                if(parseNode.GetIntValue() is int integerValue)
+                {
+                    result.Integer = integerValue;
+                }
+                else {
+                    result.ProductsPostRequestBodyCostCentsMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyCostCentsMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyCostCentsMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Integer != null)
+                {
+                    writer.WriteIntValue(null, Integer);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_costCentsMember1>(null, ProductsPostRequestBodyCostCentsMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1"/>, <see cref="int"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_dailyStock : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="int"/></summary>
+            public int? Integer { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1? ProductsPostRequestBodyDailyStockMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1 ProductsPostRequestBodyDailyStockMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_dailyStock();
+                if(parseNode.GetIntValue() is int integerValue)
+                {
+                    result.Integer = integerValue;
+                }
+                else {
+                    result.ProductsPostRequestBodyDailyStockMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyDailyStockMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyDailyStockMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Integer != null)
+                {
+                    writer.WriteIntValue(null, Integer);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_dailyStockMember1>(null, ProductsPostRequestBodyDailyStockMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1"/>, <see cref="int"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_deliveryPriceCents : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="int"/></summary>
+            public int? Integer { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1? ProductsPostRequestBodyDeliveryPriceCentsMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1 ProductsPostRequestBodyDeliveryPriceCentsMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_deliveryPriceCents();
+                if(parseNode.GetIntValue() is int integerValue)
+                {
+                    result.Integer = integerValue;
+                }
+                else {
+                    result.ProductsPostRequestBodyDeliveryPriceCentsMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyDeliveryPriceCentsMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyDeliveryPriceCentsMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Integer != null)
+                {
+                    writer.WriteIntValue(null, Integer);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_deliveryPriceCentsMember1>(null, ProductsPostRequestBodyDeliveryPriceCentsMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_imageUrl : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1? ProductsPostRequestBodyImageUrlMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1 ProductsPostRequestBodyImageUrlMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl();
+                if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                else {
+                    result.ProductsPostRequestBodyImageUrlMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyImageUrlMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyImageUrlMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_imageUrlMember1>(null, ProductsPostRequestBodyImageUrlMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_pairing : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1? ProductsPostRequestBodyPairingMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1 ProductsPostRequestBodyPairingMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing();
+                if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                else {
+                    result.ProductsPostRequestBodyPairingMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodyPairingMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodyPairingMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_pairingMember1>(null, ProductsPostRequestBodyPairingMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1"/>, <see cref="int"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ProductsPostRequestBody_spiciness : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="int"/></summary>
+            public int? Integer { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1? ProductsPostRequestBodySpicinessMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1 ProductsPostRequestBodySpicinessMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_spiciness();
+                if(parseNode.GetIntValue() is int integerValue)
+                {
+                    result.Integer = integerValue;
+                }
+                else {
+                    result.ProductsPostRequestBodySpicinessMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ProductsPostRequestBodySpicinessMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ProductsPostRequestBodySpicinessMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Integer != null)
+                {
+                    writer.WriteIntValue(null, Integer);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_spicinessMember1>(null, ProductsPostRequestBodySpicinessMember1);
+                }
+            }
         }
     }
 }

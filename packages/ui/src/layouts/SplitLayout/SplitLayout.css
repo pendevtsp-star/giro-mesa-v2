@@ -1,0 +1,23 @@
+.gm-split-layout {
+  align-items: start;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  min-width: 0;
+  width: 100%;
+}
+.gm-split-layout--reverse {
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+}
+.gm-split-layout__main,
+.gm-split-layout__aside {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .gm-split-layout,
+  .gm-split-layout--reverse {
+    grid-template-columns: 1fr;
+  }
+}

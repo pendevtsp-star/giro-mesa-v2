@@ -1,0 +1,1 @@
+ALTER TABLE "pos_tabs" ADD CONSTRAINT "pos_tabs_operational_shift_fk" FOREIGN KEY ("organization_id","unit_id","operational_shift_id") REFERENCES "public"."pos_operational_shifts"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;

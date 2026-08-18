@@ -1,0 +1,12 @@
+@import "./styles/base.css";
+@import "./features/auth/auth.css";
+@import "./features/shell/shell.css";
+@import "./styles/operational.css";
+@import "./features/salon/salon.css";
+@import "./features/catalog/catalog.css";
+@import "./features/delivery/delivery.css";
+@import "./styles/management.css";
+@import "./styles/growth.css";
+@import "./styles/responsive.css";
+@import "./features/shell/navigation.css";
+@import "./styles/convergence.css";

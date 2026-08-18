@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.Api.V1.Public.CommercialCatalog;
 using GiroMesa.ApiClient.Api.V1.Public.Contact;
 using GiroMesa.ApiClient.Api.V1.Public.Events;
+using GiroMesa.ApiClient.Api.V1.Public.Media;
 using GiroMesa.ApiClient.Api.V1.Public.Menus;
 using GiroMesa.ApiClient.Api.V1.Public.TrialApplications;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -33,6 +34,11 @@ namespace GiroMesa.ApiClient.Api.V1.Public
         public global::GiroMesa.ApiClient.Api.V1.Public.Events.EventsRequestBuilder Events
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Public.Events.EventsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The media property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Public.Media.MediaRequestBuilder Media
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Public.Media.MediaRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The menus property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Public.Menus.MenusRequestBuilder Menus

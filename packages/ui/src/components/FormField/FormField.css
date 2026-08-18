@@ -1,0 +1,14 @@
+.gm-form-field {
+  display: grid;
+  font-size: 0.8rem;
+  font-weight: 750;
+  gap: 0.45rem;
+}
+.gm-form-field__label {
+  color: var(--gm-ink);
+}
+.gm-form-field__error {
+  color: var(--gm-danger);
+  font-size: 0.72rem;
+  font-weight: 600;
+}

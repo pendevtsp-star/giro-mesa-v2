@@ -1,0 +1,219 @@
+.reservations-page {
+  gap: var(--gm-space-3);
+}
+
+.reception-sync-status {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.reception-sync-status > span {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+  min-width: 0;
+}
+
+.reception-sync-status small {
+  color: var(--gm-muted);
+  font-size: 0.66rem;
+}
+
+.reservations-board {
+  align-items: start;
+}
+
+.reservations-card {
+  min-width: 0;
+  padding: var(--gm-space-4);
+}
+
+.reservations-card .section-title h2,
+.reservations-card .section-title p {
+  margin: 0;
+}
+
+.reservations-card .gm-empty {
+  display: grid;
+  gap: var(--gm-space-1) var(--gm-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: var(--gm-space-4) 0 0;
+  text-align: left;
+}
+
+.reservations-card .gm-empty__icon {
+  grid-row: 1 / span 2;
+  height: 44px;
+  width: 44px;
+}
+
+.reservations-card .gm-empty > strong {
+  align-self: end;
+}
+
+.reservations-card .gm-empty > p {
+  align-self: start;
+}
+
+.reservations-card .gm-empty > .gm-button {
+  align-self: center;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+.arrival-bar {
+  align-items: end;
+  display: grid;
+  gap: var(--gm-space-3);
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) auto;
+  padding: var(--gm-space-3);
+}
+
+.arrival-bar > label:not(.search-field),
+.seat-guest-form label {
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: var(--gm-space-1);
+}
+
+.arrival-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.reservations-card .data-row > div:first-child {
+  align-items: start;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reservations-card .data-row a {
+  color: var(--gm-brand);
+  font-size: 0.68rem;
+  width: fit-content;
+}
+
+.reservations-card .priority-late {
+  color: var(--gm-danger);
+  font-weight: 700;
+}
+
+.reservation-note {
+  border-left: 3px solid var(--gm-warning);
+  color: var(--gm-ink);
+  margin-top: var(--gm-space-1);
+  padding-left: var(--gm-space-2);
+}
+
+.capacity-hint {
+  align-items: center;
+  color: var(--gm-muted);
+  display: flex;
+  font-size: 0.72rem;
+  gap: var(--gm-space-2);
+  justify-content: space-between;
+  margin: 0;
+}
+
+.capacity-hint--warning {
+  color: var(--gm-danger);
+  font-weight: 700;
+}
+
+.row-more-actions {
+  position: relative;
+}
+
+.row-more-actions > summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  list-style: none;
+  padding: var(--gm-space-2);
+}
+
+.row-more-actions > div {
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  box-shadow: var(--gm-shadow-md);
+  display: grid;
+  gap: var(--gm-space-1);
+  padding: var(--gm-space-2);
+  position: absolute;
+  right: 0;
+  width: max-content;
+  z-index: 4;
+}
+
+.reception-history {
+  border-top: 1px solid var(--gm-border);
+  padding-top: var(--gm-space-3);
+}
+
+.reception-history > summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: var(--gm-space-3);
+}
+
+.reception-history > .gm-button {
+  margin-top: var(--gm-space-3);
+}
+
+.seat-guest-form {
+  display: grid;
+  gap: var(--gm-space-3);
+}
+
+.seat-guest-form p,
+.muted-copy {
+  color: var(--gm-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .arrival-bar {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arrival-bar__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .arrival-bar__actions .gm-button {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .reservations-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .reservations-card {
+    padding: var(--gm-space-3);
+  }
+
+  .reservations-card .gm-empty {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-top: var(--gm-space-3);
+  }
+
+  .reservations-card .gm-empty > .gm-button {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+    margin-top: var(--gm-space-2);
+  }
+}

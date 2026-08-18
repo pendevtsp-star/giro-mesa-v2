@@ -1,0 +1,45 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--gm-paper);
+  color: var(--gm-ink);
+  font-family: var(--gm-font);
+  line-height: var(--gm-leading-normal);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  outline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--gm-focus);
+}
+
+input,
+select,
+textarea {
+  accent-color: var(--gm-action);
+}
+
+::selection {
+  background: var(--gm-brand-soft);
+  color: var(--gm-ink);
+}

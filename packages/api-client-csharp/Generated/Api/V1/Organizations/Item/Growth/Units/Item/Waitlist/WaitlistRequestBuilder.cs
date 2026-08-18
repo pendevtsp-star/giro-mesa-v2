@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlis
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WaitlistRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/waitlist", pathParameters)
+        public WaitlistRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/waitlist{?limit*,offset*,scope*}", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlis
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WaitlistRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/waitlist", rawUrl)
+        public WaitlistRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/waitlist{?limit*,offset*,scope*}", rawUrl)
         {
         }
         /// <returns>A <see cref="Stream"/></returns>
@@ -37,11 +37,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlis
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<Stream?> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder.WaitlistRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<Stream> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder.WaitlistRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
@@ -51,11 +51,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlis
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder.WaitlistRequestBuilderGetQueryParameters>>? requestConfiguration = default)
         {
 #nullable restore
 #else
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder.WaitlistRequestBuilderGetQueryParameters>> requestConfiguration = default)
         {
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
@@ -71,12 +71,34 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlis
         {
             return new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder(rawUrl, RequestAdapter);
         }
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        #pragma warning disable CS1591
+        public partial class WaitlistRequestBuilderGetQueryParameters
+        #pragma warning restore CS1591
+        {
+            [QueryParameter("limit")]
+            public int? Limit { get; set; }
+            [QueryParameter("offset")]
+            public int? Offset { get; set; }
+            [Obsolete("This property is deprecated, use ScopeAsGetScopeQueryParameterType instead")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("scope")]
+            public string? Scope { get; set; }
+#nullable restore
+#else
+            [QueryParameter("scope")]
+            public string Scope { get; set; }
+#endif
+            [QueryParameter("scope")]
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.GetScopeQueryParameterType? ScopeAsGetScopeQueryParameterType { get; set; }
+        }
         /// <summary>
         /// Configuration for the request such as headers, query parameters, and middleware options.
         /// </summary>
         [Obsolete("This class is deprecated. Please use the generic RequestConfiguration class generated by the generator.")]
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class WaitlistRequestBuilderGetRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
+        public partial class WaitlistRequestBuilderGetRequestConfiguration : RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Waitlist.WaitlistRequestBuilder.WaitlistRequestBuilderGetQueryParameters>
         {
         }
     }

@@ -14,6 +14,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchas
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The batchCode property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? BatchCode { get; set; }
+#nullable restore
+#else
+        public string BatchCode { get; set; }
+#endif
+        /// <summary>The expiresAt property</summary>
+        public DateTimeOffset? ExpiresAt { get; set; }
         /// <summary>The locationId property</summary>
         public Guid? LocationId { get; set; }
         /// <summary>The purchaseOrderItemId property</summary>
@@ -26,6 +36,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchas
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases.Item.Receipts.ReceiptsPostRequestBody_lines.ReceiptsPostRequestBody_lines_quantity Quantity { get; set; }
 #endif
+        /// <summary>The unitCostCents property</summary>
+        public int? UnitCostCents { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases.Item.Receipts.ReceiptsPostRequestBody_lines"/> and sets the default values.
         /// </summary>
@@ -51,9 +63,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchas
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "batchCode", n => { BatchCode = n.GetStringValue(); } },
+                { "expiresAt", n => { ExpiresAt = n.GetDateTimeOffsetValue(); } },
                 { "locationId", n => { LocationId = n.GetGuidValue(); } },
                 { "purchaseOrderItemId", n => { PurchaseOrderItemId = n.GetGuidValue(); } },
                 { "quantity", n => { Quantity = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases.Item.Receipts.ReceiptsPostRequestBody_lines.ReceiptsPostRequestBody_lines_quantity>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases.Item.Receipts.ReceiptsPostRequestBody_lines.ReceiptsPostRequestBody_lines_quantity.CreateFromDiscriminatorValue); } },
+                { "unitCostCents", n => { UnitCostCents = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -63,9 +78,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchas
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("batchCode", BatchCode);
+            writer.WriteDateTimeOffsetValue("expiresAt", ExpiresAt);
             writer.WriteGuidValue("locationId", LocationId);
             writer.WriteGuidValue("purchaseOrderItemId", PurchaseOrderItemId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases.Item.Receipts.ReceiptsPostRequestBody_lines.ReceiptsPostRequestBody_lines_quantity>("quantity", Quantity);
+            writer.WriteIntValue("unitCostCents", UnitCostCents);
             writer.WriteAdditionalData(AdditionalData);
         }
         /// <summary>

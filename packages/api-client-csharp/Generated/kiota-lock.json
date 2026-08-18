@@ -1,6 +1,6 @@
 {
-  "descriptionHash": "15D6F210E91560AF25A5E5B8E30E11D25FB7210178F18EC9D4D21E140DFED50AB5FE03F5B3D92CD3B9C183298B249568F7D034D6B005BA5E891C776248DA0E00",
-  "descriptionLocation": "../../../apps/api/openapi/openapi.json",
+  "descriptionHash": "5DE03C01FD62B461410069CD5772122E3491DF1BBA843FBEF8C261DF06EDEFDB789FD94F4F1E51E403B5E5C9561ED40CF4983E270E829398AEF4461864F08B7A",
+  "descriptionLocation": "../../../apps/backends/api/openapi/openapi.json",
   "lockFileVersion": "1.0.0",
   "kiotaVersion": "1.34.1",
   "clientClassName": "GiroMesaApiClient",

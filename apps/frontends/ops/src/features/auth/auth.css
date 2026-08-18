@@ -1,0 +1,224 @@
+/* Authentication */
+.auth-layout {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(380px, 0.95fr) minmax(440px, 1.05fr);
+}
+.auth-story {
+  background: #123c2d;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(2rem, 5vw, 5.5rem);
+  position: relative;
+}
+.auth-story::after {
+  background: radial-gradient(circle, rgba(229, 108, 50, 0.42) 0 2px, transparent 3px);
+  background-size: 26px 26px;
+  content: "";
+  height: 390px;
+  opacity: 0.45;
+  position: absolute;
+  right: -100px;
+  top: 20%;
+  transform: rotate(-8deg);
+  width: 390px;
+}
+.auth-story .brand__mark {
+  background: var(--gm-accent);
+}
+.auth-story > * {
+  position: relative;
+  z-index: 1;
+}
+.auth-story h1 {
+  font-size: clamp(2.8rem, 5vw, 5.4rem);
+  line-height: 0.95;
+  max-width: 10ch;
+}
+.auth-story p:not(.eyebrow) {
+  color: #c8d8d1;
+  font-size: 1.08rem;
+  line-height: 1.6;
+  max-width: 50ch;
+}
+.auth-story .eyebrow {
+  color: #f0a07b;
+}
+.auth-story > .gm-badge {
+  align-self: flex-start;
+}
+.auth-story__flow {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.auth-story__flow li {
+  border-left: 2px solid #ef8b5e;
+  color: #dfe9e4;
+  font-size: 0.76rem;
+  font-weight: 750;
+  padding: 0.8rem;
+}
+.auth-story small {
+  color: #90ab9f;
+}
+.auth-panel {
+  align-items: center;
+  background: var(--gm-paper);
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+.auth-panel__inner {
+  max-width: 470px;
+  width: 100%;
+}
+.auth-panel h2 {
+  font-family: var(--gm-display);
+  font-size: 2.3rem;
+}
+.form-stack {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.form-stack label,
+.note-field,
+.pin-field {
+  color: var(--gm-ink);
+  display: grid;
+  font-size: 0.8rem;
+  font-weight: 750;
+  gap: 0.45rem;
+}
+.form-stack input:not([type="checkbox"]),
+.form-stack select,
+.note-field textarea,
+.pin-field input {
+  background: #fff;
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-ink);
+  min-height: 48px;
+  padding: 0.75rem 0.85rem;
+  width: 100%;
+}
+.password-field {
+  display: flex;
+  position: relative;
+}
+.form-stack .password-field input {
+  padding-right: 5.4rem;
+}
+.password-field button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--gm-brand);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  min-height: 24px;
+  padding: 0 0.25rem;
+  position: absolute;
+  right: 0.45rem;
+  top: 0.65rem;
+}
+.form-inline {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.form-stack label.check-label {
+  align-items: center;
+  display: flex;
+  font-weight: 600;
+  grid-template-columns: auto 1fr;
+}
+.check-label input,
+.terminal-option input {
+  accent-color: var(--gm-brand);
+  height: 18px;
+  width: 18px;
+}
+.link-button {
+  background: none;
+  border: 0;
+  color: var(--gm-brand);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.auth-footnote {
+  border-top: 1px solid var(--gm-border);
+  color: var(--gm-muted);
+  font-size: 0.76rem;
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  text-align: center;
+}
+.auth-message {
+  background: var(--gm-brand-soft);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-success);
+  font-size: 0.72rem;
+  margin: 0;
+  padding: 0.7rem;
+}
+.auth-message--error {
+  background: #fbe1e1;
+  color: var(--gm-danger);
+}
+.scope-screen {
+  background: linear-gradient(135deg, var(--gm-paper), #e4ece6);
+  min-height: 100vh;
+  padding: 2rem;
+}
+.scope-screen__header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto 3rem;
+  max-width: 1120px;
+}
+.scope-card {
+  margin: 0 auto;
+  max-width: 580px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+.scope-card h1 {
+  margin-top: 1rem;
+}
+.scope-profile {
+  align-items: center;
+  background: var(--gm-surface-soft);
+  border-radius: var(--gm-radius);
+  display: flex;
+  gap: 0.8rem;
+  margin: 1.5rem 0;
+  padding: 0.8rem;
+}
+.scope-profile span:last-child {
+  display: grid;
+  gap: 0.2rem;
+}
+.form-stack label.terminal-option {
+  align-items: start;
+  background: var(--gm-surface-soft);
+  border-radius: var(--gm-radius-sm);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr;
+  padding: 0.9rem;
+}
+.terminal-option span {
+  display: grid;
+  gap: 0.25rem;
+}

@@ -3,7 +3,15 @@ import { describe, it } from "node:test";
 import {
   contactRequestSchema,
   createOrganizationSchema,
+  deliveryAddressSchema,
+  deliveryCourierAssignmentSchema,
+  deliveryCourierCreateSchema,
+  deliveryCourierPositionSchema,
+  deliveryNotificationSchema,
+  inviteMembershipSchema,
   loginRequestSchema,
+  operationalCapabilityAliases,
+  operationalCapabilitySchema,
   operationalCommandSchema,
   publicOrderSchema,
   registerRequestSchema,
@@ -39,6 +47,13 @@ describe("public contracts", () => {
       }).success,
       false,
     );
+    const alphanumeric = createOrganizationSchema.parse({
+      legalName: "Bar Ltda",
+      tradeName: "Bar",
+      document: "12abc345000112",
+      unitName: "Centro",
+    });
+    assert.equal(alphanumeric.document, "12ABC345000112");
     assert.equal(
       operationalCommandSchema.safeParse({
         id: crypto.randomUUID(),
@@ -51,6 +66,34 @@ describe("public contracts", () => {
       }).success,
       true,
     );
+  });
+
+  it("accepts the delivery operator role", () => {
+    const invite = inviteMembershipSchema.parse({
+      email: "delivery@example.com",
+      role: "delivery",
+      unitId: crypto.randomUUID(),
+    });
+    assert.equal(invite.role, "delivery");
+    assert.equal(
+      inviteMembershipSchema.parse({
+        email: "contador@example.com",
+        role: "accountant",
+        unitId: null,
+      }).role,
+      "accountant",
+    );
+  });
+
+  it("publishes canonical operational capabilities with legacy aliases", () => {
+    assert.equal(
+      operationalCapabilitySchema.parse("operations:payments:record"),
+      "operations:payments:record",
+    );
+    assert.equal(operationalCapabilitySchema.safeParse("payments:write").success, false);
+    assert.deepEqual(operationalCapabilityAliases["payments:write"], [
+      "operations:payments:record",
+    ]);
   });
 
   it("adapts the actual marketing forms at the API boundary", () => {
@@ -126,6 +169,62 @@ describe("public contracts", () => {
         paymentMethod: "credit_card",
       }).success,
       false,
+    );
+  });
+
+  it("validates normalized delivery coordinates", () => {
+    const address = {
+      street: "Rua Um",
+      number: "10",
+      neighborhood: "Centro",
+      city: "São Paulo",
+      state: "sp",
+      postalCode: "01001-000",
+      latitude: -23.5505,
+      longitude: -46.6333,
+    };
+    assert.equal(deliveryAddressSchema.parse(address).state, "SP");
+    assert.equal(deliveryAddressSchema.safeParse({ ...address, latitude: 91 }).success, false);
+    assert.equal(
+      deliveryAddressSchema.safeParse({ ...address, longitude: undefined }).success,
+      false,
+    );
+  });
+
+  it("keeps delivery courier and notification commands strict and idempotent", () => {
+    const idempotencyKey = "delivery-command-0001";
+    assert.equal(
+      deliveryCourierCreateSchema.safeParse({
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        reference: "courier-42",
+        name: "Maria Entregas",
+        idempotencyKey,
+      }).success,
+      true,
+    );
+    assert.equal(
+      deliveryCourierAssignmentSchema.safeParse({
+        courierId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        idempotencyKey,
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+      }).success,
+      false,
+    );
+    assert.equal(
+      deliveryCourierPositionSchema.safeParse({
+        latitude: -23.5,
+        longitude: -46.6,
+        idempotencyKey,
+      }).success,
+      true,
+    );
+    assert.equal(
+      deliveryNotificationSchema.safeParse({
+        audience: "customer",
+        type: "courier_arriving",
+        idempotencyKey,
+      }).success,
+      true,
     );
   });
 });

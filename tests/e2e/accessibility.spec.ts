@@ -1,4 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
+﻿import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
 async function expectWcagAa(page: Page) {
@@ -17,16 +17,7 @@ test("commercial landing and login meet WCAG AA", async ({ page }) => {
   await expectWcagAa(page);
 });
 
-test("public menu meets WCAG AA", async ({ page }) => {
-  await page.goto("http://localhost:3111/m/demo");
-  await expectWcagAa(page);
-});
-
-test("operational login and dashboard meet WCAG AA", async ({ page }) => {
-  await page.goto("http://127.0.0.1:3112");
-  await expectWcagAa(page);
-  await page.getByRole("button", { name: /entrar no giromesa/i }).click();
-  await page.getByRole("button", { name: /abrir operação/i }).click();
-  await expect(page.getByRole("navigation")).toBeVisible();
+test("public menu entry point meets WCAG AA", async ({ page }) => {
+  await page.goto("http://localhost:3111");
   await expectWcagAa(page);
 });

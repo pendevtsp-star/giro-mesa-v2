@@ -1,0 +1,30 @@
+.gm-avatar {
+  background: var(--gm-brand-soft);
+  border-radius: 50%;
+  color: var(--gm-brand-strong);
+  display: grid;
+  flex: 0 0 auto;
+  font-weight: 850;
+  overflow: hidden;
+  place-items: center;
+}
+.gm-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.gm-avatar--sm {
+  font-size: 0.6rem;
+  height: 28px;
+  width: 28px;
+}
+.gm-avatar--md {
+  font-size: 0.7rem;
+  height: 37px;
+  width: 37px;
+}
+.gm-avatar--lg {
+  font-size: 0.85rem;
+  height: 48px;
+  width: 48px;
+}

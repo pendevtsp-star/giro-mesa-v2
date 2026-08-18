@@ -1,5 +1,7 @@
 packages:
-  - apps/*
+  - apps/frontends/*
+  - apps/backends/*
+  - apps/native/*
   - packages/*
 
 allowBuilds:

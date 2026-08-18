@@ -1,0 +1,9 @@
+:root {
+  --gm-shadow-xs: 0 1px 0 rgba(20, 30, 25, 0.03);
+  --gm-shadow-sm: 0 2px 8px rgba(23, 32, 28, 0.04);
+  --gm-shadow-md: 0 6px 18px rgba(23, 32, 28, 0.07);
+  --gm-shadow-lg: 0 14px 34px rgba(28, 41, 34, 0.09);
+  --gm-shadow-xl: 0 24px 60px rgba(17, 39, 31, 0.13);
+  /* Legacy alias */
+  --gm-shadow: var(--gm-shadow-lg);
+}

@@ -1,0 +1,7 @@
+:root {
+  --gm-radius-xs: 6px;
+  --gm-radius-sm: 8px;
+  --gm-radius: 12px;
+  --gm-radius-lg: 18px;
+  --gm-radius-full: 999px;
+}

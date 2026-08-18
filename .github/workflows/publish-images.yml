@@ -61,11 +61,8 @@ jobs:
             NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true
             NEXT_PUBLIC_CUSTOMER_API_URL=https://api.giromesa.com.br
             NEXT_PUBLIC_CUSTOMER_API_ENABLED=true
-            NEXT_PUBLIC_DEMO_HUB_ACK=false
-            CUSTOMER_QA_DEMO_SLUG=demo
             VITE_API_URL=https://api.giromesa.com.br
             VITE_SITE_URL=https://giromesa.com.br
-            VITE_DEMO_MODE=false
           tags: |
             ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:pilot
             ghcr.io/pendevtsp-star/giro-mesa-v2-${{ matrix.service }}:${{ github.event.workflow_run.head_sha || github.sha }}
