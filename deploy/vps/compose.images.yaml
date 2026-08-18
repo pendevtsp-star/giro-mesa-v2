@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+  migrate:
+    image: ${GIROMESA_API_IMAGE:?GIROMESA_API_IMAGE must be an OCI digest}
+  api:
+    image: ${GIROMESA_API_IMAGE:?GIROMESA_API_IMAGE must be an OCI digest}
+  worker:
+    image: ${GIROMESA_WORKER_IMAGE:?GIROMESA_WORKER_IMAGE must be an OCI digest}
+  site:
+    image: ${GIROMESA_SITE_IMAGE:?GIROMESA_SITE_IMAGE must be an OCI digest}
+  customer:
+    image: ${GIROMESA_CUSTOMER_IMAGE:?GIROMESA_CUSTOMER_IMAGE must be an OCI digest}
+  ops:
+    image: ${GIROMESA_OPS_IMAGE:?GIROMESA_OPS_IMAGE must be an OCI digest}

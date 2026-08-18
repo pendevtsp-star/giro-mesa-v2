@@ -9,6 +9,7 @@ allowBuilds:
   '@scarf/scarf': true
   argon2: true
   esbuild: true
+  protobufjs: false
 
 onlyBuiltDependencies:
   - '@nestjs/core'

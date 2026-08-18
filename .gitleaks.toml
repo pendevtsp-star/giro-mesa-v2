@@ -1,0 +1,19 @@
+title = "GiroMesa gitleaks policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known synthetic Stripe-shaped redaction fixture"
+regexTarget = "secret"
+regexes = ['''^sk_live_1234567890abcdef$''']
+
+[[allowlists]]
+description = "Known non-secret storage and idempotency identifiers"
+regexTarget = "secret"
+regexes = [
+  '''^giromesa_operational_scope_v1$''',
+  '''^delivery-assign-1$''',
+  '''^delivery-notification-1$''',
+  '''^commission-idempotency-1$''',
+]

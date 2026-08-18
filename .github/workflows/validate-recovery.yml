@@ -1,0 +1,79 @@
+name: Validate recovery candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      recovery_sha:
+        description: Exact 40-character commit SHA of the recovery candidate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-recovery-${{ inputs.recovery_sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted validator from the default branch
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Bind the validator to the dispatched main commit
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "${{ inputs.recovery_sha }}" =~ ^[0-9a-f]{40}$ ]]
+      - name: Check out the exact unprivileged recovery candidate
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.recovery_sha }}
+          path: candidate
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: candidate/pnpm-lock.yaml
+      - name: Prove PostgreSQL and runtime recovery compatibility
+        run: >-
+          bash ./scripts/validate-recovery-candidate.sh
+          --candidate-directory candidate
+          --recovery-sha "${{ inputs.recovery_sha }}"
+          --output-directory evidence
+      - id: evidence
+        name: Expose the deterministic evidence digest
+        env:
+          RECOVERY_SHA: ${{ inputs.recovery_sha }}
+        run: |
+          set -Eeuo pipefail
+          digest="$(cut -d ' ' -f 1 evidence/recovery-validation.json.sha256)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'digest=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          {
+            printf '### Recovery validation evidence\n\n'
+            printf -- "- recoveryArtifact: \`git:%s\`\n" "$RECOVERY_SHA"
+            printf -- "- testReportDigest: \`sha256:%s\`\n" "$digest"
+            printf -- "- workflowRun: \`%s/%s/actions/runs/%s\`\n" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain deterministic recovery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-recovery-validation-${{ inputs.recovery_sha }}
+          path: |
+            evidence/recovery-validation.json
+            evidence/recovery-validation.json.sha256
+          if-no-files-found: error
+          retention-days: 90

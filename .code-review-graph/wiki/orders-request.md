@@ -14,8 +14,6 @@ Directory-based community: packages/api-client-csharp/Generated/Public
 |------|------|------|-------|
 | PublicRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\PublicRequestBuilder.cs | 15-39 |
 | PublicRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\PublicRequestBuilder.cs | 36-38 |
-| AuthRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\AuthRequestBuilder.cs | 22-81 |
-| AuthRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\AuthRequestBuilder.cs | 78-80 |
 | CallbackRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Google\Callback\CallbackRequestBuilder.cs | 32-34 |
 | GoogleRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Google\GoogleRequestBuilder.cs | 18-57 |
 | GoogleRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Google\GoogleRequestBuilder.cs | 54-56 |
@@ -62,8 +60,10 @@ Directory-based community: packages/api-client-csharp/Generated/Public
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 54-61 |
 | Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 66-72 |
 | VerifyRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Mfa\Oauth\Verify\VerifyRequestBuilder.cs | 32-34 |
+| ConfirmPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 10-63 |
+| ConfirmPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Public\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 28-31 |
 
-*... and 133 more members.*
+*... and 118 more members.*
 
 ## Execution Flows
 
@@ -75,14 +75,14 @@ No execution flows pass through this community.
 
 - `GetStringValue` (57 edge(s))
 - `WriteStringValue` (57 edge(s))
-- `ReferenceEquals` (56 edge(s))
-- `nameof` (56 edge(s))
-- `IParsable` (28 edge(s))
-- `writer` (17 edge(s))
-- `IAdditionalDataHolder` (16 edge(s))
-- `WriteAdditionalData` (16 edge(s))
-- `n` (16 edge(s))
-- `BaseRequestBuilder` (10 edge(s))
+- `ReferenceEquals` (52 edge(s))
+- `nameof` (52 edge(s))
+- `IParsable` (26 edge(s))
+- `writer` (15 edge(s))
+- `IAdditionalDataHolder` (14 edge(s))
+- `WriteAdditionalData` (14 edge(s))
+- `n` (14 edge(s))
+- `BaseRequestBuilder` (9 edge(s))
 - `GetBoolValue` (9 edge(s))
 - `WriteBoolValue` (9 edge(s))
 - `IComposedTypeWrapper` (5 edge(s))

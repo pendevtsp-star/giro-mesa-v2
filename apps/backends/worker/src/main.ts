@@ -1,6 +1,8 @@
 import { OutboxWorker } from "./outbox.js";
+import { createWorkerHeartbeat } from "./worker-heartbeat.js";
 
 const worker = new OutboxWorker();
+const heartbeat = createWorkerHeartbeat(process.env);
 let stopping = false;
 let nextMaintenanceAt = 0;
 let nextReportScanAt = 0;
@@ -8,7 +10,11 @@ let nextReportScanAt = 0;
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  await worker.close();
+  try {
+    await heartbeat.cleanup();
+  } finally {
+    await worker.close();
+  }
 }
 
 process.on("SIGINT", () => void shutdown());
@@ -24,5 +30,6 @@ while (!stopping) {
     nextReportScanAt = Date.now() + 15_000;
   }
   const processed = await worker.runOnce();
+  await heartbeat.recordSuccessfulCycle();
   if (processed === 0) await new Promise((resolve) => setTimeout(resolve, 1_000));
 }

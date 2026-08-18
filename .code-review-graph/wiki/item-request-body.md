@@ -12,8 +12,6 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| AuthRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\AuthRequestBuilder.cs | 22-81 |
-| AuthRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\AuthRequestBuilder.cs | 78-80 |
 | CallbackRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Google\Callback\CallbackRequestBuilder.cs | 32-34 |
 | GoogleRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Google\GoogleRequestBuilder.cs | 18-57 |
 | GoogleRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Google\GoogleRequestBuilder.cs | 54-56 |
@@ -62,8 +60,10 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 | VerifyRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Oauth\Verify\VerifyRequestBuilder.cs | 32-34 |
 | ConfirmPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 10-63 |
 | ConfirmPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 28-31 |
+| CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 37-41 |
+| GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 46-52 |
 
-*... and 985 more members.*
+*... and 909 more members.*
 
 ## Execution Flows
 
@@ -73,21 +73,21 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 
 ### Outgoing
 
-- `ReferenceEquals` (332 edge(s))
-- `nameof` (332 edge(s))
-- `IParsable` (169 edge(s))
-- `writer` (147 edge(s))
-- `GetStringValue` (140 edge(s))
-- `WriteStringValue` (139 edge(s))
-- `IAdditionalDataHolder` (126 edge(s))
-- `WriteAdditionalData` (125 edge(s))
-- `n` (106 edge(s))
-- `WriteIntValue` (64 edge(s))
-- `GetIntValue` (62 edge(s))
-- `GetGuidValue` (57 edge(s))
-- `WriteGuidValue` (57 edge(s))
-- `BaseRequestBuilder` (42 edge(s))
+- `ReferenceEquals` (316 edge(s))
+- `nameof` (316 edge(s))
+- `IParsable` (161 edge(s))
+- `writer` (140 edge(s))
+- `GetStringValue` (137 edge(s))
+- `WriteStringValue` (136 edge(s))
+- `IAdditionalDataHolder` (120 edge(s))
+- `WriteAdditionalData` (119 edge(s))
+- `n` (99 edge(s))
+- `WriteIntValue` (61 edge(s))
+- `GetIntValue` (59 edge(s))
+- `GetGuidValue` (51 edge(s))
+- `WriteGuidValue` (51 edge(s))
 - `IComposedTypeWrapper` (41 edge(s))
+- `MergeDeserializersForIntersectionWrapper` (38 edge(s))
 
 ### Incoming
 
