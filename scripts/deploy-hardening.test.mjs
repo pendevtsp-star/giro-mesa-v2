@@ -560,13 +560,23 @@ test("BuildKit attestation validation accepts single and multi-platform structur
     materials: [],
     metadata: { buildStartedOn: "2026-08-12T00:00:00Z" },
   };
+  const slsaV1 = {
+    buildDefinition: {
+      buildType: "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md",
+      resolvedDependencies: [],
+    },
+    runDetails: {
+      builder: { id: "https://github.com/example/actions/runs/1/attempts/1" },
+      metadata: { invocationId: "https://github.com/example/actions/runs/1/attempts/1" },
+    },
+  };
   const spdx = {
     SPDXID: "SPDXRef-DOCUMENT",
     spdxVersion: "SPDX-2.3",
     packages: [{ name: "large-fixture", comment: "x".repeat(300_000) }],
   };
   try {
-    writeFileSync(provenanceFile, JSON.stringify({ SLSA: slsa }));
+    writeFileSync(provenanceFile, JSON.stringify({ SLSA: slsaV1 }));
     writeFileSync(sbomFile, JSON.stringify({ SPDX: spdx }));
     assert.equal(spawnSync("python", [buildkitValidator, provenanceFile, sbomFile]).status, 0);
     writeFileSync(

@@ -21,7 +21,7 @@ def valid(provenance, sbom):
     for platform in provenance_views:
         slsa = provenance_views[platform]["SLSA"]
         spdx = sbom_views[platform]["SPDX"]
-        if not (
+        legacy_slsa = (
             isinstance(slsa, dict)
             and bool(slsa)
             and isinstance(slsa.get("builder"), dict)
@@ -31,6 +31,22 @@ def valid(provenance, sbom):
             and isinstance(slsa.get("materials"), list)
             and isinstance(slsa.get("metadata"), dict)
             and bool(slsa["metadata"])
+        )
+        build_definition = slsa.get("buildDefinition", {}) if isinstance(slsa, dict) else {}
+        run_details = slsa.get("runDetails", {}) if isinstance(slsa, dict) else {}
+        slsa_v1 = (
+            isinstance(build_definition, dict)
+            and isinstance(run_details, dict)
+            and isinstance(build_definition.get("buildType"), str)
+            and bool(build_definition["buildType"])
+            and isinstance(build_definition.get("resolvedDependencies"), list)
+            and isinstance(run_details.get("builder"), dict)
+            and bool(run_details["builder"])
+            and isinstance(run_details.get("metadata"), dict)
+            and bool(run_details["metadata"])
+        )
+        if not (
+            (legacy_slsa or slsa_v1)
             and isinstance(spdx, dict)
             and spdx.get("SPDXID") == "SPDXRef-DOCUMENT"
             and isinstance(spdx.get("spdxVersion"), str)
