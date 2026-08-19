@@ -126,6 +126,8 @@ run_database_matrix() {
   wait_for_postgres "$container" postgres postgres
   docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
+  docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+    -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
   binding="$(docker port "$container" 5432/tcp | head -n 1)"
   port="${binding##*:}"
   [[ "$port" =~ ^[0-9]+$ ]] || { printf 'RECOVERY_POSTGRES_PORT_INVALID\n' >&2; return 1; }
