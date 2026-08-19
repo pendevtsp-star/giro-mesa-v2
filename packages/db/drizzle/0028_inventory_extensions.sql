@@ -58,6 +58,30 @@ ALTER TYPE "public"."management_supplier_invoice_status_v2" RENAME TO "managemen
 --> statement-breakpoint
 ALTER TABLE "management_supplier_invoices" ALTER COLUMN "status" SET DEFAULT 'pending';
 --> statement-breakpoint
+DO $$
+BEGIN
+	IF to_regclass('public.fiscal_documents') IS NOT NULL OR to_regclass('public.fiscal_document_events') IS NOT NULL THEN
+		IF to_regclass('public.fiscal_documents') IS NULL
+			OR to_regclass('public.fiscal_document_events') IS NULL
+			OR NOT EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_schema = 'public' AND table_name = 'fiscal_documents' AND column_name = 'sale_reference'
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_schema = 'public' AND table_name = 'fiscal_document_events' AND column_name = 'event'
+			) THEN
+			RAISE EXCEPTION 'LEGACY_FISCAL_SCHEMA_UNRECOGNIZED';
+		END IF;
+		IF EXISTS (SELECT 1 FROM fiscal_documents LIMIT 1)
+			OR EXISTS (SELECT 1 FROM fiscal_document_events LIMIT 1) THEN
+			RAISE EXCEPTION 'LEGACY_FISCAL_DATA_MIGRATION_REQUIRED';
+		END IF;
+		DROP TABLE fiscal_document_events;
+		DROP TABLE fiscal_documents;
+	END IF;
+END $$;
+--> statement-breakpoint
 CREATE TABLE "accountant_requests" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,

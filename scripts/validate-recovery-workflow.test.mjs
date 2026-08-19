@@ -43,7 +43,9 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
   assert.match(script, /APP=api/);
   assert.match(script, /APP=worker/);
-  assert.match(script, /"doseClubReconciliation":\s*"not-present"/);
+  assert.match(script, /"doseClubReconciliation":\s*"legacy-source-upgraded"/);
+  assert.match(script, /run_legacy_upgrade_matrix 16/);
+  assert.match(script, /run_legacy_upgrade_matrix 17/);
   assert.match(script, /"runtime":\s*\{[\s\S]*"apiHealth":\s*"passed"/);
   assert.match(script, /"apiHealthByLevel"/);
   assert.match(script, /system\.worker_probe/);
@@ -61,6 +63,7 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(matrix.transitions.length, 1);
   const [transition] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
+  assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
   assert.equal(transition.recoveryMigration, matrix.targetMigration);
   assert.equal(transition.recoveryArtifact, "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af");

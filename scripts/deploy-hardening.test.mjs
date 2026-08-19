@@ -413,6 +413,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.deepEqual(recovery.transitions, [
     {
       appliedBefore: "0026_doseclub_integration",
+      appliedBeforeWhen: "1786493658116",
       appliedAfter: "0042_shallow_lenny_balinger",
       recoveryMigration: "0042_shallow_lenny_balinger",
       recoveryArtifact: "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af",
@@ -528,8 +529,8 @@ test("recovery validation waits through the PostgreSQL temporary-server restart"
 test("trusted recovery evidence matches the production-only schema matrix", () => {
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");
   const provenance = readFileSync(imageProvenance, "utf8");
-  assert.match(entrypoint, /evidence\.get\("doseClubReconciliation"\) == "not-present"/);
-  assert.match(provenance, /evidence\.get\("doseClubReconciliation"\) == "not-present"/);
+  assert.match(entrypoint, /evidence\.get\("doseClubReconciliation"\) == "legacy-source-upgraded"/);
+  assert.match(provenance, /evidence\.get\("doseClubReconciliation"\) == "legacy-source-upgraded"/);
 });
 
 test("trusted entrypoint sanitizes privileged execution and serializes release operations", () => {

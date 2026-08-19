@@ -4,6 +4,7 @@
   "transitions": [
     {
       "appliedBefore": "0026_doseclub_integration",
+      "appliedBeforeWhen": "1786493658116",
       "appliedAfter": "0042_shallow_lenny_balinger",
       "recoveryMigration": "0042_shallow_lenny_balinger",
       "recoveryArtifact": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af",

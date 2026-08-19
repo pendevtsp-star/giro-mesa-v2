@@ -77,10 +77,14 @@ applied_migration_at=$(docker exec "$postgres_id" psql --username "$postgres_use
   --set ON_ERROR_STOP=1 --tuples-only --no-align --command "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1")
 applied_migration_at=${applied_migration_at//$'\r'/}
 applied_migration_at=${applied_migration_at//$'\n'/}
-source_migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" "$applied_migration_at" <<'PY'
+recovery_matrix="$release_dir/deploy/vps/recovery-compatibility.json"
+source_migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" "$recovery_matrix" "$applied_migration_at" <<'PY'
 import json, sys
 entries = json.load(open(sys.argv[1], encoding="utf-8")).get("entries", [])
-matches = [entry.get("tag") for entry in entries if str(entry.get("when")) == sys.argv[2]]
+matches = [entry.get("tag") for entry in entries if str(entry.get("when")) == sys.argv[3]]
+if not matches:
+    matrix = json.load(open(sys.argv[2], encoding="utf-8"))
+    matches = [item.get("appliedBefore") for item in matrix.get("transitions", []) if str(item.get("appliedBeforeWhen")) == sys.argv[3]]
 if len(matches) != 1: raise SystemExit(1)
 print(matches[0], end="")
 PY
@@ -92,12 +96,12 @@ if not entries or not isinstance(entries[-1].get("tag"), str): raise SystemExit(
 print(entries[-1]["tag"], end="")
 PY
 )
-recovery_matrix="$release_dir/deploy/vps/recovery-compatibility.json"
 python3 - "$recovery_matrix" "$source_migration_id" "$target_migration_id" "$recovery_migration_id" "$recovery_sha" <<'PY'
 import json, re, sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 valid=value.get("schemaVersion")==1 and value.get("targetMigration")=="0042_shallow_lenny_balinger" and any(
     item.get("appliedBefore")==sys.argv[2]
+    and str(item.get("appliedBeforeWhen"))=="1786493658116"
     and item.get("appliedAfter")==sys.argv[3]
     and item.get("recoveryMigration")==sys.argv[4]
     and item.get("recoveryArtifact")==f"git:{sys.argv[5]}"

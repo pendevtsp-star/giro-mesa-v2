@@ -25,7 +25,7 @@ if [[ -z "$candidate_directory" || -z "$output_directory" ]]; then
   exit 64
 fi
 
-for command_name in docker git node pnpm python3 sha256sum; do
+for command_name in docker git node pnpm python3 sha256sum tar; do
   command -v "$command_name" >/dev/null 2>&1 || {
     printf 'RECOVERY_VALIDATION_TOOL_REQUIRED:%s\n' "$command_name" >&2
     exit 69
@@ -86,6 +86,7 @@ declare -a containers=()
 declare -a networks=()
 declare -a local_images=()
 runtime_environment=""
+legacy_directory="$(mktemp -d)"
 
 cleanup() {
   local item
@@ -93,8 +94,13 @@ cleanup() {
   for item in "${networks[@]}"; do docker network rm "$item" >/dev/null 2>&1 || true; done
   for item in "${local_images[@]}"; do docker image rm -f "$item" >/dev/null 2>&1 || true; done
   [[ -z "$runtime_environment" ]] || rm -f -- "$runtime_environment"
+  rm -rf -- "$legacy_directory"
 }
 trap cleanup EXIT
+
+legacy_source_sha="4d408037c3fbcb67e2ad57f8ad47b6300a10ec77"
+git -C "$candidate_directory" cat-file -e "${legacy_source_sha}^{commit}"
+git -C "$candidate_directory" archive "$legacy_source_sha" -- packages/db/drizzle | tar -x -C "$legacy_directory"
 
 wait_for_postgres() {
   local container="$1" user="$2" database="$3"
@@ -134,6 +140,40 @@ run_database_matrix() {
 run_database_matrix 16 "$postgres16"
 run_database_matrix 17 "$postgres17"
 
+run_legacy_upgrade_matrix() {
+  local major="$1" image="$2" binding port container tag when file hash latest
+  container="gm-recovery-legacy-${major}-${suffix}"
+  containers+=("$container")
+  docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 "$image" >/dev/null
+  wait_for_postgres "$container" postgres postgres
+  docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+    -c 'CREATE SCHEMA drizzle; CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);' >/dev/null
+  while IFS=$'\t' read -r tag when; do
+    file="$legacy_directory/packages/db/drizzle/${tag}.sql"
+    [[ -f "$file" ]] || { printf 'RECOVERY_LEGACY_MIGRATION_MISSING:%s\n' "$tag" >&2; return 1; }
+    docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file" >/dev/null
+    hash="$(sha256sum "$file" | cut -d ' ' -f 1)"
+    docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+      -v hash="$hash" -v applied_at="$when" \
+      -c "INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES (:'hash', :'applied_at'::bigint)" >/dev/null
+  done < <(python3 -I - "$legacy_directory/packages/db/drizzle/meta/_journal.json" <<'PY'
+import json, pathlib, sys
+entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
+if not entries or entries[-1].get("tag") != "0026_doseclub_integration": raise SystemExit("RECOVERY_LEGACY_JOURNAL_INVALID")
+for entry in entries: print(f'{entry["tag"]}\t{entry["when"]}')
+PY
+  )
+  binding="$(docker port "$container" 5432/tcp | head -n 1)"
+  port="${binding##*:}"
+  (cd -- "$candidate_directory" && DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:${port}/postgres" pnpm db:migrate)
+  latest="$(docker exec "$container" psql -U postgres -d postgres -Atqc 'SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1')"
+  [[ "$latest" == "1787029862431" ]] || { printf 'RECOVERY_LEGACY_UPGRADE_TARGET_MISMATCH\n' >&2; return 1; }
+  docker rm -f "$container" >/dev/null
+}
+
+run_legacy_upgrade_matrix 16 "$postgres16"
+run_legacy_upgrade_matrix 17 "$postgres17"
+
 network="gm-recovery-runtime-${suffix}"
 runtime_postgres="gm-recovery-runtime-pg-${suffix}"
 otel_collector="gm-recovery-otel-${suffix}"
@@ -157,7 +197,7 @@ MSYS_NO_PATHCONV=1 docker run -d --name "$otel_collector" --network "$network" -
 docker build --build-arg APP=api -t "$api_image" -f "$candidate_directory/Dockerfile" "$candidate_directory"
 docker build --build-arg APP=worker -t "$worker_image" -f "$candidate_directory/Dockerfile" "$candidate_directory"
 
-doseclub_present=false
+doseclub_present=true
 
 runtime_environment="$(mktemp)"
 python3 -I - "$runtime_environment" <<'PY'
@@ -274,7 +314,14 @@ value={
     "schemaLevels":levels,
     "targetMigration":"0042_shallow_lenny_balinger",
     "testedUpgrade":True,
-    "doseClubReconciliation":"not-present",
+    "doseClubReconciliation":"legacy-source-upgraded",
+    "legacyUpgrade":{
+        "sourceArtifact":"git:4d408037c3fbcb67e2ad57f8ad47b6300a10ec77",
+        "sourceMigration":"0026_doseclub_integration",
+        "sourceAppliedAt":"1786493658116",
+        "postgresMajors":[16,17],
+        "result":"passed",
+    },
     "runtime":{
         "postgresMajor":17,
         "schemaLevel":42,
