@@ -198,6 +198,23 @@ deployment_committed=0
 mutators_stopped=0
 recover_mutators() {
   if [[ $deployment_committed -eq 0 && $mutators_stopped -eq 1 ]]; then
+    current_applied_at=$(docker exec "$postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" \
+      --tuples-only --no-align --command "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1" 2>/dev/null || true)
+    current_applied_at=${current_applied_at//$'\r'/}; current_applied_at=${current_applied_at//$'\n'/}
+    if [[ $current_applied_at == "$applied_migration_at" ]]; then
+      docker start "${mutators[@]}" >/dev/null
+      for container_id in "${mutators[@]}"; do
+        status=
+        for _ in $(seq 1 30); do
+          status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+          [[ $status == healthy || $status == running ]] && break
+          sleep 2
+        done
+        [[ $status == healthy || $status == running ]] || { echo "SOURCE_RELEASE_RESTART_FAILED" >&2; return 97; }
+      done
+      echo "SOURCE_RELEASE_RESTORED_BEFORE_MIGRATION" >&2
+      return 0
+    fi
     export GIROMESA_RELEASE_ARTIFACT_SHA=$recovery_sha GIROMESA_IMAGE_ATTESTATION_FILE=$recovery_attestation GIROMESA_EXPECTED_PROVENANCE_ROLE=recovery
     export GIROMESA_IMAGE_ATTESTATION_BUNDLE_FILE=$recovery_attestation_bundle GIROMESA_IMAGE_ATTESTATION_CHECKSUM_FILE=$recovery_attestation_checksum
     export GIROMESA_API_IMAGE=${recovery_image_values[0]} GIROMESA_WORKER_IMAGE=${recovery_image_values[1]}
@@ -274,7 +291,13 @@ mutators_stopped=1
 "$provenance_script"
 "${compose[@]}" up -d postgres
 postgres_id=$("${compose[@]}" ps -q postgres)
-[[ $(docker inspect --format '{{.State.Health.Status}}' "$postgres_id") == healthy ]] || { echo "POSTGRES_UPDATE_UNHEALTHY" >&2; exit 1; }
+postgres_status=
+for _ in $(seq 1 30); do
+  postgres_status=$(docker inspect --format '{{.State.Health.Status}}' "$postgres_id" 2>/dev/null || true)
+  [[ $postgres_status == healthy ]] && break
+  sleep 2
+done
+[[ $postgres_status == healthy ]] || { echo "POSTGRES_UPDATE_UNHEALTHY" >&2; exit 1; }
 "${compose[@]}" --profile tools run --rm migrate
 "${compose[@]}" up -d --remove-orphans
 

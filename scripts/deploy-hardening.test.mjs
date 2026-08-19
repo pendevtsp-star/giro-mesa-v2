@@ -393,6 +393,8 @@ test("deploy health gate includes the asynchronous worker", () => {
   assert.match(deploy, /for service in api worker site customer ops/);
   assert.match(deploy, /RestartCount/);
   assert.match(deploy, /GIROMESA_STABILITY_SECONDS/);
+  assert.match(deploy, /SOURCE_RELEASE_RESTORED_BEFORE_MIGRATION/);
+  assert.match(deploy, /postgres_status == healthy/);
 });
 
 test("pre-migration backup binds the migration actually applied in the source database", () => {
