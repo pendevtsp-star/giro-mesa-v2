@@ -745,6 +745,19 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
             new { tabId = target.Id, body = new { tableId = TableTwoId, reason = "Mudança operacional" } });
         Assert.Equal(TableTwoId, (await store.AcceptCommandAsync(transfer)).Result!.Value.GetProperty("tableId").GetString());
 
+        var cleaning = Command(
+            "10000000-0000-4000-8000-000000000020",
+            "pos.table.turnover_requested",
+            "table-turnover",
+            new { tableId = TableId, status = "cleaning" });
+        await store.AcceptCommandAsync(cleaning);
+        var available = Command(
+            "10000000-0000-4000-8000-000000000021",
+            "pos.table.turnover_requested",
+            "table-turnover",
+            new { tableId = TableId, status = "available" });
+        await store.AcceptCommandAsync(available);
+
         var source = Command(
             "10000000-0000-4000-8000-000000000003",
             "pos.tab.open_requested",
@@ -872,7 +885,7 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
         var actorDenied = await Assert.ThrowsAsync<OperationalConflictException>(
             () => store.AcceptCommandAsync(unauthorized));
         Assert.Equal("OFFLINE_ACTOR_AUTHORIZATION_DENIED", actorDenied.Code);
-        Assert.Equal(10, (await store.GetPendingAsync(20)).Count);
+        Assert.Equal(12, (await store.GetPendingAsync(20)).Count);
         Assert.DoesNotContain("1234", (await store.GetPendingAsync(20)).Single(row => row.Id == cancel.Id).Payload);
         Assert.Contains("1234", (await store.GetPendingAsync(20, includeSecrets: true)).Single(row => row.Id == cancel.Id).Payload);
         Assert.True(await store.RejectEventAsync(cancel.Id, "CLOUD_APPROVAL_REJECTED"));

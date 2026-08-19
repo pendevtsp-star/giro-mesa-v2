@@ -371,7 +371,18 @@ test("application rollback only accepts immutable releases and refuses database 
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
   assert.equal(matrix.requiredAppliedMigration, "0042_shallow_lenny_balinger");
-  assert.deepEqual(matrix.transitions, []);
+  assert.deepEqual(matrix.transitions, [
+    {
+      appliedMigration: "0042_shallow_lenny_balinger",
+      targetReleaseMigration: "0042_shallow_lenny_balinger",
+      targetArtifact: "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+      evidence: {
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
+        testReportDigest:
+          "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230",
+      },
+    },
+  ]);
   assert.match(rollback, /targetArtifact/);
   assert.match(rollback, /testReportDigest/);
   assert.match(rollback, /actions\/runs/);
@@ -399,7 +410,22 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
   assert.equal(recovery.targetMigration, "0042_shallow_lenny_balinger");
-  assert.deepEqual(recovery.transitions, []);
+  assert.deepEqual(recovery.transitions, [
+    {
+      appliedBefore: "0026_doseclub_integration",
+      appliedAfter: "0042_shallow_lenny_balinger",
+      recoveryMigration: "0042_shallow_lenny_balinger",
+      recoveryArtifact: "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+      testedUpgrade: true,
+      evidence: {
+        path: "docs/evidence/recovery/ae6711-validation.json",
+        sha256: "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230",
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
+        testReportDigest:
+          "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230",
+      },
+    },
+  ]);
 });
 
 test("deployment and rollback compose contracts always include observability and digest images", () => {

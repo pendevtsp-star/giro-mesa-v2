@@ -58,7 +58,23 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
   assert.equal(matrix.targetMigration, "0042_shallow_lenny_balinger");
-  assert.deepEqual(matrix.transitions, []);
+  assert.equal(matrix.transitions.length, 1);
+  const [transition] = matrix.transitions;
+  assert.equal(transition.appliedBefore, "0026_doseclub_integration");
+  assert.equal(transition.appliedAfter, matrix.targetMigration);
+  assert.equal(transition.recoveryMigration, matrix.targetMigration);
+  assert.equal(transition.recoveryArtifact, "git:ae6711ca93048d232335dd935bbaad93d684dca1");
+  assert.equal(transition.testedUpgrade, true);
+  assert.equal(transition.evidence.path, "docs/evidence/recovery/ae6711-validation.json");
+  assert.equal(
+    transition.evidence.sha256,
+    "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230",
+  );
+  assert.equal(
+    transition.evidence.workflowRun,
+    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
+  );
+  assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   const evidence = readFileSync(
     join(root, "docs", "evidence", "recovery", "ae6711-validation.json"),
     "utf8",

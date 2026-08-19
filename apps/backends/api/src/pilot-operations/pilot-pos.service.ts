@@ -3680,7 +3680,7 @@ export class PilotPosService {
           if (tables.length !== tableIds.length) {
             throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
           }
-          if (tables.some((table) => table.status !== "available")) {
+          if (tables.some((table) => !["available", "needs_cleaning"].includes(table.status))) {
             throw new ConflictException({
               code: "TABLE_NOT_AVAILABLE_FOR_REOPEN",
               message: "Uma mesa do atendimento já está reservada ou ocupada.",

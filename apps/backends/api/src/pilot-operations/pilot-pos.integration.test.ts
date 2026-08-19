@@ -292,7 +292,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     assert.equal(
       groupCloseFloor.tables
         .filter((candidate) => [groupCloseTableA.id, groupCloseTableB.id].includes(candidate.id))
-        .every((candidate) => candidate.status === "available"),
+        .every((candidate) => candidate.status === "needs_cleaning"),
       true,
     );
     await pos.reopenTab(
@@ -1537,7 +1537,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     groupedFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.equal(
       groupedFloor.tables.find((candidate) => candidate.id === freeTable.id)?.status,
-      "available",
+      "needs_cleaning",
     );
     await assert.rejects(() =>
       pos.dissolveTableGroup(
@@ -1658,6 +1658,12 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       ),
       false,
     );
+    await pos.updateTableTurnover(identity.id, organizationA.id, unitA.id, freeTable.id, {
+      status: "cleaning",
+    });
+    await pos.updateTableTurnover(identity.id, organizationA.id, unitA.id, freeTable.id, {
+      status: "available",
+    });
     const transferredTab = await pos.openTab(
       identity.id,
       organizationA.id,

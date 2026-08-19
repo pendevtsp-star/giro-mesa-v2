@@ -1,5 +1,19 @@
 {
   "schemaVersion": 1,
   "targetMigration": "0042_shallow_lenny_balinger",
-  "transitions": []
+  "transitions": [
+    {
+      "appliedBefore": "0026_doseclub_integration",
+      "appliedAfter": "0042_shallow_lenny_balinger",
+      "recoveryMigration": "0042_shallow_lenny_balinger",
+      "recoveryArtifact": "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+      "testedUpgrade": true,
+      "evidence": {
+        "path": "docs/evidence/recovery/ae6711-validation.json",
+        "sha256": "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
+        "testReportDigest": "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230"
+      }
+    }
+  ]
 }

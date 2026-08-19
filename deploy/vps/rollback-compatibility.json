@@ -1,5 +1,15 @@
 {
   "schemaVersion": 2,
   "requiredAppliedMigration": "0042_shallow_lenny_balinger",
-  "transitions": []
+  "transitions": [
+    {
+      "appliedMigration": "0042_shallow_lenny_balinger",
+      "targetReleaseMigration": "0042_shallow_lenny_balinger",
+      "targetArtifact": "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+      "evidence": {
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
+        "testReportDigest": "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230"
+      }
+    }
+  ]
 }
