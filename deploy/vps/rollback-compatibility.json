@@ -5,10 +5,10 @@
     {
       "appliedMigration": "0042_shallow_lenny_balinger",
       "targetReleaseMigration": "0042_shallow_lenny_balinger",
-      "targetArtifact": "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+      "targetArtifact": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af",
       "evidence": {
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32273424900",
-        "testReportDigest": "sha256:72573c6614c2555acf7a76bed31a55110ea1d56aca803e98659cde943762e230"
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32280692224",
+        "testReportDigest": "sha256:7d37532ea2390b2d96a6d941d7e74e9449bef026d8df6d2d0e97fcf2d157ee25"
       }
     }
   ]

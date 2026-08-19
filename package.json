@@ -32,20 +32,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:ae6711ca93048d232335dd935bbaad93d684dca1",
+    "artifact": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af",
     "migration": {
       "id": "0042_shallow_lenny_balinger",
       "status": "verified",
-      "evidence": "git:ae6711ca93048d232335dd935bbaad93d684dca1"
+      "evidence": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-          "evidence": "git:ae6711ca93048d232335dd935bbaad93d684dca1"
+        "evidence": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af"
       },
       "security": {
         "status": "passed",
-          "evidence": "git:ae6711ca93048d232335dd935bbaad93d684dca1"
+        "evidence": "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af"
       }
     }
   },
