@@ -153,9 +153,9 @@ run_legacy_upgrade_matrix() {
     [[ -f "$file" ]] || { printf 'RECOVERY_LEGACY_MIGRATION_MISSING:%s\n' "$tag" >&2; return 1; }
     docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file" >/dev/null
     hash="$(sha256sum "$file" | cut -d ' ' -f 1)"
+    [[ "$hash" =~ ^[0-9a-f]{64}$ && "$when" =~ ^[0-9]{13}$ ]] || { printf 'RECOVERY_LEGACY_JOURNAL_INVALID\n' >&2; return 1; }
     docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-      -v hash="$hash" -v applied_at="$when" \
-      -c "INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES (:'hash', :'applied_at'::bigint)" >/dev/null
+      -c "INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES ('$hash', $when)" >/dev/null
   done < <(python3 -I - "$legacy_directory/packages/db/drizzle/meta/_journal.json" <<'PY'
 import json, pathlib, sys
 entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
