@@ -126,8 +126,6 @@ run_database_matrix() {
   wait_for_postgres "$container" postgres postgres
   docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
-  docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-    -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
   binding="$(docker port "$container" 5432/tcp | head -n 1)"
   port="${binding##*:}"
   [[ "$port" =~ ^[0-9]+$ ]] || { printf 'RECOVERY_POSTGRES_PORT_INVALID\n' >&2; return 1; }
@@ -148,6 +146,8 @@ run_legacy_upgrade_matrix() {
   containers+=("$container")
   docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 "$image" >/dev/null
   wait_for_postgres "$container" postgres postgres
+  docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+    -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='giromesa') THEN CREATE ROLE giromesa NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END \$\$" >/dev/null
   docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c 'CREATE SCHEMA drizzle; CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);' >/dev/null
   while IFS=$'\t' read -r tag when; do
