@@ -66,20 +66,20 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
   assert.equal(transition.recoveryMigration, matrix.targetMigration);
-  assert.equal(transition.recoveryArtifact, "git:08d766051ee2dc3aef9ccb45b7eed02b0ac6a8af");
+  assert.equal(transition.recoveryArtifact, "git:528233fb51e20eab19f0547e7dfe96796fa840e8");
   assert.equal(transition.testedUpgrade, true);
-  assert.equal(transition.evidence.path, "docs/evidence/recovery/08d766-validation.json");
+  assert.equal(transition.evidence.path, "docs/evidence/recovery/528233-validation.json");
   assert.equal(
     transition.evidence.sha256,
-    "sha256:7d37532ea2390b2d96a6d941d7e74e9449bef026d8df6d2d0e97fcf2d157ee25",
+    "sha256:c54d3ca8dca9c9d04595804dc742bac27d95b0ae30cd46dfcec266625ef3269d",
   );
   assert.equal(
     transition.evidence.workflowRun,
-    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32280692224",
+    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32290390600",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   const evidence = readFileSync(
-    join(root, "docs", "evidence", "recovery", "08d766-validation.json"),
+    join(root, "docs", "evidence", "recovery", "528233-validation.json"),
     "utf8",
   );
   assert.equal(JSON.parse(evidence).targetMigration, "0042_shallow_lenny_balinger");
