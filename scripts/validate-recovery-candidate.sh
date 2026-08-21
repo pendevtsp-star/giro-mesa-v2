@@ -169,7 +169,7 @@ PY
   port="${binding##*:}"
   (cd -- "$candidate_directory" && DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:${port}/postgres" pnpm db:migrate)
   latest="$(docker exec "$container" psql -U postgres -d postgres -Atqc 'SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1')"
-  [[ "$latest" == "1787029862431" ]] || { printf 'RECOVERY_LEGACY_UPGRADE_TARGET_MISMATCH\n' >&2; return 1; }
+  [[ "$latest" == "1787256690924" ]] || { printf 'RECOVERY_LEGACY_UPGRADE_TARGET_MISMATCH\n' >&2; return 1; }
   docker rm -f "$container" >/dev/null
 }
 

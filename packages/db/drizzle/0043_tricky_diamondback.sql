@@ -7,7 +7,7 @@ CREATE TYPE "public"."management_report_cost_confidence" AS ENUM('exact', 'estim
 CREATE TYPE "public"."management_report_view_visibility" AS ENUM('private', 'unit', 'organization');--> statement-breakpoint
 ALTER TYPE "public"."management_report_export_format" ADD VALUE 'pdf';--> statement-breakpoint
 ALTER TYPE "public"."management_report_export_format" ADD VALUE 'xlsx';--> statement-breakpoint
-CREATE TABLE "doseclub_operations" (
+CREATE TABLE IF NOT EXISTS "doseclub_operations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE "doseclub_operations" (
 );
 --> statement-breakpoint
 ALTER TABLE "doseclub_operations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "doseclub_product_mappings" (
+CREATE TABLE IF NOT EXISTS "doseclub_product_mappings" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE "doseclub_reconciliation_runs" (
 );
 --> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_runs" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "doseclub_states" (
+CREATE TABLE IF NOT EXISTS "doseclub_states" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
@@ -408,22 +408,62 @@ ALTER TABLE "pos_orders" ADD COLUMN "runner_identity_id" uuid;--> statement-brea
 ALTER TABLE "pos_orders" ADD COLUMN "runner_claimed_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "pos_orders" ADD COLUMN "runner_picked_up_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "pos_product_stations" ADD COLUMN "stage" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
-ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_state_fk" FOREIGN KEY ("organization_id","unit_id","state_id") REFERENCES "public"."doseclub_states"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_product_fk" FOREIGN KEY ("organization_id","product_id") REFERENCES "public"."pos_products"("organization_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_inventory_item_fk" FOREIGN KEY ("organization_id","unit_id","inventory_item_id") REFERENCES "public"."management_inventory_items"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_stock_location_fk" FOREIGN KEY ("organization_id","unit_id","stock_location_id") REFERENCES "public"."management_stock_locations"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_operations'::regclass AND conname = 'doseclub_operations_organization_id_organizations_id_fk') THEN
+		ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_operations'::regclass AND conname = 'doseclub_operations_unit_fk') THEN
+		ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_operations'::regclass AND conname = 'doseclub_operations_state_fk') THEN
+		ALTER TABLE "doseclub_operations" ADD CONSTRAINT "doseclub_operations_state_fk" FOREIGN KEY ("organization_id","unit_id","state_id") REFERENCES "public"."doseclub_states"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_product_mappings'::regclass AND conname = 'doseclub_product_mappings_organization_id_organizations_id_fk') THEN
+		ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_product_mappings'::regclass AND conname = 'doseclub_product_mappings_unit_fk') THEN
+		ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_product_mappings'::regclass AND conname = 'doseclub_product_mappings_product_fk') THEN
+		ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_product_fk" FOREIGN KEY ("organization_id","product_id") REFERENCES "public"."pos_products"("organization_id","id") ON DELETE restrict ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_product_mappings'::regclass AND conname = 'doseclub_product_mappings_inventory_item_fk') THEN
+		ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_inventory_item_fk" FOREIGN KEY ("organization_id","unit_id","inventory_item_id") REFERENCES "public"."management_inventory_items"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_product_mappings'::regclass AND conname = 'doseclub_product_mappings_stock_location_fk') THEN
+		ALTER TABLE "doseclub_product_mappings" ADD CONSTRAINT "doseclub_product_mappings_stock_location_fk" FOREIGN KEY ("organization_id","unit_id","stock_location_id") REFERENCES "public"."management_stock_locations"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_findings" ADD CONSTRAINT "doseclub_reconciliation_findings_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_findings" ADD CONSTRAINT "doseclub_reconciliation_findings_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_findings" ADD CONSTRAINT "doseclub_reconciliation_findings_run_fk" FOREIGN KEY ("organization_id","unit_id","last_run_id") REFERENCES "public"."doseclub_reconciliation_runs"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_runs" ADD CONSTRAINT "doseclub_reconciliation_runs_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_runs" ADD CONSTRAINT "doseclub_reconciliation_runs_requested_by_identity_id_identities_id_fk" FOREIGN KEY ("requested_by_identity_id") REFERENCES "public"."identities"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doseclub_reconciliation_runs" ADD CONSTRAINT "doseclub_reconciliation_runs_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_states" ADD CONSTRAINT "doseclub_states_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "doseclub_states" ADD CONSTRAINT "doseclub_states_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_states'::regclass AND conname = 'doseclub_states_organization_id_organizations_id_fk') THEN
+		ALTER TABLE "doseclub_states" ADD CONSTRAINT "doseclub_states_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.doseclub_states'::regclass AND conname = 'doseclub_states_unit_fk') THEN
+		ALTER TABLE "doseclub_states" ADD CONSTRAINT "doseclub_states_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
 ALTER TABLE "aggregate_sequence_states" ADD CONSTRAINT "aggregate_sequence_states_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -459,12 +499,12 @@ ALTER TABLE "management_report_cost_snapshots" ADD CONSTRAINT "management_report
 ALTER TABLE "management_report_cost_snapshots" ADD CONSTRAINT "management_report_cost_snapshots_backfill_fk" FOREIGN KEY ("organization_id","unit_id","backfill_id") REFERENCES "public"."management_report_cost_backfills"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "management_report_views" ADD CONSTRAINT "management_report_views_owner_identity_id_identities_id_fk" FOREIGN KEY ("owner_identity_id") REFERENCES "public"."identities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "management_report_views" ADD CONSTRAINT "management_report_views_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "doseclub_operations_idempotency_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
-CREATE UNIQUE INDEX "doseclub_operations_operation_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","operation_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "doseclub_operations_v2_sequence_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","external_club_id","version") WHERE "doseclub_operations"."contract_version" = 'v2';--> statement-breakpoint
-CREATE UNIQUE INDEX "doseclub_operations_reversal_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","original_operation_id") WHERE "doseclub_operations"."operation" = 'reversal' and "doseclub_operations"."original_operation_id" is not null;--> statement-breakpoint
-CREATE INDEX "doseclub_operations_reconcile_idx" ON "doseclub_operations" USING btree ("organization_id","unit_id","external_club_id","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "doseclub_product_mappings_external_unique" ON "doseclub_product_mappings" USING btree ("organization_id","unit_id","external_product_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "doseclub_operations_idempotency_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "doseclub_operations_operation_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","operation_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "doseclub_operations_v2_sequence_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","external_club_id","version") WHERE "doseclub_operations"."contract_version" = 'v2';--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "doseclub_operations_reversal_unique" ON "doseclub_operations" USING btree ("organization_id","unit_id","original_operation_id") WHERE "doseclub_operations"."operation" = 'reversal' and "doseclub_operations"."original_operation_id" is not null;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "doseclub_operations_reconcile_idx" ON "doseclub_operations" USING btree ("organization_id","unit_id","external_club_id","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "doseclub_product_mappings_external_unique" ON "doseclub_product_mappings" USING btree ("organization_id","unit_id","external_product_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "doseclub_reconciliation_findings_fingerprint_unique" ON "doseclub_reconciliation_findings" USING btree ("organization_id","unit_id","fingerprint");--> statement-breakpoint
 CREATE INDEX "doseclub_reconciliation_findings_status_idx" ON "doseclub_reconciliation_findings" USING btree ("organization_id","unit_id","status","last_detected_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "doseclub_reconciliation_runs_scheduled_day_unique" ON "doseclub_reconciliation_runs" USING btree ("organization_id","unit_id","run_date") WHERE "doseclub_reconciliation_runs"."trigger" = 'scheduled';--> statement-breakpoint
