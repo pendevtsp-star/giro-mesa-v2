@@ -15,6 +15,10 @@ const positiveQuantity = quantity.refine(
   (value) => Number(value) > 0,
   "A quantidade deve ser positiva.",
 );
+const nonnegativeQuantity = quantity.refine(
+  (value) => Number(value) >= 0,
+  "A quantidade não pode ser negativa.",
+);
 const date = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -38,11 +42,27 @@ export const stockLocationSchema = z.object({
     .min(1)
     .max(40)
     .regex(/^[A-Za-z0-9_-]+$/),
+  barcode: z.string().trim().min(3).max(80).optional(),
+  kind: z
+    .enum(["warehouse", "cooler", "freezer", "bar", "kitchen", "returnables", "other"])
+    .optional(),
+  responsibleIdentityId: id.nullable().optional(),
+  requireDistinctTransferReceiver: z.boolean().optional(),
+  transferSlaMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(7 * 24 * 60)
+    .optional(),
 });
 
 export const stockLocationUpdateSchema = stockLocationSchema
   .partial()
-  .extend({ active: z.boolean().optional() })
+  .extend({
+    active: z.boolean().optional(),
+    barcode: z.string().trim().min(3).max(80).nullable().optional(),
+    responsibleIdentityId: id.nullable().optional(),
+  })
   .refine((value) => Object.keys(value).length > 0, { message: "Informe ao menos uma alteração." });
 
 export const inventoryItemSchema = z.object({
@@ -184,6 +204,32 @@ export const returnableSupplierExchangeSchema = z.object({
   note: z.string().trim().min(3).max(1_000),
 });
 
+export const returnableSupplierExchangeResolutionSchema = z.object({
+  decision: z.enum(["received", "canceled"]),
+  note: z.string().trim().min(3).max(1_000),
+});
+
+export const inventoryIssueRouteSchema = z.object({
+  productId: id,
+  stationId: id.optional(),
+  locationId: id,
+  active: z.boolean().default(true),
+});
+
+export const stockLocationItemSettingSchema = z
+  .object({
+    locationId: id,
+    inventoryItemId: id,
+    minimumQuantity: nonnegativeQuantity.default("0"),
+    targetQuantity: nonnegativeQuantity.default("0"),
+    transferUnitLabel: z.string().trim().min(1).max(40).optional(),
+    unitsPerTransferUnit: positiveQuantity.default("1"),
+  })
+  .refine((value) => Number(value.targetQuantity) >= Number(value.minimumQuantity), {
+    path: ["targetQuantity"],
+    message: "O estoque alvo deve ser maior ou igual ao mínimo.",
+  });
+
 export const inventoryItemUpdateSchema = inventoryItemSchema
   .partial()
   .extend({
@@ -258,10 +304,23 @@ export const inventoryReviewSchema = z.object({
   reason: z.string().trim().min(5).max(1_000),
 });
 
-export const inventoryTransferResolutionSchema = z.object({
-  decision: z.enum(["received", "canceled"]),
-  note: z.string().trim().min(3).max(1_000),
-});
+export const inventoryTransferResolutionSchema = z
+  .object({
+    decision: z.enum(["received", "canceled"]),
+    quantityReceived: nonnegativeQuantity.optional(),
+    quantityDivergent: nonnegativeQuantity.optional(),
+    divergenceReason: z.string().trim().min(3).max(1_000).optional(),
+    evidence: z.array(z.string().trim().url().max(2_000)).max(10).optional(),
+    note: z.string().trim().min(3).max(1_000),
+  })
+  .superRefine((value, context) => {
+    if (Number(value.quantityDivergent ?? 0) > 0 && !value.divergenceReason)
+      context.addIssue({
+        code: "custom",
+        path: ["divergenceReason"],
+        message: "Informe o motivo da divergência.",
+      });
+  });
 
 export const inventoryAssetSchema = z.object({
   inventoryItemId: id,
@@ -295,6 +354,33 @@ export const inventoryTransferSchema = z
     message: "Origem e destino devem ser diferentes.",
     path: ["destinationLocationId"],
   });
+
+export const inventoryTransferBatchSchema = z
+  .object({
+    sourceLocationId: id,
+    destinationLocationId: id,
+    reason: z.string().trim().min(3).max(1_000),
+    lines: z
+      .array(
+        z.object({
+          inventoryItemId: id,
+          quantity: positiveQuantity,
+          lotId: id.optional(),
+        }),
+      )
+      .min(1)
+      .max(200),
+  })
+  .refine((value) => value.sourceLocationId !== value.destinationLocationId, {
+    message: "Origem e destino devem ser diferentes.",
+    path: ["destinationLocationId"],
+  })
+  .refine(
+    (value) =>
+      new Set(value.lines.map((line) => `${line.inventoryItemId}:${line.lotId ?? ""}`)).size ===
+      value.lines.length,
+    { message: "O mesmo item e lote não pode aparecer duas vezes.", path: ["lines"] },
+  );
 
 export const inventoryLotSchema = z.object({
   inventoryItemId: id,
@@ -393,6 +479,8 @@ export const interunitTransferCancellationSchema = z.object({
 
 export const inventoryClosingSchema = z.object({
   period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  locationId: id.optional(),
+  shiftReference: z.string().trim().min(1).max(80).optional(),
   notes: z.string().trim().max(2_000).optional(),
 });
 
@@ -714,7 +802,20 @@ const punchLocationSchema = z.object({
   longitude: z.number().finite().min(-180).max(180),
   accuracyMeters: z.number().finite().int().min(0).max(10_000).optional(),
   deviceId: z.string().trim().min(8).max(160).optional(),
+  sessionId: z.string().trim().min(8).max(160).optional(),
   mockLocationDetected: z.boolean().optional(),
+  offline: z.boolean().default(false),
+  offlineJustification: z.string().trim().min(5).max(1_000).optional(),
+});
+
+const timeTrackingLocationSchema = z.object({
+  id: id.optional(),
+  label: z.string().trim().min(2).max(160),
+  address: z.string().trim().min(3).max(300).optional(),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  radiusMeters: z.number().int().min(25).max(5_000),
+  accuracyToleranceMeters: z.number().int().min(0).max(500),
 });
 
 export const timeTrackingSettingsSchema = z
@@ -722,16 +823,25 @@ export const timeTrackingSettingsSchema = z
     mode: z.enum(["off", "all", "selected"]),
     geofenceEnabled: z.boolean().default(true),
     locationLabel: z.string().trim().min(2).max(160).optional(),
+    locationAddress: z.string().trim().min(3).max(300).optional(),
     latitude: z.number().finite().min(-90).max(90).optional(),
     longitude: z.number().finite().min(-180).max(180).optional(),
     radiusMeters: z.number().int().min(25).max(5_000),
     accuracyToleranceMeters: z.number().int().min(0).max(500),
+    maxLocationAccuracyMeters: z.number().int().min(5).max(2_000).default(100),
+    lowAccuracyPolicy: z.enum(["block", "flag"]).default("block"),
+    additionalLocations: z.array(timeTrackingLocationSchema).max(10).default([]),
     managerCanView: z.boolean().default(false),
     financeCanView: z.boolean().default(false),
     antiFraudEnabled: z.boolean().default(true),
     offlineEnabled: z.boolean().default(true),
+    offlineMaxDelayMinutes: z.number().int().min(5).max(2_880).default(120),
+    offlineRequiresJustification: z.boolean().default(true),
     notificationsEnabled: z.boolean().default(true),
+    emailAlertsEnabled: z.boolean().default(false),
     managerAlertOnAnomaly: z.boolean().default(true),
+    locationRetentionDays: z.number().int().min(30).max(1_825).default(365),
+    locationChangeReason: z.string().trim().min(5).max(1_000).optional(),
     lateToleranceMinutes: z.number().int().min(0).max(120).default(15),
     minimumBreakMinutes: z.number().int().min(0).max(1_440).default(0),
     maxOvertimeMinutes: z.number().int().min(0).max(720).default(120),
@@ -759,17 +869,59 @@ export const timeTrackingSettingsSchema = z
         message: "Selecione ao menos um funcionário.",
       });
     }
+    const labels = [
+      value.locationLabel,
+      ...value.additionalLocations.map((location) => location.label),
+    ]
+      .filter((label): label is string => Boolean(label))
+      .map((label) => label.toLocaleLowerCase("pt-BR"));
+    if (new Set(labels).size !== labels.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["additionalLocations"],
+        message: "Os locais permitidos precisam ter nomes diferentes.",
+      });
+    }
   });
 
 const capturedAt = instant.optional();
 
-export const selfClockInSchema = punchLocationSchema.extend({ capturedAt });
-export const selfBreakSchema = punchLocationSchema.extend({
-  type: z.enum(["meal", "temporary"]),
-  capturedAt,
-});
-export const selfClockOutSchema = punchLocationSchema.extend({ capturedAt });
-export const completeBreakSchema = punchLocationSchema.extend({ capturedAt });
+function validateOfflinePunch(
+  value: { offline: boolean; capturedAt?: string; offlineJustification?: string },
+  context: z.RefinementCtx,
+) {
+  if (!value.offline) return;
+  if (!value.capturedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["capturedAt"],
+      message: "Informe o horário em que a marcação offline foi capturada.",
+    });
+  }
+  if (!value.offlineJustification) {
+    context.addIssue({
+      code: "custom",
+      path: ["offlineJustification"],
+      message: "Informe a justificativa da marcação offline.",
+    });
+  }
+}
+
+export const selfClockInSchema = punchLocationSchema
+  .extend({ capturedAt })
+  .superRefine(validateOfflinePunch);
+export const selfBreakSchema = punchLocationSchema
+  .extend({
+    type: z.enum(["meal", "temporary"]),
+    capturedAt,
+  })
+  .superRefine(validateOfflinePunch);
+export const selfClockOutSchema = punchLocationSchema
+  .extend({ capturedAt })
+  .superRefine(validateOfflinePunch);
+export const completeBreakSchema = punchLocationSchema
+  .extend({ capturedAt })
+  .superRefine(validateOfflinePunch);
 
 export const timeCorrectionSchema = z
   .object({
@@ -921,7 +1073,13 @@ export type ReturnableCustodyConfirmInput = z.infer<typeof returnableCustodyConf
 export type ReturnableIncidentInput = z.infer<typeof returnableIncidentSchema>;
 export type ReturnableIncidentReviewInput = z.infer<typeof returnableIncidentReviewSchema>;
 export type ReturnableSupplierExchangeInput = z.infer<typeof returnableSupplierExchangeSchema>;
+export type ReturnableSupplierExchangeResolutionInput = z.infer<
+  typeof returnableSupplierExchangeResolutionSchema
+>;
+export type InventoryIssueRouteInput = z.infer<typeof inventoryIssueRouteSchema>;
+export type StockLocationItemSettingInput = z.infer<typeof stockLocationItemSettingSchema>;
 export type InventoryTransferInput = z.infer<typeof inventoryTransferSchema>;
+export type InventoryTransferBatchInput = z.infer<typeof inventoryTransferBatchSchema>;
 export type InventoryTransferResolutionInput = z.infer<typeof inventoryTransferResolutionSchema>;
 export type InventoryReviewInput = z.infer<typeof inventoryReviewSchema>;
 export type InventoryAssetInput = z.infer<typeof inventoryAssetSchema>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, Input, Label, NativeSelect, Textarea } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 
 type PlanSlug = "operacao" | "crescimento" | "rede";
@@ -55,29 +56,29 @@ export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
   return (
     <form className="lead-form" onSubmit={submit}>
       <div className="field-row">
-        <label>
+        <Label>
           Nome completo
-          <input name="name" autoComplete="name" required />
-        </label>
-        <label>
+          <Input name="name" autoComplete="name" required />
+        </Label>
+        <Label>
           WhatsApp
-          <input name="phone" inputMode="tel" autoComplete="tel" required />
-        </label>
+          <Input name="phone" inputMode="tel" autoComplete="tel" required />
+        </Label>
       </div>
-      <label>
+      <Label>
         E-mail profissional
-        <input name="email" type="email" autoComplete="email" required />
-      </label>
+        <Input name="email" type="email" autoComplete="email" required />
+      </Label>
       {kind === "trial" ? (
         <>
-          <label>
+          <Label>
             Nome do estabelecimento
-            <input name="businessName" autoComplete="organization" required />
-          </label>
+            <Input name="businessName" autoComplete="organization" required />
+          </Label>
           <div className="field-row">
-            <label>
+            <Label>
               Tipo de operação
-              <select name="segment" required defaultValue="">
+              <NativeSelect name="segment" required defaultValue="">
                 <option value="" disabled>
                   Selecione
                 </option>
@@ -87,38 +88,38 @@ export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
                 <option>Cafeteria</option>
                 <option>Pizzaria</option>
                 <option>Outro food service</option>
-              </select>
-            </label>
-            <label>
+              </NativeSelect>
+            </Label>
+            <Label>
               Plano de interesse
-              <select name="planSlug" defaultValue={initialPlan}>
+              <NativeSelect name="planSlug" defaultValue={initialPlan}>
                 <option value="operacao">Operação</option>
                 <option value="crescimento">Crescimento</option>
                 <option value="rede">Rede</option>
-              </select>
-            </label>
+              </NativeSelect>
+            </Label>
           </div>
         </>
       ) : (
-        <label>
+        <Label>
           Como podemos ajudar?
-          <textarea name="message" rows={5} required />
-        </label>
+          <Textarea name="message" rows={5} required />
+        </Label>
       )}
-      <label className="check-label">
-        <input type="checkbox" name="consent" required />
+      <Label className="check-label">
+        <Input type="checkbox" name="consent" required />
         <span>
           Li a <a href="/privacidade">Política de Privacidade</a> e autorizo contato sobre esta
           solicitação.
         </span>
-      </label>
-      <button className="button button-primary" disabled={status === "sending"} type="submit">
+      </Label>
+      <Button className="button button-primary" disabled={status === "sending"} type="submit">
         {status === "sending"
           ? "Enviando…"
           : kind === "trial"
             ? "Solicitar teste assistido"
             : "Enviar mensagem"}
-      </button>
+      </Button>
       <p className="form-status" role="status">
         {status === "success" && "Solicitação recebida. Nossa equipe entrará em contato."}
         {status === "error" &&

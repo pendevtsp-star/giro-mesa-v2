@@ -12,14 +12,24 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Pri
     public partial class PriorityPutResponse : IAdditionalDataHolder, IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The acknowledgedAt property</summary>
+        public DateTimeOffset? AcknowledgedAt { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The approvalId property</summary>
         public Guid? ApprovalId { get; set; }
+        /// <summary>The changeId property</summary>
+        public Guid? ChangeId { get; set; }
+        /// <summary>The claimedAt property</summary>
+        public DateTimeOffset? ClaimedAt { get; set; }
+        /// <summary>The claimExpiresAt property</summary>
+        public DateTimeOffset? ClaimExpiresAt { get; set; }
         /// <summary>The course property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_course? Course { get; set; }
         /// <summary>The idempotentReplay property</summary>
         public bool? IdempotentReplay { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The itemState property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_itemState? ItemState { get; set; }
         /// <summary>The orderId property</summary>
@@ -38,6 +48,20 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Pri
         public int? Priority { get; set; }
         /// <summary>The readyQuantity property</summary>
         public int? ReadyQuantity { get; set; }
+        /// <summary>The releasedAt property</summary>
+        public DateTimeOffset? ReleasedAt { get; set; }
+        /// <summary>The revision property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Revision { get; set; }
+#nullable restore
+#else
+        public string Revision { get; set; }
+#endif
+        /// <summary>The runnerClaimedAt property</summary>
+        public DateTimeOffset? RunnerClaimedAt { get; set; }
+        /// <summary>The runnerIdentityId property</summary>
+        public Guid? RunnerIdentityId { get; set; }
         /// <summary>The state property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_state? State { get; set; }
         /// <summary>The target property</summary>
@@ -85,15 +109,24 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Pri
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "acknowledgedAt", n => { AcknowledgedAt = n.GetDateTimeOffsetValue(); } },
                 { "approvalId", n => { ApprovalId = n.GetGuidValue(); } },
+                { "changeId", n => { ChangeId = n.GetGuidValue(); } },
+                { "claimExpiresAt", n => { ClaimExpiresAt = n.GetDateTimeOffsetValue(); } },
+                { "claimedAt", n => { ClaimedAt = n.GetDateTimeOffsetValue(); } },
                 { "course", n => { Course = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_course>(); } },
                 { "idempotentReplay", n => { IdempotentReplay = n.GetBoolValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "itemState", n => { ItemState = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_itemState>(); } },
                 { "orderId", n => { OrderId = n.GetGuidValue(); } },
                 { "orderItemId", n => { OrderItemId = n.GetGuidValue(); } },
                 { "orderStatuses", n => { OrderStatuses = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_orderStatuses>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_orderStatuses.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "priority", n => { Priority = n.GetIntValue(); } },
                 { "readyQuantity", n => { ReadyQuantity = n.GetIntValue(); } },
+                { "releasedAt", n => { ReleasedAt = n.GetDateTimeOffsetValue(); } },
+                { "revision", n => { Revision = n.GetStringValue(); } },
+                { "runnerClaimedAt", n => { RunnerClaimedAt = n.GetDateTimeOffsetValue(); } },
+                { "runnerIdentityId", n => { RunnerIdentityId = n.GetGuidValue(); } },
                 { "state", n => { State = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_state>(); } },
                 { "target", n => { Target = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_target>(); } },
                 { "ticketId", n => { TicketId = n.GetGuidValue(); } },
@@ -108,15 +141,24 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Pri
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteDateTimeOffsetValue("acknowledgedAt", AcknowledgedAt);
             writer.WriteGuidValue("approvalId", ApprovalId);
+            writer.WriteGuidValue("changeId", ChangeId);
+            writer.WriteDateTimeOffsetValue("claimedAt", ClaimedAt);
+            writer.WriteDateTimeOffsetValue("claimExpiresAt", ClaimExpiresAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_course>("course", Course);
             writer.WriteBoolValue("idempotentReplay", IdempotentReplay);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_itemState>("itemState", ItemState);
             writer.WriteGuidValue("orderId", OrderId);
             writer.WriteGuidValue("orderItemId", OrderItemId);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_orderStatuses>("orderStatuses", OrderStatuses);
             writer.WriteIntValue("priority", Priority);
             writer.WriteIntValue("readyQuantity", ReadyQuantity);
+            writer.WriteDateTimeOffsetValue("releasedAt", ReleasedAt);
+            writer.WriteStringValue("revision", Revision);
+            writer.WriteDateTimeOffsetValue("runnerClaimedAt", RunnerClaimedAt);
+            writer.WriteGuidValue("runnerIdentityId", RunnerIdentityId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_state>("state", State);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityPutResponse_target>("target", Target);
             writer.WriteGuidValue("ticketId", TicketId);

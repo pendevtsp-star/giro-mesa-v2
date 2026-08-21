@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import "./Callout.css";
 
 export function Callout({
   tone = "info",
@@ -8,5 +7,9 @@ export function Callout({
   tone?: "info" | "success" | "warning" | "danger";
   children: ReactNode;
 }) {
-  return <div className={`gm-callout gm-callout--${tone}`}>{children}</div>;
+  return (
+    <div className={`gm-callout gm-callout--${tone}`} data-slot="alert">
+      {children}
+    </div>
+  );
 }

@@ -14,6 +14,7 @@ export const routePermissions: Record<RouteId, Permission> = {
   fiscal: "fiscal.manage",
   accountant: "accounting.view",
   people: "people.view",
+  "waiter-settlements": "settlements.view",
   delivery: "delivery.operate",
   reservations: "reservations.manage",
   crm: "growth.manage",

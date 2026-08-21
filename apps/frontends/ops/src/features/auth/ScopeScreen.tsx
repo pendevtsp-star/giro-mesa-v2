@@ -1,4 +1,4 @@
-import { Badge, Button, Card } from "@giromesa/ui";
+import { Badge, Button, Card, Label, NativeSelect } from "@giromesa/ui";
 import { useEffect, useState } from "react";
 import { sessionForScope } from "../../app/access";
 import type { ScopeSource, Session } from "../../app/types";
@@ -52,9 +52,9 @@ export function ScopeScreen({
           </span>
         </div>
         <div className="form-stack">
-          <label>
+          <Label>
             Organização
-            <select
+            <NativeSelect
               value={organizationId}
               onChange={(event) => {
                 const nextOrganizationId = event.target.value;
@@ -73,19 +73,19 @@ export function ScopeScreen({
                   {item.organization.name} · {item.organization.document}
                 </option>
               ))}
-            </select>
-          </label>
-          <label>
+            </NativeSelect>
+          </Label>
+          <Label>
             Unidade
-            <select value={unitId} onChange={(event) => setUnitId(event.target.value)}>
+            <NativeSelect value={unitId} onChange={(event) => setUnitId(event.target.value)}>
               {accessibleUnits.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                   {item.city ? ` · ${item.city}` : ""}
                 </option>
               ))}
-            </select>
-          </label>
+            </NativeSelect>
+          </Label>
           <label className="terminal-option">
             <input
               checked={terminalMode}

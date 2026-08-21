@@ -23,7 +23,7 @@
     "test:e2e:real-ui": "playwright test --config=playwright.real.config.ts",
     "integrations:check": "node --env-file-if-exists=.env scripts/check-integrations.mjs",
     "openapi:generate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/api openapi:generate",
-    "clients:generate:ts": "openapi-typescript apps/backends/api/openapi/openapi.json -o packages/contracts/src/generated-api.ts && biome format --write packages/contracts/src/generated-api.ts",
+    "clients:generate:ts": "openapi-typescript apps/backends/api/openapi/openapi.json -o packages/contracts/src/generated-api.ts && biome format --write --files-max-size=2097152 packages/contracts/src/generated-api.ts",
     "clients:generate:csharp": "powershell -NoProfile -File scripts/generate-csharp-client.ps1",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:generate": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:generate",

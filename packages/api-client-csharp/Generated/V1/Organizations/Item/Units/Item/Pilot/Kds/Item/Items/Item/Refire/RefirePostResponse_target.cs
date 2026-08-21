@@ -12,6 +12,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Ite
         #pragma warning disable CS1591
         Expedition,
         #pragma warning restore CS1591
+        [EnumMember(Value = "runner")]
+        #pragma warning disable CS1591
+        Runner,
+        #pragma warning restore CS1591
         [EnumMember(Value = "served")]
         #pragma warning disable CS1591
         Served,

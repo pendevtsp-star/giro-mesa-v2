@@ -1,3 +1,5 @@
+import { Button } from "@giromesa/ui";
+
 export const SPEED_KITCHEN_CHIPS = [
   "Sem cebola",
   "Gelo e limão",
@@ -18,14 +20,15 @@ export function QuickOrderChips({ onSelectChip }: { onSelectChip: (chip: string)
       <small className="speed-kitchen-chips__label">Obs. Rápidas:</small>
       <div className="speed-kitchen-chips__list">
         {SPEED_KITCHEN_CHIPS.map((chip) => (
-          <button
+          <Button
             className="speed-chip-btn"
             key={chip}
             onClick={() => onSelectChip(chip)}
             type="button"
+            variant="ghost"
           >
             {chip}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

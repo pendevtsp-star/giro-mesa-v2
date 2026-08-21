@@ -1,4 +1,5 @@
-import { Button, Icon, Modal } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Icon, Modal, NativeSelect } from "@giromesa/ui";
 import { useState } from "react";
 import { formatMoney } from "../../rules";
 
@@ -64,22 +65,24 @@ export function MoveTableDialog({
         {/* Toggle Mode */}
         {canTransferItems && (
           <div className="move-table-mode-toggle">
-            <button
+            <Button
               className={`move-table-mode-btn ${mode === "entire_tab" ? "active" : ""}`}
               onClick={() => setMode("entire_tab")}
               type="button"
+              variant="ghost"
             >
               <Icon name="salon" size={14} />
               <span>Mudar Comanda de Mesa</span>
-            </button>
-            <button
+            </Button>
+            <Button
               className={`move-table-mode-btn ${mode === "items" ? "active" : ""}`}
               onClick={() => setMode("items")}
               type="button"
+              variant="ghost"
             >
               <Icon name="list" size={14} />
               <span>Transferir Itens Específicos</span>
-            </button>
+            </Button>
           </div>
         )}
 
@@ -92,7 +95,7 @@ export function MoveTableDialog({
             </p>
             <label className="move-table-select-label">
               <span>Selecione a Mesa de Destino (Livre):</span>
-              <select
+              <NativeSelect
                 aria-label="Mesa de destino livre"
                 onChange={(e) => setSelectedTargetTableId(e.target.value)}
                 value={selectedTargetTableId}
@@ -103,7 +106,7 @@ export function MoveTableDialog({
                     {t.label} ({t.seats} lugares · {t.roomName})
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
           </div>
         )}
@@ -122,6 +125,7 @@ export function MoveTableDialog({
                 tabItems.map((item) => (
                   <label className="move-table-item-checkbox" key={item.id}>
                     <input
+                      className="accent-primary"
                       checked={selectedItemIds.includes(item.id)}
                       onChange={(e) =>
                         setSelectedItemIds((curr) =>
@@ -145,7 +149,7 @@ export function MoveTableDialog({
 
             <label className="move-table-select-label">
               <span>Transferir para a Mesa:</span>
-              <select
+              <NativeSelect
                 aria-label="Mesa de destino"
                 onChange={(e) => setSelectedTargetTableId(e.target.value)}
                 value={selectedTargetTableId}
@@ -157,7 +161,7 @@ export function MoveTableDialog({
                     {t.totalCents ? formatMoney(t.totalCents) : "R$ 0,00"})
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
           </div>
         )}

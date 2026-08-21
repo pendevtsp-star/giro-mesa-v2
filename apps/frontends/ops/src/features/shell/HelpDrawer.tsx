@@ -86,6 +86,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     title: "Acompanhar equipe",
     steps: ["Confira pessoas ativas e ponto aberto.", "Saídas registram o horário no servidor."],
   },
+  "waiter-settlements": {
+    title: "Fechar valores da equipe",
+    steps: [
+      "Pré-visualize o período antes de gerar o fechamento.",
+      "Confira serviço, partnership e perdas operacionais separadamente.",
+    ],
+    warning: "Aprovação, pagamento e reversões exigem justificativa e ficam auditados.",
+  },
   delivery: {
     title: "Configurar delivery próprio",
     steps: [
@@ -134,21 +142,22 @@ export function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => 
   }, [onClose]);
   return (
     <div className="help-layer">
-      <button aria-label="Fechar ajuda" className="help-backdrop" onClick={onClose} type="button" />
+      <Button aria-label="Fechar ajuda" className="help-backdrop" onClick={onClose} type="button" />
       <aside aria-labelledby="help-title" aria-modal="true" className="help-drawer" role="dialog">
         <div className="dialog-header">
           <div>
             <p className="eyebrow">Ajuda local</p>
             <h2 id="help-title">{topic.title}</h2>
           </div>
-          <button
+          <Button
             aria-label="Fechar ajuda"
             className="dialog-close"
             onClick={onClose}
-            type="button"
+            size="sm"
+            variant="ghost"
           >
             ×
-          </button>
+          </Button>
         </div>
         <p className="muted">
           Orientações determinísticas desta versão; nenhuma resposta é gerada por IA.

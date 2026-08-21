@@ -1,4 +1,4 @@
-import { Badge, Button } from "@giromesa/ui";
+import { Badge, Button, Input, Label } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api, type LoginResponse, type MfaChallengeProof } from "../../api";
 import { Brand } from "./Brand";
@@ -97,9 +97,9 @@ export function LoginScreen({
           <p className="muted">Use o e-mail vinculado à sua organização.</p>
           <form onSubmit={handleSubmit} className="form-stack">
             {!challengeToken && (
-              <label>
+              <Label>
                 E-mail
-                <input
+                <Input
                   autoComplete="username"
                   inputMode="email"
                   onChange={(event) => setEmail(event.target.value)}
@@ -107,28 +107,31 @@ export function LoginScreen({
                   type="email"
                   value={email}
                 />
-              </label>
+              </Label>
             )}
             {!challengeToken && (
-              <label>
+              <Label>
                 Senha
                 <span className="password-field">
-                  <input
+                  <Input
                     autoComplete="current-password"
                     onChange={(event) => setPassword(event.target.value)}
                     required
                     type={showPassword ? "text" : "password"}
                     value={password}
                   />
-                  <button
+                  <Button
                     aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    className="password-field__toggle"
                     onClick={() => setShowPassword(!showPassword)}
+                    size="sm"
                     type="button"
+                    variant="ghost"
                   >
                     {showPassword ? "Ocultar" : "Mostrar"}
-                  </button>
+                  </Button>
                 </span>
-              </label>
+              </Label>
             )}
             {!challengeToken && (
               <div className="form-inline">
@@ -140,39 +143,49 @@ export function LoginScreen({
                   />{" "}
                   Confiar neste dispositivo pessoal
                 </label>
-                <button className="link-button" onClick={() => void requestReset()} type="button">
+                <Button
+                  className="link-button"
+                  onClick={() => void requestReset()}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
                   Esqueci minha senha
-                </button>
+                </Button>
               </div>
             )}
             {challengeToken && (
               <>
                 <fieldset className="segmented mfa-method">
                   <legend className="gm-sr-only">Método do segundo fator</legend>
-                  <button
+                  <Button
                     aria-pressed={proofMode === "totp"}
                     onClick={() => {
                       setProofMode("totp");
                       setMfaProof("");
                     }}
+                    size="sm"
                     type="button"
+                    variant={proofMode === "totp" ? "secondary" : "ghost"}
                   >
                     Aplicativo autenticador
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     aria-pressed={proofMode === "recovery"}
                     onClick={() => {
                       setProofMode("recovery");
                       setMfaProof("");
                     }}
+                    size="sm"
                     type="button"
+                    variant={proofMode === "recovery" ? "secondary" : "ghost"}
                   >
                     Código de recuperação
-                  </button>
+                  </Button>
                 </fieldset>
-                <label>
+                <Label>
                   {proofMode === "totp" ? "Código de 6 dígitos" : "Código de recuperação"}
-                  <input
+                  <Input
                     autoComplete="one-time-code"
                     inputMode={proofMode === "totp" ? "numeric" : "text"}
                     maxLength={proofMode === "totp" ? 6 : 64}
@@ -188,8 +201,8 @@ export function LoginScreen({
                     required
                     value={mfaProof}
                   />
-                </label>
-                <button
+                </Label>
+                <Button
                   className="link-button"
                   onClick={() => {
                     setChallengeToken("");
@@ -197,10 +210,12 @@ export function LoginScreen({
                     setError("");
                     setNotice("");
                   }}
+                  size="sm"
                   type="button"
+                  variant="ghost"
                 >
                   Voltar ao login
-                </button>
+                </Button>
               </>
             )}
             {error && (

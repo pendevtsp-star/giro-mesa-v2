@@ -546,6 +546,7 @@ export const posProductStations = pgTable(
     unitId: uuid("unit_id").notNull(),
     productId: uuid("product_id").notNull(),
     stationId: uuid("station_id").notNull(),
+    stage: integer("stage").notNull().default(1),
   },
   (table) => [
     primaryKey({ columns: [table.unitId, table.productId, table.stationId] }),
@@ -554,6 +555,7 @@ export const posProductStations = pgTable(
       columns: [table.organizationId, table.productId],
       foreignColumns: [posProducts.organizationId, posProducts.id],
     }).onDelete("cascade"),
+    check("pos_product_stations_stage_check", sql`${table.stage} BETWEEN 1 AND 20`),
     foreignKey({
       name: "pos_product_stations_station_fk",
       columns: [table.organizationId, table.unitId, table.stationId],
@@ -607,6 +609,55 @@ export const posKdsTerminalProfiles = pgTable(
     check(
       "pos_kds_terminal_profiles_mode_station_check",
       sql`(${table.mode} = 'station' AND ${table.stationId} IS NOT NULL) OR (${table.mode} = 'pass' AND ${table.stationId} IS NULL)`,
+    ),
+  ],
+);
+
+export const posTerminalProfiles = pgTable(
+  "pos_terminal_profiles",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    mode: varchar("mode", { length: 32 }).notNull(),
+    defaultRoute: varchar("default_route", { length: 48 }).notNull(),
+    printerId: varchar("printer_id", { length: 120 }),
+    stationId: uuid("station_id"),
+    compact: boolean("compact").notNull().default(true),
+    quickActions: jsonb("quick_actions").$type<string[]>().notNull().default([]),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.installationId] }),
+    index("pos_terminal_profiles_unit_idx").on(table.organizationId, table.unitId),
+    foreignKey({
+      name: "pos_terminal_profiles_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_terminal_profiles_station_fk",
+      columns: [table.organizationId, table.unitId, table.stationId],
+      foreignColumns: [
+        posProductionStations.organizationId,
+        posProductionStations.unitId,
+        posProductionStations.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "pos_terminal_profiles_mode_check",
+      sql`${table.mode} IN ('waiter_mobile', 'reception', 'cashier', 'kds', 'expedition', 'shared')`,
+    ),
+    check(
+      "pos_terminal_profiles_route_check",
+      sql`${table.defaultRoute} IN ('dashboard', 'reservations', 'salon', 'counter', 'cash', 'kds')`,
     ),
   ],
 );
@@ -1368,6 +1419,9 @@ export const posOrders = pgTable(
       () => identities.id,
     ),
     kdsPriorityUpdatedAt: timestamp("kds_priority_updated_at", { withTimezone: true }),
+    runnerIdentityId: uuid("runner_identity_id").references(() => identities.id),
+    runnerClaimedAt: timestamp("runner_claimed_at", { withTimezone: true }),
+    runnerPickedUpAt: timestamp("runner_picked_up_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -1384,6 +1438,10 @@ export const posOrders = pgTable(
       foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
     }).onDelete("restrict"),
     check("pos_orders_kds_priority_check", sql`${table.kdsPriority} BETWEEN 0 AND 100`),
+    check(
+      "pos_orders_runner_check",
+      sql`(${table.runnerIdentityId} IS NULL AND ${table.runnerClaimedAt} IS NULL AND ${table.runnerPickedUpAt} IS NULL) OR (${table.runnerIdentityId} IS NOT NULL AND ${table.runnerClaimedAt} IS NOT NULL AND (${table.runnerPickedUpAt} IS NULL OR ${table.runnerPickedUpAt} >= ${table.runnerClaimedAt}))`,
+    ),
   ],
 );
 
@@ -1489,6 +1547,9 @@ export const posKdsTickets = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     recallCount: integer("recall_count").notNull().default(0),
     refireCount: integer("refire_count").notNull().default(0),
+    claimedByInstallationId: uuid("claimed_by_installation_id"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    claimExpiresAt: timestamp("claim_expires_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -1519,6 +1580,10 @@ export const posKdsTickets = pgTable(
     }).onDelete("restrict"),
     check("pos_kds_priority_check", sql`${table.priority} BETWEEN 0 AND 100`),
     check("pos_kds_counters_check", sql`${table.recallCount} >= 0 AND ${table.refireCount} >= 0`),
+    check(
+      "pos_kds_claim_check",
+      sql`(${table.claimedByInstallationId} IS NULL AND ${table.claimedAt} IS NULL AND ${table.claimExpiresAt} IS NULL) OR (${table.claimedByInstallationId} IS NOT NULL AND ${table.claimedAt} IS NOT NULL AND ${table.claimExpiresAt} > ${table.claimedAt})`,
+    ),
   ],
 );
 
@@ -1531,6 +1596,9 @@ export const posKdsTicketItems = pgTable(
     orderItemId: uuid("order_item_id").notNull(),
     quantity: integer("quantity").notNull().default(1),
     readyQuantity: integer("ready_quantity").notNull().default(0),
+    stage: integer("stage").notNull().default(1),
+    courseHeld: boolean("course_held").notNull().default(false),
+    dependencyHeld: boolean("dependency_held").notNull().default(false),
     status: posItemStatus("status").notNull().default("queued"),
     held: boolean("held").notNull().default(false),
     heldAt: timestamp("held_at", { withTimezone: true }),
@@ -1570,6 +1638,7 @@ export const posKdsTicketItems = pgTable(
       foreignColumns: [posOrderItems.organizationId, posOrderItems.unitId, posOrderItems.id],
     }).onDelete("restrict"),
     check("pos_kds_ticket_items_quantity_check", sql`${table.quantity} > 0`),
+    check("pos_kds_ticket_items_stage_check", sql`${table.stage} BETWEEN 1 AND 20`),
     check(
       "pos_kds_ticket_items_ready_quantity_check",
       sql`${table.readyQuantity} BETWEEN 0 AND ${table.quantity}`,
@@ -1602,6 +1671,59 @@ export const posKdsTicketItems = pgTable(
           )
         )
       )`,
+    ),
+  ],
+);
+
+export const posKdsItemChanges = pgTable(
+  "pos_kds_item_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    ticketId: uuid("ticket_id").notNull(),
+    orderItemId: uuid("order_item_id").notNull(),
+    kind: varchar("kind", { length: 20 }).notNull(),
+    revision: varchar("revision", { length: 64 }).notNull(),
+    summary: text("summary").notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    acknowledgedByIdentityId: uuid("acknowledged_by_identity_id").references(() => identities.id),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("pos_kds_item_changes_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    uniqueIndex("pos_kds_item_changes_revision_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.ticketId,
+      table.revision,
+    ),
+    index("pos_kds_item_changes_unacknowledged_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.ticketId,
+      table.acknowledgedAt,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "pos_kds_item_changes_assignment_fk",
+      columns: [table.organizationId, table.unitId, table.ticketId, table.orderItemId],
+      foreignColumns: [
+        posKdsTicketItems.organizationId,
+        posKdsTicketItems.unitId,
+        posKdsTicketItems.ticketId,
+        posKdsTicketItems.orderItemId,
+      ],
+    }).onDelete("cascade"),
+    check("pos_kds_item_changes_kind_check", sql`${table.kind} IN ('added', 'updated', 'removed')`),
+    check("pos_kds_item_changes_revision_check", sql`${table.revision} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "pos_kds_item_changes_ack_check",
+      sql`(${table.acknowledgedAt} IS NULL AND ${table.acknowledgedByIdentityId} IS NULL) OR (${table.acknowledgedAt} IS NOT NULL AND ${table.acknowledgedByIdentityId} IS NOT NULL)`,
     ),
   ],
 );

@@ -1,4 +1,5 @@
-import { Badge, Card, EmptyState, VisuallyHidden } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, EmptyState, Input, NativeSelect, VisuallyHidden } from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import type { Profile } from "../../domain";
@@ -195,16 +196,17 @@ export function RealDashboard({
                 {!actionError && (
                   <div className="dashboard-source-retries">
                     {overview.unavailableSources.map((source) => (
-                      <button
+                      <Button
                         disabled={busyAction === `source:${source}`}
                         key={source}
                         onClick={() => void retrySource(source as OverviewSourceId)}
                         type="button"
+                        variant="secondary"
                       >
                         {busyAction === `source:${source}`
                           ? "Consultando…"
                           : `Tentar ${sourceLabel(source)}`}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -254,27 +256,29 @@ export function RealDashboard({
                       </a>
                       <div className="dashboard-priority__controls">
                         <a href={routeHref(item.route)}>{item.actionLabel} →</a>
-                        <button
+                        <Button
                           disabled={busyAction !== null || item.assignedTo?.isMe}
                           onClick={() => void actOnPriority(item, "claim")}
                           type="button"
+                          variant="secondary"
                         >
                           Assumir
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={busyAction !== null}
                           onClick={() => void actOnPriority(item, "snooze")}
                           type="button"
+                          variant="ghost"
                         >
                           Adiar 15 min
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           disabled={busyAction !== null}
                           onClick={() => void actOnPriority(item, "resolve")}
                           type="button"
                         >
                           Marcar tratada
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   ))}
@@ -470,13 +474,14 @@ export function RealDashboard({
                       </span>
                       <time dateTime={source.checkedAt}>{time(source.checkedAt)}</time>
                       {source.status === "unavailable" && (
-                        <button
+                        <Button
                           disabled={busyAction === `source:${source.id}`}
                           onClick={() => void retrySource(source.id)}
                           type="button"
+                          variant="secondary"
                         >
                           Tentar novamente
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ))}
@@ -522,7 +527,7 @@ function PreferencesForm({
         }}
       >
         <label className="dashboard-check">
-          <input
+          <Input
             checked={draft.alertsEnabled}
             onChange={(event) =>
               setDraft((current) => ({ ...current, alertsEnabled: event.target.checked }))
@@ -533,7 +538,7 @@ function PreferencesForm({
         </label>
         <label>
           Severidade mínima
-          <select
+          <NativeSelect
             onChange={(event) =>
               setDraft((current) => ({
                 ...current,
@@ -545,7 +550,7 @@ function PreferencesForm({
             <option value="info">Informativa</option>
             <option value="warning">Atenção</option>
             <option value="danger">Crítica</option>
-          </select>
+          </NativeSelect>
         </label>
         <NumberField
           label="Agrupar por"
@@ -581,7 +586,7 @@ function PreferencesForm({
         />
         <label>
           Meta de vendas
-          <input
+          <Input
             min="0"
             max="1000000"
             onChange={(event) =>
@@ -621,9 +626,9 @@ function PreferencesForm({
           onChange={(next) => threshold("maxReconciliations", next)}
           value={draft.thresholds.maxReconciliations}
         />
-        <button disabled={busy} type="submit">
+        <Button disabled={busy} type="submit">
           {busy ? "Salvando…" : "Salvar preferências"}
-        </button>
+        </Button>
         {saved && <span role="status">Preferências salvas.</span>}
       </form>
     </details>
@@ -648,7 +653,7 @@ function NumberField({
   return (
     <label>
       {label}
-      <input
+      <Input
         max={max}
         min={min}
         onChange={(event) => onChange(Number(event.target.value))}

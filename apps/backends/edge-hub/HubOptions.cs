@@ -15,6 +15,10 @@ public sealed class HubOptions
     public int CloudRequestTimeoutSeconds { get; init; } = 10;
     public FocusOptions Focus { get; init; } = new();
     public PrinterOptions Printer { get; init; } = new();
+    public List<PrinterOptions> Printers { get; init; } = [];
+
+    public IReadOnlyList<PrinterOptions> AvailablePrinters =>
+        Printers.Count > 0 ? Printers : [Printer];
 }
 
 public sealed class FocusOptions
@@ -36,4 +40,8 @@ public sealed class PrinterOptions
     public int CodeTable { get; init; } = 16;
     public bool Cut { get; init; } = true;
     public int TimeoutSeconds { get; init; } = 5;
+    public bool Default { get; init; }
+    public string? FallbackPrinterId { get; init; }
+    public string[] Stations { get; init; } = [];
+    public string[] DocumentTypes { get; init; } = [];
 }

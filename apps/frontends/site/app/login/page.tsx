@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
@@ -139,9 +140,9 @@ export default function LoginPage() {
           </p>
           {!challengeToken && !oauthMfa && (
             <>
-              <button className="button google-button" type="button" onClick={startGoogleLogin}>
+              <Button className="button google-button" type="button" onClick={startGoogleLogin}>
                 <span aria-hidden="true">G</span> Continuar com Google
-              </button>
+              </Button>
               <div className="divider">
                 <span>ou com e-mail</span>
               </div>
@@ -149,9 +150,9 @@ export default function LoginPage() {
           )}
           {challengeToken || oauthMfa ? (
             <form onSubmit={verifyMfa} className="auth-form">
-              <label>
+              <Label>
                 {useRecoveryCode ? "Código de recuperação" : "Código do autenticador"}
-                <input
+                <Input
                   type="text"
                   name="mfaProof"
                   inputMode={useRecoveryCode ? "text" : "numeric"}
@@ -161,18 +162,18 @@ export default function LoginPage() {
                   maxLength={useRecoveryCode ? 64 : 6}
                   required
                 />
-              </label>
-              <button className="button button-primary" type="submit">
+              </Label>
+              <Button className="button button-primary" type="submit">
                 Confirmar acesso →
-              </button>
-              <button
+              </Button>
+              <Button
                 className="button button-secondary"
                 type="button"
                 onClick={() => setUseRecoveryCode((value) => !value)}
               >
                 {useRecoveryCode ? "Usar autenticador" : "Usar código de recuperação"}
-              </button>
-              <button
+              </Button>
+              <Button
                 className="button button-secondary"
                 type="button"
                 onClick={() => {
@@ -183,42 +184,44 @@ export default function LoginPage() {
                 }}
               >
                 Voltar
-              </button>
+              </Button>
             </form>
           ) : (
             <form onSubmit={submit} className="auth-form">
-              <label>
+              <Label>
                 E-mail
-                <input type="email" name="email" autoComplete="email" required />
-              </label>
-              <label>
+                <Input type="email" name="email" autoComplete="email" required />
+              </Label>
+              <Label>
                 Senha
                 <span className="password-field">
-                  <input
+                  <Input
                     type={showPassword ? "text" : "password"}
                     name="password"
                     autoComplete="current-password"
                     required
                   />
-                  <button
+                  <Button
                     type="button"
                     aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                     onClick={() => setShowPassword((value) => !value)}
+                    size="sm"
+                    variant="ghost"
                   >
                     {showPassword ? "Ocultar" : "Mostrar"}
-                  </button>
+                  </Button>
                 </span>
-              </label>
+              </Label>
               <div className="auth-options">
-                <label className="check-label">
-                  <input type="checkbox" name="trustedDevice" />
+                <Label className="check-label">
+                  <Input type="checkbox" name="trustedDevice" />
                   <span>Confiar neste dispositivo pessoal</span>
-                </label>
+                </Label>
                 <Link href="/recuperar-senha">Esqueci minha senha</Link>
               </div>
-              <button className="button button-primary" type="submit">
+              <Button className="button button-primary" type="submit">
                 Entrar →
-              </button>
+              </Button>
             </form>
           )}
           <p className="form-status" role="status">

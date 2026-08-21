@@ -1,4 +1,4 @@
-import { Button, Icon, Modal } from "@giromesa/ui";
+import { Button, Card, Icon, Input, Label, Modal, NativeSelect } from "@giromesa/ui";
 import { useState } from "react";
 
 export type WaitlistEntry = {
@@ -100,19 +100,19 @@ export function WaitlistDrawer({
           <form className="waitlist-form" onSubmit={handleCreate}>
             <h4>Adicionar à Lista de Espera</h4>
             <div className="waitlist-form-grid">
-              <label>
+              <Label>
                 Nome do Titular
-                <input
+                <Input
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex.: Mariana Silva"
                   required
                   value={name}
                 />
-              </label>
+              </Label>
 
-              <label>
+              <Label>
                 Qtd. Pessoas
-                <input
+                <Input
                   max={50}
                   min={1}
                   onChange={(e) => setPartySize(Number(e.target.value))}
@@ -120,25 +120,25 @@ export function WaitlistDrawer({
                   type="number"
                   value={partySize}
                 />
-              </label>
+              </Label>
 
-              <label>
+              <Label>
                 WhatsApp / Telefone (opcional)
-                <input
+                <Input
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(31) 99999-0000"
                   value={phone}
                 />
-              </label>
+              </Label>
 
-              <label>
+              <Label>
                 Observações
-                <input
+                <Input
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ex.: Prefere varanda / com criança"
                   value={notes}
                 />
-              </label>
+              </Label>
             </div>
             <div className="waitlist-form-actions">
               <Button disabled={!name.trim()} size="sm" type="submit" variant="primary">
@@ -157,9 +157,9 @@ export function WaitlistDrawer({
               {waitlist.find((w) => w.id === seatingEntryId)?.partySize} pessoas)
             </h4>
             <div className="waitlist-seating-grid">
-              <label>
+              <Label>
                 Selecione a Mesa Livre:
-                <select
+                <NativeSelect
                   aria-label="Mesa livre compatível"
                   onChange={(e) => setSelectedTableId(e.target.value)}
                   value={selectedTableId}
@@ -170,8 +170,8 @@ export function WaitlistDrawer({
                       {t.label} ({t.seats} lugares · {t.roomName})
                     </option>
                   ))}
-                </select>
-              </label>
+                </NativeSelect>
+              </Label>
               <div className="waitlist-seating-actions">
                 <Button onClick={() => setSeatingEntryId(null)} size="sm" variant="ghost">
                   Cancelar
@@ -199,7 +199,7 @@ export function WaitlistDrawer({
             </div>
           ) : (
             waitlist.map((entry, idx) => (
-              <div className="waitlist-card" key={entry.id}>
+              <Card className="waitlist-card" key={entry.id}>
                 <div className="waitlist-card__pos">
                   <span>#{idx + 1}</span>
                 </div>
@@ -230,16 +230,17 @@ export function WaitlistDrawer({
                   >
                     Alocar Mesa
                   </Button>
-                  <button
+                  <Button
                     aria-label="Remover da fila"
                     className="waitlist-remove-btn"
                     onClick={() => onRemoveEntry(entry.id)}
                     type="button"
+                    variant="ghost"
                   >
                     <Icon name="x" size={14} />
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             ))
           )}
         </div>

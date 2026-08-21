@@ -60,6 +60,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
 #else
         public List<Guid?> StationIds { get; set; }
 #endif
+        /// <summary>The stationRouting property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody_stationRouting>? StationRouting { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody_stationRouting> StationRouting { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody"/> and sets the default values.
         /// </summary>
@@ -94,6 +102,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
                 { "deliveryPriceCents", n => { DeliveryPriceCents = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody.UnitConfigPutRequestBody_deliveryPriceCents>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody.UnitConfigPutRequestBody_deliveryPriceCents.CreateFromDiscriminatorValue); } },
                 { "priceCents", n => { PriceCents = n.GetIntValue(); } },
                 { "stationIds", n => { StationIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
+                { "stationRouting", n => { StationRouting = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody_stationRouting>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody_stationRouting.CreateFromDiscriminatorValue)?.AsList(); } },
             };
         }
         /// <summary>
@@ -111,6 +120,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Prod
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody.UnitConfigPutRequestBody_deliveryPriceCents>("deliveryPriceCents", DeliveryPriceCents);
             writer.WriteIntValue("priceCents", PriceCents);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("stationIds", StationIds);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.Item.UnitConfig.UnitConfigPutRequestBody_stationRouting>("stationRouting", StationRouting);
             writer.WriteAdditionalData(AdditionalData);
         }
         /// <summary>

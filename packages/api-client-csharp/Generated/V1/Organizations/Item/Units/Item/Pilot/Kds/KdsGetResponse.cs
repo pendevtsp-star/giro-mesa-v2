@@ -48,6 +48,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
 #endif
         /// <summary>The capturedAt property</summary>
         public DateTimeOffset? CapturedAt { get; set; }
+        /// <summary>The demand property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_demand? Demand { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_demand Demand { get; set; }
+#endif
         /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -79,6 +87,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
 #nullable restore
 #else
         public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productAvailability> ProductAvailability { get; set; }
+#endif
+        /// <summary>The productionGrid property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productionGrid>? ProductionGrid { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productionGrid> ProductionGrid { get; set; }
 #endif
         /// <summary>The revision property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -144,10 +160,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
                 { "batches", n => { Batches = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_batches>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_batches.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "capabilities", n => { Capabilities = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_capabilities>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_capabilities.CreateFromDiscriminatorValue); } },
                 { "capturedAt", n => { CapturedAt = n.GetDateTimeOffsetValue(); } },
+                { "demand", n => { Demand = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_demand>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_demand.CreateFromDiscriminatorValue); } },
                 { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "metrics", n => { Metrics = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_metrics>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_metrics.CreateFromDiscriminatorValue); } },
                 { "operationServiceMode", n => { OperationServiceMode = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_operationServiceMode>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_operationServiceMode.CreateFromDiscriminatorValue); } },
                 { "productAvailability", n => { ProductAvailability = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productAvailability>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productAvailability.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "productionGrid", n => { ProductionGrid = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productionGrid>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productionGrid.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "revision", n => { Revision = n.GetStringValue(); } },
                 { "serverTime", n => { ServerTime = n.GetDateTimeOffsetValue(); } },
                 { "serviceMode", n => { ServiceMode = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_serviceMode>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_serviceMode.CreateFromDiscriminatorValue); } },
@@ -167,10 +185,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_batches>("batches", Batches);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_capabilities>("capabilities", Capabilities);
             writer.WriteDateTimeOffsetValue("capturedAt", CapturedAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_demand>("demand", Demand);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items>("items", Items);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_metrics>("metrics", Metrics);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_operationServiceMode>("operationServiceMode", OperationServiceMode);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productAvailability>("productAvailability", ProductAvailability);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_productionGrid>("productionGrid", ProductionGrid);
             writer.WriteStringValue("revision", Revision);
             writer.WriteDateTimeOffsetValue("serverTime", ServerTime);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse.KdsGetResponse_serviceMode>("serviceMode", ServiceMode);

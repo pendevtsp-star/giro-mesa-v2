@@ -1,3 +1,4 @@
+import { Button, Input, Label, NativeSelect } from "@giromesa/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { type CartItem, cartTotal, formatMoney } from "../../lib/menu";
 import type { PublicOrderOptions } from "../../lib/public-order";
@@ -83,8 +84,8 @@ export function OrderFlow({
           <>
             <fieldset className="fulfillment-options">
               <legend className="sr-only">Modalidade do pedido</legend>
-              <label>
-                <input
+              <Label>
+                <Input
                   type="radio"
                   name="fulfillment"
                   checked={fulfillment === "pickup"}
@@ -94,9 +95,9 @@ export function OrderFlow({
                   <b>Retirada</b>
                   <small>Sem taxa de entrega</small>
                 </span>
-              </label>
-              <label>
-                <input
+              </Label>
+              <Label>
+                <Input
                   type="radio"
                   name="fulfillment"
                   checked={fulfillment === "delivery"}
@@ -107,22 +108,22 @@ export function OrderFlow({
                   <b>Entrega própria</b>
                   <small>Taxa conforme a região</small>
                 </span>
-              </label>
+              </Label>
             </fieldset>
             <div className="checkout-grid checkout-grid-two">
-              <label>
+              <Label>
                 Nome
-                <input
+                <Input
                   required
                   autoComplete="name"
                   value={customerName}
                   onChange={(event) => onCustomerName(event.target.value)}
                   placeholder="Quem receberá o pedido"
                 />
-              </label>
-              <label>
+              </Label>
+              <Label>
                 Celular
-                <input
+                <Input
                   required
                   inputMode="tel"
                   autoComplete="tel"
@@ -130,13 +131,13 @@ export function OrderFlow({
                   onChange={(event) => onCustomerPhone(event.target.value)}
                   placeholder="(00) 00000-0000"
                 />
-              </label>
+              </Label>
             </div>
             {fulfillment === "delivery" && (
               <div className="delivery-fields">
-                <label>
+                <Label>
                   Região de entrega
-                  <select
+                  <NativeSelect
                     required
                     value={deliveryZone}
                     onChange={(event) => onDeliveryZone(event.target.value)}
@@ -147,76 +148,76 @@ export function OrderFlow({
                           {zone.name} · {formatMoney(zone.feeCents)}
                         </option>
                       ))}
-                  </select>
-                </label>
+                  </NativeSelect>
+                </Label>
                 {belowMinimum && (
                   <p className="checkout-state checkout-state-warning">
                     Pedido mínimo desta região: {formatMoney(selectedZone?.minimumOrderCents ?? 0)}.
                   </p>
                 )}
                 <div className="checkout-grid checkout-grid-address">
-                  <label className="checkout-street">
+                  <Label className="checkout-street">
                     Rua
-                    <input
+                    <Input
                       required
                       autoComplete="address-line1"
                       value={address.street}
                       onChange={(event) => setField("street", event.target.value)}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     Número
-                    <input
+                    <Input
                       required
                       value={address.number}
                       onChange={(event) => setField("number", event.target.value)}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     Complemento
-                    <input
+                    <Input
                       autoComplete="address-line2"
                       value={address.complement}
                       onChange={(event) => setField("complement", event.target.value)}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     Bairro
-                    <input
+                    <Input
                       required
                       value={address.neighborhood}
                       onChange={(event) => setField("neighborhood", event.target.value)}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     Cidade
-                    <input
+                    <Input
                       required
                       autoComplete="address-level2"
                       value={address.city}
                       onChange={(event) => setField("city", event.target.value)}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     UF
-                    <input
+                    <Input
                       required
                       maxLength={2}
                       autoComplete="address-level1"
                       value={address.state}
                       onChange={(event) => setField("state", event.target.value.toUpperCase())}
                     />
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     CEP
-                    <input
+                    <Input
                       required
                       inputMode="numeric"
                       autoComplete="postal-code"
                       value={address.postalCode}
                       onChange={(event) => setField("postalCode", event.target.value)}
                     />
-                  </label>
+                  </Label>
                 </div>
               </div>
             )}
@@ -227,8 +228,8 @@ export function OrderFlow({
                 <small>O GiroMesa não solicitará cartão nem Pix nesta etapa.</small>
               </div>
             </div>
-            <label className="privacy-check">
-              <input
+            <Label className="privacy-check">
+              <Input
                 type="checkbox"
                 checked={privacyAccepted}
                 onChange={(event) => onPrivacy(event.target.checked)}
@@ -240,7 +241,7 @@ export function OrderFlow({
                 </a>
                 .
               </span>
-            </label>
+            </Label>
           </>
         )}
       </section>
@@ -259,14 +260,14 @@ export function OrderFlow({
       <p className="service-note">
         O servidor confirma preços, disponibilidade, pedido mínimo e taxa antes de registrar.
       </p>
-      <button
+      <Button
         className="place-order"
         type="button"
         disabled={!canPlace || !cart.length || pending || belowMinimum}
         onClick={onPlace}
       >
         {pending ? "Registrando pedido…" : "Confirmar pedido"}
-      </button>
+      </Button>
     </>
   );
 }

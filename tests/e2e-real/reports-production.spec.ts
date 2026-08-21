@@ -140,7 +140,15 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
         payables: 1,
         costLines: 0,
       },
-      coverage: { sales: "complete", cashFlow: "complete", costs: "partial", budget: "complete" },
+      coverage: {
+        sales: "complete",
+        cashFlow: "complete",
+        costs: "partial",
+        budget: "complete",
+        labor: "unavailable",
+        reconciliation: "complete",
+        forecast: "partial",
+      },
     },
     capabilities: {
       viewCosts: true,
@@ -148,6 +156,9 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
       export: true,
       manageBudget: true,
       manageSchedules: true,
+      manageViews: true,
+      manageAlerts: true,
+      backfillCosts: true,
       emailDeliveryConfigured: true,
     },
     budget: {
@@ -165,6 +176,8 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
 }
 
 async function mockReportsApi(page: Page, requestedPeriods: string[]) {
+  const savedViews: Array<Record<string, unknown>> = [];
+  const alerts: Array<Record<string, unknown>> = [];
   const csvContent = "\uFEFFseção;rótulo;timezone\r\nvendas;Prato executivo;America/Sao_Paulo\r\n";
   const csvSha256 = createHash("sha256").update(csvContent).digest("hex");
   const exportRecord = {
@@ -237,6 +250,41 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
                 version: 1,
               },
       });
+      return;
+    }
+    if (url.pathname.endsWith("/management/reports/views")) {
+      if (route.request().method() === "POST") {
+        const created = {
+          id: "view-1",
+          ...route.request().postDataJSON(),
+          ownerIdentityId: "identity-1",
+          version: 1,
+          updatedAt: "2026-08-17T12:00:00.000Z",
+        };
+        savedViews.splice(0, savedViews.length, created);
+        await route.fulfill({ json: created });
+      } else await route.fulfill({ json: { views: savedViews } });
+      return;
+    }
+    if (url.pathname.endsWith("/management/reports/alerts/evaluate")) {
+      alerts.splice(0, alerts.length, {
+        id: "alert-1",
+        title: "Divergência fiscal",
+        detail: "Revise os documentos do período.",
+        severity: "critical",
+        status: "open",
+        dueAt: "2026-08-20T12:00:00.000Z",
+        version: 1,
+      });
+      await route.fulfill({ json: { candidates: 1, created: 1 } });
+      return;
+    }
+    if (url.pathname.endsWith("/management/reports/alerts")) {
+      await route.fulfill({ json: { alerts } });
+      return;
+    }
+    if (url.pathname.endsWith("/management/reports/costs/backfill")) {
+      await route.fulfill({ json: { estimatedCount: 2, unavailableCount: 0 } });
       return;
     }
     if (url.pathname.endsWith("/management/reports")) {
@@ -317,6 +365,24 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("heading", { name: "Metas rateadas para o período" })).toBeVisible();
   await expect(page).toHaveURL(/reportOrganization=org-1.*reportUnit=unit-1.*#\/reports/);
   await expect(page.getByText("+25,0% vs. período anterior").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Visões compartilhadas" }).click();
+  await page.getByLabel("Nome").fill("Fechamento semanal");
+  await page.getByRole("button", { name: "Salvar visão" }).click();
+  await expect(page.getByText("Visão salva no servidor.")).toBeVisible();
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+
+  await page.getByRole("button", { name: "Central de ações" }).click();
+  await page.getByRole("button", { name: "Avaliar período atual" }).click();
+  await expect(page.getByRole("table", { name: "Alertas abertos dos relatórios" })).toContainText(
+    "Divergência fiscal",
+  );
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+
+  await page.getByLabel(/Entendo que custos históricos/).check();
+  await page.getByRole("button", { name: "Recompor custos estimados" }).click();
+  await expect(page.getByText(/2 item\(ns\) receberam custo estimado/)).toBeVisible();
+
   await page.getByRole("button", { name: "Vendas" }).click();
   await expect(page.getByRole("heading", { name: "Desempenho comercial" })).toBeVisible();
   await page.getByRole("button", { name: "Descontos e cancelamentos" }).click();
@@ -333,6 +399,12 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("heading", { name: "Margem e resultado operacional" })).toBeVisible();
   await page.getByRole("button", { name: "Multiunidade" }).click();
   await expect(page.getByRole("heading", { name: "Comparativo entre unidades" })).toBeVisible();
+  await page.getByRole("button", { name: "Mão de obra" }).click();
+  await expect(page.getByRole("heading", { name: "Mão de obra" })).toBeVisible();
+  await page.getByRole("button", { name: "Fiscal e pagamentos", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Fiscal e pagamentos" })).toBeVisible();
+  await page.getByRole("button", { name: "Previsão" }).click();
+  await expect(page.getByRole("heading", { name: "Previsão operacional" })).toBeVisible();
   await page.getByRole("button", { name: "Qualidade dos dados" }).click();
   await expect(page.getByRole("heading", { name: "Confiabilidade do relatório" })).toBeVisible();
   await page.getByRole("button", { name: "Visão geral" }).click();
@@ -359,12 +431,12 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("dialog", { name: "Produtos: Prato executivo" })).toContainText(
     "PED-101",
   );
-  await page.getByRole("button", { name: "Fechar" }).click();
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   await page.getByRole("button", { name: "Categorias" }).click();
   await expect(page.getByRole("table", { name: "Categorias por receita" })).toContainText("Almoço");
   await page.getByRole("button", { name: "Canais" }).click();
   await expect(page.getByRole("table", { name: "Canais por receita" })).toContainText("Salão");
-  await page.getByRole("button", { name: "Pagamentos" }).click();
+  await page.getByRole("button", { name: /^Pagamentos/ }).click();
   await expect(page.getByRole("table", { name: "Pagamentos por receita" })).toContainText("Pix");
 
   const downloadPromise = page.waitForEvent("download");
@@ -395,9 +467,7 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("button", { name: "Exportar CSV auditado" })).toBeHidden();
   await page.getByRole("button", { name: "Mais ações" }).click();
   await expect(page.getByRole("button", { name: "Exportar CSV auditado" })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
 
   await page.getByLabel("Data inicial").fill("2026-07-01");
   await page.getByLabel("Data final").fill("2026-07-31");

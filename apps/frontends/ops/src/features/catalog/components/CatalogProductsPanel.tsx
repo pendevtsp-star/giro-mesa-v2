@@ -1,4 +1,13 @@
-import { EmptyState, Icon, type IconName } from "@giromesa/ui";
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  Icon,
+  type IconName,
+  Input,
+  Label,
+} from "@giromesa/ui";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import {
   type CatalogProduct,
@@ -214,7 +223,7 @@ function ProductTable({
 }) {
   return (
     <div className="catalog-products-table-shell">
-      <table className="catalog-products-table">
+      <DataTable caption="Produtos do cardápio" className="catalog-products-table">
         <thead>
           <tr>
             <th>Status</th>
@@ -235,7 +244,7 @@ function ProductTable({
             return (
               <tr data-available={product.available} key={product.id}>
                 <td>
-                  <button
+                  <Button
                     className="catalog-products-table__status"
                     data-available={product.available}
                     onClick={() => void callbacks.toggleAvailability(product)}
@@ -243,7 +252,7 @@ function ProductTable({
                     type="button"
                   >
                     {product.available ? "Ativo" : "Pausado"}
-                  </button>
+                  </Button>
                 </td>
                 <td>
                   <div className="catalog-products-table__identity">
@@ -293,7 +302,7 @@ function ProductTable({
             );
           })}
         </tbody>
-      </table>
+      </DataTable>
     </div>
   );
 }
@@ -316,9 +325,9 @@ function QuickPriceInput({
   useEffect(() => setValue(confirmedValue), [confirmedValue]);
 
   return (
-    <label className="catalog-quick-price">
+    <Label className="catalog-quick-price">
       <span>R$</span>
-      <input
+      <Input
         onBlur={() => {
           onCommit(priceToCents(value));
           setValue(confirmedValue);
@@ -329,7 +338,7 @@ function QuickPriceInput({
         type="text"
         value={value}
       />
-    </label>
+    </Label>
   );
 }
 
@@ -347,7 +356,7 @@ function ProductList({
   return (
     <div className="catalog-product-list">
       {items.map((product) => (
-        <article
+        <Card
           className={`catalog-product-card ${!product.available ? "catalog-product-card--unavailable" : ""}`}
           key={product.id}
         >
@@ -379,7 +388,7 @@ function ProductList({
             <ProductOperationalActions callbacks={callbacks} product={product} />
             <ProductIconActions callbacks={callbacks} product={product} showMove />
           </div>
-        </article>
+        </Card>
       ))}
     </div>
   );
@@ -397,7 +406,7 @@ function ProductGrid({
   return (
     <div className="catalog-product-grid">
       {items.map((product) => (
-        <article
+        <Card
           className="catalog-product-grid__card"
           data-available={product.available}
           key={product.id}
@@ -453,7 +462,7 @@ function ProductGrid({
             <ProductOperationalActions callbacks={callbacks} product={product} compact />
             <ProductIconActions callbacks={callbacks} product={product} />
           </div>
-        </article>
+        </Card>
       ))}
     </div>
   );
@@ -500,7 +509,7 @@ function ProductMetadata({
         </span>
       ))}
       {!!product.modifierGroupIds?.length && (
-        <button
+        <Button
           className="gm-pill gm-pill--button"
           data-tone="positive"
           onClick={() => onCustomize(product)}
@@ -508,7 +517,7 @@ function ProductMetadata({
           type="button"
         >
           <Icon name="list" size={11} /> {product.modifierGroupIds.length} opcionais
-        </button>
+        </Button>
       )}
       {product.tags?.map((tag) => {
         const definition = TAGS[tag];
@@ -590,7 +599,7 @@ function ProductOperationalActions({
 }) {
   return (
     <div className="catalog-product-card__actions-left">
-      <button
+      <Button
         className={`catalog-card-btn ${product.available ? "catalog-card-btn--pause" : "catalog-card-btn--active"}`}
         disabled={callbacks.busy === `toggle-${product.id}`}
         onClick={() => void callbacks.toggleAvailability(product)}
@@ -599,24 +608,24 @@ function ProductOperationalActions({
       >
         <Icon name={product.available ? "minus" : "check"} size={13} />
         <span>{product.available ? "Pausar" : "Ativar"}</span>
-      </button>
+      </Button>
       {!compact &&
         (product.dailyStockRemaining === 0 ? (
-          <button
+          <Button
             className="catalog-card-btn catalog-card-btn--active"
             onClick={() => callbacks.restoreDailyStock(product.id)}
             type="button"
           >
             <Icon name="plus" size={13} /> <span>Reabastecer</span>
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             className="catalog-card-btn catalog-card-btn--stockout"
             onClick={() => callbacks.quickStockOut(product.id)}
             type="button"
           >
             <Icon name="alerts" size={13} /> <span>Esgotar Hoje</span>
-          </button>
+          </Button>
         ))}
     </div>
   );
@@ -682,7 +691,7 @@ function IconButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       className={`catalog-card-icon-btn ${danger ? "catalog-card-icon-btn--danger" : ""}`}
       disabled={disabled}
       onClick={onClick}
@@ -690,7 +699,7 @@ function IconButton({
       type="button"
     >
       <Icon name={name} size={14} />
-    </button>
+    </Button>
   );
 }
 

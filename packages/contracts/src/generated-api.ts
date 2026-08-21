@@ -36,6 +36,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_providerStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_providerStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/validate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_validateProvider[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/validate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_validateProvider[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/activate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_activateProvider[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/activate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_activateProvider[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_checkProvider[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/provider/check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_checkProvider[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions": {
     parameters: {
       query?: never;
@@ -62,6 +190,38 @@ export interface paths {
     get: operations["FiscalController_taxRevisions[1]"];
     put?: never;
     post: operations["FiscalController_createTaxRevision[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions/bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_createTaxRevisionsBulk[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions/bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_createTaxRevisionsBulk[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -158,6 +318,70 @@ export interface paths {
     get: operations["FiscalController_document[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_reconcileDocument[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_reconcileDocument[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancelDocument[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_cancelDocument[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -4436,6 +4660,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/terminal-profiles/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getTerminalProfile[0]"];
+    put: operations["PilotPosController_putTerminalProfile[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/terminal-profiles/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getTerminalProfile[1]"];
+    put: operations["PilotPosController_putTerminalProfile[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds": {
     parameters: {
       query?: never;
@@ -4686,6 +4942,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_transitionKds[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_claimKdsTicket[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_claimKdsTicket[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/claim/release": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_releaseKdsTicketClaim[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/claim/release": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_releaseKdsTicketClaim[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/changes/{changeId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeKdsChange[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/changes/{changeId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeKdsChange[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -5038,6 +5390,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_handoffKdsOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/runner/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_claimKdsRunner[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/orders/{orderId}/runner/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_claimKdsRunner[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -5588,6 +5972,102 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/supplier-exchanges/{exchangeId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveReturnableSupplierExchange[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/supplier-exchanges/{exchangeId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveReturnableSupplierExchange[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/issue-routes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_configureInventoryIssueRoute[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/issue-routes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_configureInventoryIssueRoute[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/location-item-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_configureStockLocationItemSetting[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/location-item-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_configureStockLocationItemSetting[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/items/{inventoryItemId}": {
     parameters: {
       query?: never;
@@ -5710,6 +6190,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_transferInventory[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferInventoryBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferInventoryBatch[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -7220,6 +7732,198 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/views": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportViews[0]"];
+    put?: never;
+    post: operations["ManagementController_createReportView[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/views": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportViews[1]"];
+    put?: never;
+    post: operations["ManagementController_createReportView[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/views/{viewId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_deleteReportView[0]"];
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportView[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/views/{viewId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_deleteReportView[1]"];
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportView[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportAlerts[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_reportAlerts[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts/evaluate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_evaluateReportAlerts[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts/evaluate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_evaluateReportAlerts[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts/{alertId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportAlert[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/alerts/{alertId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReportAlert[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/costs/backfill": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_backfillReportCosts[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/costs/backfill": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_backfillReportCosts[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/schedules": {
     parameters: {
       query?: never;
@@ -7437,6 +8141,70 @@ export interface paths {
     };
     get: operations["ManagementController_timeTrackingSettings[1]"];
     put: operations["ManagementController_updateTimeTrackingSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/settings/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingSettingsHistory[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/settings/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingSettingsHistory[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/location-anomalies": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingLocationAnomalies[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/time-tracking/location-anomalies": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_timeTrackingLocationAnomalies[1]"];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -8270,6 +9038,326 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_transitionCommission[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_overview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_overview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/operational-losses/candidates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_candidates[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/operational-losses/candidates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_candidates[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementSettlementsController_updateSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementSettlementsController_updateSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/partnership-plan": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementSettlementsController_updatePartnershipPlan[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/partnership-plan": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementSettlementsController_updatePartnershipPlan[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/operational-losses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_createLoss[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/operational-losses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_createLoss[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/losses/{lossId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_decideLoss[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/losses/{lossId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_decideLoss[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_preview[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_preview[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_createSettlement[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_createSettlement[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/transition": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_transition[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/transition": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementSettlementsController_transition[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_export[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementSettlementsController_export[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -10058,6 +11146,12 @@ export interface components {
             /** Format: int64 */
             averageTicketCents: number | null;
             changePercent: number | null;
+            rank: number;
+            operatingDays: number;
+            /** Format: int64 */
+            revenuePerOperatingDayCents: number | null;
+            organizationRevenueSharePercent: number | null;
+            sameStoreChangePercent: number | null;
           }[];
         };
         quality: {
@@ -10068,6 +11162,66 @@ export interface components {
             count: number;
             /** @enum {string} */
             severity: "info" | "warning" | "critical";
+          }[];
+        };
+        labor: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          costCoverage: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          scheduleCoverage: "complete" | "partial" | "unavailable";
+          people: number;
+          workedMinutes: number;
+          scheduledMinutes: number;
+          overtimeMinutes: number | null;
+          /** Format: int64 */
+          laborCostCents: number | null;
+          laborCostPercent: number | null;
+          /** Format: int64 */
+          salesPerLaborHourCents: number | null;
+          roles: {
+            [key: string]: unknown;
+          }[];
+        };
+        reconciliation: {
+          /** @enum {string} */
+          coverage: "complete" | "partial" | "unavailable";
+          /** Format: int64 */
+          posRevenueCents: number;
+          /** Format: int64 */
+          paymentCents: number;
+          /** Format: int64 */
+          paymentDifferenceCents: number;
+          /** Format: int64 */
+          fiscalAuthorizedCents: number;
+          /** Format: int64 */
+          fiscalDifferenceCents: number;
+          /** Format: int64 */
+          taxCents: number;
+          documents: {
+            [key: string]: number;
+          };
+          external: {
+            [key: string]: number;
+          };
+        };
+        forecast: {
+          /** @enum {string} */
+          method: "historical_daily_average_v1";
+          horizonDays: number;
+          sampleDays: number;
+          /** @enum {string} */
+          confidence: "low" | "medium" | "high";
+          errorPercent: number | null;
+          revenue: {
+            [key: string]: number;
+          };
+          cash: {
+            [key: string]: number;
+          };
+          purchases: {
+            [key: string]: unknown;
           }[];
         };
       };
@@ -10093,6 +11247,12 @@ export interface components {
           costs: "complete" | "partial" | "unavailable";
           /** @enum {string} */
           budget: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          labor: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          reconciliation: "complete" | "partial" | "unavailable";
+          /** @enum {string} */
+          forecast: "complete" | "partial" | "unavailable";
         };
       };
       budget: {
@@ -10140,6 +11300,9 @@ export interface components {
         export: boolean;
         manageBudget: boolean;
         manageSchedules: boolean;
+        manageViews: boolean;
+        manageAlerts: boolean;
+        backfillCosts: boolean;
         emailDeliveryConfigured: boolean;
       };
     };
@@ -10161,7 +11324,10 @@ export interface components {
         | "exception"
         | "inventory"
         | "purchase"
-        | "operation";
+        | "operation"
+        | "labor"
+        | "reconciliation"
+        | "forecast";
       key: string;
       totals: {
         /** Format: int64 */
@@ -10191,7 +11357,7 @@ export interface components {
       /** @enum {string} */
       status: "ready" | "failed";
       /** @enum {string} */
-      format: "csv";
+      format: "csv" | "pdf" | "xlsx";
       filename: string;
       sha256: string | null;
       rowCount: number;
@@ -10206,6 +11372,9 @@ export interface components {
     ManagementReportExportContent: {
       filename: string;
       content: string;
+      /** @enum {string} */
+      contentEncoding: "utf8" | "base64";
+      mimeType: string;
       sha256: string;
     };
     ManagementReportBudgetMonths: {
@@ -10244,7 +11413,12 @@ export interface components {
         | "operations"
         | "profitability"
         | "multiunit"
-        | "quality";
+        | "quality"
+        | "labor"
+        | "reconciliation"
+        | "forecast";
+      /** @enum {string} */
+      format: "csv" | "pdf" | "xlsx";
       /** @enum {string} */
       delivery: "in_app" | "email";
       enabled: boolean;
@@ -10253,6 +11427,80 @@ export interface components {
       /** Format: date-time */
       lastRunAt?: string | null;
       version: number;
+    };
+    ManagementReportView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** @enum {string} */
+      visibility: "private" | "unit" | "organization";
+      query: {
+        [key: string]: unknown;
+      };
+      /** Format: uuid */
+      ownerIdentityId: string;
+      version: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ManagementReportViewQuery: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** @enum {string} */
+      comparisonMode: "previous_period" | "previous_year" | "none";
+      /** @enum {string} */
+      family:
+        | "overview"
+        | "sales"
+        | "exceptions"
+        | "inventory"
+        | "purchasing"
+        | "operations"
+        | "profitability"
+        | "multiunit"
+        | "quality"
+        | "labor"
+        | "reconciliation"
+        | "forecast";
+    };
+    ManagementReportViewInput: {
+      name: string;
+      /** @enum {string} */
+      visibility: "private" | "unit" | "organization";
+      query: components["schemas"]["ManagementReportViewQuery"];
+      version?: number;
+    };
+    ManagementReportViews: {
+      views: components["schemas"]["ManagementReportView"][];
+    };
+    ManagementReportAlert: {
+      /** Format: uuid */
+      id: string;
+      kind: string;
+      title: string;
+      detail: string;
+      /** @enum {string} */
+      severity: "info" | "warning" | "critical";
+      /** @enum {string} */
+      status: "open" | "claimed" | "resolved" | "dismissed";
+      /** Format: int64 */
+      actualCents?: number | null;
+      /** Format: int64 */
+      targetCents?: number | null;
+      /** Format: uuid */
+      assignedToIdentityId?: string | null;
+      /** Format: date-time */
+      dueAt?: string | null;
+      /** Format: date-time */
+      resolvedAt?: string | null;
+      version: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ManagementReportAlerts: {
+      alerts: components["schemas"]["ManagementReportAlert"][];
     };
   };
   responses: never;
@@ -10395,6 +11643,286 @@ export interface operations {
       };
     };
   };
+  "FiscalController_providerStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_providerStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_validateProvider[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+          stateRegistration: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          street: string;
+          number: number;
+          complement?: string;
+          district: string;
+          city: string;
+          postalCode: string;
+          accountantDocument?: string;
+          certificateBase64: string;
+          certificatePassword: string;
+          /** @default true */
+          enableNfce?: boolean;
+          /** @default false */
+          enableNfe?: boolean;
+          /** @default false */
+          enableNfse?: boolean;
+          cscProduction?: string;
+          cscProductionId?: string;
+          cscHomologation?: string;
+          cscHomologationId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_validateProvider[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+          stateRegistration: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          street: string;
+          number: number;
+          complement?: string;
+          district: string;
+          city: string;
+          postalCode: string;
+          accountantDocument?: string;
+          certificateBase64: string;
+          certificatePassword: string;
+          /** @default true */
+          enableNfce?: boolean;
+          /** @default false */
+          enableNfe?: boolean;
+          /** @default false */
+          enableNfse?: boolean;
+          cscProduction?: string;
+          cscProductionId?: string;
+          cscHomologation?: string;
+          cscHomologationId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_activateProvider[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+          stateRegistration: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          street: string;
+          number: number;
+          complement?: string;
+          district: string;
+          city: string;
+          postalCode: string;
+          accountantDocument?: string;
+          certificateBase64: string;
+          certificatePassword: string;
+          /** @default true */
+          enableNfce?: boolean;
+          /** @default false */
+          enableNfe?: boolean;
+          /** @default false */
+          enableNfse?: boolean;
+          cscProduction?: string;
+          cscProductionId?: string;
+          cscHomologation?: string;
+          cscHomologationId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_activateProvider[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+          stateRegistration: string;
+          /** Format: email */
+          email: string;
+          phone: string;
+          street: string;
+          number: number;
+          complement?: string;
+          district: string;
+          city: string;
+          postalCode: string;
+          accountantDocument?: string;
+          certificateBase64: string;
+          certificatePassword: string;
+          /** @default true */
+          enableNfce?: boolean;
+          /** @default false */
+          enableNfe?: boolean;
+          /** @default false */
+          enableNfse?: boolean;
+          cscProduction?: string;
+          cscProductionId?: string;
+          cscHomologation?: string;
+          cscHomologationId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_checkProvider[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_checkProvider[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "FiscalController_taxRevisions[0]": {
     parameters: {
       query?: never;
@@ -10500,6 +12028,100 @@ export interface operations {
           productId: string;
           /**
            * @default draft
+           * @enum {string}
+           */
+          status?: "draft" | "active";
+          effectiveFrom: string;
+          effectiveUntil?: string;
+          classification: {
+            ncm: string;
+            cfop: string;
+            cest?: string;
+            origin: number;
+            cstIcms?: string;
+            csosn?: string;
+            cstPis?: string;
+            cstCofins?: string;
+            cstIbsCbs?: string;
+            cClassTrib?: string;
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createTaxRevisionsBulk[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          productIds: string[];
+          /**
+           * @default active
+           * @enum {string}
+           */
+          status?: "draft" | "active";
+          effectiveFrom: string;
+          effectiveUntil?: string;
+          classification: {
+            ncm: string;
+            cfop: string;
+            cest?: string;
+            origin: number;
+            cstIcms?: string;
+            csosn?: string;
+            cstPis?: string;
+            cstCofins?: string;
+            cstIbsCbs?: string;
+            cClassTrib?: string;
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_createTaxRevisionsBulk[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          productIds: string[];
+          /**
+           * @default active
            * @enum {string}
            */
           status?: "draft" | "active";
@@ -10646,6 +12268,102 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_reconcileDocument[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_reconcileDocument[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_cancelDocument[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          justification: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_cancelDocument[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          justification: string;
+        };
+      };
+    };
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };
@@ -13981,6 +15699,11 @@ export interface operations {
           /** @default [] */
           modifierGroupIds?: string[];
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           /** @default [] */
           recipe?: {
             ingredientName: string;
@@ -14068,6 +15791,11 @@ export interface operations {
           /** @default [] */
           modifierGroupIds?: string[];
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           /** @default [] */
           recipe?: {
             ingredientName: string;
@@ -14150,6 +15878,11 @@ export interface operations {
             }[];
           } | null;
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           dailyStock?: number | null;
           /** @default false */
           autoDeductStock?: boolean;
@@ -14191,6 +15924,11 @@ export interface operations {
             }[];
           } | null;
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           dailyStock?: number | null;
           /** @default false */
           autoDeductStock?: boolean;
@@ -14342,6 +16080,11 @@ export interface operations {
           /** @default [] */
           modifierGroupIds?: string[];
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           /** @default [] */
           recipe?: {
             ingredientName: string;
@@ -14428,6 +16171,11 @@ export interface operations {
           /** @default [] */
           modifierGroupIds?: string[];
           stationIds: string[];
+          stationRouting?: {
+            /** Format: uuid */
+            stationId: string;
+            stage: number;
+          }[];
           /** @default [] */
           recipe?: {
             ingredientName: string;
@@ -15712,6 +17460,11 @@ export interface operations {
             /** @default [] */
             modifierGroupIds?: string[];
             stationIds: string[];
+            stationRouting?: {
+              /** Format: uuid */
+              stationId: string;
+              stage: number;
+            }[];
             /** @default [] */
             recipe?: {
               ingredientName: string;
@@ -15806,6 +17559,11 @@ export interface operations {
             /** @default [] */
             modifierGroupIds?: string[];
             stationIds: string[];
+            stationRouting?: {
+              /** Format: uuid */
+              stationId: string;
+              stage: number;
+            }[];
             /** @default [] */
             recipe?: {
               ingredientName: string;
@@ -19218,6 +20976,222 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_getTerminalProfile[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            label: string;
+            /** @enum {string} */
+            mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+            /** @enum {string} */
+            defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+            printerId: string | null;
+            stationId: string | null;
+            compact: boolean;
+            quickActions: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          } | null;
+        };
+      };
+    };
+  };
+  "PilotPosController_putTerminalProfile[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @enum {string} */
+          mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+          /** @enum {string} */
+          defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+          printerId: string | null;
+          stationId: string | null;
+          compact: boolean;
+          quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            label: string;
+            /** @enum {string} */
+            mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+            /** @enum {string} */
+            defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+            printerId: string | null;
+            stationId: string | null;
+            compact: boolean;
+            quickActions: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getTerminalProfile[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            label: string;
+            /** @enum {string} */
+            mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+            /** @enum {string} */
+            defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+            printerId: string | null;
+            stationId: string | null;
+            compact: boolean;
+            quickActions: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          } | null;
+        };
+      };
+    };
+  };
+  "PilotPosController_putTerminalProfile[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @enum {string} */
+          mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+          /** @enum {string} */
+          defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+          printerId: string | null;
+          stationId: string | null;
+          compact: boolean;
+          quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            /** Format: uuid */
+            installationId: string;
+            label: string;
+            /** @enum {string} */
+            mode: "waiter_mobile" | "reception" | "cashier" | "kds" | "expedition" | "shared";
+            /** @enum {string} */
+            defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
+            printerId: string | null;
+            stationId: string | null;
+            compact: boolean;
+            quickActions: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            updatedByIdentityId: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
   "PilotPosController_kds[0]": {
     parameters: {
       query?: {
@@ -19297,6 +21271,13 @@ export interface operations {
               automaticThrottling: false;
               terminalProfileRead: boolean;
               terminalProfileManage: boolean;
+              sequentialStages: boolean;
+              ticketClaim: boolean;
+              orderChanges: boolean;
+              runnerHandoff: boolean;
+              productionGrid: boolean;
+              recipes: boolean;
+              demandControl: boolean;
             };
             tickets: {
               /** Format: uuid */
@@ -19321,6 +21302,9 @@ export interface operations {
               completedAt: string | null;
               recallCount: number;
               refireCount: number;
+              claimedByInstallationId: string | null;
+              claimedAt: string | null;
+              claimExpiresAt: string | null;
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
@@ -19372,6 +21356,9 @@ export interface operations {
                 priorityReason: string | null;
                 priorityUpdatedAt: string | null;
                 priorityUpdatedByIdentityId: string | null;
+                runnerIdentityId: string | null;
+                runnerClaimedAt: string | null;
+                runnerPickedUpAt: string | null;
               };
               tab: {
                 /** Format: uuid */
@@ -19437,6 +21424,8 @@ export interface operations {
               kds: {
                 quantity: number;
                 readyQuantity: number;
+                stage: number;
+                dependencyHeld: boolean;
                 /** @enum {string} */
                 status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
                 held: boolean;
@@ -19485,6 +21474,39 @@ export interface operations {
                 unitDeltaCents: number;
                 totalDeltaCents: number;
               }[];
+              recipe: {
+                /** Format: uuid */
+                id: string;
+                ingredientName: string;
+                quantityMilli: number;
+                unit: string;
+                lossBasisPoints: number;
+              }[];
+              changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                /** @enum {string} */
+                kind: "added" | "updated" | "removed";
+                revision: string;
+                summary: string;
+                details: {
+                  [key: string]: unknown;
+                };
+                /** Format: uuid */
+                createdByIdentityId: string;
+                acknowledgedByIdentityId: string | null;
+                acknowledgedAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
             }[];
             alerts: {
               ticket: {
@@ -19510,6 +21532,9 @@ export interface operations {
                 completedAt: string | null;
                 recallCount: number;
                 refireCount: number;
+                claimedByInstallationId: string | null;
+                claimedAt: string | null;
+                claimExpiresAt: string | null;
                 /** Format: date-time */
                 createdAt: string;
                 /** Format: date-time */
@@ -19561,6 +21586,9 @@ export interface operations {
                   priorityReason: string | null;
                   priorityUpdatedAt: string | null;
                   priorityUpdatedByIdentityId: string | null;
+                  runnerIdentityId: string | null;
+                  runnerClaimedAt: string | null;
+                  runnerPickedUpAt: string | null;
                 };
                 tab: {
                   /** Format: uuid */
@@ -19627,6 +21655,8 @@ export interface operations {
                 kds: {
                   quantity: number;
                   readyQuantity: number;
+                  stage: number;
+                  dependencyHeld: boolean;
                   /** @enum {string} */
                   status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
                   held: boolean;
@@ -19674,6 +21704,39 @@ export interface operations {
                   quantity: number;
                   unitDeltaCents: number;
                   totalDeltaCents: number;
+                }[];
+                recipe: {
+                  /** Format: uuid */
+                  id: string;
+                  ingredientName: string;
+                  quantityMilli: number;
+                  unit: string;
+                  lossBasisPoints: number;
+                }[];
+                changes: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  organizationId: string;
+                  /** Format: uuid */
+                  unitId: string;
+                  /** Format: uuid */
+                  ticketId: string;
+                  /** Format: uuid */
+                  orderItemId: string;
+                  /** @enum {string} */
+                  kind: "added" | "updated" | "removed";
+                  revision: string;
+                  summary: string;
+                  details: {
+                    [key: string]: unknown;
+                  };
+                  /** Format: uuid */
+                  createdByIdentityId: string;
+                  acknowledgedByIdentityId: string | null;
+                  acknowledgedAt: string | null;
+                  /** Format: date-time */
+                  createdAt: string;
                 }[];
               }[];
             }[];
@@ -19753,6 +21816,43 @@ export interface operations {
               canceledAt: string | null;
               idempotentReplay?: boolean;
             }[];
+            productionGrid: {
+              /** Format: uuid */
+              stationId: string;
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              totalQuantity: number;
+              queuedQuantity: number;
+              preparingQuantity: number;
+              readyQuantity: number;
+              heldQuantity: number;
+              assignments: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                reference: string;
+                quantity: number;
+                readyQuantity: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                stage: number;
+              }[];
+            }[];
+            demand: {
+              /** @enum {string} */
+              state: "normal" | "strained" | "overloaded";
+              suggestedDelayMinutes: number;
+              /** @enum {boolean} */
+              automatic: false;
+              channels: {
+                /** @enum {string} */
+                channel: "dine_in" | "pickup" | "delivery";
+                activeOrders: number;
+                suggestedDelayMinutes: number;
+              }[];
+            };
           };
         };
       };
@@ -19849,6 +21949,13 @@ export interface operations {
               automaticThrottling: false;
               terminalProfileRead: boolean;
               terminalProfileManage: boolean;
+              sequentialStages: boolean;
+              ticketClaim: boolean;
+              orderChanges: boolean;
+              runnerHandoff: boolean;
+              productionGrid: boolean;
+              recipes: boolean;
+              demandControl: boolean;
             };
             tickets: {
               /** Format: uuid */
@@ -19873,6 +21980,9 @@ export interface operations {
               completedAt: string | null;
               recallCount: number;
               refireCount: number;
+              claimedByInstallationId: string | null;
+              claimedAt: string | null;
+              claimExpiresAt: string | null;
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
@@ -19924,6 +22034,9 @@ export interface operations {
                 priorityReason: string | null;
                 priorityUpdatedAt: string | null;
                 priorityUpdatedByIdentityId: string | null;
+                runnerIdentityId: string | null;
+                runnerClaimedAt: string | null;
+                runnerPickedUpAt: string | null;
               };
               tab: {
                 /** Format: uuid */
@@ -19989,6 +22102,8 @@ export interface operations {
               kds: {
                 quantity: number;
                 readyQuantity: number;
+                stage: number;
+                dependencyHeld: boolean;
                 /** @enum {string} */
                 status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
                 held: boolean;
@@ -20037,6 +22152,39 @@ export interface operations {
                 unitDeltaCents: number;
                 totalDeltaCents: number;
               }[];
+              recipe: {
+                /** Format: uuid */
+                id: string;
+                ingredientName: string;
+                quantityMilli: number;
+                unit: string;
+                lossBasisPoints: number;
+              }[];
+              changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                organizationId: string;
+                /** Format: uuid */
+                unitId: string;
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                /** @enum {string} */
+                kind: "added" | "updated" | "removed";
+                revision: string;
+                summary: string;
+                details: {
+                  [key: string]: unknown;
+                };
+                /** Format: uuid */
+                createdByIdentityId: string;
+                acknowledgedByIdentityId: string | null;
+                acknowledgedAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
             }[];
             alerts: {
               ticket: {
@@ -20062,6 +22210,9 @@ export interface operations {
                 completedAt: string | null;
                 recallCount: number;
                 refireCount: number;
+                claimedByInstallationId: string | null;
+                claimedAt: string | null;
+                claimExpiresAt: string | null;
                 /** Format: date-time */
                 createdAt: string;
                 /** Format: date-time */
@@ -20113,6 +22264,9 @@ export interface operations {
                   priorityReason: string | null;
                   priorityUpdatedAt: string | null;
                   priorityUpdatedByIdentityId: string | null;
+                  runnerIdentityId: string | null;
+                  runnerClaimedAt: string | null;
+                  runnerPickedUpAt: string | null;
                 };
                 tab: {
                   /** Format: uuid */
@@ -20179,6 +22333,8 @@ export interface operations {
                 kds: {
                   quantity: number;
                   readyQuantity: number;
+                  stage: number;
+                  dependencyHeld: boolean;
                   /** @enum {string} */
                   status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
                   held: boolean;
@@ -20226,6 +22382,39 @@ export interface operations {
                   quantity: number;
                   unitDeltaCents: number;
                   totalDeltaCents: number;
+                }[];
+                recipe: {
+                  /** Format: uuid */
+                  id: string;
+                  ingredientName: string;
+                  quantityMilli: number;
+                  unit: string;
+                  lossBasisPoints: number;
+                }[];
+                changes: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  organizationId: string;
+                  /** Format: uuid */
+                  unitId: string;
+                  /** Format: uuid */
+                  ticketId: string;
+                  /** Format: uuid */
+                  orderItemId: string;
+                  /** @enum {string} */
+                  kind: "added" | "updated" | "removed";
+                  revision: string;
+                  summary: string;
+                  details: {
+                    [key: string]: unknown;
+                  };
+                  /** Format: uuid */
+                  createdByIdentityId: string;
+                  acknowledgedByIdentityId: string | null;
+                  acknowledgedAt: string | null;
+                  /** Format: date-time */
+                  createdAt: string;
                 }[];
               }[];
             }[];
@@ -20305,6 +22494,43 @@ export interface operations {
               canceledAt: string | null;
               idempotentReplay?: boolean;
             }[];
+            productionGrid: {
+              /** Format: uuid */
+              stationId: string;
+              /** Format: uuid */
+              productId: string;
+              productName: string;
+              totalQuantity: number;
+              queuedQuantity: number;
+              preparingQuantity: number;
+              readyQuantity: number;
+              heldQuantity: number;
+              assignments: {
+                /** Format: uuid */
+                ticketId: string;
+                /** Format: uuid */
+                orderItemId: string;
+                reference: string;
+                quantity: number;
+                readyQuantity: number;
+                /** @enum {string} */
+                status: "draft" | "queued" | "preparing" | "ready" | "served" | "canceled";
+                stage: number;
+              }[];
+            }[];
+            demand: {
+              /** @enum {string} */
+              state: "normal" | "strained" | "overloaded";
+              suggestedDelayMinutes: number;
+              /** @enum {boolean} */
+              automatic: false;
+              channels: {
+                /** @enum {string} */
+                channel: "dine_in" | "pickup" | "delivery";
+                activeOrders: number;
+                suggestedDelayMinutes: number;
+              }[];
+            };
           };
         };
       };
@@ -21343,6 +23569,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -21359,7 +23602,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -21445,6 +23688,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -21461,7 +23721,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -21512,6 +23772,656 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_claimKdsTicket[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId: string;
+          /** @default 120 */
+          leaseSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_claimKdsTicket[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId: string;
+          /** @default 120 */
+          leaseSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_releaseKdsTicketClaim[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId: string;
+          /** @default 120 */
+          leaseSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_releaseKdsTicketClaim[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId: string;
+          /** @default 120 */
+          leaseSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_acknowledgeKdsChange[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        changeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_acknowledgeKdsChange[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+        changeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
   "PilotPosController_transitionKdsItem[0]": {
     parameters: {
       query?: never;
@@ -21554,6 +24464,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -21570,7 +24497,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -21663,6 +24590,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -21679,7 +24623,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22359,6 +25303,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22375,7 +25336,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22465,6 +25426,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22481,7 +25459,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22566,6 +25544,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22582,7 +25577,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22667,6 +25662,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22683,7 +25695,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22769,6 +25781,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22785,7 +25814,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22871,6 +25900,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22887,7 +25933,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -22973,6 +26019,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -22989,7 +26052,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23075,6 +26138,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -23091,7 +26171,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23179,6 +26259,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -23195,7 +26292,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23283,6 +26380,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -23299,7 +26413,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23367,7 +26481,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          target: "expedition" | "served";
+          target: "expedition" | "runner" | "served";
           reason?: string;
         };
       };
@@ -23386,6 +26500,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -23402,7 +26533,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23470,7 +26601,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          target: "expedition" | "served";
+          target: "expedition" | "runner" | "served";
           reason?: string;
         };
       };
@@ -23489,6 +26620,23 @@ export interface operations {
             orderId?: string;
             /** Format: uuid */
             orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
             /** @enum {string} */
             state?:
               | "pending"
@@ -23505,7 +26653,7 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             /** @enum {string} */
-            target?: "expedition" | "served";
+            target?: "expedition" | "runner" | "served";
             priority?: number;
             /** Format: uuid */
             approvalId?: string;
@@ -23551,6 +26699,218 @@ export interface operations {
             statusCode?: number;
             code: string;
             message: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_claimKdsRunner[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_claimKdsRunner[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            ticketId?: string;
+            ticketIds?: string[];
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: uuid */
+            orderItemId?: string;
+            /** Format: uuid */
+            changeId?: string;
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: date-time */
+            claimedAt?: string;
+            /** Format: date-time */
+            claimExpiresAt?: string;
+            /** Format: date-time */
+            releasedAt?: string;
+            revision?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+            /** Format: uuid */
+            runnerIdentityId?: string;
+            /** Format: date-time */
+            runnerClaimedAt?: string;
+            /** @enum {string} */
+            state?:
+              | "pending"
+              | "preparing"
+              | "ready"
+              | "done"
+              | "canceled"
+              | "held"
+              | "fired"
+              | "served";
+            /** @enum {string} */
+            itemState?: "preparing" | "ready";
+            readyQuantity?: number;
+            /** @enum {string} */
+            course?: "anytime" | "starter" | "main" | "dessert";
+            /** @enum {string} */
+            target?: "expedition" | "runner" | "served";
+            priority?: number;
+            /** Format: uuid */
+            approvalId?: string;
+            orderStatuses?: {
+              /** Format: uuid */
+              orderId: string;
+              /** @enum {string} */
+              status: "sent" | "preparing" | "ready" | "served" | "canceled";
+            }[];
+            totals?: {
+              /** Format: uuid */
+              tabId: string;
+              totals: {
+                subtotalCents: number;
+                discountCents: number;
+                serviceChargeCents: number;
+                tipCents: number;
+                totalCents: number;
+              };
+            }[];
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            statusCode?: number;
+            code: string;
+            message?: string;
           };
         };
       };
@@ -24165,6 +27525,12 @@ export interface operations {
         "application/json": {
           name: string;
           code: string;
+          barcode?: string;
+          /** @enum {string} */
+          kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+          responsibleIdentityId?: string | null;
+          requireDistinctTransferReceiver?: boolean;
+          transferSlaMinutes?: number;
         };
       };
     };
@@ -24194,6 +27560,12 @@ export interface operations {
         "application/json": {
           name: string;
           code: string;
+          barcode?: string;
+          /** @enum {string} */
+          kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+          responsibleIdentityId?: string | null;
+          requireDistinctTransferReceiver?: boolean;
+          transferSlaMinutes?: number;
         };
       };
     };
@@ -24222,6 +27594,12 @@ export interface operations {
         "application/json": {
           name?: string;
           code?: string;
+          barcode?: string | null;
+          /** @enum {string} */
+          kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+          responsibleIdentityId?: string | null;
+          requireDistinctTransferReceiver?: boolean;
+          transferSlaMinutes?: number;
           active?: boolean;
         };
       };
@@ -24272,6 +27650,12 @@ export interface operations {
         "application/json": {
           name?: string;
           code?: string;
+          barcode?: string | null;
+          /** @enum {string} */
+          kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+          responsibleIdentityId?: string | null;
+          requireDistinctTransferReceiver?: boolean;
+          transferSlaMinutes?: number;
           active?: boolean;
         };
       };
@@ -24806,6 +28190,214 @@ export interface operations {
       };
     };
   };
+  "ManagementController_resolveReturnableSupplierExchange[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        exchangeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "received" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveReturnableSupplierExchange[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        exchangeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "received" | "canceled";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureInventoryIssueRoute[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          stationId?: string;
+          /** Format: uuid */
+          locationId: string;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureInventoryIssueRoute[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          productId: string;
+          /** Format: uuid */
+          stationId?: string;
+          /** Format: uuid */
+          locationId: string;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureStockLocationItemSetting[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** @default 0 */
+          minimumQuantity?: string | number;
+          /** @default 0 */
+          targetQuantity?: string | number;
+          transferUnitLabel?: string;
+          /** @default 1 */
+          unitsPerTransferUnit?: string | number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_configureStockLocationItemSetting[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          /** Format: uuid */
+          inventoryItemId: string;
+          /** @default 0 */
+          minimumQuantity?: string | number;
+          /** @default 0 */
+          targetQuantity?: string | number;
+          transferUnitLabel?: string;
+          /** @default 1 */
+          unitsPerTransferUnit?: string | number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_updateItem[0]": {
     parameters: {
       query?: never;
@@ -25166,6 +28758,84 @@ export interface operations {
       };
     };
   };
+  "ManagementController_transferInventoryBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          sourceLocationId: string;
+          /** Format: uuid */
+          destinationLocationId: string;
+          reason: string;
+          lines: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            quantity: string | number;
+            /** Format: uuid */
+            lotId?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transferInventoryBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          sourceLocationId: string;
+          /** Format: uuid */
+          destinationLocationId: string;
+          reason: string;
+          lines: {
+            /** Format: uuid */
+            inventoryItemId: string;
+            quantity: string | number;
+            /** Format: uuid */
+            lotId?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_resolveInventoryTransfer[0]": {
     parameters: {
       query?: never;
@@ -25184,6 +28854,10 @@ export interface operations {
         "application/json": {
           /** @enum {string} */
           decision: "received" | "canceled";
+          quantityReceived?: string | number;
+          quantityDivergent?: string | number;
+          divergenceReason?: string;
+          evidence?: string[];
           note: string;
         };
       };
@@ -25215,6 +28889,10 @@ export interface operations {
         "application/json": {
           /** @enum {string} */
           decision: "received" | "canceled";
+          quantityReceived?: string | number;
+          quantityDivergent?: string | number;
+          divergenceReason?: string;
+          evidence?: string[];
           note: string;
         };
       };
@@ -25858,6 +29536,9 @@ export interface operations {
       content: {
         "application/json": {
           period: string;
+          /** Format: uuid */
+          locationId?: string;
+          shiftReference?: string;
           notes?: string;
         };
       };
@@ -25887,6 +29568,9 @@ export interface operations {
       content: {
         "application/json": {
           period: string;
+          /** Format: uuid */
+          locationId?: string;
+          shiftReference?: string;
           notes?: string;
         };
       };
@@ -28594,7 +32278,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
         };
       };
     };
@@ -28668,7 +32360,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
         };
       };
     };
@@ -28728,6 +32428,502 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ManagementReportExportContent"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportViews[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportViews"];
+        };
+      };
+    };
+  };
+  "ManagementController_createReportView[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ManagementReportViewInput"];
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportView"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportViews[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportViews"];
+        };
+      };
+    };
+  };
+  "ManagementController_createReportView[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ManagementReportViewInput"];
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportView"];
+        };
+      };
+    };
+  };
+  "ManagementController_deleteReportView[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        viewId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportView[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        viewId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ManagementReportViewInput"];
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportView"];
+        };
+      };
+    };
+  };
+  "ManagementController_deleteReportView[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        viewId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportView[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        viewId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ManagementReportViewInput"];
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportView"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportAlerts[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportAlerts"];
+        };
+      };
+    };
+  };
+  "ManagementController_reportAlerts[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportAlerts"];
+        };
+      };
+    };
+  };
+  "ManagementController_evaluateReportAlerts[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /** @default 3 */
+          dueInDays?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_evaluateReportAlerts[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode: "previous_period" | "previous_year" | "none";
+          /** @default 3 */
+          dueInDays?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportAlert[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        alertId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "open" | "claimed" | "resolved" | "dismissed";
+          /** Format: uuid */
+          assignedToIdentityId?: string | null;
+          /** Format: date-time */
+          dueAt?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportAlert"];
+        };
+      };
+    };
+  };
+  "ManagementController_updateReportAlert[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        alertId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "open" | "claimed" | "resolved" | "dismissed";
+          /** Format: uuid */
+          assignedToIdentityId?: string | null;
+          /** Format: date-time */
+          dueAt?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ManagementReportAlert"];
+        };
+      };
+    };
+  };
+  "ManagementController_backfillReportCosts[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /**
+           * @default previous_period
+           * @enum {string}
+           */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /** @enum {boolean} */
+          allowEstimated: true;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_backfillReportCosts[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /**
+           * @default previous_period
+           * @enum {string}
+           */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /** @enum {boolean} */
+          allowEstimated: true;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
         };
       };
     };
@@ -28795,7 +32991,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
           /**
            * @default in_app
            * @enum {string}
@@ -28881,7 +33085,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
           /**
            * @default in_app
            * @enum {string}
@@ -28971,7 +33183,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
           /**
            * @default in_app
            * @enum {string}
@@ -29062,7 +33282,15 @@ export interface operations {
             | "operations"
             | "profitability"
             | "multiunit"
-            | "quality";
+            | "quality"
+            | "labor"
+            | "reconciliation"
+            | "forecast";
+          /**
+           * @default csv
+           * @enum {string}
+           */
+          format?: "csv" | "pdf" | "xlsx";
           /**
            * @default in_app
            * @enum {string}
@@ -29348,10 +33576,29 @@ export interface operations {
           /** @default true */
           geofenceEnabled?: boolean;
           locationLabel?: string;
+          locationAddress?: string;
           latitude?: number;
           longitude?: number;
           radiusMeters: number;
           accuracyToleranceMeters: number;
+          /** @default 100 */
+          maxLocationAccuracyMeters?: number;
+          /**
+           * @default block
+           * @enum {string}
+           */
+          lowAccuracyPolicy?: "block" | "flag";
+          /** @default [] */
+          additionalLocations?: {
+            /** Format: uuid */
+            id?: string;
+            label: string;
+            address?: string;
+            latitude: number;
+            longitude: number;
+            radiusMeters: number;
+            accuracyToleranceMeters: number;
+          }[];
           /** @default false */
           managerCanView?: boolean;
           /** @default false */
@@ -29360,10 +33607,19 @@ export interface operations {
           antiFraudEnabled?: boolean;
           /** @default true */
           offlineEnabled?: boolean;
+          /** @default 120 */
+          offlineMaxDelayMinutes?: number;
+          /** @default true */
+          offlineRequiresJustification?: boolean;
           /** @default true */
           notificationsEnabled?: boolean;
+          /** @default false */
+          emailAlertsEnabled?: boolean;
           /** @default true */
           managerAlertOnAnomaly?: boolean;
+          /** @default 365 */
+          locationRetentionDays?: number;
+          locationChangeReason?: string;
           /** @default 15 */
           lateToleranceMinutes?: number;
           /** @default 0 */
@@ -29428,10 +33684,29 @@ export interface operations {
           /** @default true */
           geofenceEnabled?: boolean;
           locationLabel?: string;
+          locationAddress?: string;
           latitude?: number;
           longitude?: number;
           radiusMeters: number;
           accuracyToleranceMeters: number;
+          /** @default 100 */
+          maxLocationAccuracyMeters?: number;
+          /**
+           * @default block
+           * @enum {string}
+           */
+          lowAccuracyPolicy?: "block" | "flag";
+          /** @default [] */
+          additionalLocations?: {
+            /** Format: uuid */
+            id?: string;
+            label: string;
+            address?: string;
+            latitude: number;
+            longitude: number;
+            radiusMeters: number;
+            accuracyToleranceMeters: number;
+          }[];
           /** @default false */
           managerCanView?: boolean;
           /** @default false */
@@ -29440,10 +33715,19 @@ export interface operations {
           antiFraudEnabled?: boolean;
           /** @default true */
           offlineEnabled?: boolean;
+          /** @default 120 */
+          offlineMaxDelayMinutes?: number;
+          /** @default true */
+          offlineRequiresJustification?: boolean;
           /** @default true */
           notificationsEnabled?: boolean;
+          /** @default false */
+          emailAlertsEnabled?: boolean;
           /** @default true */
           managerAlertOnAnomaly?: boolean;
+          /** @default 365 */
+          locationRetentionDays?: number;
+          locationChangeReason?: string;
           /** @default 15 */
           lateToleranceMinutes?: number;
           /** @default 0 */
@@ -29461,6 +33745,86 @@ export interface operations {
         };
       };
     };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingSettingsHistory[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingSettingsHistory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingLocationAnomalies[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_timeTrackingLocationAnomalies[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       200: {
         headers: {
@@ -29647,7 +34011,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -29681,7 +34049,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -29783,7 +34155,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** @enum {string} */
           type: "meal" | "temporary";
           /** Format: date-time */
@@ -29819,7 +34195,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** @enum {string} */
           type: "meal" | "temporary";
           /** Format: date-time */
@@ -29856,7 +34236,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -29891,7 +34275,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -29925,7 +34313,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -29959,7 +34351,11 @@ export interface operations {
           longitude: number;
           accuracyMeters?: number;
           deviceId?: string;
+          sessionId?: string;
           mockLocationDetected?: boolean;
+          /** @default false */
+          offline?: boolean;
+          offlineJustification?: string;
           /** Format: date-time */
           capturedAt?: string;
         };
@@ -31065,6 +35461,614 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_overview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_overview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_candidates[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_candidates[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_updateSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          attributionMode: "final_responsible" | "order_creator";
+          /** @enum {string} */
+          transferMode: "move_to_final" | "preserve_origin";
+          /** @enum {string} */
+          serviceBase: "gross" | "net_after_discounts";
+          /** @enum {string} */
+          eligibleTabs: "closed" | "fully_paid";
+          /** @enum {string} */
+          serviceDistribution: "individual_sales" | "equal_pool";
+          serviceTeamShareBasisPoints: number;
+          /** @enum {string} */
+          partnershipBase: "gross" | "net" | "received" | "net_excluding_service";
+          /** @enum {string} */
+          tierApplication: "all_revenue" | "progressive";
+          /** @enum {string} */
+          discountTreatment: "deduct" | "ignore";
+          /** @enum {string} */
+          cancellationTreatment: "exclude" | "deduct";
+          /** @enum {string} */
+          refundTreatment: "deduct" | "informational";
+          /** @enum {string} */
+          periodMode: "calendar_month" | "custom";
+          customPeriodStartDay: number;
+          aggregateAcrossUnits: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_updateSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          attributionMode: "final_responsible" | "order_creator";
+          /** @enum {string} */
+          transferMode: "move_to_final" | "preserve_origin";
+          /** @enum {string} */
+          serviceBase: "gross" | "net_after_discounts";
+          /** @enum {string} */
+          eligibleTabs: "closed" | "fully_paid";
+          /** @enum {string} */
+          serviceDistribution: "individual_sales" | "equal_pool";
+          serviceTeamShareBasisPoints: number;
+          /** @enum {string} */
+          partnershipBase: "gross" | "net" | "received" | "net_excluding_service";
+          /** @enum {string} */
+          tierApplication: "all_revenue" | "progressive";
+          /** @enum {string} */
+          discountTreatment: "deduct" | "ignore";
+          /** @enum {string} */
+          cancellationTreatment: "exclude" | "deduct";
+          /** @enum {string} */
+          refundTreatment: "deduct" | "informational";
+          /** @enum {string} */
+          periodMode: "calendar_month" | "custom";
+          customPeriodStartDay: number;
+          aggregateAcrossUnits: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_updatePartnershipPlan[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          effectiveFrom: string;
+          tiers: {
+            minimumCents: number;
+            maximumCents: number | null;
+            /** @enum {string} */
+            rewardType: "percentage" | "fixed";
+            rewardValue: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_updatePartnershipPlan[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          effectiveFrom: string;
+          tiers: {
+            minimumCents: number;
+            maximumCents: number | null;
+            /** @enum {string} */
+            rewardType: "percentage" | "fixed";
+            rewardValue: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_createLoss[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          tabId: string;
+          /** @enum {string} */
+          type: "unpaid_tab" | "refund" | "chargeback" | "other";
+          reason: string;
+          amountCents?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_createLoss[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          tabId: string;
+          /** @enum {string} */
+          type: "unpaid_tab" | "refund" | "chargeback" | "other";
+          reason: string;
+          amountCents?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_decideLoss[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lossId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "reject" | "reverse";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_decideLoss[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lossId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "reject" | "reverse";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_preview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /** Format: uuid */
+          operationalShiftId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_preview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /** Format: uuid */
+          operationalShiftId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_createSettlement[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /** Format: uuid */
+          operationalShiftId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_createSettlement[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          from: string;
+          to: string;
+          /** Format: uuid */
+          operationalShiftId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_transition[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        settlementId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "pay" | "cancel";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_transition[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        settlementId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "approve" | "pay" | "cancel";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_export[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        settlementId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementSettlementsController_export[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        settlementId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };

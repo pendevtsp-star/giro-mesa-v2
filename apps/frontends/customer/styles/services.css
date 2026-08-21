@@ -22,12 +22,12 @@
   font-size: 12px;
 }
 .service-runtime-status.ready {
-  background: #e2f2e2;
-  color: #245e38;
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
 }
 .service-runtime-status.blocked {
-  background: #fff0e7;
-  color: #8c3e21;
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
 }
 .service-runtime-status > span {
   font-size: 11px;
@@ -43,12 +43,12 @@
   font-size: 12px;
 }
 .public-service-message.success {
-  background: #e2f2e2;
-  color: #245e38;
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
 }
 .public-service-message.warning {
-  background: #fff0e7;
-  color: #8c3e21;
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
 }
 .public-service-card {
   margin-top: 18px;
@@ -56,7 +56,7 @@
   scroll-margin-top: 18px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--gm-surface);
   box-shadow: 0 10px 28px rgba(30, 49, 41, 0.06);
 }
 .public-service-card > .preference-eyebrow {
@@ -85,9 +85,9 @@
   width: 100%;
   min-width: 0;
   padding: 11px 12px;
-  border: 1px solid #cbd2cd;
+  border: 1px solid var(--gm-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--gm-surface);
 }
 .public-service-form textarea {
   resize: vertical;
@@ -104,7 +104,7 @@
   align-items: flex-start;
   gap: 10px;
   border-radius: 10px;
-  background: #f3f0e7;
+  background: var(--gm-surface-soft);
   font-size: 10px;
   font-weight: 500;
 }
@@ -120,7 +120,7 @@
   border: 0;
   border-radius: 11px;
   background: var(--orange);
-  color: #fff;
+  color: var(--gm-on-action);
   font-weight: 800;
   cursor: pointer;
 }
@@ -132,7 +132,7 @@
   margin-top: 24px;
   padding: 22px;
   border-left: 4px solid var(--gold);
-  background: #f3f0e7;
+  background: var(--gm-surface-soft);
 }
 .public-service-dependencies > h2 {
   margin: 0 0 8px;
@@ -142,6 +142,6 @@
 }
 .public-service-dependencies > p {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 12px;
 }

@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The locationId property</summary>
+        public Guid? LocationId { get; set; }
         /// <summary>The notes property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -29,6 +31,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
 #nullable restore
 #else
         public string Period { get; set; }
+#endif
+        /// <summary>The shiftReference property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ShiftReference { get; set; }
+#nullable restore
+#else
+        public string ShiftReference { get; set; }
 #endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Closings.ClosingsPostRequestBody"/> and sets the default values.
@@ -55,8 +65,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "locationId", n => { LocationId = n.GetGuidValue(); } },
                 { "notes", n => { Notes = n.GetStringValue(); } },
                 { "period", n => { Period = n.GetStringValue(); } },
+                { "shiftReference", n => { ShiftReference = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -66,8 +78,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteGuidValue("locationId", LocationId);
             writer.WriteStringValue("notes", Notes);
             writer.WriteStringValue("period", Period);
+            writer.WriteStringValue("shiftReference", ShiftReference);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

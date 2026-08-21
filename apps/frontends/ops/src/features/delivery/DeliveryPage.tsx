@@ -1,10 +1,13 @@
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import {
   Badge,
   Button,
   Card,
   EmptyState,
   Icon,
+  Input,
   Modal,
+  NativeSelect,
   SearchField,
   SegmentedTabs,
 } from "@giromesa/ui";
@@ -825,15 +828,16 @@ function OrderCard({
         {isLate(order) && <span>Atrasado</span>}
         {isScheduled(order) && <span>Agendado</span>}
       </div>
-      <button
+      <Button
         aria-label={`Abrir pedido ${orderId(order)}`}
         className="delivery-order-real__open"
         onClick={onOpen}
         type="button"
+        variant="ghost"
       >
         <strong>#{orderId(order)}</strong>
         <span>{order.customerName ?? "Cliente não informado"}</span>
-      </button>
+      </Button>
       <div className="delivery-order-real__footer">
         <strong>{formatMoney(order.totalCents)}</strong>
         <small>{dateTime(order.scheduledFor ?? order.createdAt)}</small>
@@ -1089,7 +1093,7 @@ function OrderModal({
             <form className="gm-form-stack" onSubmit={onDispatch}>
               <label className="gm-form-field">
                 <span>Entregador disponível</span>
-                <select
+                <NativeSelect
                   onChange={(event) => onCourierChange(event.target.value)}
                   required
                   value={courierId}
@@ -1106,7 +1110,7 @@ function OrderModal({
                         {`${courier.name} · ${courier.reference}`}
                       </option>
                     ))}
-                </select>
+                </NativeSelect>
               </label>
               {couriers.length === 0 && !couriersLoading && (
                 <p className="delivery-notice delivery-notice--error" role="status">
@@ -1169,7 +1173,7 @@ function CourierModal({
       <form className="gm-form-stack" onSubmit={(event) => void submit(event)}>
         <label className="gm-form-field">
           <span>Nome</span>
-          <input
+          <Input
             autoComplete="name"
             minLength={2}
             onChange={(event) => setName(event.target.value)}
@@ -1179,7 +1183,7 @@ function CourierModal({
         </label>
         <label className="gm-form-field">
           <span>Referência operacional</span>
-          <input
+          <Input
             minLength={2}
             onChange={(event) => setReference(event.target.value)}
             required
@@ -1188,7 +1192,7 @@ function CourierModal({
         </label>
         <label className="gm-form-field">
           <span>Telefone (opcional)</span>
-          <input
+          <Input
             autoComplete="tel"
             inputMode="tel"
             onChange={(event) => setPhone(event.target.value)}
@@ -1295,7 +1299,7 @@ function ZoneModal({
       <form className="gm-form-stack" onSubmit={(event) => void submit(event)}>
         <label className="gm-form-field">
           <span>Região declarada</span>
-          <input
+          <Input
             minLength={2}
             onChange={(event) => setName(event.target.value)}
             required
@@ -1305,7 +1309,7 @@ function ZoneModal({
         {radiusEditable && (
           <label className="gm-form-field">
             <span>Raio declarado (km)</span>
-            <input
+            <Input
               min={0.1}
               onChange={(event) => setRadius(event.target.value)}
               required
@@ -1317,7 +1321,7 @@ function ZoneModal({
         )}
         <label className="gm-form-field">
           <span>Taxa (R$)</span>
-          <input
+          <Input
             inputMode="decimal"
             onChange={(event) => setFee(event.target.value)}
             required
@@ -1326,7 +1330,7 @@ function ZoneModal({
         </label>
         <label className="gm-form-field">
           <span>Pedido mínimo (R$)</span>
-          <input
+          <Input
             inputMode="decimal"
             onChange={(event) => setMinimum(event.target.value)}
             required
@@ -1335,7 +1339,7 @@ function ZoneModal({
         </label>
         <label className="gm-form-field">
           <span>Previsão de entrega (min)</span>
-          <input
+          <Input
             max={240}
             min={5}
             onChange={(event) => setEstimatedDeliveryMinutes(event.target.value)}

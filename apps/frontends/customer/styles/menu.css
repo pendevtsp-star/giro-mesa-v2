@@ -13,9 +13,9 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  border: 1px solid #d2d7d3;
+  border: 1px solid var(--gm-border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--gm-surface);
 }
 .search > span:first-child {
   color: var(--green);
@@ -30,7 +30,7 @@
   color: var(--ink);
 }
 .search input::placeholder {
-  color: #909793;
+  color: var(--gm-muted);
 }
 .category-list {
   max-width: 100%;
@@ -54,10 +54,10 @@
   flex: 0 0 auto;
   min-height: 37px;
   padding: 7px 15px;
-  border: 1px solid #d5dad6;
+  border: 1px solid var(--gm-border);
   border-radius: 20px;
-  background: #fff;
-  color: #5f6964;
+  background: var(--gm-surface);
+  color: var(--gm-muted);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -65,7 +65,7 @@
 .category-list button[aria-pressed="true"] {
   border-color: var(--green);
   background: var(--green);
-  color: #fff;
+  color: var(--gm-on-action);
 }
 .menu-content {
   padding: 30px 18px 34px;
@@ -93,7 +93,7 @@
     serif;
 }
 .section-title > span {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 11px;
 }
 .menu-grid {
@@ -108,7 +108,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--gm-surface);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -170,7 +170,7 @@
 }
 .item-description {
   margin-top: 6px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -190,8 +190,8 @@
 .item-meta small {
   padding: 3px 6px;
   border-radius: 10px;
-  background: #edf1e8;
-  color: #55705f;
+  background: var(--gm-surface-soft);
+  color: var(--gm-muted);
   font-size: 8px;
 }
 .sold-out {
@@ -201,7 +201,7 @@
   padding: 5px 8px;
   border-radius: 10px;
   background: #342f2ccc;
-  color: #fff;
+  color: var(--gm-on-action);
   font-size: 9px;
 }
 .menu-card:has(.sold-out) .food-visual {
@@ -211,7 +211,7 @@
 .empty-state {
   padding: 60px 20px;
   text-align: center;
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .empty-state span {
   font-size: 40px;
@@ -249,9 +249,9 @@
 }
 .table-actions button {
   min-height: 55px;
-  border: 1px solid #cfd4cc;
+  border: 1px solid var(--gm-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--gm-surface);
   color: var(--green);
   font-size: 12px;
   font-weight: 750;
@@ -262,8 +262,8 @@
   font-size: 19px;
 }
 .table-actions button:disabled {
-  color: #7c8580;
-  background: #eef0ed;
+  color: var(--gm-muted);
+  background: var(--gm-surface-soft);
   cursor: wait;
 }
 .public-services {
@@ -271,7 +271,7 @@
   padding: 26px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--gm-surface);
 }
 .public-services-heading {
   margin-bottom: 18px;
@@ -302,10 +302,10 @@
   border-radius: 13px;
 }
 .service-card-locked {
-  background: #f5f3ed;
+  background: var(--gm-surface-soft);
 }
 .service-card-public {
-  background: #eaf2e5;
+  background: var(--gm-success-soft);
   border-color: rgba(36, 94, 56, 0.22);
 }
 .service-state {
@@ -321,7 +321,7 @@
 }
 .service-card-public .service-state {
   background: #d7e8d2;
-  color: #245e38;
+  color: var(--gm-success);
 }
 .service-card-title {
   margin: 11px 0 5px;
@@ -331,7 +331,7 @@
 }
 .service-card-copy {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .service-card-action {
@@ -391,7 +391,7 @@
     serif;
 }
 .privacy p {
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .privacy a {
   color: var(--green);

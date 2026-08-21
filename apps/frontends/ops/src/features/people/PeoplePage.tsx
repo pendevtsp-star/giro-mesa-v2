@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import {
   Badge,
   Button,
@@ -5,9 +6,12 @@ import {
   DataTable,
   EmptyState,
   Icon,
+  Input,
   Modal,
+  NativeSelect,
   SearchField,
   SegmentedTabs,
+  Textarea,
   Toast,
 } from "@giromesa/ui";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -25,9 +29,12 @@ import {
   parsePersonTimeline,
   parseTimeTrackingReport,
   RemoteGate,
+  type TimeTrackingLocation,
   type TimeTrackingReport,
   useRemote,
 } from "../../management.shared";
+import { TimeTrackingAuditPanel } from "./TimeTrackingAuditPanel";
+import { TimeTrackingLocationControls } from "./TimeTrackingLocationControls";
 
 function workedMinutes(
   entry: { id: string; clockedInAt: string; clockedOutAt: string | null },
@@ -71,6 +78,10 @@ function anomalyLabel(code: string) {
       mock_location: "Localização simulada",
       clock_skew: "Relógio do dispositivo divergente",
       missing_device: "Dispositivo não identificado",
+      missing_session: "Sessão não identificada",
+      low_location_accuracy: "Precisão de GPS insuficiente",
+      missing_location_accuracy: "Precisão de GPS ausente",
+      offline_punch: "Marcação offline",
       pending_correction: "Correção pendente",
     }[code] ?? code
   );
@@ -208,16 +219,25 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const [trackingMode, setTrackingMode] = useState<"off" | "all" | "selected">("off");
   const [geofenceEnabled, setGeofenceEnabled] = useState(true);
   const [locationLabel, setLocationLabel] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [radiusMeters, setRadiusMeters] = useState("100");
   const [accuracyToleranceMeters, setAccuracyToleranceMeters] = useState("50");
+  const [maxLocationAccuracyMeters, setMaxLocationAccuracyMeters] = useState("100");
+  const [lowAccuracyPolicy, setLowAccuracyPolicy] = useState<"block" | "flag">("block");
+  const [additionalLocations, setAdditionalLocations] = useState<TimeTrackingLocation[]>([]);
   const [managerCanView, setManagerCanView] = useState(false);
   const [financeCanView, setFinanceCanView] = useState(false);
   const [antiFraudEnabled, setAntiFraudEnabled] = useState(true);
   const [offlineEnabled, setOfflineEnabled] = useState(true);
+  const [offlineMaxDelayMinutes, setOfflineMaxDelayMinutes] = useState("120");
+  const [offlineRequiresJustification, setOfflineRequiresJustification] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
   const [managerAlertOnAnomaly, setManagerAlertOnAnomaly] = useState(true);
+  const [locationRetentionDays, setLocationRetentionDays] = useState("365");
+  const [locationChangeReason, setLocationChangeReason] = useState("");
   const [lateToleranceMinutes, setLateToleranceMinutes] = useState("15");
   const [minimumBreakMinutes, setMinimumBreakMinutes] = useState("0");
   const [maxOvertimeMinutes, setMaxOvertimeMinutes] = useState("120");
@@ -260,16 +280,25 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     setTrackingMode(settings.mode);
     setGeofenceEnabled(settings.geofenceEnabled);
     setLocationLabel(settings.locationLabel ?? "");
+    setLocationAddress(settings.locationAddress ?? "");
     setLatitude(settings.latitude?.toString() ?? "");
     setLongitude(settings.longitude?.toString() ?? "");
     setRadiusMeters(String(settings.radiusMeters));
     setAccuracyToleranceMeters(String(settings.accuracyToleranceMeters));
+    setMaxLocationAccuracyMeters(String(settings.maxLocationAccuracyMeters));
+    setLowAccuracyPolicy(settings.lowAccuracyPolicy);
+    setAdditionalLocations(settings.additionalLocations);
     setManagerCanView(settings.managerCanView);
     setFinanceCanView(settings.financeCanView);
     setAntiFraudEnabled(settings.antiFraudEnabled);
     setOfflineEnabled(settings.offlineEnabled);
+    setOfflineMaxDelayMinutes(String(settings.offlineMaxDelayMinutes));
+    setOfflineRequiresJustification(settings.offlineRequiresJustification);
     setNotificationsEnabled(settings.notificationsEnabled);
+    setEmailAlertsEnabled(settings.emailAlertsEnabled);
     setManagerAlertOnAnomaly(settings.managerAlertOnAnomaly);
+    setLocationRetentionDays(String(settings.locationRetentionDays));
+    setLocationChangeReason("");
     setLateToleranceMinutes(String(settings.lateToleranceMinutes));
     setMinimumBreakMinutes(String(settings.minimumBreakMinutes));
     setMaxOvertimeMinutes(String(settings.maxOvertimeMinutes));
@@ -633,16 +662,28 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
         mode: trackingMode,
         geofenceEnabled,
         locationLabel: locationLabel.trim() || undefined,
+        locationAddress: locationAddress.trim() || undefined,
         latitude: latitude ? Number(latitude) : undefined,
         longitude: longitude ? Number(longitude) : undefined,
         radiusMeters: Number(radiusMeters),
         accuracyToleranceMeters: Number(accuracyToleranceMeters),
+        maxLocationAccuracyMeters: Number(maxLocationAccuracyMeters),
+        lowAccuracyPolicy,
+        additionalLocations: additionalLocations.map((location) => ({
+          ...location,
+          address: location.address?.trim() || undefined,
+        })),
         managerCanView,
         financeCanView,
         antiFraudEnabled,
         offlineEnabled,
+        offlineMaxDelayMinutes: Number(offlineMaxDelayMinutes),
+        offlineRequiresJustification,
         notificationsEnabled,
+        emailAlertsEnabled,
         managerAlertOnAnomaly,
+        locationRetentionDays: Number(locationRetentionDays),
+        locationChangeReason: locationChangeReason.trim() || undefined,
         lateToleranceMinutes: Number(lateToleranceMinutes),
         minimumBreakMinutes: Number(minimumBreakMinutes),
         maxOvertimeMinutes: Number(maxOvertimeMinutes),
@@ -726,8 +767,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       setActionId("");
     }
   }
-  function downloadReport() {
+  function downloadReport(format: "csv" | "json") {
     if (!report) return;
+    if (format === "json") {
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `ponto-${report.from}-${report.to}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
     const header =
       "funcionario,data,entrada,saida,horas_trabalhadas,pausas,horas_extras,valor_hora, custo_estimado,anomalias";
     const lines = report.rows.map((row) =>
@@ -1129,18 +1180,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               >
                 <label>
                   Aplicação
-                  <select
+                  <NativeSelect
                     value={trackingMode}
                     onChange={(event) => setTrackingMode(event.target.value as typeof trackingMode)}
                   >
                     <option value="off">Desativado</option>
                     <option value="all">Todos os funcionários ativos</option>
                     <option value="selected">Somente selecionados</option>
-                  </select>
+                  </NativeSelect>
                 </label>
                 <label>
                   Local do restaurante
-                  <input
+                  <Input
                     value={locationLabel}
                     onChange={(event) => setLocationLabel(event.target.value)}
                     placeholder="Ex.: Unidade Centro"
@@ -1148,7 +1199,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Latitude
-                  <input
+                  <Input
                     inputMode="decimal"
                     min={-90}
                     max={90}
@@ -1161,7 +1212,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Longitude
-                  <input
+                  <Input
                     inputMode="decimal"
                     min={-180}
                     max={180}
@@ -1174,7 +1225,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Raio permitido (m)
-                  <input
+                  <Input
                     min={25}
                     max={5000}
                     required
@@ -1185,7 +1236,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Tolerância GPS (m)
-                  <input
+                  <Input
                     min={0}
                     max={500}
                     required
@@ -1194,6 +1245,49 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     onChange={(event) => setAccuracyToleranceMeters(event.target.value)}
                   />
                 </label>
+                <label>
+                  Precisão máxima aceita (m)
+                  <Input
+                    min={5}
+                    max={2000}
+                    required
+                    type="number"
+                    value={maxLocationAccuracyMeters}
+                    onChange={(event) => setMaxLocationAccuracyMeters(event.target.value)}
+                  />
+                </label>
+                <label>
+                  GPS acima do limite
+                  <NativeSelect
+                    value={lowAccuracyPolicy}
+                    onChange={(event) =>
+                      setLowAccuracyPolicy(event.target.value as typeof lowAccuracyPolicy)
+                    }
+                  >
+                    <option value="block">Bloquear marcação</option>
+                    <option value="flag">Registrar e sinalizar para revisão</option>
+                  </NativeSelect>
+                </label>
+                <TimeTrackingLocationControls
+                  locations={additionalLocations}
+                  maxLocationAccuracyMeters={maxLocationAccuracyMeters}
+                  onLocationsChange={setAdditionalLocations}
+                  onPrimaryChange={(next) => {
+                    if (next.address !== undefined) setLocationAddress(next.address);
+                    if (next.latitude !== undefined) setLatitude(next.latitude);
+                    if (next.longitude !== undefined) setLongitude(next.longitude);
+                    if (next.radiusMeters !== undefined) setRadiusMeters(next.radiusMeters);
+                    if (next.accuracyToleranceMeters !== undefined)
+                      setAccuracyToleranceMeters(next.accuracyToleranceMeters);
+                  }}
+                  primary={{
+                    address: locationAddress,
+                    latitude,
+                    longitude,
+                    radiusMeters,
+                    accuracyToleranceMeters,
+                  }}
+                />
                 <label className="action-form__check">
                   <input
                     checked={geofenceEnabled}
@@ -1234,6 +1328,24 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   />
                   Permitir marcação offline
                 </label>
+                <label>
+                  Prazo máximo offline (min)
+                  <Input
+                    min={5}
+                    max={2880}
+                    type="number"
+                    value={offlineMaxDelayMinutes}
+                    onChange={(event) => setOfflineMaxDelayMinutes(event.target.value)}
+                  />
+                </label>
+                <label className="action-form__check">
+                  <input
+                    checked={offlineRequiresJustification}
+                    onChange={(event) => setOfflineRequiresJustification(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Exigir justificativa na marcação offline
+                </label>
                 <label className="action-form__check">
                   <input
                     checked={notificationsEnabled}
@@ -1241,6 +1353,14 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     type="checkbox"
                   />
                   Exibir alertas automáticos
+                </label>
+                <label className="action-form__check">
+                  <input
+                    checked={emailAlertsEnabled}
+                    onChange={(event) => setEmailAlertsEnabled(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Enviar alertas por e-mail quando o provedor estiver configurado
                 </label>
                 <label className="action-form__check">
                   <input
@@ -1252,7 +1372,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Tolerância de atraso (min)
-                  <input
+                  <Input
                     min={0}
                     max={120}
                     type="number"
@@ -1262,7 +1382,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Pausa mínima (min)
-                  <input
+                  <Input
                     min={0}
                     max={1440}
                     type="number"
@@ -1272,7 +1392,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Limite de hora extra (min)
-                  <input
+                  <Input
                     min={0}
                     max={720}
                     type="number"
@@ -1282,7 +1402,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Alerta de turno longo (min)
-                  <input
+                  <Input
                     min={60}
                     max={1440}
                     type="number"
@@ -1292,7 +1412,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Lembrete antes da escala (min)
-                  <input
+                  <Input
                     min={0}
                     max={240}
                     type="number"
@@ -1302,13 +1422,35 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Lembrete após a escala (min)
-                  <input
+                  <Input
                     min={0}
                     max={240}
                     type="number"
                     value={reminderAfterShiftMinutes}
                     onChange={(event) => setReminderAfterShiftMinutes(event.target.value)}
                   />
+                </label>
+                <label>
+                  Retenção de localização (dias)
+                  <Input
+                    min={30}
+                    max={1825}
+                    type="number"
+                    value={locationRetentionDays}
+                    onChange={(event) => setLocationRetentionDays(event.target.value)}
+                  />
+                </label>
+                <label className="action-form__wide">
+                  Motivo da alteração de localização
+                  <Textarea
+                    maxLength={1000}
+                    value={locationChangeReason}
+                    onChange={(event) => setLocationChangeReason(event.target.value)}
+                    placeholder="Ex.: mudança de endereço da unidade ou ajuste de raio após teste presencial."
+                  />
+                  <small className="form-hint">
+                    Obrigatório ao alterar um local já configurado; fica no histórico de auditoria.
+                  </small>
                 </label>
                 {trackingMode === "selected" && (
                   <fieldset className="action-form__wide">
@@ -1337,6 +1479,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   {actionId === "tracking-settings" ? "Salvando…" : "Salvar política"}
                 </Button>
               </form>
+              <TimeTrackingAuditPanel scope={scope} />
             </details>
           )}
           {section === "settings" && !canConfigureTracking && (
@@ -1364,7 +1507,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               <form className="action-form" onSubmit={(event) => void createPerson(event)}>
                 <label>
                   Nome
-                  <input
+                  <Input
                     minLength={2}
                     onChange={(event) => setPersonName(event.target.value)}
                     required
@@ -1373,7 +1516,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Função
-                  <input
+                  <Input
                     minLength={1}
                     onChange={(event) => setRoleLabel(event.target.value)}
                     placeholder="Ex.: Garçom"
@@ -1383,14 +1526,14 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Código interno
-                  <input
+                  <Input
                     onChange={(event) => setEmploymentCode(event.target.value)}
                     value={employmentCode}
                   />
                 </label>
                 <label>
                   Conta de acesso
-                  <select
+                  <NativeSelect
                     onChange={(event) => setPersonIdentityId(event.target.value)}
                     value={personIdentityId}
                   >
@@ -1405,7 +1548,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                           {account.displayName} · {account.email}
                         </option>
                       ))}
-                  </select>
+                  </NativeSelect>
                 </label>
                 <Button
                   disabled={
@@ -1434,7 +1577,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   <form className="action-form" onSubmit={(event) => void createSchedule(event)}>
                     <label className="action-form__wide">
                       Pessoa
-                      <select
+                      <NativeSelect
                         onChange={(event) => setSchedulePersonId(event.target.value)}
                         required
                         value={schedulePersonId}
@@ -1447,11 +1590,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                               {person.name}
                             </option>
                           ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <label>
                       Início
-                      <input
+                      <Input
                         onChange={(event) => setScheduleStart(event.target.value)}
                         required
                         type="datetime-local"
@@ -1460,7 +1603,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label>
                       Fim
-                      <input
+                      <Input
                         onChange={(event) => setScheduleEnd(event.target.value)}
                         required
                         type="datetime-local"
@@ -1469,7 +1612,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label>
                       Intervalo (min)
-                      <input
+                      <Input
                         max={1440}
                         min={0}
                         onChange={(event) => setBreakMinutes(event.target.value)}
@@ -1480,7 +1623,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="action-form__wide">
                       Observação
-                      <input
+                      <Input
                         maxLength={1000}
                         onChange={(event) => setScheduleNotes(event.target.value)}
                         placeholder="Opcional"
@@ -1513,7 +1656,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   <form className="action-form" onSubmit={(event) => void createTimeEntry(event)}>
                     <label>
                       Pessoa
-                      <select
+                      <NativeSelect
                         onChange={(event) => setTimePersonId(event.target.value)}
                         required
                         value={timePersonId}
@@ -1526,11 +1669,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                               {person.name}
                             </option>
                           ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <label>
                       Entrada
-                      <input
+                      <Input
                         onChange={(event) => setClockedInAt(event.target.value)}
                         required
                         type="datetime-local"
@@ -1672,7 +1815,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               >
                 <label>
                   De
-                  <input
+                  <Input
                     type="date"
                     required
                     value={reportFrom}
@@ -1681,7 +1824,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Até
-                  <input
+                  <Input
                     type="date"
                     required
                     value={reportTo}
@@ -1692,9 +1835,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   {actionId === "time-report" ? "Carregando…" : "Consultar horas"}
                 </Button>
                 {report && (
-                  <Button onClick={downloadReport} type="button" variant="secondary">
-                    Exportar CSV
-                  </Button>
+                  <>
+                    <Button onClick={() => downloadReport("csv")} type="button" variant="secondary">
+                      Exportar CSV
+                    </Button>
+                    <Button
+                      onClick={() => downloadReport("json")}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Exportar JSON
+                    </Button>
+                  </>
                 )}
                 {scope.profileId === "owner" && (
                   <Button
@@ -1931,7 +2083,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   placeholder="Buscar por nome ou função"
                   value={peopleQuery}
                 />
-                <select
+                <NativeSelect
                   aria-label="Filtrar situação da pessoa"
                   className="gm-control gm-control--compact"
                   onChange={(event) => {
@@ -1945,8 +2097,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   <option value="inactive">Inativas</option>
                   <option value="unlinked">Sem conta vinculada</option>
                   <option value="on_shift">Em turno agora</option>
-                </select>
-                <select
+                </NativeSelect>
+                <NativeSelect
                   aria-label="Filtrar por função"
                   className="gm-control gm-control--compact"
                   onChange={(event) => {
@@ -1963,7 +2115,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         {role}
                       </option>
                     ))}
-                </select>
+                </NativeSelect>
               </div>
               {data.canManage && batchPersonIds.length > 0 && (
                 <section className="people-batch-bar" aria-label="Ações em lote">
@@ -2124,7 +2276,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     >
                       <label>
                         Nome da regra
-                        <input
+                        <Input
                           maxLength={120}
                           onChange={(event) => setCommissionRuleName(event.target.value)}
                           placeholder="Ex.: Venda do salão"
@@ -2134,7 +2286,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       </label>
                       <label>
                         Percentual (%)
-                        <input
+                        <Input
                           max={100}
                           min={0}
                           onChange={(event) => setCommissionRate(event.target.value)}
@@ -2162,7 +2314,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     >
                       <label>
                         Pessoa
-                        <select
+                        <NativeSelect
                           onChange={(event) => setCommissionPersonId(event.target.value)}
                           required
                           value={commissionPersonId}
@@ -2175,11 +2327,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                                 {person.name}
                               </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label>
                         Regra
-                        <select
+                        <NativeSelect
                           onChange={(event) => setCommissionRuleId(event.target.value)}
                           value={commissionRuleId}
                         >
@@ -2191,11 +2343,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                                 {rule.name} · {(rule.basisPoints / 100).toFixed(2)}%
                               </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label>
                         Base da comissão (R$)
-                        <input
+                        <Input
                           max={21474836.47}
                           min={0}
                           onChange={(event) => setCommissionBase(event.target.value)}
@@ -2208,7 +2360,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       {!commissionRuleId && (
                         <label>
                           Comissão manual (R$)
-                          <input
+                          <Input
                             max={21474836.47}
                             min={0}
                             onChange={(event) => setCommissionAmount(event.target.value)}
@@ -2382,7 +2534,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 <div className="action-form">
                   <label>
                     Início
-                    <input
+                    <Input
                       required
                       type="datetime-local"
                       value={scheduleStart}
@@ -2394,7 +2546,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Fim
-                    <input
+                    <Input
                       required
                       type="datetime-local"
                       value={scheduleEnd}
@@ -2406,7 +2558,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Intervalo (min)
-                    <input
+                    <Input
                       min={0}
                       max={1440}
                       type="number"
@@ -2419,7 +2571,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Observação
-                    <input
+                    <Input
                       maxLength={1000}
                       value={scheduleNotes}
                       onChange={(event) => {
@@ -2578,7 +2730,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
             <form className="action-form" onSubmit={(event) => void saveSchedule(event)}>
               <label>
                 Início
-                <input
+                <Input
                   required
                   type="datetime-local"
                   value={scheduleStart}
@@ -2587,7 +2739,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </label>
               <label>
                 Fim
-                <input
+                <Input
                   required
                   type="datetime-local"
                   value={scheduleEnd}
@@ -2596,7 +2748,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </label>
               <label>
                 Intervalo (min)
-                <input
+                <Input
                   min={0}
                   max={1440}
                   required
@@ -2607,7 +2759,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </label>
               <label className="action-form__wide">
                 Observação
-                <input
+                <Input
                   maxLength={1000}
                   value={scheduleNotes}
                   onChange={(event) => setScheduleNotes(event.target.value)}
@@ -2664,7 +2816,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   >
                     <label>
                       Nome
-                      <input
+                      <Input
                         minLength={2}
                         onChange={(event) => setEditPersonName(event.target.value)}
                         required
@@ -2673,7 +2825,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label>
                       Função
-                      <input
+                      <Input
                         minLength={1}
                         onChange={(event) => setEditPersonRole(event.target.value)}
                         required
@@ -2682,7 +2834,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label>
                       Código interno
-                      <input
+                      <Input
                         maxLength={80}
                         onChange={(event) => setEditPersonCode(event.target.value)}
                         value={editPersonCode}
@@ -2690,7 +2842,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label>
                       Valor por hora (R$)
-                      <input
+                      <Input
                         max={21474836.47}
                         min={0}
                         onChange={(event) => setEditPersonHourlyRate(event.target.value)}
@@ -2701,7 +2853,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="action-form__wide">
                       Conta de acesso
-                      <select
+                      <NativeSelect
                         onChange={(event) => setEditPersonIdentityId(event.target.value)}
                         value={editPersonIdentityId}
                       >
@@ -2717,7 +2869,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                               {account.displayName} · {account.email}
                             </option>
                           ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <div className="people-person-edit__actions action-form__wide">
                       <Button disabled={actionId === `person-${selectedPersonId}`} type="submit">
@@ -2935,7 +3087,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               )}
               <label className="gm-field">
                 {confirmationNoteRequired(confirmation) ? "Motivo" : "Motivo opcional"}
-                <textarea
+                <Textarea
                   className="gm-control gm-control--textarea"
                   maxLength={1000}
                   minLength={confirmation?.kind === "commission" ? 2 : 5}

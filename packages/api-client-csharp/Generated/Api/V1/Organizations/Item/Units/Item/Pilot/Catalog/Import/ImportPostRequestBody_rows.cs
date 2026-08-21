@@ -182,6 +182,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
 #else
         public List<Guid?> StationIds { get; set; }
 #endif
+        /// <summary>The stationRouting property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_stationRouting>? StationRouting { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_stationRouting> StationRouting { get; set; }
+#endif
         /// <summary>The suggestedProductIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -259,6 +267,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
                 { "sortOrder", n => { SortOrder = n.GetIntValue(); } },
                 { "spiciness", n => { Spiciness = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows.ImportPostRequestBody_rows_spiciness>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows.ImportPostRequestBody_rows_spiciness.CreateFromDiscriminatorValue); } },
                 { "stationIds", n => { StationIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
+                { "stationRouting", n => { StationRouting = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_stationRouting>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_stationRouting.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "suggestedProductIds", n => { SuggestedProductIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "tags", n => { Tags = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
                 { "translations", n => { Translations = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_translations>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_translations.CreateFromDiscriminatorValue); } },
@@ -298,6 +307,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
             writer.WriteIntValue("sortOrder", SortOrder);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows.ImportPostRequestBody_rows_spiciness>("spiciness", Spiciness);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("stationIds", StationIds);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_stationRouting>("stationRouting", StationRouting);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("suggestedProductIds", SuggestedProductIds);
             writer.WriteCollectionOfPrimitiveValues<string>("tags", Tags);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Import.ImportPostRequestBody_rows_translations>("translations", Translations);

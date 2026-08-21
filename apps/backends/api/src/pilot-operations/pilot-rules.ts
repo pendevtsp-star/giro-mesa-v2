@@ -66,7 +66,7 @@ export function initialKdsCourseDispatch(serviceMode: KdsServiceMode, course: Kd
 }
 
 export function assertKdsOrderHandoff(
-  target: "expedition" | "served",
+  target: "expedition" | "runner" | "served",
   tickets: readonly {
     status: KdsState;
     handedOffAt: Date | null;
@@ -303,6 +303,7 @@ export function tabTotals(
   items: readonly { grossCents: number; discountCents: number; canceled?: boolean }[],
   serviceChargeBasisPoints: number,
   tipCents: number,
+  serviceBase: "gross" | "net_after_discounts" = "net_after_discounts",
 ) {
   if (
     !Number.isSafeInteger(serviceChargeBasisPoints) ||
@@ -321,7 +322,10 @@ export function tabTotals(
   const subtotalCents = active.reduce((sum, item) => sum + item.grossCents, 0);
   const discountCents = active.reduce((sum, item) => sum + item.discountCents, 0);
   const netBeforeCharges = subtotalCents - discountCents;
-  const serviceChargeCents = Math.floor((netBeforeCharges * serviceChargeBasisPoints) / 10_000);
+  const serviceChargeCents = Math.floor(
+    ((serviceBase === "gross" ? subtotalCents : netBeforeCharges) * serviceChargeBasisPoints) /
+      10_000,
+  );
   const totalCents = netBeforeCharges + serviceChargeCents + tipCents;
   if (
     ![subtotalCents, discountCents, serviceChargeCents, totalCents].every(

@@ -20,12 +20,14 @@ import {
   managementInventoryCountSchedules,
   managementInventoryEventLines,
   managementInventoryEvents,
+  managementInventoryIssueRoutes,
   managementInventoryItems,
   managementInventoryLots,
   managementInventoryMovements,
   managementInventoryReservations,
   managementInventoryReviewRequests,
   managementInventorySupplierAliases,
+  managementInventoryTransferReceipts,
   managementInventoryTransfers,
   managementNfeImportLines,
   managementNfeImports,
@@ -48,8 +50,10 @@ import {
   managementReconciliationImports,
   managementReturnableCustodyMovements,
   managementReturnableIncidents,
+  managementReturnableSupplierExchanges,
   managementSchedules,
   managementStockBalances,
+  managementStockLocationItemSettings,
   managementStockLocations,
   managementSupplierInvoiceLines,
   managementSupplierInvoices,
@@ -66,6 +70,7 @@ import {
   posCatalogCategories,
   posOrderItems,
   posOrders,
+  posProductionStations,
   posProducts,
   posTabPayments,
   posTabs,
@@ -144,6 +149,7 @@ import type {
   InventoryAssetUpdateInput,
   InventoryClosingInput,
   InventoryEventInput,
+  InventoryIssueRouteInput,
   InventoryItemInput,
   InventoryItemUpdateInput,
   InventoryLotInput,
@@ -151,6 +157,7 @@ import type {
   InventoryReservationInput,
   InventoryReservationResolutionInput,
   InventoryReviewInput,
+  InventoryTransferBatchInput,
   InventoryTransferInput,
   InventoryTransferResolutionInput,
   NfeImportConfirmInput,
@@ -189,6 +196,7 @@ import type {
   ReturnableIncidentInput,
   ReturnableIncidentReviewInput,
   ReturnableSupplierExchangeInput,
+  ReturnableSupplierExchangeResolutionInput,
   ScheduleBatchInput,
   ScheduleCancelInput,
   ScheduleInput,
@@ -197,6 +205,7 @@ import type {
   SelfClockInInput,
   SelfClockOutInput,
   StockLocationInput,
+  StockLocationItemSettingInput,
   StockLocationUpdateInput,
   SupplierInput,
   SupplierInvoiceInput,
@@ -247,16 +256,32 @@ const DEFAULT_TIME_TRACKING_SETTINGS = {
   mode: "off" as const,
   geofenceEnabled: true,
   locationLabel: null,
+  locationAddress: null,
   latitude: null,
   longitude: null,
   radiusMeters: 100,
   accuracyToleranceMeters: 50,
+  maxLocationAccuracyMeters: 100,
+  lowAccuracyPolicy: "block" as const,
+  additionalLocations: [] as Array<{
+    id: string;
+    label: string;
+    address?: string;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    accuracyToleranceMeters: number;
+  }>,
   managerCanView: false,
   financeCanView: false,
   antiFraudEnabled: true,
   offlineEnabled: true,
+  offlineMaxDelayMinutes: 120,
+  offlineRequiresJustification: true,
   notificationsEnabled: true,
+  emailAlertsEnabled: false,
   managerAlertOnAnomaly: true,
+  locationRetentionDays: 365,
   lateToleranceMinutes: 15,
   minimumBreakMinutes: 0,
   maxOvertimeMinutes: 120,
@@ -264,6 +289,57 @@ const DEFAULT_TIME_TRACKING_SETTINGS = {
   reminderBeforeShiftMinutes: 15,
   reminderAfterShiftMinutes: 15,
 };
+
+function timeTrackingSettingsWithoutCoordinates<
+  T extends {
+    locationAddress: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    additionalLocations: unknown[];
+  },
+>(settings: T) {
+  return {
+    ...settings,
+    locationAddress: null,
+    latitude: null,
+    longitude: null,
+    additionalLocations: [] as T["additionalLocations"],
+  };
+}
+
+export function timeTrackingEntryForRead<
+  T extends {
+    id: string;
+    personId: string;
+    clockedInAt: Date;
+    clockedOutAt: Date | null;
+    source: string;
+  },
+>(entry: T) {
+  return {
+    id: entry.id,
+    personId: entry.personId,
+    clockedInAt: entry.clockedInAt,
+    clockedOutAt: entry.clockedOutAt,
+    source: entry.source,
+  };
+}
+
+function timeTrackingBreakForRead(entry: {
+  id: string;
+  timeEntryId: string;
+  type: "meal" | "temporary";
+  startedAt: Date;
+  endedAt: Date | null;
+}) {
+  return {
+    id: entry.id,
+    timeEntryId: entry.timeEntryId,
+    type: entry.type,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+  };
+}
 
 export function assertTimeTrackingReadPolicy(
   role: (typeof TIME_TRACKING_READ_ROLES)[number],
@@ -444,6 +520,11 @@ export function summarizeTimeEntries(
       if (flags.includes("mock_location")) anomalyCodes.push("mock_location");
       if (flags.includes("clock_skew")) anomalyCodes.push("clock_skew");
       if (flags.includes("missing_device")) anomalyCodes.push("missing_device");
+      if (flags.includes("missing_session")) anomalyCodes.push("missing_session");
+      if (flags.includes("low_location_accuracy")) anomalyCodes.push("low_location_accuracy");
+      if (flags.includes("missing_location_accuracy"))
+        anomalyCodes.push("missing_location_accuracy");
+      if (flags.includes("offline_punch")) anomalyCodes.push("offline_punch");
     }
     if (
       entries.some(
@@ -544,9 +625,8 @@ export function buildTimeTrackingAlerts(
   return alerts;
 }
 
-function resolveCapturedAt(value?: string) {
-  const now = Date.now();
-  if (!value) return new Date(now);
+function parseCapturedAt(value: string | undefined) {
+  if (!value) return null;
   const capturedAt = new Date(value);
   if (!Number.isFinite(capturedAt.getTime())) {
     throw new BadRequestException({
@@ -554,13 +634,51 @@ function resolveCapturedAt(value?: string) {
       message: "O horário capturado pelo dispositivo é inválido.",
     });
   }
-  if (capturedAt.getTime() > now + 5 * 60_000 || capturedAt.getTime() < now - 48 * 60 * 60_000) {
-    throw new BadRequestException({
-      code: "CAPTURED_AT_OUT_OF_RANGE",
-      message: "O horário offline precisa estar entre agora e as últimas 48 horas.",
+  return capturedAt;
+}
+
+function resolvePunchTiming(
+  input: PunchLocationInput & { capturedAt?: string },
+  settings: Pick<
+    typeof DEFAULT_TIME_TRACKING_SETTINGS,
+    "offlineEnabled" | "offlineMaxDelayMinutes" | "offlineRequiresJustification"
+  >,
+  serverAt = new Date(),
+) {
+  const capturedAt = parseCapturedAt(input.capturedAt) ?? serverAt;
+  if (!input.offline) {
+    if (capturedAt.getTime() > serverAt.getTime() + 5 * 60_000) {
+      throw new BadRequestException({
+        code: "CAPTURED_AT_OUT_OF_RANGE",
+        message: "O relógio do dispositivo está adiantado demais para registrar o ponto.",
+      });
+    }
+    return { occurredAt: serverAt, capturedAt, serverAt };
+  }
+  if (!settings.offlineEnabled) {
+    throw new ForbiddenException({
+      code: "TIME_TRACKING_OFFLINE_DISABLED",
+      message: "Marcações offline estão desativadas nesta unidade.",
     });
   }
-  return capturedAt;
+  if (settings.offlineRequiresJustification && !input.offlineJustification?.trim()) {
+    throw new BadRequestException({
+      code: "TIME_TRACKING_OFFLINE_JUSTIFICATION_REQUIRED",
+      message: "Informe a justificativa da marcação offline.",
+    });
+  }
+  const delayMilliseconds = serverAt.getTime() - capturedAt.getTime();
+  if (
+    delayMilliseconds < -5 * 60_000 ||
+    delayMilliseconds > settings.offlineMaxDelayMinutes * 60_000
+  ) {
+    throw new BadRequestException({
+      code: "TIME_TRACKING_OFFLINE_DELAY_EXCEEDED",
+      message:
+        "A marcação offline ultrapassou o prazo configurado. Solicite uma correção ao proprietário.",
+    });
+  }
+  return { occurredAt: capturedAt, capturedAt, serverAt };
 }
 
 function punchMetadata(
@@ -568,20 +686,28 @@ function punchMetadata(
   input: PunchLocationInput,
   context: PunchContext,
   antiFraudEnabled: boolean,
+  serverAt = new Date(),
+  extraFlags: string[] = [],
 ) {
-  const serverAt = new Date();
-  const flags: string[] = [];
+  const flags = [...extraFlags];
   if (antiFraudEnabled && input.mockLocationDetected) flags.push("mock_location");
   if (antiFraudEnabled && !input.deviceId) flags.push("missing_device");
-  if (antiFraudEnabled && Math.abs(serverAt.getTime() - capturedAt.getTime()) > 2 * 60_000) {
+  if (antiFraudEnabled && !input.sessionId) flags.push("missing_session");
+  if (input.offline) flags.push("offline_punch");
+  if (
+    antiFraudEnabled &&
+    !input.offline &&
+    Math.abs(serverAt.getTime() - capturedAt.getTime()) > 2 * 60_000
+  ) {
     flags.push("clock_skew");
   }
   return {
     serverAt,
     deviceId: input.deviceId,
+    sessionId: input.sessionId,
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
-    flags,
+    flags: [...new Set(flags)],
   };
 }
 
@@ -781,6 +907,11 @@ type ReportFamilySource = {
     revenueCents: number;
     averageTicketCents: number | null;
     changePercent: number | null;
+    rank: number;
+    operatingDays: number;
+    revenuePerOperatingDayCents: number | null;
+    organizationRevenueSharePercent: number | null;
+    sameStoreChangePercent: number | null;
   }> | null;
   quality?: {
     scorePercent: number;
@@ -1192,28 +1323,83 @@ export class ManagementService {
       | typeof managementTimeTrackingSettings.$inferSelect,
     location: PunchLocationInput,
   ) {
-    if (!settings.geofenceEnabled) return;
-    if (settings.latitude === null || settings.longitude === null) {
+    if (!settings.geofenceEnabled) return { flags: [], locationLabel: null };
+    const configuredLocations = [
+      settings.latitude === null || settings.longitude === null
+        ? null
+        : {
+            label: settings.locationLabel ?? "Local principal",
+            latitude: settings.latitude,
+            longitude: settings.longitude,
+            radiusMeters: settings.radiusMeters,
+            accuracyToleranceMeters: settings.accuracyToleranceMeters,
+          },
+      ...settings.additionalLocations,
+    ].filter(
+      (
+        candidate,
+      ): candidate is {
+        label: string;
+        latitude: number;
+        longitude: number;
+        radiusMeters: number;
+        accuracyToleranceMeters: number;
+      } => candidate !== null,
+    );
+    if (configuredLocations.length === 0) {
       throw new ConflictException({
         code: "TIME_TRACKING_LOCATION_NOT_CONFIGURED",
         message: "Configure a localização da unidade antes de registrar o ponto.",
       });
     }
-    const distance = distanceMeters(
-      settings.latitude,
-      settings.longitude,
-      location.latitude,
-      location.longitude,
-    );
-    const allowedDistance =
-      settings.radiusMeters + settings.accuracyToleranceMeters + (location.accuracyMeters ?? 0);
-    if (distance > allowedDistance) {
+    const flags: string[] = [];
+    if (location.accuracyMeters === undefined) flags.push("missing_location_accuracy");
+    if (
+      location.accuracyMeters !== undefined &&
+      location.accuracyMeters > settings.maxLocationAccuracyMeters
+    ) {
+      if (settings.lowAccuracyPolicy === "block") {
+        throw new ForbiddenException({
+          code: "TIME_TRACKING_LOCATION_ACCURACY_TOO_LOW",
+          message: `A precisão do GPS (${location.accuracyMeters} m) está acima do limite de ${settings.maxLocationAccuracyMeters} m configurado para esta unidade.`,
+          details: {
+            accuracyMeters: location.accuracyMeters,
+            maximumAccuracyMeters: settings.maxLocationAccuracyMeters,
+          },
+        });
+      }
+      flags.push("low_location_accuracy");
+    }
+    const candidates = configuredLocations.map((configured) => {
+      const distance = distanceMeters(
+        configured.latitude,
+        configured.longitude,
+        location.latitude,
+        location.longitude,
+      );
+      const allowedDistance = configured.radiusMeters + configured.accuracyToleranceMeters;
+      return { ...configured, distance, allowedDistance };
+    });
+    const match = candidates.find((candidate) => candidate.distance <= candidate.allowedDistance);
+    if (!match) {
+      const closest = candidates.reduce((previous, candidate) =>
+        candidate.distance < previous.distance ? candidate : previous,
+      );
       throw new ForbiddenException({
         code: "TIME_TRACKING_OUTSIDE_GEOFENCE",
-        message: `Você está a aproximadamente ${Math.round(distance)} m da unidade. A marcação exige estar no raio configurado.`,
-        details: { distanceMeters: Math.round(distance), allowedDistanceMeters: allowedDistance },
+        message: `Você está a aproximadamente ${Math.round(closest.distance)} m do local permitido mais próximo. A marcação exige estar no raio configurado.`,
+        details: {
+          distanceMeters: Math.round(closest.distance),
+          allowedDistanceMeters: closest.allowedDistance,
+        },
       });
     }
+    return {
+      flags,
+      locationLabel: match.label,
+      distanceMeters: Math.round(match.distance),
+      allowedDistanceMeters: match.allowedDistance,
+    };
   }
 
   private async idempotent<T extends JsonResponse>(
@@ -1293,13 +1479,23 @@ export class ManagementService {
     actorIdentityId: string,
     timeEntryId: string,
     flags: string[],
+    settings: Pick<
+      typeof DEFAULT_TIME_TRACKING_SETTINGS,
+      "emailAlertsEnabled" | "managerAlertOnAnomaly" | "managerCanView"
+    >,
   ) {
-    if (flags.length === 0) return;
+    if (flags.length === 0 || !settings.emailAlertsEnabled) return;
     await tx.insert(outboxEvents).values({
       topic: "management.time-tracking.alert",
       aggregateType: "time_entry",
       aggregateId: timeEntryId,
-      payload: { organizationId, unitId, actorIdentityId, flags },
+      payload: {
+        organizationId,
+        unitId,
+        actorIdentityId,
+        flags,
+        includeManagers: settings.managerCanView && settings.managerAlertOnAnomaly,
+      },
     });
   }
 
@@ -1925,8 +2121,12 @@ export class ManagementService {
       assets,
       reviewRequests,
       transfers,
+      transferReceipts,
+      locationItemSettings,
+      issueRoutes,
       pendingNfeImports,
       pendingReturnableIncidents,
+      inventoryOperators,
       planning,
     ] = await Promise.all([
       this.database.db
@@ -2064,6 +2264,35 @@ export class ManagementService {
         .orderBy(desc(managementInventoryTransfers.createdAt))
         .limit(100),
       this.database.db
+        .select()
+        .from(managementInventoryTransferReceipts)
+        .where(
+          and(
+            eq(managementInventoryTransferReceipts.organizationId, organizationId),
+            eq(managementInventoryTransferReceipts.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementInventoryTransferReceipts.receivedAt))
+        .limit(200),
+      this.database.db
+        .select()
+        .from(managementStockLocationItemSettings)
+        .where(
+          and(
+            eq(managementStockLocationItemSettings.organizationId, organizationId),
+            eq(managementStockLocationItemSettings.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementInventoryIssueRoutes)
+        .where(
+          and(
+            eq(managementInventoryIssueRoutes.organizationId, organizationId),
+            eq(managementInventoryIssueRoutes.unitId, unitId),
+          ),
+        ),
+      this.database.db
         .select({ id: managementNfeImports.id, createdAt: managementNfeImports.createdAt })
         .from(managementNfeImports)
         .where(
@@ -2088,9 +2317,36 @@ export class ManagementService {
           ),
         )
         .orderBy(desc(managementReturnableIncidents.createdAt)),
+      this.database.db
+        .select({ id: managementPeople.identityId, name: managementPeople.name })
+        .from(managementPeople)
+        .where(
+          and(
+            eq(managementPeople.organizationId, organizationId),
+            eq(managementPeople.unitId, unitId),
+            eq(managementPeople.active, true),
+            sql`${managementPeople.identityId} is not null`,
+          ),
+        )
+        .orderBy(managementPeople.name),
       this.inventoryPlanningSnapshot(identityId, organizationId, unitId),
     ]);
     const automation = automationRows[0] ?? { pending: 0, failed: 0, lastProcessedAt: null };
+    const transferActorIds = [
+      ...transfers.flatMap((transfer) => [
+        transfer.sentByIdentityId,
+        transfer.receivedByIdentityId,
+        transfer.canceledByIdentityId,
+      ]),
+      ...transferReceipts.map((receipt) => receipt.receivedByIdentityId),
+    ].filter((value): value is string => Boolean(value));
+    const transferActors = transferActorIds.length
+      ? await this.database.db
+          .select({ id: identities.id, name: identities.displayName })
+          .from(identities)
+          .where(inArray(identities.id, [...new Set(transferActorIds)]))
+      : [];
+    const transferActorById = new Map(transferActors.map((actor) => [actor.id, actor.name]));
     const returnableByProduct = new Map(
       returnableConfigurations.map((configuration) => [configuration.productId, configuration]),
     );
@@ -2132,6 +2388,68 @@ export class ManagementService {
         detail: `${items.find((item) => item.id === lot.inventoryItemId)?.name ?? "Item"} · lote ${lot.batchCode}.`,
         createdAt: lot.expiresAt ?? lot.createdAt,
       }));
+    const settingByLocationItem = new Map(
+      locationItemSettings.map((setting) => [
+        `${setting.locationId}:${setting.inventoryItemId}`,
+        setting,
+      ]),
+    );
+    const sectorReplenishmentSuggestions = locationItemSettings.flatMap((setting) => {
+      const targetBalance = balances.find(
+        (balance) =>
+          balance.locationId === setting.locationId &&
+          balance.inventoryItemId === setting.inventoryItemId,
+      );
+      const current = Number(targetBalance?.quantity ?? 0);
+      const target = Number(setting.targetQuantity);
+      if (current >= Number(setting.minimumQuantity) || target <= current) return [];
+      const source = balances
+        .filter(
+          (balance) =>
+            balance.inventoryItemId === setting.inventoryItemId &&
+            balance.locationId !== setting.locationId,
+        )
+        .map((balance) => {
+          const sourceSetting = settingByLocationItem.get(
+            `${balance.locationId}:${balance.inventoryItemId}`,
+          );
+          const reserve = Number(sourceSetting?.minimumQuantity ?? 0);
+          return { balance, surplus: Math.max(0, Number(balance.quantity) - reserve) };
+        })
+        .sort((left, right) => right.surplus - left.surplus)[0];
+      if (!source || source.surplus <= 0) return [];
+      const suggestedQuantity = Math.min(target - current, source.surplus);
+      return [
+        {
+          inventoryItemId: setting.inventoryItemId,
+          sourceLocationId: source.balance.locationId,
+          destinationLocationId: setting.locationId,
+          suggestedQuantity: suggestedQuantity.toFixed(3),
+          transferUnitLabel: setting.transferUnitLabel,
+          unitsPerTransferUnit: setting.unitsPerTransferUnit,
+        },
+      ];
+    });
+    const inTransitBalances = [
+      ...new Set(transfers.map((transfer) => transfer.inventoryItemId)),
+    ].map((inventoryItemId) => ({
+      inventoryItemId,
+      quantity: transfers
+        .filter(
+          (transfer) =>
+            transfer.inventoryItemId === inventoryItemId &&
+            ["in_transit", "partially_received"].includes(transfer.status),
+        )
+        .reduce(
+          (total, transfer) =>
+            total +
+            Number(transfer.quantity) -
+            Number(transfer.quantityReceived) -
+            Number(transfer.quantityDivergent),
+          0,
+        )
+        .toFixed(3),
+    }));
     return {
       locations,
       items: items.map((item) => {
@@ -2162,7 +2480,27 @@ export class ManagementService {
       lots,
       assets,
       inventoryReviewRequests: reviewRequests,
-      transfers,
+      transfers: transfers.map((transfer) => ({
+        ...transfer,
+        sentByName: transferActorById.get(transfer.sentByIdentityId) ?? null,
+        receivedByName: transfer.receivedByIdentityId
+          ? (transferActorById.get(transfer.receivedByIdentityId) ?? null)
+          : null,
+        canceledByName: transfer.canceledByIdentityId
+          ? (transferActorById.get(transfer.canceledByIdentityId) ?? null)
+          : null,
+        receipts: transferReceipts
+          .filter((receipt) => receipt.transferId === transfer.id)
+          .map((receipt) => ({
+            ...receipt,
+            receivedByName: transferActorById.get(receipt.receivedByIdentityId) ?? null,
+          })),
+      })),
+      inTransitBalances,
+      locationItemSettings,
+      issueRoutes,
+      sectorReplenishmentSuggestions,
+      inventoryOperators,
       reservations: planning.reservations,
       countSchedules: planning.countSchedules,
       productionBatches: planning.productionBatches,
@@ -2186,13 +2524,20 @@ export class ManagementService {
           createdAt: request.createdAt,
         })),
         ...transfers
-          .filter((transfer) => transfer.status === "in_transit")
+          .filter((transfer) => ["in_transit", "partially_received"].includes(transfer.status))
           .map((transfer) => ({
             id: transfer.id,
             type: "transfer_receipt" as const,
             priority: "high" as const,
-            title: "Confirmar transferência recebida",
-            detail: transfer.reason,
+            title:
+              transfer.deadlineAt.getTime() < Date.now()
+                ? "Transferência fora do prazo"
+                : "Confirmar transferência recebida",
+            detail: `${transfer.reason} · ${(
+              Number(transfer.quantity) -
+                Number(transfer.quantityReceived) -
+                Number(transfer.quantityDivergent)
+            ).toLocaleString("pt-BR")} em trânsito.`,
             createdAt: transfer.createdAt,
           })),
         ...pendingNfeImports.map((item) => ({
@@ -2293,9 +2638,14 @@ export class ManagementService {
     const [
       configurations,
       custody,
+      custodyByLocation,
       recentMovements,
       incidents,
       physical,
+      physicalByLocation,
+      fullProductBalances,
+      supplierExchanges,
+      lossIndicators,
       roleRows,
       agingMovements,
     ] = await Promise.all([
@@ -2313,6 +2663,24 @@ export class ManagementService {
           ),
         )
         .groupBy(managementReturnableCustodyMovements.containerInventoryItemId),
+      this.database.db
+        .select({
+          containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
+          locationId: managementReturnableCustodyMovements.locationId,
+          expectedQuantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
+        })
+        .from(managementReturnableCustodyMovements)
+        .where(
+          and(
+            eq(managementReturnableCustodyMovements.organizationId, organizationId),
+            eq(managementReturnableCustodyMovements.unitId, unitId),
+            sql`${managementReturnableCustodyMovements.locationId} is not null`,
+          ),
+        )
+        .groupBy(
+          managementReturnableCustodyMovements.containerInventoryItemId,
+          managementReturnableCustodyMovements.locationId,
+        ),
       this.database.db
         .select()
         .from(managementReturnableCustodyMovements)
@@ -2353,6 +2721,74 @@ export class ManagementService {
           ),
         )
         .groupBy(managementStockBalances.inventoryItemId),
+      this.database.db
+        .select({
+          containerInventoryItemId: managementStockBalances.inventoryItemId,
+          locationId: managementStockBalances.locationId,
+          physicalQuantity: managementStockBalances.quantity,
+        })
+        .from(managementStockBalances)
+        .innerJoin(
+          managementInventoryItems,
+          eq(managementStockBalances.inventoryItemId, managementInventoryItems.id),
+        )
+        .where(
+          and(
+            eq(managementStockBalances.organizationId, organizationId),
+            eq(managementStockBalances.unitId, unitId),
+            eq(managementInventoryItems.kind, "returnable_container"),
+          ),
+        ),
+      this.database.db
+        .select({
+          productId: managementInventoryItems.productId,
+          locationId: managementStockBalances.locationId,
+          quantity: managementStockBalances.quantity,
+        })
+        .from(managementStockBalances)
+        .innerJoin(
+          managementInventoryItems,
+          eq(managementStockBalances.inventoryItemId, managementInventoryItems.id),
+        )
+        .where(
+          and(
+            eq(managementStockBalances.organizationId, organizationId),
+            eq(managementStockBalances.unitId, unitId),
+            eq(managementInventoryItems.kind, "resale"),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementReturnableSupplierExchanges)
+        .where(
+          and(
+            eq(managementReturnableSupplierExchanges.organizationId, organizationId),
+            eq(managementReturnableSupplierExchanges.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementReturnableSupplierExchanges.sentAt))
+        .limit(100),
+      this.database.db
+        .select({
+          type: managementReturnableIncidents.type,
+          locationId: managementReturnableIncidents.locationId,
+          quantity: sql<string>`sum(${managementReturnableIncidents.quantity})`,
+          estimatedCostCents:
+            sql<number>`coalesce(sum(${managementReturnableIncidents.estimatedCostCents}), 0)`.mapWith(
+              Number,
+            ),
+          incidentCount: sql<number>`count(*)`.mapWith(Number),
+        })
+        .from(managementReturnableIncidents)
+        .where(
+          and(
+            eq(managementReturnableIncidents.organizationId, organizationId),
+            eq(managementReturnableIncidents.unitId, unitId),
+            eq(managementReturnableIncidents.status, "approved"),
+            gte(managementReturnableIncidents.occurredAt, sql`now() - interval '90 days'`),
+          ),
+        )
+        .groupBy(managementReturnableIncidents.type, managementReturnableIncidents.locationId),
       this.scope.requireOrganizationRole(identityId, organizationId, [
         "owner",
         "manager",
@@ -2384,6 +2820,24 @@ export class ManagementService {
     const physicalByContainer = new Map(
       physical.map((row) => [row.containerInventoryItemId, row.physicalQuantity]),
     );
+    const configurationsByProduct = new Map<string, typeof configurations>();
+    for (const configuration of configurations)
+      configurationsByProduct.set(configuration.productId, [
+        ...(configurationsByProduct.get(configuration.productId) ?? []),
+        configuration,
+      ]);
+    const fullContainers = new Map<string, number>();
+    for (const balance of fullProductBalances) {
+      if (!balance.productId) continue;
+      for (const configuration of configurationsByProduct.get(balance.productId) ?? []) {
+        const key = `${configuration.containerInventoryItemId}:${balance.locationId}`;
+        fullContainers.set(
+          key,
+          (fullContainers.get(key) ?? 0) +
+            Number(balance.quantity) * Number(configuration.quantityPerUnit),
+        );
+      }
+    }
     const agingByContainer = new Map(
       [...new Set(agingMovements.map((movement) => movement.containerInventoryItemId))].map(
         (containerInventoryItemId) => [
@@ -2415,7 +2869,10 @@ export class ManagementService {
           locationId: null,
           expectedQuantity,
           physicalQuantity: physicalByContainer.get(containerInventoryItemId) ?? "0.000",
-          divergenceQuantity: milliToQuantity(Math.max(quantityToMilli(expectedQuantity), 0)),
+          divergenceQuantity: milliToQuantity(
+            quantityToMilli(physicalByContainer.get(containerInventoryItemId) ?? "0") -
+              quantityToMilli(expectedQuantity),
+          ),
           oldestOutstandingAt: aging?.oldestOutstandingAt ?? null,
           ageDays: aging?.ageDays ?? 0,
           depositExposureCents: aging?.depositExposureCents ?? 0,
@@ -2427,6 +2884,25 @@ export class ManagementService {
       }),
       recentMovements,
       incidents,
+      physicalByLocation,
+      custodyByLocation,
+      custodySummary: [...expectedByContainer].map(
+        ([containerInventoryItemId, expectedQuantity]) => ({
+          containerInventoryItemId,
+          expectedQuantity,
+          ...(agingByContainer.get(containerInventoryItemId) ?? {
+            oldestOutstandingAt: null,
+            ageDays: 0,
+            depositExposureCents: 0,
+          }),
+        }),
+      ),
+      fullContainersByLocation: [...fullContainers].map(([key, quantity]) => {
+        const [containerInventoryItemId, locationId] = key.split(":");
+        return { containerInventoryItemId, locationId, quantity: quantity.toFixed(3) };
+      }),
+      supplierExchanges,
+      lossIndicators,
       capabilities: {
         canConfigure: roles.has("owner") || roles.has("manager") || roles.has("inventory"),
         canConfirmReturnables: roles.has("owner") || roles.has("manager") || roles.has("inventory"),
@@ -2628,6 +3104,18 @@ export class ManagementService {
           sourceId: movementId,
           actorIdentityId: identityId,
         });
+        await tx.insert(managementReturnableSupplierExchanges).values({
+          id: movementId,
+          organizationId,
+          unitId,
+          containerInventoryItemId: input.containerInventoryItemId,
+          locationId: input.locationId,
+          supplierId: input.supplierId,
+          quantity: String(input.quantity),
+          note: input.note,
+          idempotencyKey,
+          sentByIdentityId: identityId,
+        });
         await this.record(
           tx,
           identityId,
@@ -2642,7 +3130,96 @@ export class ManagementService {
             note: input.note,
           },
         );
-        return { movementId, resultingQuantity: milliToQuantity(balance.resultingMilli) };
+        return {
+          exchangeId: movementId,
+          movementId,
+          status: "in_transit",
+          resultingQuantity: milliToQuantity(balance.resultingMilli),
+        };
+      },
+    );
+  }
+
+  async resolveReturnableSupplierExchange(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    exchangeId: string,
+    idempotencyKey: string,
+    input: ReturnableSupplierExchangeResolutionInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-supplier-exchange.resolve",
+      { exchangeId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_returnable_supplier_exchanges where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${exchangeId}::uuid for update`,
+        );
+        const [exchange] = await tx
+          .select()
+          .from(managementReturnableSupplierExchanges)
+          .where(
+            and(
+              eq(managementReturnableSupplierExchanges.organizationId, organizationId),
+              eq(managementReturnableSupplierExchanges.unitId, unitId),
+              eq(managementReturnableSupplierExchanges.id, exchangeId),
+            ),
+          )
+          .limit(1);
+        if (!exchange)
+          throw new NotFoundException({
+            code: "RETURNABLE_SUPPLIER_EXCHANGE_NOT_FOUND",
+            message: "Envio de vasilhames não encontrado.",
+          });
+        if (exchange.status !== "in_transit") return exchange;
+        const now = new Date();
+        if (input.decision === "canceled")
+          await this.applyStockMovement(tx, organizationId, unitId, {
+            locationId: exchange.locationId,
+            inventoryItemId: exchange.containerInventoryItemId,
+            quantityDeltaMilli: quantityToMilli(exchange.quantity),
+            type: "returnable_supplier_exchange_canceled",
+            sourceType: "supplier_exchange_cancellation",
+            sourceId: exchange.id,
+            actorIdentityId: identityId,
+          });
+        const [updated] = await tx
+          .update(managementReturnableSupplierExchanges)
+          .set(
+            input.decision === "received"
+              ? {
+                  status: "received",
+                  receivedByIdentityId: identityId,
+                  receivedAt: now,
+                  note: `${exchange.note}\n${input.note}`,
+                  updatedAt: now,
+                }
+              : {
+                  status: "canceled",
+                  canceledByIdentityId: identityId,
+                  canceledAt: now,
+                  note: `${exchange.note}\n${input.note}`,
+                  updatedAt: now,
+                },
+          )
+          .where(eq(managementReturnableSupplierExchanges.id, exchange.id))
+          .returning();
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          `management.returnable.supplier-exchange-${input.decision}`,
+          "returnable_supplier_exchange",
+          exchange.id,
+          { note: input.note },
+        );
+        return updated ?? exchange;
       },
     );
   }
@@ -2893,6 +3470,8 @@ export class ManagementService {
     input: StockLocationInput,
   ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    if (input.responsibleIdentityId)
+      await this.scope.requireUnitAccess(input.responsibleIdentityId, organizationId, unitId);
     return this.idempotent(
       identityId,
       organizationId,
@@ -2930,6 +3509,8 @@ export class ManagementService {
     input: StockLocationUpdateInput,
   ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    if (input.responsibleIdentityId)
+      await this.scope.requireUnitAccess(input.responsibleIdentityId, organizationId, unitId);
     return this.database.db.transaction(async (tx) => {
       const [location] = await tx
         .update(managementStockLocations)
@@ -2959,6 +3540,203 @@ export class ManagementService {
       );
       return location;
     });
+  }
+
+  async configureStockLocationItemSetting(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: StockLocationItemSettingInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "stock-location-item-setting.configure",
+      input,
+      async (tx) => {
+        await Promise.all([
+          this.requireInventoryItem(tx, organizationId, unitId, input.inventoryItemId),
+          tx
+            .select({ id: managementStockLocations.id })
+            .from(managementStockLocations)
+            .where(
+              and(
+                eq(managementStockLocations.organizationId, organizationId),
+                eq(managementStockLocations.unitId, unitId),
+                eq(managementStockLocations.id, input.locationId),
+                eq(managementStockLocations.active, true),
+              ),
+            )
+            .limit(1)
+            .then((rows) => {
+              if (!rows[0])
+                throw new NotFoundException({
+                  code: "STOCK_LOCATION_NOT_FOUND",
+                  message: "Local de estoque não encontrado nesta unidade.",
+                });
+            }),
+        ]);
+        const [setting] = await tx
+          .insert(managementStockLocationItemSettings)
+          .values({
+            organizationId,
+            unitId,
+            ...input,
+            minimumQuantity: String(input.minimumQuantity),
+            targetQuantity: String(input.targetQuantity),
+            unitsPerTransferUnit: String(input.unitsPerTransferUnit),
+          })
+          .onConflictDoUpdate({
+            target: [
+              managementStockLocationItemSettings.organizationId,
+              managementStockLocationItemSettings.unitId,
+              managementStockLocationItemSettings.locationId,
+              managementStockLocationItemSettings.inventoryItemId,
+            ],
+            set: {
+              minimumQuantity: String(input.minimumQuantity),
+              targetQuantity: String(input.targetQuantity),
+              transferUnitLabel: input.transferUnitLabel,
+              unitsPerTransferUnit: String(input.unitsPerTransferUnit),
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+        if (!setting) throw new ConflictException("Não foi possível configurar o setor.");
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.location-item-setting.configured",
+          "stock_location_item_setting",
+          setting.id,
+          { inventoryItemId: input.inventoryItemId, locationId: input.locationId },
+        );
+        return setting;
+      },
+    );
+  }
+
+  async configureInventoryIssueRoute(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: InventoryIssueRouteInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-issue-route.configure",
+      input,
+      async (tx) => {
+        const [product, location, station] = await Promise.all([
+          tx
+            .select({ id: managementInventoryItems.id })
+            .from(managementInventoryItems)
+            .where(
+              and(
+                eq(managementInventoryItems.organizationId, organizationId),
+                eq(managementInventoryItems.unitId, unitId),
+                eq(managementInventoryItems.productId, input.productId),
+                eq(managementInventoryItems.kind, "resale"),
+                eq(managementInventoryItems.active, true),
+              ),
+            )
+            .limit(1),
+          tx
+            .select({ id: managementStockLocations.id })
+            .from(managementStockLocations)
+            .where(
+              and(
+                eq(managementStockLocations.organizationId, organizationId),
+                eq(managementStockLocations.unitId, unitId),
+                eq(managementStockLocations.id, input.locationId),
+                eq(managementStockLocations.active, true),
+              ),
+            )
+            .limit(1),
+          input.stationId
+            ? tx
+                .select({ id: posProductionStations.id })
+                .from(posProductionStations)
+                .where(
+                  and(
+                    eq(posProductionStations.organizationId, organizationId),
+                    eq(posProductionStations.unitId, unitId),
+                    eq(posProductionStations.id, input.stationId),
+                  ),
+                )
+                .limit(1)
+            : Promise.resolve([{ id: null }]),
+        ]);
+        if (!product[0])
+          throw new NotFoundException({
+            code: "RESALE_INVENTORY_ITEM_NOT_FOUND",
+            message: "O produto não possui item de revenda ativo nesta unidade.",
+          });
+        if (!location[0])
+          throw new NotFoundException({
+            code: "STOCK_LOCATION_NOT_FOUND",
+            message: "Local de saída não encontrado nesta unidade.",
+          });
+        if (!station[0])
+          throw new NotFoundException({
+            code: "PRODUCTION_STATION_NOT_FOUND",
+            message: "Estação não encontrada nesta unidade.",
+          });
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`inventory-route:${organizationId}:${unitId}:${input.productId}:${input.stationId ?? "default"}`}, 0))`,
+        );
+        const routeFilter = and(
+          eq(managementInventoryIssueRoutes.organizationId, organizationId),
+          eq(managementInventoryIssueRoutes.unitId, unitId),
+          eq(managementInventoryIssueRoutes.productId, input.productId),
+          input.stationId
+            ? eq(managementInventoryIssueRoutes.stationId, input.stationId)
+            : isNull(managementInventoryIssueRoutes.stationId),
+        );
+        const [existing] = await tx
+          .select({ id: managementInventoryIssueRoutes.id })
+          .from(managementInventoryIssueRoutes)
+          .where(routeFilter)
+          .limit(1);
+        const [route] = existing
+          ? await tx
+              .update(managementInventoryIssueRoutes)
+              .set({ locationId: input.locationId, active: input.active, updatedAt: new Date() })
+              .where(eq(managementInventoryIssueRoutes.id, existing.id))
+              .returning()
+          : await tx
+              .insert(managementInventoryIssueRoutes)
+              .values({ organizationId, unitId, ...input })
+              .returning();
+        if (!route) throw new ConflictException("Não foi possível configurar a rota de saída.");
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.issue-route.configured",
+          "inventory_issue_route",
+          route.id,
+          {
+            productId: input.productId,
+            stationId: input.stationId ?? null,
+            locationId: input.locationId,
+          },
+        );
+        return route;
+      },
+    );
   }
 
   async archiveStockLocation(
@@ -4481,7 +5259,7 @@ export class ManagementService {
       input,
       async (tx) => {
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`inventory-closing:${organizationId}:${unitId}:${input.period}`}, 0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${`inventory-closing:${organizationId}:${unitId}:${input.period}:${input.locationId ?? "all"}:${input.shiftReference ?? "all"}`}, 0))`,
         );
         const period = `${input.period}-01`;
         const [existing] = await tx
@@ -4492,6 +5270,12 @@ export class ManagementService {
               eq(managementInventoryClosings.organizationId, organizationId),
               eq(managementInventoryClosings.unitId, unitId),
               eq(managementInventoryClosings.period, period),
+              input.locationId
+                ? eq(managementInventoryClosings.locationId, input.locationId)
+                : isNull(managementInventoryClosings.locationId),
+              input.shiftReference
+                ? eq(managementInventoryClosings.shiftReference, input.shiftReference)
+                : isNull(managementInventoryClosings.shiftReference),
             ),
           )
           .limit(1);
@@ -4508,6 +5292,9 @@ export class ManagementService {
               and(
                 eq(managementStockBalances.organizationId, organizationId),
                 eq(managementStockBalances.unitId, unitId),
+                input.locationId
+                  ? eq(managementStockBalances.locationId, input.locationId)
+                  : undefined,
               ),
             ),
           tx
@@ -4524,6 +5311,9 @@ export class ManagementService {
                 eq(managementInventoryReservations.organizationId, organizationId),
                 eq(managementInventoryReservations.unitId, unitId),
                 eq(managementInventoryReservations.status, "active"),
+                input.locationId
+                  ? eq(managementInventoryReservations.locationId, input.locationId)
+                  : undefined,
                 or(
                   isNull(managementInventoryReservations.expiresAt),
                   sql`${managementInventoryReservations.expiresAt} > now()`,
@@ -4568,6 +5358,8 @@ export class ManagementService {
             id: closingId,
             organizationId,
             unitId,
+            locationId: input.locationId,
+            shiftReference: input.shiftReference,
             period,
             totalValueCents,
             totalReservedValueCents,
@@ -4587,7 +5379,13 @@ export class ManagementService {
           "management.inventory.period-closed",
           "inventory_closing",
           closingId,
-          { period: input.period, totalValueCents, lineCount: lines.length },
+          {
+            period: input.period,
+            locationId: input.locationId ?? null,
+            shiftReference: input.shiftReference ?? null,
+            totalValueCents,
+            lineCount: lines.length,
+          },
         );
         return closing;
       },
@@ -5569,6 +6367,178 @@ export class ManagementService {
     return updated;
   }
 
+  async transferInventoryBatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: InventoryTransferBatchInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-transfer.batch",
+      input,
+      async (tx) => {
+        const locations = await tx
+          .select({
+            id: managementStockLocations.id,
+            transferSlaMinutes: managementStockLocations.transferSlaMinutes,
+          })
+          .from(managementStockLocations)
+          .where(
+            and(
+              eq(managementStockLocations.organizationId, organizationId),
+              eq(managementStockLocations.unitId, unitId),
+              eq(managementStockLocations.active, true),
+              inArray(managementStockLocations.id, [
+                input.sourceLocationId,
+                input.destinationLocationId,
+              ]),
+            ),
+          );
+        if (locations.length !== 2)
+          throw new NotFoundException({
+            code: "INVENTORY_TRANSFER_SCOPE_INVALID",
+            message: "Origem ou destino não pertence a esta unidade.",
+          });
+        const destination = locations.find(
+          (location) => location.id === input.destinationLocationId,
+        );
+        if (!destination) throw new ConflictException("Destino da transferência inválido.");
+        const eventId = randomUUID();
+        const batchId = randomUUID();
+        await tx.insert(managementInventoryEvents).values({
+          id: eventId,
+          organizationId,
+          unitId,
+          type: "transfer",
+          reason: input.reason,
+          idempotencyKey,
+          actorIdentityId: identityId,
+        });
+        const transfers = [];
+        for (const [index, line] of input.lines.entries()) {
+          const item = await this.requireInventoryItem(
+            tx,
+            organizationId,
+            unitId,
+            line.inventoryItemId,
+          );
+          if (!line.lotId) {
+            const trackedLots = await tx
+              .select({ id: managementInventoryLots.id })
+              .from(managementInventoryLots)
+              .where(
+                and(
+                  eq(managementInventoryLots.organizationId, organizationId),
+                  eq(managementInventoryLots.unitId, unitId),
+                  eq(managementInventoryLots.locationId, input.sourceLocationId),
+                  eq(managementInventoryLots.inventoryItemId, line.inventoryItemId),
+                  eq(managementInventoryLots.active, true),
+                  gt(managementInventoryLots.quantity, "0"),
+                ),
+              )
+              .limit(1);
+            if (trackedLots.length)
+              throw new BadRequestException({
+                code: "INVENTORY_LOT_REQUIRED",
+                message: `Selecione o lote para transferir ${item.name}.`,
+              });
+          }
+          const [sourceBalance] = await tx
+            .select({ averageCostCents: managementStockBalances.averageCostCents })
+            .from(managementStockBalances)
+            .where(
+              and(
+                eq(managementStockBalances.organizationId, organizationId),
+                eq(managementStockBalances.unitId, unitId),
+                eq(managementStockBalances.locationId, input.sourceLocationId),
+                eq(managementStockBalances.inventoryItemId, line.inventoryItemId),
+              ),
+            )
+            .limit(1);
+          await tx
+            .insert(managementStockBalances)
+            .values({
+              organizationId,
+              unitId,
+              locationId: input.destinationLocationId,
+              inventoryItemId: line.inventoryItemId,
+            })
+            .onConflictDoNothing();
+          const transferId = randomUUID();
+          const eventLineId = randomUUID();
+          const quantityMilli = quantityToMilli(line.quantity);
+          const movement = await this.applyStockMovement(tx, organizationId, unitId, {
+            locationId: input.sourceLocationId,
+            inventoryItemId: line.inventoryItemId,
+            lotId: line.lotId,
+            quantityDeltaMilli: -quantityMilli,
+            unitCostCents: sourceBalance?.averageCostCents,
+            type: "transfer_out",
+            sourceType: "inventory_event_line",
+            sourceId: eventLineId,
+            actorIdentityId: identityId,
+          });
+          await tx.insert(managementInventoryEventLines).values({
+            id: eventLineId,
+            organizationId,
+            unitId,
+            eventId,
+            locationId: input.sourceLocationId,
+            inventoryItemId: line.inventoryItemId,
+            lotId: line.lotId,
+            previousQuantity: milliToQuantity(movement.previousMilli),
+            quantityDelta: milliToQuantity(-quantityMilli),
+            resultingQuantity: milliToQuantity(movement.resultingMilli),
+          });
+          const [transfer] = await tx
+            .insert(managementInventoryTransfers)
+            .values({
+              id: transferId,
+              organizationId,
+              unitId,
+              batchId,
+              lineNumber: index + 1,
+              inventoryItemId: line.inventoryItemId,
+              sourceLocationId: input.sourceLocationId,
+              destinationLocationId: input.destinationLocationId,
+              sourceLotId: line.lotId,
+              eventId,
+              quantity: String(line.quantity),
+              reason: input.reason,
+              deadlineAt: new Date(Date.now() + destination.transferSlaMinutes * 60_000),
+              idempotencyKey: `${idempotencyKey.slice(0, 90)}:${index + 1}:${batchId}`,
+              sentByIdentityId: identityId,
+            })
+            .returning();
+          if (!transfer) throw new ConflictException("Não foi possível enviar a transferência.");
+          transfers.push(transfer);
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.transfer-batch-dispatched",
+          "inventory_transfer_batch",
+          batchId,
+          {
+            eventId,
+            lineCount: transfers.length,
+            sourceLocationId: input.sourceLocationId,
+            destinationLocationId: input.destinationLocationId,
+          },
+        );
+        return { batchId, eventId, status: "in_transit", transfers };
+      },
+    );
+  }
+
   async transferInventory(
     identityId: string,
     organizationId: string,
@@ -5803,7 +6773,7 @@ export class ManagementService {
     idempotencyKey: string,
     input: InventoryTransferResolutionInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    const role = await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
@@ -5831,7 +6801,58 @@ export class ManagementService {
             code: "INVENTORY_TRANSFER_NOT_FOUND",
             message: "Transferência não encontrada.",
           });
-        if (transfer.status !== "in_transit") return transfer;
+        if (!["in_transit", "partially_received"].includes(transfer.status)) return transfer;
+        const [destinationLocation] = await tx
+          .select({
+            requireDistinctTransferReceiver:
+              managementStockLocations.requireDistinctTransferReceiver,
+          })
+          .from(managementStockLocations)
+          .where(
+            and(
+              eq(managementStockLocations.organizationId, organizationId),
+              eq(managementStockLocations.unitId, unitId),
+              eq(managementStockLocations.id, transfer.destinationLocationId),
+            ),
+          )
+          .limit(1);
+        if (
+          destinationLocation?.requireDistinctTransferReceiver &&
+          transfer.sentByIdentityId === identityId
+        )
+          throw new ForbiddenException({
+            code: "TRANSFER_DISTINCT_RECEIVER_REQUIRED",
+            message: "Outra pessoa deve conferir esta transferência.",
+          });
+        const sentMilli = quantityToMilli(transfer.quantity);
+        const accountedMilli =
+          quantityToMilli(transfer.quantityReceived) + quantityToMilli(transfer.quantityDivergent);
+        const remainingMilli = sentMilli - accountedMilli;
+        const divergentMilli =
+          input.decision === "received" ? quantityToMilli(input.quantityDivergent ?? "0") : 0;
+        const receivedMilli =
+          input.decision === "received"
+            ? quantityToMilli(
+                input.quantityReceived ??
+                  milliToQuantity(Math.max(remainingMilli - divergentMilli, 0)),
+              )
+            : 0;
+        if (receivedMilli + divergentMilli > remainingMilli)
+          throw new ConflictException({
+            code: "TRANSFER_RECEIPT_EXCEEDS_REMAINING",
+            message: "A conferência excede o saldo ainda em trânsito.",
+          });
+        if (input.decision === "received" && receivedMilli + divergentMilli <= 0)
+          throw new BadRequestException({
+            code: "TRANSFER_RECEIPT_EMPTY",
+            message: "Informe a quantidade recebida ou divergente.",
+          });
+        if (divergentMilli > 0 && role === "inventory")
+          throw new ForbiddenException({
+            code: "TRANSFER_DIVERGENCE_MANAGER_REQUIRED",
+            message: "Uma pessoa gerente deve confirmar a divergência.",
+          });
+        const stockDeltaMilli = input.decision === "received" ? receivedMilli : remainingMilli;
         const targetLocationId =
           input.decision === "received"
             ? transfer.destinationLocationId
@@ -5872,12 +6893,11 @@ export class ManagementService {
             code: "BALANCE_LOCK_FAILED",
             message: "Não foi possível bloquear o saldo da transferência.",
           });
-        const quantityMilli = quantityToMilli(transfer.quantity);
         const resultingQuantity = milliToQuantity(
-          quantityToMilli(targetBalance.quantity) + quantityMilli,
+          quantityToMilli(targetBalance.quantity) + stockDeltaMilli,
         );
         let resolvedLotId: string | null = null;
-        if (transfer.sourceLotId) {
+        if (transfer.sourceLotId && stockDeltaMilli > 0) {
           const [sourceLot] = await tx
             .select()
             .from(managementInventoryLots)
@@ -5898,7 +6918,7 @@ export class ManagementService {
                 inventoryItemId: transfer.inventoryItemId,
                 batchCode: sourceLot.batchCode,
                 expiresAt: sourceLot.expiresAt,
-                quantity: transfer.quantity,
+                quantity: milliToQuantity(stockDeltaMilli),
                 unitCostCents: sourceLot.unitCostCents,
               })
               .onConflictDoUpdate({
@@ -5910,7 +6930,7 @@ export class ManagementService {
                   managementInventoryLots.batchCode,
                 ],
                 set: {
-                  quantity: sql`${managementInventoryLots.quantity} + ${transfer.quantity}::numeric`,
+                  quantity: sql`${managementInventoryLots.quantity} + ${milliToQuantity(stockDeltaMilli)}::numeric`,
                   active: true,
                   updatedAt: new Date(),
                 },
@@ -5921,7 +6941,7 @@ export class ManagementService {
             await tx
               .update(managementInventoryLots)
               .set({
-                quantity: sql`${managementInventoryLots.quantity} + ${transfer.quantity}::numeric`,
+                quantity: sql`${managementInventoryLots.quantity} + ${milliToQuantity(stockDeltaMilli)}::numeric`,
                 active: true,
                 updatedAt: new Date(),
               })
@@ -5929,65 +6949,86 @@ export class ManagementService {
             resolvedLotId = transfer.sourceLotId;
           }
         }
-        await tx
-          .update(managementStockBalances)
-          .set({
-            quantity: resultingQuantity,
-            averageCostCents:
-              input.decision === "received"
-                ? (sourceBalance?.averageCostCents ?? targetBalance.averageCostCents)
-                : targetBalance.averageCostCents,
-            version: targetBalance.version + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(managementStockBalances.id, targetBalance.id));
-        const lineId = randomUUID();
-        await tx.insert(managementInventoryEventLines).values({
-          id: lineId,
-          organizationId,
-          unitId,
-          eventId: transfer.eventId,
-          locationId: targetLocationId,
-          inventoryItemId: transfer.inventoryItemId,
-          lotId: resolvedLotId,
-          previousQuantity: targetBalance.quantity,
-          quantityDelta: transfer.quantity,
-          resultingQuantity,
-        });
-        await tx.insert(managementInventoryMovements).values({
-          organizationId,
-          unitId,
-          locationId: targetLocationId,
-          inventoryItemId: transfer.inventoryItemId,
-          lotId: resolvedLotId,
-          type: input.decision === "received" ? "transfer_in" : "transfer_canceled",
-          quantityDelta: transfer.quantity,
-          unitCostCents: sourceBalance?.averageCostCents ?? targetBalance.averageCostCents,
-          sourceType: "inventory_event_line",
-          sourceId: lineId,
-          actorIdentityId: identityId,
-        });
+        if (stockDeltaMilli > 0) {
+          await tx
+            .update(managementStockBalances)
+            .set({
+              quantity: resultingQuantity,
+              averageCostCents:
+                input.decision === "received"
+                  ? (sourceBalance?.averageCostCents ?? targetBalance.averageCostCents)
+                  : targetBalance.averageCostCents,
+              version: targetBalance.version + 1,
+              updatedAt: new Date(),
+            })
+            .where(eq(managementStockBalances.id, targetBalance.id));
+          const lineId = randomUUID();
+          await tx.insert(managementInventoryEventLines).values({
+            id: lineId,
+            organizationId,
+            unitId,
+            eventId: transfer.eventId,
+            locationId: targetLocationId,
+            inventoryItemId: transfer.inventoryItemId,
+            lotId: resolvedLotId,
+            previousQuantity: targetBalance.quantity,
+            quantityDelta: milliToQuantity(stockDeltaMilli),
+            resultingQuantity,
+          });
+          await tx.insert(managementInventoryMovements).values({
+            organizationId,
+            unitId,
+            locationId: targetLocationId,
+            inventoryItemId: transfer.inventoryItemId,
+            lotId: resolvedLotId,
+            type: input.decision === "received" ? "transfer_in" : "transfer_canceled",
+            quantityDelta: milliToQuantity(stockDeltaMilli),
+            unitCostCents: sourceBalance?.averageCostCents ?? targetBalance.averageCostCents,
+            sourceType: "inventory_event_line",
+            sourceId: lineId,
+            actorIdentityId: identityId,
+          });
+        }
         const now = new Date();
+        const nextReceivedMilli = quantityToMilli(transfer.quantityReceived) + receivedMilli;
+        const nextDivergentMilli = quantityToMilli(transfer.quantityDivergent) + divergentMilli;
+        const fullyAccounted = nextReceivedMilli + nextDivergentMilli === sentMilli;
+        const nextStatus =
+          input.decision === "canceled"
+            ? ("canceled" as const)
+            : fullyAccounted
+              ? nextDivergentMilli > 0
+                ? ("divergent" as const)
+                : ("received" as const)
+              : ("partially_received" as const);
+        if (input.decision === "received")
+          await tx.insert(managementInventoryTransferReceipts).values({
+            organizationId,
+            unitId,
+            transferId: transfer.id,
+            quantityReceived: milliToQuantity(receivedMilli),
+            quantityDivergent: milliToQuantity(divergentMilli),
+            divergenceReason: input.divergenceReason,
+            evidenceMetadata: { urls: input.evidence ?? [] },
+            note: input.note,
+            idempotencyKey,
+            receivedByIdentityId: identityId,
+          });
         const [updated] = await tx
           .update(managementInventoryTransfers)
-          .set(
-            input.decision === "received"
-              ? {
-                  status: "received",
-                  destinationLotId: resolvedLotId,
-                  receivedByIdentityId: identityId,
-                  receivedAt: now,
-                  resolutionNote: input.note,
-                  updatedAt: now,
-                }
-              : {
-                  status: "canceled",
-                  canceledByIdentityId: identityId,
-                  canceledAt: now,
-                  resolutionNote: input.note,
-                  updatedAt: now,
-                },
-          )
+          .set({
+            status: nextStatus,
+            quantityReceived: milliToQuantity(nextReceivedMilli),
+            quantityDivergent: milliToQuantity(nextDivergentMilli),
+            destinationLotId: resolvedLotId ?? transfer.destinationLotId,
+            receivedByIdentityId:
+              input.decision === "received" ? identityId : transfer.receivedByIdentityId,
+            receivedAt: input.decision === "received" && fullyAccounted ? now : transfer.receivedAt,
+            canceledByIdentityId: input.decision === "canceled" ? identityId : null,
+            canceledAt: input.decision === "canceled" ? now : null,
+            resolutionNote: input.note,
+            updatedAt: now,
+          })
           .where(eq(managementInventoryTransfers.id, transfer.id))
           .returning();
         await this.record(
@@ -5998,7 +7039,12 @@ export class ManagementService {
           `management.inventory.transfer-${input.decision}`,
           "inventory_transfer",
           transfer.id,
-          { note: input.note },
+          {
+            note: input.note,
+            quantityReceived: milliToQuantity(receivedMilli),
+            quantityDivergent: milliToQuantity(divergentMilli),
+            status: nextStatus,
+          },
         );
         return updated ?? transfer;
       },
@@ -10335,6 +11381,8 @@ export class ManagementService {
       closedTabs: number;
       revenueCents: number;
       previousRevenueCents: number;
+      operatingDays: number;
+      previousOperatingDays: number;
     };
     const periodsSql = previousPeriod
       ? sql`(values ('current', ${period.from}::date, ${period.to}::date), ('previous', ${previousPeriod.from}::date, ${previousPeriod.to}::date))`
@@ -10491,7 +11539,9 @@ export class ManagementService {
             select units.id::text as key, units.name as label,
                    count(tabs.id) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date)::int as "closedTabs",
                    coalesce(sum(tabs.total_cents) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date), 0)::int as "revenueCents",
-                   coalesce(sum(tabs.total_cents) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date), 0)::int as "previousRevenueCents"
+                   coalesce(sum(tabs.total_cents) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date), 0)::int as "previousRevenueCents",
+                   count(distinct timezone(units.timezone, tabs.closed_at)::date) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date)::int as "operatingDays",
+                   count(distinct timezone(units.timezone, tabs.closed_at)::date) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date)::int as "previousOperatingDays"
             from units
             left join pos_tabs tabs on tabs.organization_id = units.organization_id and tabs.unit_id = units.id and tabs.status = 'closed'
             where units.organization_id = ${organizationId}::uuid and units.active = true
@@ -10851,7 +11901,7 @@ export class ManagementService {
       supplierPerformance,
       multiunit:
         reportRole === "owner"
-          ? multiunitRows.map((row) => ({
+          ? multiunitRows.map((row, index) => ({
               key: row.key,
               label: row.label,
               closedTabs: Number(row.closedTabs),
@@ -10867,6 +11917,33 @@ export class ManagementService {
                       Number(row.revenueCents),
                       Number(row.previousRevenueCents),
                     ),
+              rank: index + 1,
+              operatingDays: Number(row.operatingDays),
+              revenuePerOperatingDayCents:
+                Number(row.operatingDays) > 0
+                  ? Math.round(Number(row.revenueCents) / Number(row.operatingDays))
+                  : null,
+              organizationRevenueSharePercent:
+                multiunitRows.reduce((sum, item) => sum + Number(item.revenueCents), 0) > 0
+                  ? Number(
+                      (
+                        (Number(row.revenueCents) /
+                          multiunitRows.reduce((sum, item) => sum + Number(item.revenueCents), 0)) *
+                        100
+                      ).toFixed(2),
+                    )
+                  : null,
+              sameStoreChangePercent:
+                previousPeriod !== null &&
+                Number(row.operatingDays) > 0 &&
+                Number(row.previousOperatingDays) > 0
+                  ? reportPercentageChange(
+                      Math.round(Number(row.revenueCents) / Number(row.operatingDays)),
+                      Math.round(
+                        Number(row.previousRevenueCents) / Number(row.previousOperatingDays),
+                      ),
+                    )
+                  : null,
             }))
           : null,
       quality: { scorePercent: qualityScorePercent, issues: qualityIssues },
@@ -10970,12 +12047,144 @@ export class ManagementService {
         ),
       );
     return {
-      settings,
-      selectedPersonIds: assignments.map((assignment) => assignment.personId),
+      settings: role === "owner" ? settings : timeTrackingSettingsWithoutCoordinates(settings),
+      selectedPersonIds:
+        role === "owner" ? assignments.map((assignment) => assignment.personId) : [],
       capabilities: {
         canConfigure: role === "owner",
         canView: true,
       },
+    };
+  }
+
+  async timeTrackingSettingsHistory(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner"]);
+    const rows = await this.database.db
+      .select({
+        id: auditEvents.id,
+        actorName: identities.displayName,
+        occurredAt: auditEvents.occurredAt,
+        metadata: auditEvents.metadata,
+      })
+      .from(auditEvents)
+      .leftJoin(identities, eq(identities.id, auditEvents.actorIdentityId))
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationId),
+          eq(auditEvents.unitId, unitId),
+          eq(auditEvents.action, "management.time-tracking.settings.updated"),
+          eq(auditEvents.entityType, "time_tracking_settings"),
+        ),
+      )
+      .orderBy(desc(auditEvents.occurredAt))
+      .limit(50);
+    return rows.map((row) => ({
+      id: row.id,
+      actorName: row.actorName ?? "Sistema",
+      occurredAt: row.occurredAt,
+      locationChangeReason:
+        typeof row.metadata.locationChangeReason === "string"
+          ? row.metadata.locationChangeReason
+          : null,
+      previous: row.metadata.previous ?? null,
+      current: row.metadata.current ?? null,
+    }));
+  }
+
+  async timeTrackingLocationAnomalies(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    period: ReportPeriodInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner"]);
+    const [unit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const entryDate = sql<string>`timezone(${unit.timezone}, ${managementTimeEntries.clockedInAt})::date`;
+    const entries = await this.database.db
+      .select({ entry: managementTimeEntries, personName: managementPeople.name })
+      .from(managementTimeEntries)
+      .innerJoin(
+        managementPeople,
+        and(
+          eq(managementPeople.organizationId, managementTimeEntries.organizationId),
+          eq(managementPeople.unitId, managementTimeEntries.unitId),
+          eq(managementPeople.id, managementTimeEntries.personId),
+        ),
+      )
+      .where(
+        and(
+          eq(managementTimeEntries.organizationId, organizationId),
+          eq(managementTimeEntries.unitId, unitId),
+          gte(entryDate, period.from),
+          lte(entryDate, period.to),
+          or(
+            sql`jsonb_array_length(${managementTimeEntries.clockInFlags}) > 0`,
+            sql`jsonb_array_length(${managementTimeEntries.clockOutFlags}) > 0`,
+          ),
+        ),
+      )
+      .orderBy(desc(managementTimeEntries.clockedInAt))
+      .limit(500);
+    return {
+      from: period.from,
+      to: period.to,
+      points: entries.flatMap(({ entry, personName }) => {
+        const points: Array<{
+          timeEntryId: string;
+          personId: string;
+          personName: string;
+          event: "clock-in" | "clock-out";
+          occurredAt: Date;
+          latitude: number;
+          longitude: number;
+          accuracyMeters: number | null;
+          locationLabel: string | null;
+          flags: string[];
+        }> = [];
+        if (
+          entry.clockInLatitude !== null &&
+          entry.clockInLongitude !== null &&
+          entry.clockInFlags.length
+        ) {
+          points.push({
+            timeEntryId: entry.id,
+            personId: entry.personId,
+            personName,
+            event: "clock-in",
+            occurredAt: entry.clockedInAt,
+            latitude: entry.clockInLatitude,
+            longitude: entry.clockInLongitude,
+            accuracyMeters: entry.clockInAccuracyMeters,
+            locationLabel: entry.clockInGeofenceLabel,
+            flags: entry.clockInFlags,
+          });
+        }
+        if (
+          entry.clockedOutAt &&
+          entry.clockOutLatitude !== null &&
+          entry.clockOutLongitude !== null &&
+          entry.clockOutFlags.length
+        ) {
+          points.push({
+            timeEntryId: entry.id,
+            personId: entry.personId,
+            personName,
+            event: "clock-out",
+            occurredAt: entry.clockedOutAt,
+            latitude: entry.clockOutLatitude,
+            longitude: entry.clockOutLongitude,
+            accuracyMeters: entry.clockOutAccuracyMeters,
+            locationLabel: entry.clockOutGeofenceLabel,
+            flags: entry.clockOutFlags,
+          });
+        }
+        return points;
+      }),
     };
   }
 
@@ -11190,8 +12399,8 @@ export class ManagementService {
     return {
       people,
       schedules: canManage ? schedules : [],
-      timeEntries,
-      breaks,
+      timeEntries: timeEntries.map(timeTrackingEntryForRead),
+      breaks: breaks.map(timeTrackingBreakForRead),
       corrections,
       summaries,
       anomalies: summaries.filter((summary) => summary.anomalyCodes.length > 0),
@@ -11201,7 +12410,7 @@ export class ManagementService {
       accounts,
       commissionRules: canViewCommissions ? rules : [],
       commissions: canViewCommissions ? commissions : [],
-      settings,
+      settings: role === "owner" ? settings : timeTrackingSettingsWithoutCoordinates(settings),
       canManage,
     };
   }
@@ -11311,10 +12520,10 @@ export class ManagementService {
       if (!summary) throw new Error("TIME_ENTRY_SUMMARY_MISSING");
       const person = peopleById.get(entry.personId) ?? null;
       const hourlyRateCents = person?.hourlyRateCents ?? null;
-      const { localDate, ...entryFields } = entry;
+      const { localDate } = entry;
       const localizedSummary = { ...summary, date: localDate };
       return {
-        ...entryFields,
+        ...timeTrackingEntryForRead(entry),
         summary: localizedSummary,
         person,
         hourlyRateCents,
@@ -11806,6 +13015,56 @@ export class ManagementService {
   ) {
     await this.requireRole(identityId, organizationId, unitId, ["owner"]);
     return this.database.db.transaction(async (tx) => {
+      const previousSettings = await this.timeTrackingSettings(tx, organizationId, unitId);
+      const additionalLocations = input.additionalLocations.map((location) => ({
+        ...location,
+        id: location.id ?? randomUUID(),
+      }));
+      if (
+        new Set(additionalLocations.map((location) => location.id)).size !==
+        additionalLocations.length
+      ) {
+        throw new BadRequestException({
+          code: "TIME_TRACKING_LOCATION_DUPLICATE_ID",
+          message: "Cada local permitido deve possuir uma identificação única.",
+        });
+      }
+      const previousLocationPolicy = {
+        locationLabel: previousSettings.locationLabel,
+        locationAddress: previousSettings.locationAddress,
+        latitude: previousSettings.latitude,
+        longitude: previousSettings.longitude,
+        radiusMeters: previousSettings.radiusMeters,
+        accuracyToleranceMeters: previousSettings.accuracyToleranceMeters,
+        maxLocationAccuracyMeters: previousSettings.maxLocationAccuracyMeters,
+        lowAccuracyPolicy: previousSettings.lowAccuracyPolicy,
+        additionalLocations: previousSettings.additionalLocations,
+      };
+      const nextLocationPolicy = {
+        locationLabel: input.locationLabel ?? null,
+        locationAddress: input.locationAddress ?? null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        radiusMeters: input.radiusMeters,
+        accuracyToleranceMeters: input.accuracyToleranceMeters,
+        maxLocationAccuracyMeters: input.maxLocationAccuracyMeters,
+        lowAccuracyPolicy: input.lowAccuracyPolicy,
+        additionalLocations,
+      };
+      const previouslyConfigured =
+        previousSettings.latitude !== null ||
+        previousSettings.longitude !== null ||
+        previousSettings.additionalLocations.length > 0;
+      if (
+        previouslyConfigured &&
+        JSON.stringify(previousLocationPolicy) !== JSON.stringify(nextLocationPolicy) &&
+        !input.locationChangeReason?.trim()
+      ) {
+        throw new BadRequestException({
+          code: "TIME_TRACKING_LOCATION_CHANGE_REASON_REQUIRED",
+          message: "Informe o motivo ao alterar uma localização de ponto já configurada.",
+        });
+      }
       const activePeople = await tx
         .select({ id: managementPeople.id, identityId: managementPeople.identityId })
         .from(managementPeople)
@@ -11837,16 +13096,24 @@ export class ManagementService {
           mode: input.mode,
           geofenceEnabled: input.geofenceEnabled,
           locationLabel: input.locationLabel,
+          locationAddress: input.locationAddress,
           latitude: input.latitude,
           longitude: input.longitude,
           radiusMeters: input.radiusMeters,
           accuracyToleranceMeters: input.accuracyToleranceMeters,
+          maxLocationAccuracyMeters: input.maxLocationAccuracyMeters,
+          lowAccuracyPolicy: input.lowAccuracyPolicy,
+          additionalLocations,
           managerCanView: input.managerCanView,
           financeCanView: input.financeCanView,
           antiFraudEnabled: input.antiFraudEnabled,
           offlineEnabled: input.offlineEnabled,
+          offlineMaxDelayMinutes: input.offlineMaxDelayMinutes,
+          offlineRequiresJustification: input.offlineRequiresJustification,
           notificationsEnabled: input.notificationsEnabled,
+          emailAlertsEnabled: input.emailAlertsEnabled,
           managerAlertOnAnomaly: input.managerAlertOnAnomaly,
+          locationRetentionDays: input.locationRetentionDays,
           lateToleranceMinutes: input.lateToleranceMinutes,
           minimumBreakMinutes: input.minimumBreakMinutes,
           maxOvertimeMinutes: input.maxOvertimeMinutes,
@@ -11864,16 +13131,24 @@ export class ManagementService {
             mode: input.mode,
             geofenceEnabled: input.geofenceEnabled,
             locationLabel: input.locationLabel,
+            locationAddress: input.locationAddress,
             latitude: input.latitude,
             longitude: input.longitude,
             radiusMeters: input.radiusMeters,
             accuracyToleranceMeters: input.accuracyToleranceMeters,
+            maxLocationAccuracyMeters: input.maxLocationAccuracyMeters,
+            lowAccuracyPolicy: input.lowAccuracyPolicy,
+            additionalLocations,
             managerCanView: input.managerCanView,
             financeCanView: input.financeCanView,
             antiFraudEnabled: input.antiFraudEnabled,
             offlineEnabled: input.offlineEnabled,
+            offlineMaxDelayMinutes: input.offlineMaxDelayMinutes,
+            offlineRequiresJustification: input.offlineRequiresJustification,
             notificationsEnabled: input.notificationsEnabled,
+            emailAlertsEnabled: input.emailAlertsEnabled,
             managerAlertOnAnomaly: input.managerAlertOnAnomaly,
+            locationRetentionDays: input.locationRetentionDays,
             lateToleranceMinutes: input.lateToleranceMinutes,
             minimumBreakMinutes: input.minimumBreakMinutes,
             maxOvertimeMinutes: input.maxOvertimeMinutes,
@@ -11911,7 +13186,21 @@ export class ManagementService {
         "management.time-tracking.settings.updated",
         "time_tracking_settings",
         settings?.id ?? `${organizationId}:${unitId}`,
-        { mode: input.mode, selectedPersonIds: input.selectedPersonIds },
+        {
+          mode: input.mode,
+          selectedPersonIds: input.selectedPersonIds,
+          locationChangeReason: input.locationChangeReason ?? null,
+          previous: {
+            ...previousLocationPolicy,
+            offlineMaxDelayMinutes: previousSettings.offlineMaxDelayMinutes,
+            locationRetentionDays: previousSettings.locationRetentionDays,
+          },
+          current: {
+            ...nextLocationPolicy,
+            offlineMaxDelayMinutes: input.offlineMaxDelayMinutes,
+            locationRetentionDays: input.locationRetentionDays,
+          },
+        },
       );
       return { settings, selectedPersonIds: input.selectedPersonIds };
     });
@@ -12131,7 +13420,7 @@ export class ManagementService {
       return {
         enabled: false,
         person: person ?? null,
-        settings,
+        settings: timeTrackingSettingsWithoutCoordinates(settings),
         current: null,
         entries: [],
         breaks: [],
@@ -12154,7 +13443,14 @@ export class ManagementService {
       enabled = Boolean(assignment);
     }
     if (!enabled)
-      return { enabled: false, person, settings, current: null, entries: [], breaks: [] };
+      return {
+        enabled: false,
+        person,
+        settings: timeTrackingSettingsWithoutCoordinates(settings),
+        current: null,
+        entries: [],
+        breaks: [],
+      };
     const entries = await this.database.db
       .select()
       .from(managementTimeEntries)
@@ -12179,13 +13475,14 @@ export class ManagementService {
           )
           .orderBy(desc(managementTimeEntryBreaks.startedAt))
       : [];
+    const readableEntries = entries.map(timeTrackingEntryForRead);
     return {
       enabled: true,
       person,
-      settings,
-      current: entries.find((entry) => !entry.clockedOutAt) ?? null,
-      entries,
-      breaks,
+      settings: timeTrackingSettingsWithoutCoordinates(settings),
+      current: readableEntries.find((entry) => !entry.clockedOutAt) ?? null,
+      entries: readableEntries,
+      breaks: breaks.map(timeTrackingBreakForRead),
     };
   }
 
@@ -12217,13 +13514,8 @@ export class ManagementService {
           organizationId,
           unitId,
         );
-        this.assertGeofence(settings, location);
-        if (location.capturedAt && !settings.offlineEnabled) {
-          throw new ForbiddenException({
-            code: "TIME_TRACKING_OFFLINE_DISABLED",
-            message: "Marcações offline estão desativadas nesta unidade.",
-          });
-        }
+        const geofence = this.assertGeofence(settings, location);
+        const timing = resolvePunchTiming(location, settings);
         const [openEntry] = await tx
           .select({ id: managementTimeEntries.id })
           .from(managementTimeEntries)
@@ -12243,23 +13535,33 @@ export class ManagementService {
           });
         }
         const id = randomUUID();
-        const clockedInAt = resolveCapturedAt(location.capturedAt);
+        const clockedInAt = timing.occurredAt;
         await this.assertTimeTrackingPeriodOpen(tx, organizationId, unitId, clockedInAt);
-        const metadata = punchMetadata(clockedInAt, location, context, settings.antiFraudEnabled);
+        const metadata = punchMetadata(
+          timing.capturedAt,
+          location,
+          context,
+          settings.antiFraudEnabled,
+          timing.serverAt,
+          geofence.flags,
+        );
         await tx.insert(managementTimeEntries).values({
           id,
           organizationId,
           unitId,
           personId: person.id,
           clockedInAt,
-          source: location.capturedAt ? "self_offline" : "self",
+          source: location.offline ? "self_offline" : "self",
           clockInLatitude: location.latitude,
           clockInLongitude: location.longitude,
           clockInAccuracyMeters: location.accuracyMeters,
           clockInServerAt: metadata.serverAt,
           clockInDeviceId: metadata.deviceId,
+          clockInSessionId: metadata.sessionId,
           clockInIpAddress: metadata.ipAddress,
           clockInUserAgent: metadata.userAgent,
+          clockInGeofenceLabel: geofence.locationLabel,
+          clockInOfflineJustification: location.offlineJustification,
           clockInFlags: metadata.flags,
           idempotencyKey,
           recordedByIdentityId: identityId,
@@ -12274,7 +13576,9 @@ export class ManagementService {
           id,
           {
             personId: person.id,
-            source: location.capturedAt ? "self_offline" : "self",
+            source: location.offline ? "self_offline" : "self",
+            locationLabel: geofence.locationLabel,
+            distanceMeters: geofence.distanceMeters,
             flags: metadata.flags,
           },
         );
@@ -12285,6 +13589,7 @@ export class ManagementService {
           identityId,
           id,
           metadata.flags,
+          settings,
         );
         return { timeEntryId: id, personId: person.id, clockedInAt: clockedInAt.toISOString() };
       },
@@ -12314,13 +13619,8 @@ export class ManagementService {
           organizationId,
           unitId,
         );
-        this.assertGeofence(settings, input);
-        if (input.capturedAt && !settings.offlineEnabled) {
-          throw new ForbiddenException({
-            code: "TIME_TRACKING_OFFLINE_DISABLED",
-            message: "Marcações offline estão desativadas nesta unidade.",
-          });
-        }
+        const geofence = this.assertGeofence(settings, input);
+        const timing = resolvePunchTiming(input, settings);
         await tx.execute(
           sql`select id from management_time_entries where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and person_id=${person.id}::uuid and clocked_out_at is null for update`,
         );
@@ -12357,8 +13657,15 @@ export class ManagementService {
             message: "Finalize a pausa atual antes de iniciar outra.",
           });
         const id = randomUUID();
-        const startedAt = resolveCapturedAt(input.capturedAt);
-        const metadata = punchMetadata(startedAt, input, context, settings.antiFraudEnabled);
+        const startedAt = timing.occurredAt;
+        const metadata = punchMetadata(
+          timing.capturedAt,
+          input,
+          context,
+          settings.antiFraudEnabled,
+          timing.serverAt,
+          geofence.flags,
+        );
         await tx.insert(managementTimeEntryBreaks).values({
           id,
           organizationId,
@@ -12371,8 +13678,11 @@ export class ManagementService {
           startAccuracyMeters: input.accuracyMeters,
           startServerAt: metadata.serverAt,
           startDeviceId: metadata.deviceId,
+          startSessionId: metadata.sessionId,
           startIpAddress: metadata.ipAddress,
           startUserAgent: metadata.userAgent,
+          startGeofenceLabel: geofence.locationLabel,
+          startOfflineJustification: input.offlineJustification,
           startFlags: metadata.flags,
           idempotencyKey,
           recordedByIdentityId: identityId,
@@ -12388,6 +13698,8 @@ export class ManagementService {
           {
             timeEntryId: entry.id,
             type: input.type,
+            locationLabel: geofence.locationLabel,
+            distanceMeters: geofence.distanceMeters,
             flags: metadata.flags,
           },
         );
@@ -12425,13 +13737,8 @@ export class ManagementService {
           organizationId,
           unitId,
         );
-        this.assertGeofence(settings, location);
-        if (location.capturedAt && !settings.offlineEnabled) {
-          throw new ForbiddenException({
-            code: "TIME_TRACKING_OFFLINE_DISABLED",
-            message: "Marcações offline estão desativadas nesta unidade.",
-          });
-        }
+        const geofence = this.assertGeofence(settings, location);
+        const timing = resolvePunchTiming(location, settings);
         await tx.execute(
           sql`select id from management_time_entry_breaks where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${breakId}::uuid for update`,
         );
@@ -12461,8 +13768,15 @@ export class ManagementService {
             code: "TIME_BREAK_ALREADY_CLOSED",
             message: "A pausa já foi finalizada.",
           });
-        const endedAt = resolveCapturedAt(location.capturedAt);
-        const metadata = punchMetadata(endedAt, location, context, settings.antiFraudEnabled);
+        const endedAt = timing.occurredAt;
+        const metadata = punchMetadata(
+          timing.capturedAt,
+          location,
+          context,
+          settings.antiFraudEnabled,
+          timing.serverAt,
+          geofence.flags,
+        );
         await tx
           .update(managementTimeEntryBreaks)
           .set({
@@ -12472,8 +13786,11 @@ export class ManagementService {
             endAccuracyMeters: location.accuracyMeters,
             endServerAt: metadata.serverAt,
             endDeviceId: metadata.deviceId,
+            endSessionId: metadata.sessionId,
             endIpAddress: metadata.ipAddress,
             endUserAgent: metadata.userAgent,
+            endGeofenceLabel: geofence.locationLabel,
+            endOfflineJustification: location.offlineJustification,
             endFlags: metadata.flags,
             updatedAt: metadata.serverAt,
           })
@@ -12488,6 +13805,8 @@ export class ManagementService {
           breakId,
           {
             timeEntryId: entryBreak.entry.id,
+            locationLabel: geofence.locationLabel,
+            distanceMeters: geofence.distanceMeters,
             flags: metadata.flags,
           },
         );
@@ -12519,13 +13838,8 @@ export class ManagementService {
           organizationId,
           unitId,
         );
-        this.assertGeofence(settings, location);
-        if (location.capturedAt && !settings.offlineEnabled) {
-          throw new ForbiddenException({
-            code: "TIME_TRACKING_OFFLINE_DISABLED",
-            message: "Marcações offline estão desativadas nesta unidade.",
-          });
-        }
+        const geofence = this.assertGeofence(settings, location);
+        const timing = resolvePunchTiming(location, settings);
         await tx.execute(
           sql`select id from management_time_entries where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and person_id=${person.id}::uuid and clocked_out_at is null for update`,
         );
@@ -12561,14 +13875,21 @@ export class ManagementService {
             code: "TIME_BREAK_OPEN",
             message: "Finalize a pausa antes de encerrar o turno.",
           });
-        const clockedOutAt = resolveCapturedAt(location.capturedAt);
+        const clockedOutAt = timing.occurredAt;
         if (clockedOutAt <= entry.clockedInAt) {
           throw new BadRequestException({
             code: "INVALID_TIME_ENTRY_WINDOW",
             message: "A saída deve ser posterior à entrada.",
           });
         }
-        const metadata = punchMetadata(clockedOutAt, location, context, settings.antiFraudEnabled);
+        const metadata = punchMetadata(
+          timing.capturedAt,
+          location,
+          context,
+          settings.antiFraudEnabled,
+          timing.serverAt,
+          geofence.flags,
+        );
         await tx
           .update(managementTimeEntries)
           .set({
@@ -12578,8 +13899,11 @@ export class ManagementService {
             clockOutAccuracyMeters: location.accuracyMeters,
             clockOutServerAt: metadata.serverAt,
             clockOutDeviceId: metadata.deviceId,
+            clockOutSessionId: metadata.sessionId,
             clockOutIpAddress: metadata.ipAddress,
             clockOutUserAgent: metadata.userAgent,
+            clockOutGeofenceLabel: geofence.locationLabel,
+            clockOutOfflineJustification: location.offlineJustification,
             clockOutFlags: metadata.flags,
             updatedAt: metadata.serverAt,
           })
@@ -12594,6 +13918,8 @@ export class ManagementService {
           entry.id,
           {
             personId: person.id,
+            locationLabel: geofence.locationLabel,
+            distanceMeters: geofence.distanceMeters,
             flags: metadata.flags,
           },
         );
@@ -12604,6 +13930,7 @@ export class ManagementService {
           identityId,
           entry.id,
           metadata.flags,
+          settings,
         );
         return {
           timeEntryId: entry.id,

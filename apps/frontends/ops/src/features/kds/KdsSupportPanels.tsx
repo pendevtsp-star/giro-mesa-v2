@@ -1,4 +1,5 @@
-import { Badge, Button, Card } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, Input, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type { KdsAllDayItem, KdsBatch, KdsStation } from "../../operations.shared";
 import type { RealtimeStatus } from "../../realtime";
@@ -218,7 +219,7 @@ export function KdsAnalyticsPanel({
         <div className="kds-analytics-controls">
           <label>
             Período
-            <select
+            <NativeSelect
               onChange={(event) => onWindowChange(Number(event.target.value))}
               value={windowHours}
             >
@@ -226,7 +227,7 @@ export function KdsAnalyticsPanel({
               <option value={72}>Últimas 72 horas</option>
               <option value={168}>Últimos 7 dias</option>
               <option value={672}>Últimos 28 dias</option>
-            </select>
+            </NativeSelect>
           </label>
           <Button disabled={loading} onClick={onLoad} size="sm" variant="secondary">
             {loading ? "Carregando…" : "Carregar histórico"}
@@ -356,7 +357,7 @@ export function KdsBatchesPanel({
         <form className="kds-batch-form" onSubmit={submit}>
           <label>
             Praça
-            <select
+            <NativeSelect
               onChange={(event) => setStationId(event.target.value)}
               required
               value={stationId}
@@ -366,22 +367,22 @@ export function KdsBatchesPanel({
                   {station.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label>
             Produto opcional
-            <select onChange={(event) => setProductId(event.target.value)} value={productId}>
+            <NativeSelect onChange={(event) => setProductId(event.target.value)} value={productId}>
               <option value="">Qualquer item compatível</option>
               {availableProducts.map((item) => (
                 <option key={item.productId} value={item.productId ?? ""}>
                   {item.productName}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label>
             Máximo de itens
-            <input
+            <Input
               inputMode="numeric"
               max={50}
               min={1}
@@ -468,7 +469,7 @@ export function KdsBatchesPanel({
                     >
                       <label>
                         Motivo do cancelamento
-                        <input
+                        <Input
                           minLength={3}
                           onChange={(event) => setCancelReason(event.target.value)}
                           required

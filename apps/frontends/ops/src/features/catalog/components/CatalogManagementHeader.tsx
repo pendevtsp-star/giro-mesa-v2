@@ -184,7 +184,7 @@ export function CatalogManagementHeader({
           <legend className="catalog-visually-hidden">Idioma do cardápio</legend>
           <span className="catalog-language-switcher__label">Idioma:</span>
           {LANGUAGE_OPTIONS.map((option) => (
-            <button
+            <Button
               aria-pressed={language === option.value}
               className="catalog-language-switcher__option"
               data-active={language === option.value}
@@ -194,7 +194,7 @@ export function CatalogManagementHeader({
               type="button"
             >
               {option.label}
-            </button>
+            </Button>
           ))}
         </fieldset>
 

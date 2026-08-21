@@ -22,6 +22,8 @@ namespace GiroMesa.ApiClient.Models
 #else
         public string Content { get; set; }
 #endif
+        /// <summary>The contentEncoding property</summary>
+        public global::GiroMesa.ApiClient.Models.ManagementReportExportContent_contentEncoding? ContentEncoding { get; set; }
         /// <summary>The filename property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -29,6 +31,14 @@ namespace GiroMesa.ApiClient.Models
 #nullable restore
 #else
         public string Filename { get; set; }
+#endif
+        /// <summary>The mimeType property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? MimeType { get; set; }
+#nullable restore
+#else
+        public string MimeType { get; set; }
 #endif
         /// <summary>The sha256 property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -64,7 +74,9 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "content", n => { Content = n.GetStringValue(); } },
+                { "contentEncoding", n => { ContentEncoding = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportExportContent_contentEncoding>(); } },
                 { "filename", n => { Filename = n.GetStringValue(); } },
+                { "mimeType", n => { MimeType = n.GetStringValue(); } },
                 { "sha256", n => { Sha256 = n.GetStringValue(); } },
             };
         }
@@ -76,7 +88,9 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("content", Content);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportExportContent_contentEncoding>("contentEncoding", ContentEncoding);
             writer.WriteStringValue("filename", Filename);
+            writer.WriteStringValue("mimeType", MimeType);
             writer.WriteStringValue("sha256", Sha256);
             writer.WriteAdditionalData(AdditionalData);
         }

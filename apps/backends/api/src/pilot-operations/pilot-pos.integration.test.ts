@@ -28,7 +28,11 @@ import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 import { kdsAttentionRevision } from "./pilot-rules.js";
-import { kdsAnalyticsResponseSchema, kdsReadModelSchema } from "./pilot-schemas.js";
+import {
+  kdsAnalyticsResponseSchema,
+  kdsReadModelSchema,
+  type TerminalProfileInput,
+} from "./pilot-schemas.js";
 
 it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", async (context) => {
   const databaseUrl = process.env.PILOT_DATABASE_URL;
@@ -881,6 +885,46 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         )
       ).mode,
       "pass",
+    );
+    const sharedInstallationId = randomUUID();
+    const sharedProfileInput: TerminalProfileInput = {
+      label: "Caixa principal",
+      mode: "cashier" as const,
+      defaultRoute: "counter" as const,
+      printerId: "receipt-main",
+      stationId: null,
+      compact: true,
+      quickActions: ["receive", "print", "search"],
+    };
+    await pos.putTerminalProfile(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      sharedInstallationId,
+      "terminal-profile-0001",
+      sharedProfileInput,
+    );
+    const sharedProfile = await pos.getTerminalProfile(
+      kdsIdentity.id,
+      organizationA.id,
+      unitA.id,
+      sharedInstallationId,
+    );
+    assert.equal(sharedProfile?.defaultRoute, "counter");
+    assert.equal(sharedProfile?.printerId, "receipt-main");
+    await assert.rejects(
+      () =>
+        pos.putTerminalProfile(
+          kdsIdentity.id,
+          organizationA.id,
+          unitA.id,
+          sharedInstallationId,
+          "terminal-profile-denied-0001",
+          sharedProfileInput,
+        ),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "POS_ROLE_DENIED",
     );
     await assert.rejects(
       () =>

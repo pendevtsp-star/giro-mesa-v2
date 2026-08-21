@@ -62,10 +62,10 @@ fi
 postgres16="${postgres_images[0]%$'\r'}"
 postgres17="${postgres_images[1]%$'\r'}"
 
-required_migration="$candidate_directory/packages/db/drizzle/0042_shallow_lenny_balinger.sql"
+required_migration="$candidate_directory/packages/db/drizzle/0045_strong_pride.sql"
 required_matrix_test="$candidate_directory/packages/db/src/schema.test.ts"
 [[ -f "$required_migration" && -f "$required_matrix_test" ]] || {
-  printf 'RECOVERY_0042_PROOF_MISSING\n' >&2
+  printf 'RECOVERY_0045_PROOF_MISSING\n' >&2
   exit 65
 }
 
@@ -253,7 +253,7 @@ PY
   mv -f -- "$temporary" "$runtime_environment"
 }
 
-for level in 42; do
+for level in 45; do
   database="recovery_level_${level}"
   api="gm-recovery-api-${level}-${suffix}"
   worker="gm-recovery-worker-${level}-${suffix}"
@@ -261,7 +261,7 @@ for level in 42; do
   apply_schema_level "$database" "$level"
   write_runtime_environment "$database"
 
-  if ((level == 42)); then
+  if ((level == 45)); then
     docker run -d --name "$api" --network "$network" --env-file "$runtime_environment" \
       -e HOST=0.0.0.0 -e PORT=3200 "$api_image" >/dev/null
     ready=false
@@ -297,7 +297,7 @@ for level in 42; do
   done
   [[ "$processed" == true ]] || { printf 'RECOVERY_WORKER_OUTBOX_PROBE_FAILED:%s\n' "$level" >&2; exit 1; }
   docker rm -f "$worker" >/dev/null
-  if ((level == 42)); then docker rm -f "$api" >/dev/null; fi
+  if ((level == 45)); then docker rm -f "$api" >/dev/null; fi
 done
 
 mkdir -p -- "$output_directory"
@@ -307,14 +307,14 @@ import hashlib, json, os, pathlib, sys, tempfile
 directory=pathlib.Path(sys.argv[1])
 recovery_sha=sys.argv[2]
 doseclub_present=sys.argv[3]=="true"
-levels=[42]
+levels=[45]
 value={
     "schemaVersion":1,
     "role":"recovery",
     "recoveryArtifact":"git:"+recovery_sha,
     "postgresMajors":[16,17],
     "schemaLevels":levels,
-    "targetMigration":"0042_shallow_lenny_balinger",
+    "targetMigration":"0045_strong_pride",
     "testedUpgrade":True,
     "doseClubReconciliation":"legacy-source-upgraded",
     "legacyUpgrade":{
@@ -326,7 +326,7 @@ value={
     },
     "runtime":{
         "postgresMajor":17,
-        "schemaLevel":42,
+        "schemaLevel":45,
         "apiHealth":"passed",
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
@@ -334,8 +334,8 @@ value={
     "runtimeMatrix":{
         "postgresMajor":17,
         "schemaLevels":levels,
-        "apiHealthByLevel":{"42":"passed"},
-        "workerByLevel":{"42":"passed"},
+        "apiHealthByLevel":{"45":"passed"},
+        "workerByLevel":{"45":"passed"},
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
         "doseClub":{"present":doseclub_present,"probe":"passed" if doseclub_present else "not-present"},

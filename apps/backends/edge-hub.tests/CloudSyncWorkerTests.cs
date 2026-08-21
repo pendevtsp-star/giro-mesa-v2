@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Storage;
 using GiroMesa.EdgeHub.Sync;
 using Microsoft.Data.Sqlite;
@@ -35,9 +36,11 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         await store.AcceptCommandAsync(edgeCommand);
         var cloudCommandId = Guid.NewGuid().ToString();
         var handler = new SyncHandler(store, edgeCommand.Id, cloudCommandId);
+        var fiscalCredentials = new FocusCredentialStore();
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
+            fiscalCredentials,
             options,
             NullLogger<CloudSyncWorker>.Instance);
 
@@ -55,6 +58,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.NotNull(cloudState.CloudAcknowledgedAt);
         Assert.True(cloudState.Result.HasValue);
         Assert.Equal("projected", cloudState.Result.Value.GetProperty("state").GetString());
+        Assert.Equal("focus-company-token", fiscalCredentials.Current?.Token);
     }
 
     [Fact]
@@ -74,6 +78,7 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
+            new FocusCredentialStore(),
             options,
             NullLogger<CloudSyncWorker>.Instance);
 
@@ -144,6 +149,13 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                         },
                     },
                     serverTime = DateTimeOffset.UtcNow,
+                    fiscalConfiguration = new
+                    {
+                        provider = "focus",
+                        enabled = true,
+                        environment = "homologation",
+                        token = "focus-company-token",
+                    },
                     snapshot = new
                     {
                         organizationId = ValidOrganizationId,
@@ -185,6 +197,13 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                     rejectedEvents = Array.Empty<object>(),
                     commands = Array.Empty<object>(),
                     serverTime = DateTimeOffset.UtcNow,
+                    fiscalConfiguration = new
+                    {
+                        provider = "focus",
+                        enabled = true,
+                        environment = "homologation",
+                        token = "focus-company-token",
+                    },
                 };
             }
 

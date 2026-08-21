@@ -55,21 +55,21 @@ export function CartSummary({
             <strong>{formatMoney(cartLineTotal(line, fulfillment))}</strong>
           </div>
           <div className="quantity">
-            <button
+            <Button
               type="button"
               aria-label={`Remover uma unidade de ${line.item.name}`}
               onClick={() => onQuantity(line.lineId, -1)}
             >
               −
-            </button>
+            </Button>
             <output>{line.quantity}</output>
-            <button
+            <Button
               type="button"
               aria-label={`Adicionar uma unidade de ${line.item.name}`}
               onClick={() => onQuantity(line.lineId, 1)}
             >
               +
-            </button>
+            </Button>
           </div>
         </article>
       ))}
@@ -80,3 +80,5 @@ export function CartSummary({
     </div>
   );
 }
+
+import { Button } from "@giromesa/ui";

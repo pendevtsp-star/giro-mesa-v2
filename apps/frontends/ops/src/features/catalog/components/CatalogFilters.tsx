@@ -1,4 +1,5 @@
-import { Icon, SearchField } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Icon, NativeSelect, SearchField } from "@giromesa/ui";
 import type { ChangeEvent } from "react";
 import type { CatalogProduct, PilotCatalogCategory } from "../../../operations.shared";
 
@@ -78,7 +79,7 @@ export function CatalogFilters({
           <fieldset className="catalog-view-switcher">
             <legend className="catalog-visually-hidden">Visualização</legend>
             {VIEW_MODES.map((mode) => (
-              <button
+              <Button
                 aria-label={mode.label}
                 aria-pressed={viewMode === mode.value}
                 className="catalog-view-switcher__button"
@@ -87,15 +88,16 @@ export function CatalogFilters({
                 onClick={() => onViewModeChange(mode.value)}
                 title={mode.label}
                 type="button"
+                variant="ghost"
               >
                 <Icon name={mode.icon} size={16} />
-              </button>
+              </Button>
             ))}
           </fieldset>
 
-          <select
+          <NativeSelect
             aria-label="Status dos produtos"
-            className="catalog-filters__status"
+            className="w-auto catalog-filters__status"
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               onStatusChange(event.target.value as CatalogStatusFilter)
             }
@@ -104,7 +106,7 @@ export function CatalogFilters({
             <option value="active">Apenas Ativos</option>
             <option value="inactive">Apenas Inativos</option>
             <option value="all">Todos os Status</option>
-          </select>
+          </NativeSelect>
 
           <SearchField
             className="catalog-filters__search"
@@ -120,17 +122,18 @@ export function CatalogFilters({
         {DIET_FILTERS.map((diet) => {
           const active = dietFilter === diet.id;
           return (
-            <button
+            <Button
               aria-pressed={active}
               className="catalog-diet-filters__chip"
               data-active={active}
               key={diet.id}
               onClick={() => onDietFilterChange(diet.id)}
               type="button"
+              variant="ghost"
             >
               {active && <Icon name="check" size={11} />}
               <span>{diet.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -150,16 +153,17 @@ function CategoryTab({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       aria-selected={active}
       className="catalog-category-tabs__tab"
       data-active={active}
       onClick={onClick}
       role="tab"
       type="button"
+      variant="ghost"
     >
       <span>{label}</span>
       <span className="catalog-category-tabs__count">{count}</span>
-    </button>
+    </Button>
   );
 }

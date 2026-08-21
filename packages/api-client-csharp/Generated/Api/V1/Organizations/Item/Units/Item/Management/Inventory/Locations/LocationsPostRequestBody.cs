@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The barcode property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Barcode { get; set; }
+#nullable restore
+#else
+        public string Barcode { get; set; }
+#endif
         /// <summary>The code property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -22,6 +30,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
 #else
         public string Code { get; set; }
 #endif
+        /// <summary>The kind property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_kind? Kind { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -30,6 +40,18 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
 #else
         public string Name { get; set; }
 #endif
+        /// <summary>The requireDistinctTransferReceiver property</summary>
+        public bool? RequireDistinctTransferReceiver { get; set; }
+        /// <summary>The responsibleIdentityId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId? ResponsibleIdentityId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId ResponsibleIdentityId { get; set; }
+#endif
+        /// <summary>The transferSlaMinutes property</summary>
+        public int? TransferSlaMinutes { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody"/> and sets the default values.
         /// </summary>
@@ -55,8 +77,13 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "barcode", n => { Barcode = n.GetStringValue(); } },
                 { "code", n => { Code = n.GetStringValue(); } },
+                { "kind", n => { Kind = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_kind>(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
+                { "requireDistinctTransferReceiver", n => { RequireDistinctTransferReceiver = n.GetBoolValue(); } },
+                { "responsibleIdentityId", n => { ResponsibleIdentityId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId.CreateFromDiscriminatorValue); } },
+                { "transferSlaMinutes", n => { TransferSlaMinutes = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -66,9 +93,76 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("barcode", Barcode);
             writer.WriteStringValue("code", Code);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_kind>("kind", Kind);
             writer.WriteStringValue("name", Name);
+            writer.WriteBoolValue("requireDistinctTransferReceiver", RequireDistinctTransferReceiver);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId>("responsibleIdentityId", ResponsibleIdentityId);
+            writer.WriteIntValue("transferSlaMinutes", TransferSlaMinutes);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class LocationsPostRequestBody_responsibleIdentityId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1? LocationsPostRequestBodyResponsibleIdentityIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1 LocationsPostRequestBodyResponsibleIdentityIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody.LocationsPostRequestBody_responsibleIdentityId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.LocationsPostRequestBodyResponsibleIdentityIdMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(LocationsPostRequestBodyResponsibleIdentityIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(LocationsPostRequestBodyResponsibleIdentityIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsPostRequestBody_responsibleIdentityIdMember1>(null, LocationsPostRequestBodyResponsibleIdentityIdMember1);
+                }
+            }
         }
     }
 }

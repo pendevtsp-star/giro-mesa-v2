@@ -1,5 +1,5 @@
 import { Toast } from "@giromesa/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../api";
 import {
   type InterunitTransfer,
@@ -20,6 +20,7 @@ import {
   type StockLocation,
   useRemote,
 } from "../../management.shared";
+import { type RealtimeStatus, subscribeScopeRealtime } from "../../realtime";
 import {
   AssetModal,
   BarcodeScanModal,
@@ -27,8 +28,10 @@ import {
   InterunitTransferModal,
   InventoryClosingModal,
   InventoryEventModal,
+  InventoryIssueRouteModal,
   InventoryReviewModal,
   ItemModal,
+  LocationItemSettingModal,
   LocationModal,
   LotModal,
   ProductionBatchModal,
@@ -39,6 +42,7 @@ import {
   ReturnableIncidentModal,
   ReturnableIncidentReviewModal,
   ReturnableSupplierExchangeModal,
+  ReturnableSupplierExchangeResolutionModal,
   TransferModal,
   TransferResolutionModal,
 } from "./InventoryModals";
@@ -51,6 +55,7 @@ interface Feedback {
 }
 
 export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
+  const { organizationId, unitId } = scope;
   const remote = useRemote(scope, api.management.inventory, parseInventory);
   const returnables = useRemote(scope, api.management.returnables, parseReturnables);
   const catalog = useRemote(scope, api.pilot.catalog, parseRecipeCatalog);
@@ -72,9 +77,33 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
   const [selectedProduction, setSelectedProduction] = useState<ProductionBatch | null>(null);
   const [selectedInterunitTransfer, setSelectedInterunitTransfer] =
     useState<InterunitTransfer | null>(null);
+  const [selectedSupplierExchangeId, setSelectedSupplierExchangeId] = useState<string | null>(null);
   const [scannedCode, setScannedCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
+
+  useEffect(
+    () =>
+      subscribeScopeRealtime(
+        { organizationId, unitId },
+        async () => {
+          await remote.retry();
+          await returnables.retry();
+          return true;
+        },
+        setRealtimeStatus,
+        15_000,
+        {
+          shouldInvalidate: (event) =>
+            event.topic?.startsWith("management.inventory") === true ||
+            event.topic?.startsWith("management.stock-location") === true ||
+            event.topic?.startsWith("management.returnable") === true ||
+            event.topic?.startsWith("management.product-returnable") === true,
+        },
+      ),
+    [organizationId, remote.retry, returnables.retry, unitId],
+  );
 
   function closeDialog() {
     if (busy) return;
@@ -88,6 +117,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
     setSelectedReservation(null);
     setSelectedProduction(null);
     setSelectedInterunitTransfer(null);
+    setSelectedSupplierExchangeId(null);
   }
 
   async function run(action: () => Promise<unknown>, success: string) {
@@ -107,6 +137,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
       setSelectedReservation(null);
       setSelectedProduction(null);
       setSelectedInterunitTransfer(null);
+      setSelectedSupplierExchangeId(null);
       return true;
     } catch (error) {
       setFeedback({
@@ -257,6 +288,10 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 setSelectedIncidentId(incidentId);
                 setDialog("returnable-review");
               }}
+              onResolveSupplierExchange={(exchangeId) => {
+                setSelectedSupplierExchangeId(exchangeId);
+                setDialog("returnable-supplier-resolution");
+              }}
               onReviewInventoryRequest={(requestId) => {
                 setSelectedReview(
                   data.inventoryReviewRequests.find((request) => request.id === requestId) ?? null,
@@ -271,6 +306,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               }}
               onViewChange={setView}
               recipes={<RecipeManager inventory={data} scope={scope} />}
+              realtimeStatus={realtimeStatus}
               scannedCode={scannedCode}
               view={view}
             />
@@ -278,6 +314,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             <LocationModal
               busy={busy}
               location={selectedLocation}
+              operators={data.inventoryOperators}
               onClose={closeDialog}
               onSubmit={(body) =>
                 run(
@@ -411,11 +448,11 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               onSubmit={(body) =>
                 run(
                   () =>
-                    api.management.transferInventory(
+                    api.management.transferInventoryBatch(
                       scope.organizationId,
                       scope.unitId,
                       body,
-                      operationalKey("inventory-transfer"),
+                      operationalKey("inventory-transfer-batch"),
                     ),
                   "Transferência enviada e aguardando conferência no destino.",
                 )
@@ -650,6 +687,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             />
             <InventoryClosingModal
               busy={busy}
+              locations={data.locations}
               onClose={closeDialog}
               onSubmit={(body) =>
                 run(
@@ -664,6 +702,43 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 )
               }
               open={dialog === "closing"}
+            />
+            <LocationItemSettingModal
+              busy={busy}
+              items={data.items}
+              locations={data.locations}
+              onClose={closeDialog}
+              onSubmit={(body) =>
+                run(
+                  () =>
+                    api.management.configureStockLocationItemSetting(
+                      scope.organizationId,
+                      scope.unitId,
+                      body,
+                    ),
+                  "Meta do setor atualizada.",
+                )
+              }
+              open={dialog === "location-item-setting"}
+            />
+            <InventoryIssueRouteModal
+              busy={busy}
+              items={data.items}
+              locations={data.locations}
+              onClose={closeDialog}
+              onSubmit={(body) =>
+                run(
+                  () =>
+                    api.management.configureInventoryIssueRoute(
+                      scope.organizationId,
+                      scope.unitId,
+                      body,
+                      operationalKey("inventory-issue-route"),
+                    ),
+                  "Rota de baixa por venda atualizada.",
+                )
+              }
+              open={dialog === "issue-route"}
             />
             <ReturnableConferenceModal
               busy={busy}
@@ -765,6 +840,28 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               }
               open={dialog === "returnable-supplier-exchange"}
               suppliers={suppliers.state.status === "ready" ? suppliers.state.data : []}
+            />
+            <ReturnableSupplierExchangeResolutionModal
+              busy={busy}
+              onClose={closeDialog}
+              onSubmit={(body) =>
+                selectedSupplierExchangeId
+                  ? run(
+                      () =>
+                        api.management.resolveReturnableSupplierExchange(
+                          scope.organizationId,
+                          scope.unitId,
+                          selectedSupplierExchangeId,
+                          body,
+                          operationalKey("returnable-supplier-exchange-resolution"),
+                        ),
+                      body.decision === "received"
+                        ? "Retorno do fornecedor confirmado."
+                        : "Envio cancelado e saldo recomposto.",
+                    )
+                  : Promise.resolve(false)
+              }
+              open={dialog === "returnable-supplier-resolution"}
             />
           </>
         )}

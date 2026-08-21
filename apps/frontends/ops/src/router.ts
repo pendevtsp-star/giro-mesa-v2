@@ -14,6 +14,7 @@ export const routeIds: RouteId[] = [
   "fiscal",
   "accountant",
   "people",
+  "waiter-settlements",
   "delivery",
   "reservations",
   "crm",
@@ -23,7 +24,7 @@ export const routeIds: RouteId[] = [
 ];
 
 export function parseRoute(hash: string): RouteId {
-  const value = hash.replace(/^#\/?/, "").split("/")[0];
+  const value = hash.replace(/^#\/?/, "").split(/[/?]/)[0];
   return routeIds.includes(value as RouteId) ? (value as RouteId) : "dashboard";
 }
 

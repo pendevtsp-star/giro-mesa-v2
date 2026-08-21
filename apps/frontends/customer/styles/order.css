@@ -57,7 +57,7 @@
 }
 .dialog-content > p:not(.overline) {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 13px;
 }
 .base-price {
@@ -80,8 +80,8 @@ legend {
   float: right;
   padding: 4px 7px;
   border-radius: 9px;
-  background: #edf1e8;
-  color: #5d6f64;
+  background: var(--gm-surface-soft);
+  color: var(--gm-muted);
   font-size: 8px;
   text-transform: uppercase;
 }
@@ -99,7 +99,7 @@ fieldset label input {
 }
 .dialog-content fieldset label b {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .notes {
@@ -111,7 +111,7 @@ fieldset label input {
 }
 .notes textarea {
   padding: 11px;
-  border: 1px solid #cbd2cd;
+  border: 1px solid var(--gm-border);
   border-radius: 10px;
   resize: vertical;
 }
@@ -129,7 +129,7 @@ fieldset label input {
 .quantity {
   display: flex;
   align-items: center;
-  border: 1px solid #d0d5d1;
+  border: 1px solid var(--gm-border);
   border-radius: 11px;
   background: white;
   overflow: hidden;
@@ -154,7 +154,7 @@ fieldset label input {
   border: 0;
   border-radius: 11px;
   background: var(--orange);
-  color: #fff;
+  color: var(--gm-on-action);
   font-weight: 800;
   cursor: pointer;
 }
@@ -206,7 +206,7 @@ fieldset label input {
   height: 39px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: #fff;
+  background: var(--gm-surface);
   font-size: 23px;
   cursor: pointer;
 }
@@ -239,7 +239,7 @@ fieldset label input {
 .cart-shell .cart-lines small {
   display: block;
   margin: 3px 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 9px;
 }
 .cart-lines strong {
@@ -266,7 +266,7 @@ fieldset label input {
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--gm-surface);
 }
 .checkout-form h3,
 .cart-shell .checkout-form p {
@@ -329,7 +329,7 @@ fieldset label input {
   font-size: 12px;
 }
 .checkout-form .fulfillment-options small {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .checkout-grid {
@@ -359,9 +359,9 @@ fieldset label input {
   width: 100%;
   min-height: 43px;
   padding: 10px 11px;
-  border: 1px solid #c9cec9;
+  border: 1px solid var(--gm-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--gm-surface);
   color: var(--ink);
   font: inherit;
 }
@@ -394,7 +394,7 @@ fieldset label input {
   font-size: 11px;
 }
 .checkout-form .payment-callout small {
-  color: #486556;
+  color: var(--gm-muted);
   font-size: 10px;
 }
 .privacy-check {
@@ -402,7 +402,7 @@ fieldset label input {
   gap: 9px;
   align-items: flex-start;
   margin-top: 15px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
   line-height: 1.45;
 }
@@ -420,14 +420,14 @@ fieldset label input {
 .checkout-form + .checkout-total small {
   flex-basis: 100%;
   margin-top: 4px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   text-align: right;
   font-size: 9px;
 }
 .order-receipt {
   margin: 24px 22px;
   padding: 26px;
-  border: 1px solid #b8d2c1;
+  border: 1px solid var(--gm-border);
   border-radius: 18px;
   background: #f1f7f2;
   text-align: center;
@@ -459,18 +459,18 @@ fieldset label input {
 }
 .order-receipt dl {
   margin: 0;
-  border-top: 1px solid #cbded0;
+  border-top: 1px solid var(--gm-border);
 }
 .order-receipt dl div {
   display: flex;
   justify-content: space-between;
   gap: 18px;
   padding: 11px 0;
-  border-bottom: 1px solid #cbded0;
+  border-bottom: 1px solid var(--gm-border);
   text-align: left;
 }
 .order-receipt dt {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .order-receipt dd {
@@ -482,12 +482,12 @@ fieldset label input {
 }
 .service-note {
   margin: 4px 22px 15px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .order-receipt .service-note {
   margin: 16px 0 0;
-  color: #486556;
+  color: var(--gm-muted);
   text-transform: none;
   letter-spacing: 0;
 }

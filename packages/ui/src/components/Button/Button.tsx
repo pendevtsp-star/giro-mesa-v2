@@ -1,7 +1,7 @@
-import type { ButtonHTMLAttributes } from "react";
-import "./Button.css";
+import type { ComponentProps } from "react";
+import { cn } from "../../lib/utils";
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ComponentProps<"button"> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md";
 };
@@ -15,7 +15,8 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`gm-button gm-button--${variant} gm-button--${size} ${className}`}
+      className={cn("gm-button", `gm-button--${variant}`, `gm-button--${size}`, className)}
+      data-slot="button"
       type={type}
       {...props}
     />

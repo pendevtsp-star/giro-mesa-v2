@@ -33,6 +33,7 @@ export interface CatalogProduct {
   imageUrl: string | null;
   estimatedPrepTimeMinutes?: number | null;
   stationIds: string[];
+  stationRouting?: Array<{ stationId: string; stage: number }>;
   priceCents: number;
   deliveryPriceCents?: number | null;
   costCents?: number | null;
@@ -524,6 +525,12 @@ export interface KdsTicket {
   servedAt: string | null;
   orderStatus: string | null;
   orderReadyNotifiedAt: string | null;
+  claimedByInstallationId: string | null;
+  claimedAt: string | null;
+  claimExpiresAt: string | null;
+  runnerIdentityId: string | null;
+  runnerClaimedAt: string | null;
+  runnerPickedUpAt: string | null;
   eta: {
     predictedReadyAt: string | null;
     remainingMinutes: number | null;
@@ -549,6 +556,23 @@ export interface KdsItem extends PosItem {
   completedAt: string | null;
   blocked: KdsItemBlock | null;
   attention: KdsAttention[];
+  stage: number;
+  dependencyHeld: boolean;
+  recipe: Array<{
+    id: string;
+    ingredientName: string;
+    quantityMilli: number;
+    unit: string;
+    lossBasisPoints: number;
+  }>;
+  changes: Array<{
+    id: string;
+    revision: string;
+    kind: "added" | "updated" | "removed";
+    summary: string;
+    acknowledgedAt: string | null;
+    createdAt: string | null;
+  }>;
 }
 
 export interface KdsBatchAssignment {
@@ -662,6 +686,13 @@ export interface KdsCapabilities {
   offlineAttentionAcknowledgement: boolean;
   offlineAvailability: boolean;
   offlineAvailabilityLifecycle: boolean;
+  sequentialStages: boolean;
+  ticketClaim: boolean;
+  orderChanges: boolean;
+  runnerHandoff: boolean;
+  productionGrid: boolean;
+  recipes: boolean;
+  demandControl: boolean;
 }
 
 export interface KdsCancellationAlert {
@@ -692,6 +723,31 @@ export interface KdsData {
   capabilities: KdsCapabilities;
   alerts: KdsCancellationAlert[];
   batches: KdsBatch[];
+  productionGrid: Array<{
+    stationId: string;
+    productId: string;
+    productName: string;
+    totalQuantity: number;
+    queuedQuantity: number;
+    preparingQuantity: number;
+    readyQuantity: number;
+    heldQuantity: number;
+    assignments: Array<{
+      ticketId: string;
+      orderItemId: string;
+      reference: string;
+      quantity: number;
+      readyQuantity: number;
+      status: KdsItemState;
+      stage: number;
+    }>;
+  }>;
+  demand: {
+    state: "normal" | "strained" | "overloaded";
+    suggestedDelayMinutes: number;
+    automatic: false;
+    channels: Array<{ channel: string; activeOrders: number; suggestedDelayMinutes: number }>;
+  } | null;
 }
 
 export const nextKdsState: Record<
@@ -865,10 +921,14 @@ export function parsePilotCatalog(value: unknown): PilotCatalog {
     }),
   );
   const productStations = new Map<string, string[]>();
+  const productStationRouting = new Map<string, Array<{ stationId: string; stage: number }>>();
   for (const row of records(payload.productStations ?? [])) {
     const pid = text(row.productId);
     if (!productStations.has(pid)) productStations.set(pid, []);
-    productStations.get(pid)?.push(text(row.stationId));
+    const stationId = text(row.stationId);
+    productStations.get(pid)?.push(stationId);
+    if (!productStationRouting.has(pid)) productStationRouting.set(pid, []);
+    productStationRouting.get(pid)?.push({ stationId, stage: optionalNumber(row.stage) ?? 1 });
   }
   const productAllergens = new Map<string, string[]>();
   for (const row of records(payload.productAllergens ?? [])) {
@@ -967,6 +1027,7 @@ export function parsePilotCatalog(value: unknown): PilotCatalog {
           imageUrl: row.imageUrl != null ? text(row.imageUrl) : null,
           estimatedPrepTimeMinutes: optionalNumber(row.estimatedPrepTimeMinutes),
           stationIds: productStations.get(id) ?? [],
+          stationRouting: productStationRouting.get(id) ?? [],
           priceCents: price ? number(price.priceCents) : 0,
           deliveryPriceCents: price ? optionalNumber(price.deliveryPriceCents) : null,
           costCents: price ? optionalNumber(price.costCents) : null,
@@ -1604,6 +1665,12 @@ export function parseKds(value: unknown): KdsData {
       orderReadyNotifiedAt: optionalText(
         row.orderReadyNotifiedAt ?? order?.readyNotifiedAt ?? tab?.readyNotifiedAt,
       ),
+      claimedByInstallationId: optionalText(row.claimedByInstallationId),
+      claimedAt: optionalText(row.claimedAt),
+      claimExpiresAt: optionalText(row.claimExpiresAt),
+      runnerIdentityId: optionalText(order?.runnerIdentityId ?? row.runnerIdentityId),
+      runnerClaimedAt: optionalText(order?.runnerClaimedAt ?? row.runnerClaimedAt),
+      runnerPickedUpAt: optionalText(order?.runnerPickedUpAt ?? row.runnerPickedUpAt),
       eta:
         eta === null
           ? null
@@ -1647,6 +1714,31 @@ export function parseKds(value: unknown): KdsData {
         completedAt: optionalText(production?.completedAt ?? itemRow.completedAt),
         blocked: parseKdsBlock(production?.blocked ?? itemRow.blocked, production ?? itemRow),
         attention: parseKdsAttention(production?.attention ?? row.attention ?? itemRow.attention),
+        stage: optionalNumber(production?.stage ?? itemRow.stage) ?? 1,
+        dependencyHeld: parseOptionalKdsBoolean(
+          production?.dependencyHeld ?? itemRow.dependencyHeld,
+        ),
+        recipe: records(row.recipe ?? itemRow.recipe ?? []).map((component) => ({
+          id: text(component.id),
+          ingredientName: text(component.ingredientName ?? component.name),
+          quantityMilli: number(component.quantityMilli),
+          unit: text(component.unit),
+          lossBasisPoints: optionalNumber(component.lossBasisPoints) ?? 0,
+        })),
+        changes: records(row.changes ?? itemRow.changes ?? []).map((change) => {
+          const kind = text(change.kind);
+          if (!(["added", "updated", "removed"] as const).includes(kind as "added")) {
+            throw new InvalidPilotPayloadError();
+          }
+          return {
+            id: text(change.id),
+            revision: text(change.revision),
+            kind: kind as "added" | "updated" | "removed",
+            summary: text(change.summary),
+            acknowledgedAt: optionalText(change.acknowledgedAt),
+            createdAt: optionalText(change.createdAt),
+          };
+        }),
       },
     };
   });
@@ -1909,10 +2001,56 @@ export function parseKds(value: unknown): KdsData {
       offlineAvailabilityLifecycle: parseOptionalKdsBoolean(
         capabilityRow?.offlineAvailabilityLifecycle ?? offlineRow?.availabilityLifecycle,
       ),
+      sequentialStages: capability("sequentialStages", [], false),
+      ticketClaim: capability("ticketClaim", [], false),
+      orderChanges: capability("orderChanges", [], false),
+      runnerHandoff: capability("runnerHandoff", [], false),
+      productionGrid: capability("productionGrid", [], false),
+      recipes: capability("recipes", [], false),
+      demandControl: capability("demandControl", [], false),
     },
     productAvailability,
     alerts,
     batches,
+    productionGrid: records(payload.productionGrid ?? []).map((row) => ({
+      stationId: text(row.stationId),
+      productId: text(row.productId),
+      productName: text(row.productName),
+      totalQuantity: number(row.totalQuantity),
+      queuedQuantity: optionalNumber(row.queuedQuantity) ?? 0,
+      preparingQuantity: optionalNumber(row.preparingQuantity) ?? 0,
+      readyQuantity: optionalNumber(row.readyQuantity) ?? 0,
+      heldQuantity: optionalNumber(row.heldQuantity) ?? 0,
+      assignments: records(row.assignments ?? []).map((assignment) => ({
+        ticketId: text(assignment.ticketId),
+        orderItemId: text(assignment.orderItemId),
+        reference: text(assignment.reference),
+        quantity: number(assignment.quantity),
+        readyQuantity: optionalNumber(assignment.readyQuantity) ?? 0,
+        status: text(assignment.status) as KdsItemState,
+        stage: optionalNumber(assignment.stage) ?? 1,
+      })),
+    })),
+    demand:
+      payload.demand == null
+        ? null
+        : (() => {
+            const demand = record(payload.demand);
+            const state = text(demand.state);
+            if (!(["normal", "strained", "overloaded"] as const).includes(state as "normal")) {
+              throw new InvalidPilotPayloadError();
+            }
+            return {
+              state: state as "normal" | "strained" | "overloaded",
+              suggestedDelayMinutes: optionalNumber(demand.suggestedDelayMinutes) ?? 0,
+              automatic: false as const,
+              channels: records(demand.channels ?? []).map((channel) => ({
+                channel: text(channel.channel),
+                activeOrders: optionalNumber(channel.activeOrders) ?? 0,
+                suggestedDelayMinutes: optionalNumber(channel.suggestedDelayMinutes) ?? 0,
+              })),
+            };
+          })(),
   };
 }
 

@@ -37,6 +37,7 @@ import {
   type InventoryAssetUpdateInput,
   type InventoryClosingInput,
   type InventoryEventInput,
+  type InventoryIssueRouteInput,
   type InventoryItemInput,
   type InventoryItemUpdateInput,
   type InventoryLotInput,
@@ -44,6 +45,7 @@ import {
   type InventoryReservationInput,
   type InventoryReservationResolutionInput,
   type InventoryReviewInput,
+  type InventoryTransferBatchInput,
   type InventoryTransferInput,
   type InventoryTransferResolutionInput,
   interunitTransferCancellationSchema,
@@ -53,6 +55,7 @@ import {
   inventoryAssetUpdateSchema,
   inventoryClosingSchema,
   inventoryEventSchema,
+  inventoryIssueRouteSchema,
   inventoryItemSchema,
   inventoryItemUpdateSchema,
   inventoryLotSchema,
@@ -60,6 +63,7 @@ import {
   inventoryReservationResolutionSchema,
   inventoryReservationSchema,
   inventoryReviewSchema,
+  inventoryTransferBatchSchema,
   inventoryTransferResolutionSchema,
   inventoryTransferSchema,
   type NfeImportConfirmInput,
@@ -125,6 +129,7 @@ import {
   type ReturnableIncidentInput,
   type ReturnableIncidentReviewInput,
   type ReturnableSupplierExchangeInput,
+  type ReturnableSupplierExchangeResolutionInput,
   receivablePaymentSchema,
   receivableSchema,
   recipeConfigurationSchema,
@@ -133,6 +138,7 @@ import {
   returnableCustodyConfirmSchema,
   returnableIncidentReviewSchema,
   returnableIncidentSchema,
+  returnableSupplierExchangeResolutionSchema,
   returnableSupplierExchangeSchema,
   type ScheduleBatchInput,
   type ScheduleCancelInput,
@@ -142,6 +148,7 @@ import {
   type SelfClockInInput,
   type SelfClockOutInput,
   type StockLocationInput,
+  type StockLocationItemSettingInput,
   type StockLocationUpdateInput,
   type SupplierInput,
   type SupplierInvoiceInput,
@@ -154,6 +161,7 @@ import {
   selfBreakSchema,
   selfClockInSchema,
   selfClockOutSchema,
+  stockLocationItemSettingSchema,
   stockLocationSchema,
   stockLocationUpdateSchema,
   supplierInvoiceSchema,
@@ -174,21 +182,35 @@ import {
 import { ManagementService, type PunchContext } from "./management.service.js";
 import { ManagementOverviewService } from "./management-overview.service.js";
 import {
+  type ReportAlertActionInput,
+  type ReportAlertEvaluateInput,
+  type ReportAlertListQuery,
   type ReportBudgetInput,
+  type ReportCostBackfillInput,
   type ReportDrillDownQuery,
   type ReportExportInput,
   type ReportExportListQuery,
   type ReportScheduleCreateInput,
   type ReportScheduleDeleteInput,
   type ReportScheduleUpdateInput,
+  type ReportViewCreateInput,
+  type ReportViewDeleteInput,
+  type ReportViewUpdateInput,
+  reportAlertActionSchema,
+  reportAlertEvaluateSchema,
+  reportAlertListQuerySchema,
   reportBudgetInputSchema,
   reportBudgetMonthSchema,
+  reportCostBackfillSchema,
   reportDrillDownQuerySchema,
   reportExportInputSchema,
   reportExportListQuerySchema,
   reportScheduleCreateSchema,
   reportScheduleDeleteSchema,
   reportScheduleUpdateSchema,
+  reportViewCreateSchema,
+  reportViewDeleteSchema,
+  reportViewUpdateSchema,
 } from "./management-report.schemas.js";
 import { ManagementReportService } from "./management-report.service.js";
 
@@ -449,6 +471,60 @@ export class ManagementController {
     );
   }
 
+  @Post("inventory/returnables/supplier-exchanges/:exchangeId/resolve")
+  resolveReturnableSupplierExchange(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("exchangeId", ParseUUIDPipe) exchangeId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(returnableSupplierExchangeResolutionSchema))
+    body: ReturnableSupplierExchangeResolutionInput,
+  ) {
+    return this.management.resolveReturnableSupplierExchange(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      exchangeId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("inventory/issue-routes")
+  configureInventoryIssueRoute(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(inventoryIssueRouteSchema)) body: InventoryIssueRouteInput,
+  ) {
+    return this.management.configureInventoryIssueRoute(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Put("inventory/location-item-settings")
+  configureStockLocationItemSetting(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(stockLocationItemSettingSchema)) body: StockLocationItemSettingInput,
+  ) {
+    return this.management.configureStockLocationItemSetting(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Put("inventory/items/:inventoryItemId")
   updateItem(
     @Req() request: AuthenticatedRequest,
@@ -526,6 +602,23 @@ export class ManagementController {
     @Body(new ZodPipe(inventoryTransferSchema)) body: InventoryTransferInput,
   ) {
     return this.management.transferInventory(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("inventory/transfers/batches")
+  transferInventoryBatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(inventoryTransferBatchSchema)) body: InventoryTransferBatchInput,
+  ) {
+    return this.management.transferInventoryBatch(
       request.auth.identityId,
       organizationId,
       unitId,
@@ -1430,6 +1523,133 @@ export class ManagementController {
     );
   }
 
+  @Get("reports/views")
+  reportViews(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.reportsService.views(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("reports/views")
+  createReportView(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportViewCreateSchema)) body: ReportViewCreateInput,
+  ) {
+    return this.reportsService.createView(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Patch("reports/views/:viewId")
+  updateReportView(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("viewId", ParseUUIDPipe) viewId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportViewUpdateSchema)) body: ReportViewUpdateInput,
+  ) {
+    return this.reportsService.updateView(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      viewId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Delete("reports/views/:viewId")
+  deleteReportView(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("viewId", ParseUUIDPipe) viewId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Query(new ZodPipe(reportViewDeleteSchema)) query: ReportViewDeleteInput,
+  ) {
+    return this.reportsService.deleteView(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      viewId,
+      query.version,
+      idempotencyKey,
+    );
+  }
+
+  @Get("reports/alerts")
+  reportAlerts(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(reportAlertListQuerySchema)) query: ReportAlertListQuery,
+  ) {
+    return this.reportsService.alerts(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Post("reports/alerts/evaluate")
+  evaluateReportAlerts(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportAlertEvaluateSchema)) body: ReportAlertEvaluateInput,
+  ) {
+    return this.reportsService.evaluateAlerts(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Patch("reports/alerts/:alertId")
+  updateReportAlert(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("alertId", ParseUUIDPipe) alertId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportAlertActionSchema)) body: ReportAlertActionInput,
+  ) {
+    return this.reportsService.updateAlert(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      alertId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("reports/costs/backfill")
+  backfillReportCosts(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportCostBackfillSchema)) body: ReportCostBackfillInput,
+  ) {
+    return this.reportsService.backfillCosts(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Get("reports/schedules")
   reportSchedules(
     @Req() request: AuthenticatedRequest,
@@ -1552,6 +1772,34 @@ export class ManagementController {
       organizationId,
       unitId,
       body,
+    );
+  }
+
+  @Get("people/time-tracking/settings/history")
+  timeTrackingSettingsHistory(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.management.timeTrackingSettingsHistory(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+    );
+  }
+
+  @Get("people/time-tracking/location-anomalies")
+  timeTrackingLocationAnomalies(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(reportPeriodSchema)) query: ReportPeriodInput,
+  ) {
+    return this.management.timeTrackingLocationAnomalies(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      query,
     );
   }
 

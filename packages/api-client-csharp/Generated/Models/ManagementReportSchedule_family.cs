@@ -44,5 +44,17 @@ namespace GiroMesa.ApiClient.Models
         #pragma warning disable CS1591
         Quality,
         #pragma warning restore CS1591
+        [EnumMember(Value = "labor")]
+        #pragma warning disable CS1591
+        Labor,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "reconciliation")]
+        #pragma warning disable CS1591
+        Reconciliation,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "forecast")]
+        #pragma warning disable CS1591
+        Forecast,
+        #pragma warning restore CS1591
     }
 }

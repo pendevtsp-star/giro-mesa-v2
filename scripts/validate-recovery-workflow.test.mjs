@@ -39,7 +39,7 @@ test("shared validator proves the full database and runtime compatibility matrix
   const script = readFileSync(validatorPath, "utf8");
   assert.match(script, /postgres16/);
   assert.match(script, /postgres17/);
-  assert.match(script, /for level in 42/);
+  assert.match(script, /for level in 45/);
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
   assert.match(script, /APP=api/);
   assert.match(script, /APP=worker/);

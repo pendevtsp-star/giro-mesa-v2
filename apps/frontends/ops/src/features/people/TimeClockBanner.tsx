@@ -1,4 +1,5 @@
-import { Button } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Input, Textarea } from "@giromesa/ui";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiClientError, api } from "../../api";
@@ -16,27 +17,11 @@ import {
   type TimeClockOfflineActionInput,
   timeClockDeviceId,
 } from "../../time-clock-offline";
-
-function location(): Promise<{ latitude: number; longitude: number; accuracyMeters?: number }> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("Este dispositivo não disponibilizou a localização."));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) =>
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracyMeters: Number.isFinite(position.coords.accuracy)
-            ? Math.round(position.coords.accuracy)
-            : undefined,
-        }),
-      () => reject(new Error("Autorize a localização para registrar o ponto.")),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 },
-    );
-  });
-}
+import {
+  locationPermission,
+  requestDeviceLocation,
+  timeClockSessionId,
+} from "./time-tracking-location";
 
 function key(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
@@ -87,6 +72,7 @@ export function TimeClockBanner({
     [identityId, scope.organizationId, scope.unitId],
   );
   const deviceId = useMemo(() => timeClockDeviceId(offlineScope), [offlineScope]);
+  const sessionId = useMemo(() => timeClockSessionId(offlineScope), [offlineScope]);
   const [state, setState] = useState<{
     status: "loading" | "ready" | "hidden" | "error";
     data?: SelfTimeTrackingData;
@@ -95,6 +81,11 @@ export function TimeClockBanner({
   const [busy, setBusy] = useState("");
   const [offlineCount, setOfflineCount] = useState(0);
   const [rejectedCount, setRejectedCount] = useState(0);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [permission, setPermission] = useState<"granted" | "prompt" | "denied" | "unavailable">(
+    "prompt",
+  );
+  const [offlineJustification, setOfflineJustification] = useState("");
   const [correction, setCorrection] = useState<{
     entryId: string;
     clockedInAt: string;
@@ -106,6 +97,12 @@ export function TimeClockBanner({
     setOfflineCount(queuedTimeClockActions(offlineScope).length);
     setRejectedCount(rejectedTimeClockActions(offlineScope).length);
   }, [offlineScope]);
+
+  const captureLocation = useCallback(async () => {
+    const location = await requestDeviceLocation();
+    setPermission("granted");
+    return location;
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -124,6 +121,17 @@ export function TimeClockBanner({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void locationPermission().then(setPermission);
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     refreshOfflineState();
@@ -183,12 +191,34 @@ export function TimeClockBanner({
   type OfflineAction = TimeClockOfflineActionInput;
   type ActionPlan = { online: () => Promise<unknown>; offline?: OfflineAction };
 
+  function canQueueOffline() {
+    const settings = state.data?.settings;
+    if (!settings?.offlineEnabled) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        message: "A unidade não permite marcações offline.",
+      }));
+      return false;
+    }
+    if (settings.offlineRequiresJustification && !offlineJustification.trim()) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        message: "Informe a justificativa antes de salvar uma marcação offline.",
+      }));
+      return false;
+    }
+    return true;
+  }
+
   async function act(action: string, operation: () => Promise<ActionPlan>) {
     setBusy(action);
     let plan: ActionPlan | undefined;
     try {
       plan = await operation();
       if (!navigator.onLine && plan.offline) {
+        if (!canQueueOffline()) return;
         enqueueTimeClockAction(offlineScope, plan.offline);
         refreshOfflineState();
         setState((current) => ({
@@ -205,6 +235,7 @@ export function TimeClockBanner({
         plan?.offline &&
         (error instanceof ApiClientError && error.retryable ? true : !navigator.onLine)
       ) {
+        if (!canQueueOffline()) return;
         enqueueTimeClockAction(offlineScope, plan.offline);
         refreshOfflineState();
         setState((current) => ({
@@ -247,13 +278,32 @@ export function TimeClockBanner({
           {settings.locationLabel ?? "Localização verificada no evento"} · raio{" "}
           {settings.radiusMeters} m
         </small>
+        <small>
+          {permission === "granted"
+            ? "Localização autorizada neste dispositivo."
+            : permission === "denied"
+              ? "Autorize a localização do dispositivo para registrar o ponto."
+              : "A localização será solicitada somente ao registrar o ponto."}
+        </small>
+        {!online && settings.offlineEnabled && (
+          <label className="time-clock-banner__offline-reason">
+            Justificativa para marcação offline
+            <Textarea
+              maxLength={1000}
+              required={settings.offlineRequiresJustification}
+              value={offlineJustification}
+              onChange={(event) => setOfflineJustification(event.target.value)}
+              placeholder="Ex.: internet indisponível na unidade."
+            />
+          </label>
+        )}
         {offlineCount > 0 && (
           <small role="status">{offlineCount} marcação(ões) aguardando conexão.</small>
         )}
         {rejectedCount > 0 && (
           <small role="alert">
             {rejectedCount} marcação(ões) offline precisam de revisão.{" "}
-            <button
+            <Button
               onClick={() => {
                 clearRejectedTimeClockActions(offlineScope);
                 refreshOfflineState();
@@ -261,7 +311,7 @@ export function TimeClockBanner({
               type="button"
             >
               Limpar avisos
-            </button>
+            </Button>
           </small>
         )}
       </div>
@@ -272,17 +322,30 @@ export function TimeClockBanner({
             onClick={() =>
               void act("in", async () => {
                 const capturedAt = new Date().toISOString();
-                const body = { ...(await location()), capturedAt, deviceId };
+                const captured = {
+                  ...(await captureLocation()),
+                  capturedAt,
+                  deviceId,
+                  sessionId,
+                };
                 const idempotencyKey = key("clock-in");
                 return {
                   online: () =>
                     api.management.selfClockIn(
                       scope.organizationId,
                       scope.unitId,
-                      body,
+                      { ...captured, offline: false },
                       idempotencyKey,
                     ),
-                  offline: { kind: "clock-in", body, idempotencyKey },
+                  offline: {
+                    kind: "clock-in",
+                    body: {
+                      ...captured,
+                      offline: true,
+                      offlineJustification: offlineJustification.trim(),
+                    },
+                    idempotencyKey,
+                  },
                 };
               })
             }
@@ -293,16 +356,35 @@ export function TimeClockBanner({
           <Button
             disabled={busy === "break-end"}
             onClick={() =>
-              void act("break-end", async () => ({
-                online: async () =>
-                  api.management.selfCompleteBreak(
-                    scope.organizationId,
-                    scope.unitId,
-                    openBreak.id,
-                    { ...(await location()), capturedAt: new Date().toISOString(), deviceId },
-                    key("break-end"),
-                  ),
-              }))
+              void act("break-end", async () => {
+                const captured = {
+                  ...(await captureLocation()),
+                  capturedAt: new Date().toISOString(),
+                  deviceId,
+                  sessionId,
+                };
+                const idempotencyKey = key("break-end");
+                return {
+                  online: () =>
+                    api.management.selfCompleteBreak(
+                      scope.organizationId,
+                      scope.unitId,
+                      openBreak.id,
+                      { ...captured, offline: false },
+                      idempotencyKey,
+                    ),
+                  offline: {
+                    kind: "break-end",
+                    breakId: openBreak.id,
+                    body: {
+                      ...captured,
+                      offline: true,
+                      offlineJustification: offlineJustification.trim(),
+                    },
+                    idempotencyKey,
+                  },
+                };
+              })
             }
           >
             {busy === "break-end" ? "Localizando…" : "Voltar ao trabalho"}
@@ -314,11 +396,12 @@ export function TimeClockBanner({
               onClick={() =>
                 void act("meal", async () => {
                   const capturedAt = new Date().toISOString();
-                  const body = {
-                    ...(await location()),
+                  const captured = {
+                    ...(await captureLocation()),
                     type: "meal" as const,
                     capturedAt,
                     deviceId,
+                    sessionId,
                   };
                   const idempotencyKey = key("meal");
                   return {
@@ -326,10 +409,18 @@ export function TimeClockBanner({
                       api.management.selfStartBreak(
                         scope.organizationId,
                         scope.unitId,
-                        body,
+                        { ...captured, offline: false },
                         idempotencyKey,
                       ),
-                    offline: { kind: "break-start", body, idempotencyKey },
+                    offline: {
+                      kind: "break-start",
+                      body: {
+                        ...captured,
+                        offline: true,
+                        offlineJustification: offlineJustification.trim(),
+                      },
+                      idempotencyKey,
+                    },
                   };
                 })
               }
@@ -342,11 +433,12 @@ export function TimeClockBanner({
               onClick={() =>
                 void act("temporary", async () => {
                   const capturedAt = new Date().toISOString();
-                  const body = {
-                    ...(await location()),
+                  const captured = {
+                    ...(await captureLocation()),
                     type: "temporary" as const,
                     capturedAt,
                     deviceId,
+                    sessionId,
                   };
                   const idempotencyKey = key("temporary");
                   return {
@@ -354,10 +446,18 @@ export function TimeClockBanner({
                       api.management.selfStartBreak(
                         scope.organizationId,
                         scope.unitId,
-                        body,
+                        { ...captured, offline: false },
                         idempotencyKey,
                       ),
-                    offline: { kind: "break-start", body, idempotencyKey },
+                    offline: {
+                      kind: "break-start",
+                      body: {
+                        ...captured,
+                        offline: true,
+                        offlineJustification: offlineJustification.trim(),
+                      },
+                      idempotencyKey,
+                    },
                   };
                 })
               }
@@ -370,17 +470,30 @@ export function TimeClockBanner({
               onClick={() =>
                 void act("out", async () => {
                   const capturedAt = new Date().toISOString();
-                  const body = { ...(await location()), capturedAt, deviceId };
+                  const captured = {
+                    ...(await captureLocation()),
+                    capturedAt,
+                    deviceId,
+                    sessionId,
+                  };
                   const idempotencyKey = key("clock-out");
                   return {
                     online: () =>
                       api.management.selfClockOut(
                         scope.organizationId,
                         scope.unitId,
-                        body,
+                        { ...captured, offline: false },
                         idempotencyKey,
                       ),
-                    offline: { kind: "clock-out", body, idempotencyKey },
+                    offline: {
+                      kind: "clock-out",
+                      body: {
+                        ...captured,
+                        offline: true,
+                        offlineJustification: offlineJustification.trim(),
+                      },
+                      idempotencyKey,
+                    },
                   };
                 })
               }
@@ -407,7 +520,7 @@ export function TimeClockBanner({
                 {Math.floor(workedMinutes(entry, data.breaks) / 60)}h{" "}
                 {String(workedMinutes(entry, data.breaks) % 60).padStart(2, "0")}min
                 {entry.clockedOutAt && (
-                  <button
+                  <Button
                     onClick={() =>
                       setCorrection({
                         entryId: entry.id,
@@ -419,7 +532,7 @@ export function TimeClockBanner({
                     type="button"
                   >
                     Corrigir
-                  </button>
+                  </Button>
                 )}
               </li>
             ))}
@@ -434,7 +547,7 @@ export function TimeClockBanner({
           <strong>Solicitar correção</strong>
           <label>
             Entrada
-            <input
+            <Input
               required
               type="datetime-local"
               value={correction.clockedInAt}
@@ -445,7 +558,7 @@ export function TimeClockBanner({
           </label>
           <label>
             Saída
-            <input
+            <Input
               type="datetime-local"
               value={correction.clockedOutAt}
               onChange={(event) =>
@@ -455,7 +568,7 @@ export function TimeClockBanner({
           </label>
           <label>
             Motivo
-            <textarea
+            <Textarea
               required
               minLength={5}
               value={correction.reason}

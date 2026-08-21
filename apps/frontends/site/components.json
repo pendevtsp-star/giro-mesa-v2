@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": { "config": "", "css": "app/globals.css", "baseColor": "neutral", "cssVariables": true },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@giromesa/ui/components",
+    "ui": "@giromesa/ui/components",
+    "lib": "@giromesa/ui/lib",
+    "utils": "@giromesa/ui/lib/utils",
+    "hooks": "@giromesa/ui/lib"
+  }
+}

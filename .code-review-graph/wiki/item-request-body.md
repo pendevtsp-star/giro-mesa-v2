@@ -63,7 +63,7 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 | CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 37-41 |
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 46-52 |
 
-*... and 909 more members.*
+*... and 848 more members.*
 
 ## Execution Flows
 
@@ -73,32 +73,30 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 
 ### Outgoing
 
-- `ReferenceEquals` (316 edge(s))
-- `nameof` (316 edge(s))
-- `IParsable` (161 edge(s))
-- `writer` (140 edge(s))
-- `GetStringValue` (137 edge(s))
-- `WriteStringValue` (136 edge(s))
-- `IAdditionalDataHolder` (120 edge(s))
-- `WriteAdditionalData` (119 edge(s))
-- `n` (99 edge(s))
-- `WriteIntValue` (61 edge(s))
-- `GetIntValue` (59 edge(s))
-- `GetGuidValue` (51 edge(s))
-- `WriteGuidValue` (51 edge(s))
-- `IComposedTypeWrapper` (41 edge(s))
-- `MergeDeserializersForIntersectionWrapper` (38 edge(s))
+- `ReferenceEquals` (290 edge(s))
+- `nameof` (290 edge(s))
+- `IParsable` (148 edge(s))
+- `GetStringValue` (129 edge(s))
+- `WriteStringValue` (128 edge(s))
+- `IAdditionalDataHolder` (117 edge(s))
+- `WriteAdditionalData` (116 edge(s))
+- `writer` (106 edge(s))
+- `n` (76 edge(s))
+- `GetGuidValue` (50 edge(s))
+- `WriteGuidValue` (50 edge(s))
+- `WriteIntValue` (50 edge(s))
+- `GetIntValue` (49 edge(s))
+- `BaseRequestBuilder` (33 edge(s))
+- `IComposedTypeWrapper` (31 edge(s))
 
 ### Incoming
 
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Units\Item\Pilot\Catalog\Products\ProductsPostRequestBody.cs` (8 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\DeliveryOrders\DeliveryOrdersPostRequestBody.cs` (6 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs` (5 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Reservations\ReservationsPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Waitlist\WaitlistPostRequestBody.cs` (4 edge(s))
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Units\Item\Pilot\Catalog\Products\Item\UnitConfig\UnitConfigPutRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Login\LoginPostRequestBodyMember2.cs::LoginPostRequestBodyMember2_trustedDevice` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Register\RegisterPostRequestBody.cs::RegisterPostRequestBody_termsAccepted` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\ApiKeys\ApiKeysPostRequestBody.cs::ApiKeysPostRequestBody_expiresAt` (3 edge(s))
@@ -106,3 +104,5 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs::CampaignsPostRequestBody_subject` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs::CampaignsPostRequestBody_unitId` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_maximumDiscountCents` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_unitId` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_validUntil` (3 edge(s))

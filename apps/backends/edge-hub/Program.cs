@@ -12,13 +12,16 @@ builder.Host.UseWindowsService(options => options.ServiceName = "GiroMesa Edge H
 builder.Services.Configure<HubOptions>(builder.Configuration.GetSection(HubOptions.Section));
 builder.Services.AddSingleton<HubStore>();
 builder.Services.AddSingleton<DeviceAuthenticator>();
+builder.Services.AddSingleton<FocusCredentialStore>();
 builder.Services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
 builder.Services.AddHttpClient<FocusFiscalGateway>();
 builder.Services.AddSingleton<DisabledFiscalGateway>();
 builder.Services.AddSingleton<IFiscalGateway>(services =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<HubOptions>>();
-    return options.Value.Focus.Enabled
+    return options.Value.Focus.Enabled ||
+        (!string.IsNullOrWhiteSpace(options.Value.CloudApiBaseUrl) &&
+         !string.IsNullOrWhiteSpace(options.Value.CloudSyncKey))
         ? services.GetRequiredService<FocusFiscalGateway>()
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
@@ -27,7 +30,7 @@ builder.Services.AddSingleton<EscPosPrinterGateway>();
 builder.Services.AddSingleton<IPrinterGateway>(services =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<HubOptions>>();
-    return PrinterConfiguration.IsValid(options.Value.Printer)
+    return options.Value.AvailablePrinters.Any(PrinterConfiguration.IsValid)
         ? services.GetRequiredService<EscPosPrinterGateway>()
         : services.GetRequiredService<DisabledPrinterGateway>();
 });
@@ -86,6 +89,33 @@ app.MapGet("/v1/capabilities", (IPaymentGateway payment, IFiscalGateway fiscal, 
         fiscal = fiscal.Capability,
         printing = printer.Capability,
     }));
+
+app.MapGet("/v1/printers", async (IPrinterGateway printer) =>
+    Results.Ok(new { printers = await printer.GetStatusesAsync() }));
+
+app.MapPost("/v1/printers/{printerId}/test", async (string printerId, IPrinterGateway printer) =>
+{
+    if (string.IsNullOrWhiteSpace(printerId) || printerId.Length > 80)
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(printerId)] = ["printerId is invalid."],
+        });
+    var payload = JsonSerializer.SerializeToElement(new
+    {
+        generatedAt = DateTimeOffset.UtcNow,
+        tab = new { label = "Teste de impressao" },
+        totals = new { },
+        items = Array.Empty<object>(),
+        payments = Array.Empty<object>(),
+    });
+    var result = await printer.PrintAsync(new PrintRequest(
+        $"printer-test:{Guid.NewGuid():N}",
+        printerId,
+        "diagnostics",
+        "partial_statement",
+        payload));
+    return PrintMutationResult(result);
+});
 
 app.MapPost("/v1/commands", async (OperationalCommand command, HubStore hubStore, HttpContext context) =>
 {

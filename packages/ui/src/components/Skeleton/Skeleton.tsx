@@ -1,5 +1,3 @@
-import "./Skeleton.css";
-
 export function Skeleton({
   width,
   height = "1em",
@@ -11,9 +9,10 @@ export function Skeleton({
 }) {
   return (
     <span
-      className={`gm-skeleton ${rounded ? "gm-skeleton--rounded" : ""}`}
-      style={{ width, height }}
       aria-hidden="true"
+      className={`gm-skeleton ${rounded ? "gm-skeleton--rounded" : ""}`}
+      data-slot="skeleton"
+      style={{ width, height }}
     />
   );
 }

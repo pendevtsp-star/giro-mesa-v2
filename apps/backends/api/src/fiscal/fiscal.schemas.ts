@@ -54,6 +54,71 @@ export const fiscalProfileSchema = z.object({
   series: fiscalSeriesSchema.default({}),
 });
 
+const optionalDigits = (minimum: number, maximum: number) =>
+  z
+    .string()
+    .trim()
+    .regex(new RegExp(`^\\d{${minimum},${maximum}}$`))
+    .optional();
+
+export const focusCompanyOnboardingSchema = z
+  .object({
+    tradeName: z.string().trim().min(2).max(120),
+    stateRegistration: z.string().trim().min(2).max(30),
+    email: z.string().trim().email().max(160),
+    phone: z
+      .string()
+      .trim()
+      .transform((value) => value.replace(/\D/g, ""))
+      .pipe(z.string().regex(/^\d{10,11}$/)),
+    street: z.string().trim().min(2).max(160),
+    number: z.coerce.number().int().positive().max(99_999_999),
+    complement: z.string().trim().max(120).optional(),
+    district: z.string().trim().min(2).max(120),
+    city: z.string().trim().min(2).max(120),
+    postalCode: z
+      .string()
+      .trim()
+      .transform((value) => value.replace(/\D/g, ""))
+      .pipe(z.string().regex(/^\d{8}$/)),
+    accountantDocument: optionalDigits(11, 14),
+    certificateBase64: z
+      .string()
+      .trim()
+      .min(64)
+      .max(12_000_000)
+      .regex(/^[A-Za-z\d+/]+={0,2}$/),
+    certificatePassword: z.string().min(1).max(256),
+    enableNfce: z.boolean().default(true),
+    enableNfe: z.boolean().default(false),
+    enableNfse: z.boolean().default(false),
+    cscProduction: z.string().trim().min(1).max(128).optional(),
+    cscProductionId: optionalDigits(1, 6),
+    cscHomologation: z.string().trim().min(1).max(128).optional(),
+    cscHomologationId: optionalDigits(1, 6),
+  })
+  .superRefine((value, context) => {
+    if (!value.enableNfce && !value.enableNfe && !value.enableNfse) {
+      context.addIssue({ code: "custom", message: "Habilite ao menos um modelo fiscal." });
+    }
+    for (const [code, id, path] of [
+      [value.cscProduction, value.cscProductionId, "cscProduction"],
+      [value.cscHomologation, value.cscHomologationId, "cscHomologation"],
+    ] as const) {
+      if (Boolean(code) !== Boolean(id)) {
+        context.addIssue({
+          code: "custom",
+          message: "Informe o CSC e o respectivo ID em conjunto.",
+          path: [path],
+        });
+      }
+    }
+  });
+
+export const cancelFiscalDocumentSchema = z.object({
+  justification: z.string().trim().min(15).max(255),
+});
+
 export const productTaxRevisionListQuerySchema = z.object({
   productId: z.string().uuid().optional(),
   status: z.enum(["draft", "active", "revoked"]).optional(),
@@ -91,6 +156,19 @@ export const productTaxRevisionSchema = z
   .object({
     productId: z.string().uuid(),
     status: z.enum(["draft", "active"]).default("draft"),
+    effectiveFrom: date,
+    effectiveUntil: date.optional(),
+    classification: taxClassificationSchema,
+  })
+  .refine((value) => !value.effectiveUntil || value.effectiveUntil >= value.effectiveFrom, {
+    message: "A vigência final deve ser posterior à inicial.",
+    path: ["effectiveUntil"],
+  });
+
+export const productTaxRevisionBulkSchema = z
+  .object({
+    productIds: z.array(z.string().uuid()).min(1).max(100),
+    status: z.enum(["draft", "active"]).default("active"),
     effectiveFrom: date,
     effectiveUntil: date.optional(),
     classification: taxClassificationSchema,
@@ -202,8 +280,11 @@ export const edgeFiscalEventSchema = z
 export type FiscalDocumentListQuery = z.infer<typeof fiscalDocumentListQuerySchema>;
 export type FiscalPackageQuery = z.infer<typeof fiscalPackageQuerySchema>;
 export type FiscalProfileInput = z.infer<typeof fiscalProfileSchema>;
+export type FocusCompanyOnboardingInput = z.infer<typeof focusCompanyOnboardingSchema>;
+export type CancelFiscalDocumentInput = z.infer<typeof cancelFiscalDocumentSchema>;
 export type ProductTaxRevisionListQuery = z.infer<typeof productTaxRevisionListQuerySchema>;
 export type ProductTaxRevisionInput = z.infer<typeof productTaxRevisionSchema>;
+export type ProductTaxRevisionBulkInput = z.infer<typeof productTaxRevisionBulkSchema>;
 export type AccountantRequestListQuery = z.infer<typeof accountantRequestListQuerySchema>;
 export type AccountantRequestInput = z.infer<typeof accountantRequestSchema>;
 export type ResolveAccountantRequestInput = z.infer<typeof resolveAccountantRequestSchema>;

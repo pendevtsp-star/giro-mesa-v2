@@ -1,4 +1,5 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, EmptyState, Input, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import {
@@ -168,7 +169,7 @@ export function RecipeManager({
                   <form className="recipe-form" onSubmit={saveRecipe}>
                     <label className="compact-field">
                       Produto vendido
-                      <select
+                      <NativeSelect
                         disabled={!activeProducts.length || submitting}
                         onChange={(event) => {
                           setProductId(event.target.value);
@@ -182,7 +183,7 @@ export function RecipeManager({
                             {product.name}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <fieldset
                       className="recipe-component-builder"
@@ -191,7 +192,7 @@ export function RecipeManager({
                       <legend>Adicionar componente</legend>
                       <label className="compact-field">
                         Insumo
-                        <select
+                        <NativeSelect
                           onChange={(event) => setInventoryItemId(event.target.value)}
                           value={inventoryItemId}
                         >
@@ -201,11 +202,11 @@ export function RecipeManager({
                               {item.name} ({item.unit})
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label className="compact-field">
                         Local de baixa
-                        <select
+                        <NativeSelect
                           onChange={(event) => setLocationId(event.target.value)}
                           value={locationId}
                         >
@@ -215,11 +216,11 @@ export function RecipeManager({
                               {location.name} ({location.code})
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label className="compact-field">
                         Quantidade por venda
-                        <input
+                        <Input
                           inputMode="decimal"
                           onChange={(event) => setQuantity(event.target.value)}
                           placeholder="Ex.: 0,250"
@@ -228,7 +229,7 @@ export function RecipeManager({
                       </label>
                       <label className="compact-field">
                         Perda prevista (%)
-                        <input
+                        <Input
                           inputMode="decimal"
                           onChange={(event) => setLossPercent(event.target.value)}
                           placeholder="Ex.: 2,50"

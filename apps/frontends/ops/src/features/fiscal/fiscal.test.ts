@@ -46,6 +46,22 @@ describe("contrato fiscal do Ops", () => {
         openAccountantRequests: 1,
         products: { total: 20, classified: 18, missingClassification: 2 },
       },
+      provider: {
+        provider: "focus",
+        status: "ready",
+        environment: "homologation",
+        platformConfigured: true,
+        nextAction: "Conexão pronta para o ambiente selecionado.",
+        connection: {
+          companyId: "focus-company-1",
+          cnpj: "05953016000132",
+          status: "ready",
+          certificateValidUntil: "2027-08-17",
+          enabled: { nfce: true, nfe: false, nfse: false },
+          lastCheckedAt: "2026-08-17T11:00:00Z",
+          environments: { homologation: true, production: true },
+        },
+      },
       documents: {
         items: [
           {
@@ -66,6 +82,7 @@ describe("contrato fiscal do Ops", () => {
 
     expect(workspace.dashboard.summary.totalCents).toBe(4500);
     expect(workspace.dashboard.provider.name).toBe("Focus NFe");
+    expect(workspace.dashboard.provider.status).toBe("ready");
     expect(workspace.dashboard.pending).toHaveLength(4);
     expect(workspace.profile?.series.nfce).toBe("1");
     expect(workspace.profile?.stateCode).toBe("");

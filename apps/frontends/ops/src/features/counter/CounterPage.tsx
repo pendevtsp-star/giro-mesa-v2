@@ -1,4 +1,5 @@
-import { Badge, Button, Card, EmptyState, Toast } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, EmptyState, Input, Label, NativeSelect, Toast } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import { pilotMutation } from "../../operational-dispatch";
@@ -198,9 +199,9 @@ export function RealCounterPage({
                   className="inline-form counter-open-form"
                   onSubmit={(event) => void open(event)}
                 >
-                  <label>
+                  <Label>
                     Atendimento
-                    <select
+                    <NativeSelect
                       onChange={(event) =>
                         setFulfillmentType(event.target.value as typeof fulfillmentType)
                       }
@@ -209,85 +210,86 @@ export function RealCounterPage({
                       <option value="pickup">Retirada</option>
                       <option value="dine_in">Consumo no local</option>
                       <option value="delivery">Delivery</option>
-                    </select>
-                  </label>
-                  <label>
+                    </NativeSelect>
+                  </Label>
+                  <Label>
                     Nome do cliente
-                    <input
+                    <Input
                       onChange={(event) => setCustomerName(event.target.value)}
                       placeholder="Opcional: gera número automático"
                       value={customerName}
                     />
-                  </label>
+                  </Label>
                   <details className="counter-open-advanced" open={fulfillmentType === "delivery"}>
                     <summary>Prazo e identificação</summary>
                     <div>
-                      <label>
+                      <Label>
                         Telefone
-                        <input
+                        <Input
                           inputMode="tel"
                           onChange={(event) => setCustomerPhone(event.target.value)}
                           value={customerPhone}
                         />
-                      </label>
-                      <label>
+                      </Label>
+                      <Label>
                         <input
+                          className="accent-primary"
                           checked={readyNotificationConsent}
                           disabled={!customerPhone.trim()}
                           onChange={(event) => setReadyNotificationConsent(event.target.checked)}
                           type="checkbox"
                         />
                         Cliente autorizou receber o aviso de pedido pronto
-                      </label>
+                      </Label>
                       {fulfillmentType !== "dine_in" && (
                         <fieldset className="promised-at-field">
                           <legend>Prometido para</legend>
-                          <label>
+                          <Label>
                             <span>Data</span>
-                            <input
+                            <Input
                               onChange={(event) => setPromisedDate(event.target.value)}
                               type="date"
                               value={promisedDate}
                             />
-                          </label>
-                          <label>
+                          </Label>
+                          <Label>
                             <span>Hora</span>
-                            <input
+                            <Input
                               lang="pt-BR"
                               onChange={(event) => setPromisedTime(event.target.value)}
                               type="time"
                               value={promisedTime}
                             />
-                          </label>
+                          </Label>
                         </fieldset>
                       )}
                       {fulfillmentType === "delivery" && (
-                        <label className="inline-form__wide">
+                        <Label className="inline-form__wide">
                           Endereço
-                          <input
+                          <Input
                             onChange={(event) => setDeliveryAddress(event.target.value)}
                             required
                             value={deliveryAddress}
                           />
-                        </label>
+                        </Label>
                       )}
-                      <label>
+                      <Label>
                         Referência interna
-                        <input
+                        <Input
                           onChange={(event) => setLabel(event.target.value)}
                           placeholder="Opcional"
                           value={label}
                         />
-                      </label>
-                      <label>
+                      </Label>
+                      <Label>
                         Pessoas
-                        <input
+                        <Input
                           min={1}
                           onChange={(event) => setGuests(Number(event.target.value))}
                           type="number"
                           value={guests}
                         />
-                      </label>
+                      </Label>
                     </div>
                   </details>
                   <Button disabled={busy || guests < 1} type="submit">
@@ -330,35 +332,37 @@ export function RealCounterPage({
                     {tabs.refreshing ? "Atualizando…" : "Atualizar"}
                   </Button>
                 </div>
-                <label className="search-field">
+                <Label className="search-field">
                   <span aria-hidden="true">⌕</span>
-                  <input
+                  <Input
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Buscar cliente, número ou telefone"
                     value={query}
                   />
-                </label>
+                </Label>
                 <fieldset className="counter-stage-filter">
                   <legend className="gm-sr-only">Etapas do balcão</legend>
                   {(Object.keys(counterQueueLabels) as CounterQueueStage[]).map((stage) => (
-                    <button
+                    <Button
                       aria-pressed={stageFilter === stage}
                       key={stage}
                       onClick={() => setStageFilter(stage)}
                       type="button"
+                      variant="ghost"
                     >
                       <span>{counterQueueLabels[stage]}</span>
                       <small>{stageCounts[stage]}</small>
-                    </button>
+                    </Button>
                   ))}
                 </fieldset>
                 <div className="segmented segmented--scroll">
                   {(["all", "pickup", "dine_in", "delivery"] as const).map((channel) => (
-                    <button
+                    <Button
                       aria-pressed={channelFilter === channel}
                       key={channel}
                       onClick={() => setChannelFilter(channel)}
                       type="button"
+                      variant="ghost"
                     >
                       {channel === "all"
                         ? "Todos"
@@ -367,7 +371,7 @@ export function RealCounterPage({
                           : channel === "delivery"
                             ? "Delivery"
                             : "Local"}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </Card>
@@ -375,11 +379,12 @@ export function RealCounterPage({
                 {counterTabs.map((tab) => {
                   const stage = counterQueueStage(tab);
                   return (
-                    <button
+                    <Button
                       className={selected === tab.id ? "data-row data-row--selected" : "data-row"}
                       key={tab.id}
                       onClick={() => setSelected(tab.id)}
                       type="button"
+                      variant="ghost"
                     >
                       <div>
                         <strong>
@@ -423,7 +428,7 @@ export function RealCounterPage({
                         </span>
                       </div>
                       <strong>{formatMoney(tab.totalCents)}</strong>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -431,13 +436,14 @@ export function RealCounterPage({
             <aside className={selected ? "ops-panel counter-ops-panel--active" : "ops-panel"}>
               {selected ? (
                 <>
-                  <button
+                  <Button
                     className="counter-workspace-close"
                     onClick={() => setSelected(null)}
                     type="button"
+                    variant="ghost"
                   >
                     ← Voltar para a fila
-                  </button>
+                  </Button>
                   <TabWorkspace
                     key={selected}
                     scope={scope}

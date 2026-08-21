@@ -6,10 +6,17 @@ import { ManagementController } from "./management.controller.js";
 import { ManagementService } from "./management.service.js";
 import { ManagementOverviewService } from "./management-overview.service.js";
 import { ManagementReportService } from "./management-report.service.js";
+import { ManagementSettlementsController } from "./management-settlements.controller.js";
+import { ManagementSettlementsService } from "./management-settlements.service.js";
 
 @Module({
   imports: [AuthModule, OrganizationsModule, HealthModule],
-  controllers: [ManagementController],
-  providers: [ManagementService, ManagementOverviewService, ManagementReportService],
+  controllers: [ManagementController, ManagementSettlementsController],
+  providers: [
+    ManagementService,
+    ManagementOverviewService,
+    ManagementReportService,
+    ManagementSettlementsService,
+  ],
 })
 export class ManagementModule {}

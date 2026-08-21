@@ -6,7 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace GiroMesa.EdgeHub.Adapters;
 
-public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOptions> hubOptions)
+public sealed class FocusFiscalGateway(
+    HttpClient httpClient,
+    IOptions<HubOptions> hubOptions,
+    FocusCredentialStore credentialStore)
     : IFiscalGateway
 {
     private const int MaxResponseBytes = 256 * 1024;
@@ -14,24 +17,42 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
     private static readonly Uri ProductionBase = new("https://api.focusnfe.com.br/");
     private readonly FocusOptions _options = hubOptions.Value.Focus;
 
-    public CapabilityState Capability => IsConfigured
-        ? new(true, "focus-nfe", $"Focus NFC-e configured for {NormalizedEnvironment}.")
-        : new(false, "focus-nfe", "Focus NFe requires an explicit environment and company token.");
+    public CapabilityState Capability
+    {
+        get
+        {
+            var configuration = CurrentConfiguration;
+            return IsConfigured(configuration)
+                ? new(true, "focus-nfe", $"Focus NFC-e configured for {configuration.Environment}.")
+                : new(false, "focus-nfe", "Focus NFe requires an explicit environment and company token.");
+        }
+    }
 
-    private string NormalizedEnvironment => (_options.Environment ?? string.Empty).Trim().ToLowerInvariant();
+    private FocusConnection CurrentConfiguration
+    {
+        get
+        {
+            var runtime = credentialStore.Current;
+            return runtime is null
+                ? new(_options.Enabled, _options.Environment.Trim().ToLowerInvariant(), _options.Token)
+                : new(runtime.Enabled, runtime.Environment, runtime.Token);
+        }
+    }
 
-    private bool IsConfigured =>
-        _options.Enabled &&
-        _options.Token is { Length: >= 12 } &&
-        (NormalizedEnvironment == "homologation" || NormalizedEnvironment == "production");
+    private static bool IsConfigured(FocusConnection configuration) =>
+        configuration.Enabled &&
+        configuration.Token is { Length: >= 12 } &&
+        configuration.Environment is "homologation" or "production";
 
-    private Uri BaseAddress => NormalizedEnvironment == "production" ? ProductionBase : HomologationBase;
+    private static Uri BaseAddress(FocusConnection configuration) =>
+        configuration.Environment == "production" ? ProductionBase : HomologationBase;
 
     public async Task<FiscalResult> IssueAsync(
         FiscalRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!IsConfigured)
+        var configuration = CurrentConfiguration;
+        if (!IsConfigured(configuration))
             return new(false, "unavailable", null, "FOCUS_NOT_CONFIGURED");
         if (!ValidRequest(request))
             return new(false, "rejected", null, "FOCUS_REQUEST_INVALID");
@@ -40,7 +61,8 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         {
             using var message = AuthorizedRequest(
                 HttpMethod.Post,
-                new Uri(BaseAddress, $"v2/nfce?ref={Uri.EscapeDataString(request.IdempotencyKey)}"));
+                new Uri(BaseAddress(configuration), $"v2/nfce?ref={Uri.EscapeDataString(request.IdempotencyKey)}"),
+                configuration.Token!);
             message.Content = new StringContent(request.DocumentPayload, Encoding.UTF8, "application/json");
             using var response = await httpClient.SendAsync(
                 message,
@@ -52,7 +74,7 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
 
             if (response.StatusCode == HttpStatusCode.UnprocessableEntity)
             {
-                var existing = await ConsultCoreAsync(request.IdempotencyKey, timeoutToken);
+                var existing = await ConsultCoreAsync(request.IdempotencyKey, configuration, timeoutToken);
                 if (existing.Status != "not_found")
                 {
                     return existing.Status == "canceled"
@@ -69,13 +91,14 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         FiscalConsultRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!IsConfigured)
+        var configuration = CurrentConfiguration;
+        if (!IsConfigured(configuration))
             return new(false, "unavailable", request.DocumentReference, "FOCUS_NOT_CONFIGURED");
         if (!ValidActor(request.ActorIdentityId) || !ValidReference(request.DocumentReference))
             return new(false, "rejected", request.DocumentReference, "FOCUS_REQUEST_INVALID");
 
         return await ExecuteAsync(
-            timeoutToken => ConsultCoreAsync(request.DocumentReference, timeoutToken),
+            timeoutToken => ConsultCoreAsync(request.DocumentReference, configuration, timeoutToken),
             cancellationToken,
             request.DocumentReference);
     }
@@ -85,7 +108,8 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         FiscalCancellationRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!IsConfigured)
+        var configuration = CurrentConfiguration;
+        if (!IsConfigured(configuration))
             return new(false, "unavailable", documentReference, "FOCUS_NOT_CONFIGURED");
         if (!ValidActor(request.ActorIdentityId) ||
             !ValidReference(documentReference) ||
@@ -96,7 +120,8 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         {
             using var message = AuthorizedRequest(
                 HttpMethod.Delete,
-                new Uri(BaseAddress, $"v2/nfce/{Uri.EscapeDataString(documentReference)}"));
+                new Uri(BaseAddress(configuration), $"v2/nfce/{Uri.EscapeDataString(documentReference)}"),
+                configuration.Token!);
             message.Content = JsonContent(new { justificativa = request.Justification.Trim() });
             using var response = await httpClient.SendAsync(
                 message,
@@ -108,7 +133,7 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
 
             if (response.StatusCode == HttpStatusCode.UnprocessableEntity)
             {
-                var existing = await ConsultCoreAsync(documentReference, timeoutToken);
+                var existing = await ConsultCoreAsync(documentReference, configuration, timeoutToken);
                 return existing.Status == "canceled"
                     ? existing
                     : new(false, "rejected", documentReference, "FOCUS_CANCELLATION_REJECTED");
@@ -121,7 +146,8 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         FiscalNumberInvalidationRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!IsConfigured)
+        var configuration = CurrentConfiguration;
+        if (!IsConfigured(configuration))
             return new(false, "unavailable", request.IdempotencyKey, "FOCUS_NOT_CONFIGURED");
         if (!ValidInvalidation(request))
             return new(false, "rejected", request.IdempotencyKey, "FOCUS_REQUEST_INVALID");
@@ -130,7 +156,8 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         {
             using var message = AuthorizedRequest(
                 HttpMethod.Post,
-                new Uri(BaseAddress, "v2/nfce/inutilizacao"));
+                new Uri(BaseAddress(configuration), "v2/nfce/inutilizacao"),
+                configuration.Token!);
             message.Content = JsonContent(new
             {
                 cnpj = request.Cnpj.Trim().ToUpperInvariant(),
@@ -151,7 +178,7 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
                 response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.UnprocessableEntity))
                 return result;
 
-            var existing = await ConsultInvalidationCoreAsync(request, timeoutToken);
+            var existing = await ConsultInvalidationCoreAsync(request, configuration, timeoutToken);
             return existing ?? result;
         }, cancellationToken, request.IdempotencyKey);
     }
@@ -185,11 +212,15 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         }
     }
 
-    private async Task<FiscalResult> ConsultCoreAsync(string reference, CancellationToken cancellationToken)
+    private async Task<FiscalResult> ConsultCoreAsync(
+        string reference,
+        FocusConnection configuration,
+        CancellationToken cancellationToken)
     {
         using var message = AuthorizedRequest(
             HttpMethod.Get,
-            new Uri(BaseAddress, $"v2/nfce/{Uri.EscapeDataString(reference)}"));
+            new Uri(BaseAddress(configuration), $"v2/nfce/{Uri.EscapeDataString(reference)}"),
+            configuration.Token!);
         using var response = await httpClient.SendAsync(
             message,
             HttpCompletionOption.ResponseHeadersRead,
@@ -202,14 +233,16 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
 
     private async Task<FiscalResult?> ConsultInvalidationCoreAsync(
         FiscalNumberInvalidationRequest request,
+        FocusConnection configuration,
         CancellationToken cancellationToken)
     {
         var cnpj = Uri.EscapeDataString(request.Cnpj.Trim().ToUpperInvariant());
         using var message = AuthorizedRequest(
             HttpMethod.Get,
             new Uri(
-                BaseAddress,
-                $"v2/nfce/inutilizacoes?cnpj={cnpj}&numero_inicial={request.InitialNumber}&numero_final={request.FinalNumber}"));
+                BaseAddress(configuration),
+                $"v2/nfce/inutilizacoes?cnpj={cnpj}&numero_inicial={request.InitialNumber}&numero_final={request.FinalNumber}"),
+            configuration.Token!);
         using var response = await httpClient.SendAsync(
             message,
             HttpCompletionOption.ResponseHeadersRead,
@@ -243,14 +276,16 @@ public sealed class FocusFiscalGateway(HttpClient httpClient, IOptions<HubOption
         return null;
     }
 
-    private HttpRequestMessage AuthorizedRequest(HttpMethod method, Uri uri)
+    private static HttpRequestMessage AuthorizedRequest(HttpMethod method, Uri uri, string token)
     {
         var message = new HttpRequestMessage(method, uri);
-        var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Token}:"));
+        var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{token}:"));
         message.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
         message.Headers.UserAgent.ParseAdd("GiroMesa-EdgeHub/2.0");
         return message;
     }
+
+    private sealed record FocusConnection(bool Enabled, string Environment, string? Token);
 
     private static FiscalResult DocumentResult(string body, string fallbackReference)
     {

@@ -1,4 +1,4 @@
-import { Button, Icon, Modal } from "@giromesa/ui";
+import { Button, Icon, Input, Label, Modal } from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { formatMoney } from "../../rules";
@@ -117,7 +117,7 @@ export function ManagerApprovalInbox({
 
   return (
     <>
-      <button
+      <Button
         aria-expanded={open}
         aria-label={
           loadError
@@ -126,11 +126,12 @@ export function ManagerApprovalInbox({
         }
         className={`manager-inbox-trigger ${loadError ? "manager-inbox-trigger--error" : ""}`}
         onClick={() => setOpen(true)}
-        type="button"
+        size="sm"
+        variant="ghost"
       >
         <Icon name="alerts" size={17} />
         {!loadError && <span>{items.length}</span>}
-      </button>
+      </Button>
       <Modal
         className="manager-inbox-modal"
         isOpen={open}
@@ -149,9 +150,9 @@ export function ManagerApprovalInbox({
             </div>
           ) : (
             <>
-              <label className="manager-inbox__pin">
+              <Label className="manager-inbox__pin">
                 Código gerencial
-                <input
+                <Input
                   autoComplete="one-time-code"
                   inputMode="numeric"
                   maxLength={8}
@@ -160,7 +161,7 @@ export function ManagerApprovalInbox({
                   type="password"
                   value={pin}
                 />
-              </label>
+              </Label>
               <div className="manager-inbox__list">
                 {items.map((item) => (
                   <article key={item.requestId}>

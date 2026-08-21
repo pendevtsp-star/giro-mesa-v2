@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  reportAlertActionSchema,
+  reportCostBackfillSchema,
   reportDrillDownQuerySchema,
   reportExportInputSchema,
   reportScheduleCreateSchema,
+  reportViewCreateSchema,
 } from "./management-report.schemas.js";
 
 describe("management report schemas", () => {
@@ -76,9 +79,48 @@ describe("management report schemas", () => {
       reportExportInputSchema.safeParse({
         from: "2026-08-01",
         to: "2026-08-31",
-        family: "quality",
+        family: "forecast",
+        format: "xlsx",
       }).success,
       true,
+    );
+    assert.equal(
+      reportExportInputSchema.safeParse({
+        from: "2026-08-01",
+        to: "2026-08-31",
+        family: "labor",
+        format: "pdf",
+      }).success,
+      true,
+    );
+  });
+
+  it("validates shared views, alert actions and explicit estimated cost backfill", () => {
+    assert.equal(
+      reportViewCreateSchema.safeParse({
+        name: "Fechamento semanal",
+        visibility: "unit",
+        query: {
+          from: "2026-08-01",
+          to: "2026-08-07",
+          comparisonMode: "previous_period",
+          family: "reconciliation",
+        },
+      }).success,
+      true,
+    );
+    assert.equal(
+      reportAlertActionSchema.safeParse({ status: "resolved", version: 2 }).success,
+      true,
+    );
+    assert.equal(
+      reportCostBackfillSchema.safeParse({
+        from: "2026-08-01",
+        to: "2026-08-31",
+        comparisonMode: "none",
+        allowEstimated: false,
+      }).success,
+      false,
     );
   });
 });

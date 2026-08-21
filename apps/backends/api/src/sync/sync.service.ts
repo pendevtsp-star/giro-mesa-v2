@@ -239,6 +239,10 @@ export class SyncService {
       .orderBy(asc(hubCommands.createdAt))
       .limit(100);
     const snapshot = await this.snapshots.capture(hub.organizationId, hub.unitId);
+    const fiscalConfiguration = await this.fiscal.edgeProviderConfiguration(
+      hub.organizationId,
+      hub.unitId,
+    );
     const snapshotRevision = operationalSnapshotRevision(snapshot);
     const requestedRevision = input.metadata.snapshotRevision;
     const snapshotUnchanged =
@@ -251,6 +255,7 @@ export class SyncService {
       snapshot: snapshotUnchanged ? null : snapshot,
       snapshotRevision,
       snapshotUnchanged,
+      fiscalConfiguration,
       serverTime: now,
     };
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@giromesa/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -46,14 +47,14 @@ export default function MarketingOptOutPage() {
           ativas.
         </p>
         {!completed && (
-          <button
+          <Button
             className="button button-primary"
             type="button"
             onClick={optOut}
             disabled={!token}
           >
             Confirmar cancelamento
-          </button>
+          </Button>
         )}
         <p className="form-status" role="status">
           {message}

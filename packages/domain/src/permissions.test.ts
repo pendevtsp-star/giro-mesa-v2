@@ -9,6 +9,9 @@ const reportPermissions = [
   "reports:export",
   "reports:budget:manage",
   "reports:schedule:manage",
+  "reports:views:manage",
+  "reports:alerts:manage",
+  "reports:costs:backfill",
 ] as const;
 
 describe("report permissions", () => {
@@ -20,11 +23,19 @@ describe("report permissions", () => {
   });
 
   it("keeps manager read-only for configuration and other roles unchanged", () => {
-    for (const permission of reportPermissions.slice(0, 4)) {
+    for (const permission of [
+      "reports:read",
+      "reports:costs:read",
+      "reports:drilldown",
+      "reports:export",
+      "reports:views:manage",
+      "reports:alerts:manage",
+    ] as const) {
       assert.equal(hasPermission("manager", permission), true);
     }
     assert.equal(hasPermission("manager", "reports:budget:manage"), false);
     assert.equal(hasPermission("manager", "reports:schedule:manage"), false);
+    assert.equal(hasPermission("manager", "reports:costs:backfill"), false);
     for (const role of [
       "waiter",
       "cashier",

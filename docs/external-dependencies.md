@@ -5,7 +5,7 @@ O código deve falhar de forma segura quando estas dependências estiverem ausen
 | Área | Necessário para homologação | Estado inicial |
 |---|---|---|
 | PayGo | contrato, adquirente, pinpad, credenciais e roteiro de homologação | adapter desabilitado |
-| Focus NFe | conta, token por empresa, CNPJ, IE/UF, regime, CSC, certificado A1, série e cadastro fiscal dos itens (NCM/CFOP/tributação) | emissão, consulta, cancelamento, inutilização e reconciliação com o livro fiscal implementados; produção permanece desabilitada sem dados e homologação reais |
+| Focus NFe | `FOCUS_NFE_PRIMARY_TOKEN`, chave de cifra, CNPJ, IE/UF, regime, CSC, certificado A1, série e cadastro fiscal dos itens | onboarding multiempresa, tokens cifrados por unidade, emissão Edge, consulta, cancelamento, inutilização e reconciliação implementados; produção permanece desabilitada sem credenciais e homologação reais |
 | Asaas | conta sandbox/produção, chave e segredo de webhook | porta backend desabilitada |
 | Google | client ID, secret e callbacks locais/produção | OIDC Authorization Code + PKCE implementado; falta carregar as credenciais no ambiente V2 |
 | AWS | conta, role OIDC, domínio, certificado e parâmetros de ambiente | Terraform sem apply |

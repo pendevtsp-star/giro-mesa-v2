@@ -1,5 +1,3 @@
-import "./StatusDot.css";
-
 export function StatusDot({
   tone = "success",
   pulse = false,
@@ -17,6 +15,7 @@ export function StatusDot({
   return (
     <span
       className={`gm-status-dot ${pulse ? "gm-status-dot--pulse" : ""}`}
+      data-slot="status-dot"
       style={{ backgroundColor: colorMap[tone] }}
     />
   );

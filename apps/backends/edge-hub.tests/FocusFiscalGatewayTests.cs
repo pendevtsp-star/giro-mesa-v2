@@ -76,7 +76,8 @@ public sealed class FocusFiscalGatewayTests
     {
         var disabled = new FocusFiscalGateway(
             new HttpClient(new RecordingHandler((_, _) => throw new Xunit.Sdk.XunitException("HTTP should not be called"))),
-            Options.Create(new HubOptions()));
+            Options.Create(new HubOptions()),
+            new FocusCredentialStore());
         var unavailable = await disabled.IssueAsync(new FiscalRequest(
             "order-2026", ActorIdentityId, "order", 100, "{}"));
         Assert.Equal("FOCUS_NOT_CONFIGURED", unavailable.ErrorCode);
@@ -84,6 +85,41 @@ public sealed class FocusFiscalGatewayTests
         var invalid = await Gateway(new RecordingHandler((_, _) => throw new Xunit.Sdk.XunitException("HTTP should not be called")))
             .IssueAsync(new FiscalRequest("unsafe ref", ActorIdentityId, "order", 100, "not-json"));
         Assert.Equal("FOCUS_REQUEST_INVALID", invalid.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UsesCompanyCredentialReceivedFromAuthenticatedCloudSync()
+    {
+        var credentials = new FocusCredentialStore();
+        credentials.Apply(new FocusRuntimeConfiguration(
+            "focus",
+            true,
+            "homologation",
+            "focus-runtime-token"));
+        var gateway = new FocusFiscalGateway(
+            new HttpClient(new RecordingHandler((request, _) =>
+            {
+                Assert.Equal("Basic", request.Headers.Authorization?.Scheme);
+                var expected = Convert.ToBase64String(Encoding.UTF8.GetBytes("focus-runtime-token:"));
+                Assert.Equal(expected, request.Headers.Authorization?.Parameter);
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("""{"status":"autorizado","ref":"runtime-ref"}""")
+                };
+            })),
+            Options.Create(new HubOptions()),
+            credentials);
+
+        var result = await gateway.IssueAsync(new FiscalRequest(
+            "runtime-ref",
+            ActorIdentityId,
+            Guid.NewGuid().ToString(),
+            100,
+            "{}"));
+
+        Assert.True(result.Success);
+        credentials.Apply(null);
+        Assert.False(gateway.Capability.Configured);
     }
 
     [Fact]
@@ -289,7 +325,8 @@ public sealed class FocusFiscalGatewayTests
                 Token = "focus-company-token",
                 RequestTimeoutSeconds = 5,
             }
-        }));
+        }),
+        new FocusCredentialStore());
 
     private sealed class RecordingHandler(Func<HttpRequestMessage, int, HttpResponseMessage> response)
         : HttpMessageHandler

@@ -29,7 +29,9 @@ Um arquivo SQLite antigo sem criptografia não é convertido automaticamente. An
 
 ## Impressão térmica ESC/POS
 
-O Hub envia recibos estruturados por TCP, normalmente na porta `9100`. Configure uma impressora com `Hub__Printer__Enabled=true`, `Hub__Printer__Id`, `Hub__Printer__Host`, `Hub__Printer__Port`, `Hub__Printer__PaperWidthMm` (`58` ou `80`) e `Hub__Printer__CharactersPerLine`. `CodeTable=16` corresponde ao perfil Latin-1/Windows-1252 usado como padrão; ajuste conforme o manual do equipamento. `Cut=false` atende modelos sem guilhotina.
+O Hub envia recibos estruturados por TCP, normalmente na porta `9100`. `Hub:Printer` permanece como configuração compatível para uma impressora; operações com vários pontos usam `Hub:Printers[]`. Cada entrada aceita `Id`, `Host`, `Port`, `PaperWidthMm` (`58` ou `80`), `CharactersPerLine`, `CodeTable`, `Cut`, `Default`, `Stations`, `DocumentTypes` e `FallbackPrinterId`. A rota explícita `printerId` vence; sem ela, o Hub escolhe por estação/tipo de documento, depois a padrão. A contingência só ocorre quando a conexão não chegou a ser aberta, evitando reimpressão incerta após envio parcial.
+
+Dispositivos pareados consultam `GET /v1/printers` para diagnóstico e usam `POST /v1/printers/{id}/test` para emitir um teste físico. `CodeTable=16` corresponde ao perfil Latin-1/Windows-1252 usado como padrão; ajuste conforme o manual do equipamento. `Cut=false` atende modelos sem guilhotina.
 
 - Cada tentativa usa uma chave idempotente persistida no banco SQLCipher. Repetir a mesma tentativa nunca gera outra via; uma falha confirmada cria uma nova tentativa.
 - Conteúdo e nomes passam por sanitização antes dos comandos ESC/POS, impedindo que texto operacional injete comandos na impressora.

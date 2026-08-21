@@ -350,6 +350,10 @@ export class OutboxWorker {
       await this.deliverReportExportEmail(event);
       return;
     }
+    if (event.topic === "management.time-tracking.alert") {
+      await this.deliverTimeTrackingAlert(event);
+      return;
+    }
     if (event.topic === ORDER_READY_NOTIFICATION_TOPIC) {
       return this.deliverOrderReadyNotification(event);
     }
@@ -787,6 +791,192 @@ export class OutboxWorker {
       },
       { configuration },
     );
+  }
+
+  private async deliverTimeTrackingAlert(event: ClaimedOutboxEvent) {
+    if (event.aggregate_type !== "time_entry" || !UUID.test(event.aggregate_id)) {
+      throw new EmailDeliveryError("TIME_TRACKING_ALERT_CONTEXT_INVALID", false);
+    }
+    const organizationId = requiredUuid(event.payload, "organizationId");
+    const unitId = requiredUuid(event.payload, "unitId");
+    const flags = Array.isArray(event.payload.flags)
+      ? event.payload.flags.filter(
+          (flag): flag is string =>
+            typeof flag === "string" && flag.length > 0 && flag.length <= 80,
+        )
+      : [];
+    if (flags.length === 0) throw new EmailDeliveryError("TIME_TRACKING_ALERT_INVALID", false);
+    const includeManagers = event.payload.includeManagers === true;
+    const [entry] = await this.connection.db.execute<{ person_name: string }>(sql`
+      select people.name as person_name
+      from management_time_entries as entries
+      inner join management_people as people
+        on people.organization_id = entries.organization_id
+       and people.unit_id = entries.unit_id
+       and people.id = entries.person_id
+      where entries.organization_id = ${organizationId}
+        and entries.unit_id = ${unitId}
+        and entries.id = ${event.aggregate_id}
+      limit 1
+    `);
+    if (!entry) throw new EmailDeliveryError("TIME_TRACKING_ALERT_ENTRY_NOT_FOUND", false);
+    const recipients = await this.connection.db.execute<{
+      identity_id: string;
+      display_name: string;
+      email: string;
+      role: string;
+    }>(sql`
+      select distinct identities.id as identity_id,
+             identities.display_name,
+             identities.email,
+             bindings.role::text as role
+      from memberships
+      inner join identities on identities.id = memberships.identity_id
+      inner join role_bindings as bindings on bindings.membership_id = memberships.id
+      where memberships.organization_id = ${organizationId}
+        and memberships.status = 'active'
+        and (bindings.unit_id is null or bindings.unit_id = ${unitId})
+        and bindings.role in ('owner', 'manager')
+    `);
+    const selected = new Map<string, { identityId: string; displayName: string; email: string }>();
+    for (const recipient of recipients) {
+      if (recipient.role !== "owner" && !(includeManagers && recipient.role === "manager"))
+        continue;
+      selected.set(recipient.identity_id, {
+        identityId: recipient.identity_id,
+        displayName: recipient.display_name,
+        email: recipient.email,
+      });
+    }
+    if (selected.size === 0)
+      throw new EmailDeliveryError("TIME_TRACKING_ALERT_RECIPIENT_NOT_FOUND", false);
+    const configuration = emailProviderConfiguration();
+    const flagsText = flags.join(", ");
+    const actionUrl = `${configuration.appUrl}/#/people`;
+    for (const recipient of selected.values()) {
+      await deliverEmail(
+        {
+          to: recipient.email,
+          subject: "Alerta de ponto no GiroMesa",
+          html: emailHtml({
+            title: "Marcação de ponto sinalizada",
+            greeting: `Olá, ${recipient.displayName}.`,
+            body: `A marcação de ${entry.person_name} foi sinalizada para revisão: ${flagsText}.`,
+            actionLabel: "Abrir Pessoas",
+            actionUrl,
+            footer:
+              "Acesse o módulo Pessoas para revisar o registro. Coordenadas só ficam disponíveis ao proprietário dentro do prazo de retenção.",
+          }),
+          text: `Olá, ${recipient.displayName}.\n\nA marcação de ${entry.person_name} foi sinalizada para revisão: ${flagsText}.\n\nAbra Pessoas: ${actionUrl}\n\nCoordenadas só ficam disponíveis ao proprietário dentro do prazo de retenção.`,
+          idempotencyKey: `time-tracking-alert/${event.id}/${recipient.identityId}`,
+          tags: [
+            { name: "message_type", value: "time_tracking_alert" },
+            { name: "time_entry_id", value: event.aggregate_id },
+          ],
+        },
+        { configuration },
+      );
+    }
+  }
+
+  async redactExpiredTimeTrackingLocations() {
+    const entries = await this.connection.db.execute<{
+      organization_id: string;
+      unit_id: string;
+    }>(sql`
+      update management_time_entries as entries
+      set clock_in_latitude = null,
+          clock_in_longitude = null,
+          clock_in_accuracy_meters = null,
+          clock_in_geofence_label = null,
+          clock_out_latitude = null,
+          clock_out_longitude = null,
+          clock_out_accuracy_meters = null,
+          clock_out_geofence_label = null,
+          updated_at = now()
+      from management_time_tracking_settings as settings
+      where settings.organization_id = entries.organization_id
+        and settings.unit_id = entries.unit_id
+        and coalesce(entries.clocked_out_at, entries.clocked_in_at) < now() - settings.location_retention_days * interval '1 day'
+        and (
+          entries.clock_in_latitude is not null
+          or entries.clock_in_longitude is not null
+          or entries.clock_in_accuracy_meters is not null
+          or entries.clock_in_geofence_label is not null
+          or entries.clock_out_latitude is not null
+          or entries.clock_out_longitude is not null
+          or entries.clock_out_accuracy_meters is not null
+          or entries.clock_out_geofence_label is not null
+        )
+      returning entries.organization_id, entries.unit_id
+    `);
+    const breaks = await this.connection.db.execute<{
+      organization_id: string;
+      unit_id: string;
+    }>(sql`
+      update management_time_entry_breaks as breaks
+      set start_latitude = null,
+          start_longitude = null,
+          start_accuracy_meters = null,
+          start_geofence_label = null,
+          end_latitude = null,
+          end_longitude = null,
+          end_accuracy_meters = null,
+          end_geofence_label = null,
+          updated_at = now()
+      from management_time_tracking_settings as settings
+      where settings.organization_id = breaks.organization_id
+        and settings.unit_id = breaks.unit_id
+        and coalesce(breaks.ended_at, breaks.started_at) < now() - settings.location_retention_days * interval '1 day'
+        and (
+          breaks.start_latitude is not null
+          or breaks.start_longitude is not null
+          or breaks.start_accuracy_meters is not null
+          or breaks.start_geofence_label is not null
+          or breaks.end_latitude is not null
+          or breaks.end_longitude is not null
+          or breaks.end_accuracy_meters is not null
+          or breaks.end_geofence_label is not null
+        )
+      returning breaks.organization_id, breaks.unit_id
+    `);
+    const scopes = new Map<
+      string,
+      { organizationId: string; unitId: string; entries: number; breaks: number }
+    >();
+    for (const row of entries) {
+      const key = `${row.organization_id}:${row.unit_id}`;
+      const current = scopes.get(key) ?? {
+        organizationId: row.organization_id,
+        unitId: row.unit_id,
+        entries: 0,
+        breaks: 0,
+      };
+      current.entries += 1;
+      scopes.set(key, current);
+    }
+    for (const row of breaks) {
+      const key = `${row.organization_id}:${row.unit_id}`;
+      const current = scopes.get(key) ?? {
+        organizationId: row.organization_id,
+        unitId: row.unit_id,
+        entries: 0,
+        breaks: 0,
+      };
+      current.breaks += 1;
+      scopes.set(key, current);
+    }
+    for (const scope of scopes.values()) {
+      await this.connection.db.insert(auditEvents).values({
+        organizationId: scope.organizationId,
+        unitId: scope.unitId,
+        action: "management.time-tracking.location-retention-applied",
+        entityType: "time_tracking_location",
+        entityId: `${scope.organizationId}:${scope.unitId}`,
+        metadata: { entries: scope.entries, breaks: scope.breaks },
+      });
+    }
+    return { entries: [...entries].length, breaks: [...breaks].length };
   }
 
   private async failCampaignDelivery(deliveryId: string, campaignId: string, code: string) {

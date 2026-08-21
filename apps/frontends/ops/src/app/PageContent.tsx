@@ -47,6 +47,11 @@ const RealInventoryPage = lazy(() =>
 const RealPeoplePage = lazy(() =>
   import("../features/people/PeoplePage").then((module) => ({ default: module.RealPeoplePage })),
 );
+const RealWaiterSettlementsPage = lazy(() =>
+  import("../features/waiter-settlements/WaiterSettlementsPage").then((module) => ({
+    default: module.RealWaiterSettlementsPage,
+  })),
+);
 const RealPurchasesPage = lazy(() =>
   import("../features/purchases/PurchasesPage").then((module) => ({
     default: module.RealPurchasesPage,
@@ -123,6 +128,10 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   people: {
     title: "Pessoas",
     description: "Equipe, escalas, ponto e comissões.",
+  },
+  "waiter-settlements": {
+    title: "Fechamento da equipe",
+    description: "Apuração de vendas, serviço, partnership e perdas operacionais.",
   },
   delivery: {
     title: "Delivery",
@@ -234,6 +243,8 @@ export function PageContent({
       return <RealAccountantPage scope={managementScope} />;
     case "people":
       return <RealPeoplePage scope={managementScope} />;
+    case "waiter-settlements":
+      return <RealWaiterSettlementsPage scope={managementScope} />;
     case "delivery":
       return (
         <RealDeliveryPage

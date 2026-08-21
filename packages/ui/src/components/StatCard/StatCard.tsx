@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "../Icon/Icon";
-import "./StatCard.css";
 
 export function StatCard({
   title,
@@ -18,18 +17,22 @@ export function StatCard({
   footer?: ReactNode;
 }) {
   return (
-    <div className="gm-stat-card">
-      <div className="gm-stat-card__header">
-        <span className="gm-stat-card__title">{title}</span>
+    <div className="gm-stat-card" data-slot="card">
+      <div className="gm-stat-card__header" data-slot="card-header">
+        <span className="gm-stat-card__title" data-slot="card-title">
+          {title}
+        </span>
         {icon && (
           <span className="gm-stat-card__icon">
             <Icon name={icon} size={18} />
           </span>
         )}
       </div>
-      <div className="gm-stat-card__value">{value}</div>
+      <div className="gm-stat-card__value" data-slot="card-content">
+        {value}
+      </div>
       {(trend || footer) && (
-        <div className="gm-stat-card__footer">
+        <div className="gm-stat-card__footer" data-slot="card-footer">
           {trend && (
             <span className={`gm-stat-card__trend gm-stat-card__trend--${trendDirection}`}>
               {trendDirection === "up" ? "↑" : "↓"} {trend}

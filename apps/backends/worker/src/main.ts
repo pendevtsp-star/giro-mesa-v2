@@ -6,6 +6,7 @@ const heartbeat = createWorkerHeartbeat(process.env);
 let stopping = false;
 let nextMaintenanceAt = 0;
 let nextReportScanAt = 0;
+let nextTimeTrackingRetentionAt = 0;
 
 async function shutdown() {
   if (stopping) return;
@@ -28,6 +29,10 @@ while (!stopping) {
   if (Date.now() >= nextReportScanAt) {
     await worker.runDueReports();
     nextReportScanAt = Date.now() + 15_000;
+  }
+  if (Date.now() >= nextTimeTrackingRetentionAt) {
+    await worker.redactExpiredTimeTrackingLocations();
+    nextTimeTrackingRetentionAt = Date.now() + 24 * 60 * 60_000;
   }
   const processed = await worker.runOnce();
   await heartbeat.recordSuccessfulCycle();

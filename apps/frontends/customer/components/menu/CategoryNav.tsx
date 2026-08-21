@@ -13,31 +13,30 @@ export function CategoryNav({
 }) {
   return (
     <section className="menu-toolbar" aria-label="Filtros do cardápio">
-      <label className="search">
-        <span aria-hidden="true">⌕</span>
-        <span className="sr-only">Buscar no cardápio</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-          placeholder="Buscar pratos e ingredientes"
-        />
-      </label>
+      <SearchField
+        aria-label="Buscar no cardápio"
+        className="search"
+        value={query}
+        onChange={(event) => onQuery(event.target.value)}
+        placeholder="Buscar pratos e ingredientes"
+      />
       <fieldset className="category-fieldset">
         <legend className="sr-only">Categorias</legend>
         <div className="category-list">
           {categories.map((item) => (
-            <button
+            <Button
               type="button"
               key={item}
               aria-pressed={category === item}
               onClick={() => onCategory(item)}
             >
               {item}
-            </button>
+            </Button>
           ))}
         </div>
       </fieldset>
     </section>
   );
 }
+
+import { Button, SearchField } from "@giromesa/ui";

@@ -17,12 +17,23 @@ import {
   productTaxRevisions,
   units,
 } from "@giromesa/db";
-import { hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
 import {
+  decryptSecret,
+  encryptionKey,
+  encryptSecret,
+  hasPermission,
+  type SecretEnvelope,
+  SYSTEM_ROLES,
+  type SystemRole,
+} from "@giromesa/domain";
+import {
+  BadGatewayException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
@@ -30,14 +41,24 @@ import { ScopeService } from "../organizations/scope.service.js";
 import type {
   AccountantRequestInput,
   AccountantRequestListQuery,
+  CancelFiscalDocumentInput,
   FiscalDocumentListQuery,
   FiscalProfileInput,
+  FocusCompanyOnboardingInput,
+  ProductTaxRevisionBulkInput,
   ProductTaxRevisionInput,
   ProductTaxRevisionListQuery,
   ReopenFiscalPeriodInput,
   ResolveAccountantRequestInput,
 } from "./fiscal.schemas.js";
 import { edgeFiscalEventSchema, idempotencyKeySchema } from "./fiscal.schemas.js";
+import {
+  type FocusCompany,
+  type FocusCompanyInput,
+  type FocusDocumentResult,
+  FocusNfeClient,
+  FocusNfeError,
+} from "./focus-nfe.client.js";
 
 type Permission =
   | "fiscal:dashboard:read"
@@ -49,6 +70,24 @@ type Permission =
   | "accounting:exports:read"
   | "accounting:requests:read"
   | "accounting:requests:write";
+
+type StoredFocusConnection = {
+  companyId: string;
+  cnpj: string;
+  status: "ready" | "credentials_missing" | "error";
+  idempotencyHash?: string;
+  tokenProduction?: SecretEnvelope;
+  tokenHomologation?: SecretEnvelope;
+  certificateValidUntil: string | null;
+  enabled: { nfce: boolean; nfe: boolean; nfse: boolean };
+  lastCheckedAt: string;
+  lastError?: { code: string; message: string };
+};
+
+type FiscalSettings = Record<string, unknown> & {
+  series?: { nfce?: string; nfe?: string; nfse?: string };
+  focus?: StoredFocusConnection;
+};
 
 export function competenceBounds(competence: string) {
   const [year, month] = competence.split("-").map(Number);
@@ -112,11 +151,199 @@ export function buildAccountingPackage(
   };
 }
 
+export function buildFocusCompanyInput(
+  legalEntity: {
+    legalName: string;
+    document: string;
+  },
+  profile: {
+    taxRegime: string;
+    crt: string;
+    stateCode: string;
+    municipalRegistration: string | null;
+    settings: Record<string, unknown>;
+  },
+  input: FocusCompanyOnboardingInput,
+): FocusCompanyInput {
+  const series = settingsOf(profile.settings).series ?? {};
+  const taxRegime =
+    profile.crt === "4"
+      ? 4
+      : profile.taxRegime === "simples_nacional"
+        ? 1
+        : profile.taxRegime === "simples_excesso"
+          ? 2
+          : 3;
+  return {
+    nome: legalEntity.legalName,
+    nome_fantasia: input.tradeName,
+    cnpj: legalEntity.document,
+    inscricao_estadual: input.stateRegistration,
+    inscricao_municipal: profile.municipalRegistration ?? undefined,
+    regime_tributario: taxRegime,
+    logradouro: input.street,
+    numero: input.number,
+    complemento: input.complement,
+    municipio: input.city,
+    bairro: input.district,
+    cep: Number(input.postalCode),
+    uf: profile.stateCode,
+    telefone: input.phone,
+    email: input.email,
+    cpf_cnpj_contabilidade: input.accountantDocument,
+    habilita_nfe: input.enableNfe,
+    habilita_nfce: input.enableNfce,
+    habilita_nfse: input.enableNfse,
+    discrimina_impostos: true,
+    arquivo_certificado_base64: input.certificateBase64,
+    senha_certificado: input.certificatePassword,
+    csc_nfce_producao: input.cscProduction,
+    id_token_nfce_producao: input.cscProductionId ? Number(input.cscProductionId) : undefined,
+    csc_nfce_homologacao: input.cscHomologation,
+    id_token_nfce_homologacao: input.cscHomologationId
+      ? Number(input.cscHomologationId)
+      : undefined,
+    serie_nfe_producao: series.nfe,
+    serie_nfe_homologacao: series.nfe,
+    serie_nfce_producao: series.nfce,
+    serie_nfce_homologacao: series.nfce,
+    serie_nfse_producao: series.nfse,
+    serie_nfse_homologacao: series.nfse,
+  };
+}
+
+function settingsOf(value: unknown): FiscalSettings {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as FiscalSettings)
+    : {};
+}
+
+function publicFocusConnection(settings: FiscalSettings) {
+  const connection = settings.focus;
+  if (!connection) return null;
+  return {
+    companyId: connection.companyId,
+    cnpj: connection.cnpj,
+    status: connection.status,
+    certificateValidUntil: connection.certificateValidUntil,
+    enabled: connection.enabled,
+    lastCheckedAt: connection.lastCheckedAt,
+    environments: {
+      homologation: Boolean(connection.tokenHomologation),
+      production: Boolean(connection.tokenProduction),
+    },
+    lastError: connection.lastError,
+  };
+}
+
+function sanitizedProfile<T extends { settings: unknown }>(profile: T) {
+  const settings = settingsOf(profile.settings);
+  return {
+    ...profile,
+    settings: {
+      series: settings.series ?? {},
+      focus: publicFocusConnection(settings),
+    },
+  };
+}
+
+function providerStatusPayload(
+  profile: { provider: string | null; environment: string; settings: unknown } | null,
+  platformConfigured: boolean,
+  encryptionConfigured: boolean,
+) {
+  const connection =
+    profile?.provider === "focus" ? publicFocusConnection(settingsOf(profile.settings)) : null;
+  const selectedEnvironmentReady =
+    profile?.environment === "production"
+      ? connection?.environments.production
+      : profile?.environment === "homologation"
+        ? connection?.environments.homologation
+        : false;
+  const status =
+    !platformConfigured || !encryptionConfigured
+      ? "platform_not_configured"
+      : !profile
+        ? "profile_required"
+        : !connection
+          ? "company_required"
+          : connection.status === "error"
+            ? "error"
+            : !selectedEnvironmentReady
+              ? "credentials_missing"
+              : "ready";
+  return {
+    provider: "focus" as const,
+    status,
+    environment:
+      profile?.environment === "production" || profile?.environment === "homologation"
+        ? profile.environment
+        : null,
+    platformConfigured: platformConfigured && encryptionConfigured,
+    connection,
+    nextAction:
+      status === "platform_not_configured"
+        ? "Configure as credenciais da conta GiroMesa no ambiente da API."
+        : status === "profile_required"
+          ? "Salve o perfil fiscal da unidade."
+          : status === "company_required"
+            ? "Valide e cadastre a empresa emitente na Focus NFe."
+            : status === "credentials_missing"
+              ? "Sincronize os tokens da empresa emitente."
+              : status === "error"
+                ? "Revise a última falha retornada pela Focus NFe."
+                : "Conexão pronta para o ambiente selecionado.",
+  };
+}
+
+function focusConnection(
+  company: FocusCompany,
+  environment: "homologation" | "production",
+  idempotencyHash: string | undefined,
+  key: Buffer,
+  scope: { organizationId: string; unitId: string },
+  current?: StoredFocusConnection,
+): StoredFocusConnection {
+  const associatedData = (target: "homologation" | "production") =>
+    `focus:${scope.organizationId}:${scope.unitId}:${target}`;
+  const tokenProduction = company.tokenProduction
+    ? encryptSecret(company.tokenProduction, key, associatedData("production"))
+    : current?.tokenProduction;
+  const tokenHomologation = company.tokenHomologation
+    ? encryptSecret(company.tokenHomologation, key, associatedData("homologation"))
+    : current?.tokenHomologation;
+  const selectedToken = environment === "production" ? tokenProduction : tokenHomologation;
+  return {
+    companyId: company.id,
+    cnpj: company.cnpj,
+    status: selectedToken ? "ready" : "credentials_missing",
+    idempotencyHash,
+    tokenProduction,
+    tokenHomologation,
+    certificateValidUntil: company.certificateValidUntil,
+    enabled: company.enabled,
+    lastCheckedAt: new Date().toISOString(),
+  };
+}
+
+function rethrowFocus(error: unknown): never {
+  if (!(error instanceof FocusNfeError)) throw error;
+  const body = {
+    code: `FOCUS_${error.code.toUpperCase()}`,
+    message: error.message,
+    details: error.details,
+  };
+  if (error.status === 503) throw new ServiceUnavailableException(body);
+  if (error.status >= 500) throw new BadGatewayException(body);
+  throw new HttpException(body, error.status >= 400 && error.status < 500 ? error.status : 422);
+}
+
 @Injectable()
 export class FiscalService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    private readonly focus: FocusNfeClient,
   ) {}
 
   private async requirePermission(
@@ -153,7 +380,7 @@ export class FiscalService {
         and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
       )
       .limit(1);
-    if (profile) return profile;
+    if (profile) return sanitizedProfile(profile);
     const [unit] = await this.database.db
       .select({ legalEntityId: units.legalEntityId })
       .from(units)
@@ -174,7 +401,7 @@ export class FiscalService {
       cityCode: "",
       environment: "homologation" as const,
       provider: null,
-      settings: { series: {} },
+      settings: { series: {}, focus: null },
       approvedByIdentityId: null,
       approvedAt: null,
       createdAt: null,
@@ -207,6 +434,19 @@ export class FiscalService {
           message: "Entidade legal não encontrada nesta organização.",
         });
       }
+      const [currentProfile] = await tx
+        .select({ legalEntityId: fiscalProfiles.legalEntityId, settings: fiscalProfiles.settings })
+        .from(fiscalProfiles)
+        .where(
+          and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+        )
+        .limit(1);
+      const currentSettings = settingsOf(currentProfile?.settings);
+      const nextSettings = {
+        ...currentSettings,
+        series: input.series,
+        focus: currentProfile?.legalEntityId === legalEntity.id ? currentSettings.focus : undefined,
+      };
       const now = new Date();
       const [profile] = await tx
         .insert(fiscalProfiles)
@@ -222,7 +462,7 @@ export class FiscalService {
           cityCode: input.cityCode,
           environment: input.environment,
           provider: input.provider,
-          settings: { series: input.series },
+          settings: nextSettings,
           approvedByIdentityId: identityId,
           approvedAt: now,
         })
@@ -239,7 +479,7 @@ export class FiscalService {
             cityCode: input.cityCode,
             environment: input.environment,
             provider: input.provider ?? null,
-            settings: { series: input.series },
+            settings: nextSettings,
             approvedByIdentityId: identityId,
             approvedAt: now,
             updatedAt: now,
@@ -262,8 +502,328 @@ export class FiscalService {
         aggregateId: profile.id,
         payload: { organizationId, unitId, profileId: profile.id, version: profile.version },
       });
-      return profile;
+      return sanitizedProfile(profile);
     });
+  }
+
+  async providerStatus(identityId: string, organizationId: string, unitId: string) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:dashboard:read");
+    const [profile] = await this.database.db
+      .select({
+        provider: fiscalProfiles.provider,
+        environment: fiscalProfiles.environment,
+        settings: fiscalProfiles.settings,
+      })
+      .from(fiscalProfiles)
+      .where(
+        and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+      )
+      .limit(1);
+    return providerStatusPayload(
+      profile ?? null,
+      this.focus.configured(),
+      Boolean(process.env.FISCAL_CREDENTIALS_ENCRYPTION_KEY?.trim()),
+    );
+  }
+
+  async edgeProviderConfiguration(organizationId: string, unitId: string) {
+    const [profile] = await this.database.db
+      .select({
+        environment: fiscalProfiles.environment,
+        provider: fiscalProfiles.provider,
+        settings: fiscalProfiles.settings,
+      })
+      .from(fiscalProfiles)
+      .where(
+        and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+      )
+      .limit(1);
+    if (profile?.provider !== "focus") {
+      return {
+        provider: "focus" as const,
+        enabled: false,
+        environment: "homologation" as const,
+        token: null,
+      };
+    }
+    const connection = settingsOf(profile.settings).focus;
+    const envelope =
+      profile.environment === "production"
+        ? connection?.tokenProduction
+        : connection?.tokenHomologation;
+    if (!envelope) {
+      return {
+        provider: "focus" as const,
+        enabled: false,
+        environment: profile.environment,
+        token: null,
+      };
+    }
+    try {
+      const key = encryptionKey(
+        process.env.FISCAL_CREDENTIALS_ENCRYPTION_KEY,
+        "FISCAL_CREDENTIALS_ENCRYPTION_KEY",
+      );
+      return {
+        provider: "focus" as const,
+        enabled: true,
+        environment: profile.environment,
+        token: decryptSecret(
+          envelope,
+          key,
+          `focus:${organizationId}:${unitId}:${profile.environment}`,
+        ),
+      };
+    } catch {
+      return {
+        provider: "focus" as const,
+        enabled: false,
+        environment: profile.environment,
+        token: null,
+      };
+    }
+  }
+
+  async validateFocusCompany(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: FocusCompanyOnboardingInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const setup = await this.focusSetup(organizationId, unitId);
+    this.assertFocusSetup(setup, input);
+    const payload = buildFocusCompanyInput(setup.legalEntity, setup.profile, input);
+    try {
+      const existing = await this.focus.listCompanies(setup.legalEntity.document);
+      const company = existing[0]
+        ? await this.focus.updateCompany(existing[0].id, payload, true)
+        : await this.focus.createCompany(payload, true);
+      return {
+        valid: true,
+        existingCompany: Boolean(existing[0]),
+        companyId: company.id,
+        cnpj: company.cnpj,
+        certificateValidUntil: company.certificateValidUntil,
+      };
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  async activateFocusCompany(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: FocusCompanyOnboardingInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const parsedKey = idempotencyKeySchema.parse(idempotencyKey);
+    const keyHash = createHash("sha256").update(parsedKey).digest("hex");
+    const encryption = encryptionKey(
+      process.env.FISCAL_CREDENTIALS_ENCRYPTION_KEY,
+      "FISCAL_CREDENTIALS_ENCRYPTION_KEY",
+    );
+    try {
+      return await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`focus:${organizationId}:${unitId}`}, 0))`,
+        );
+        const [profile] = await tx
+          .select()
+          .from(fiscalProfiles)
+          .where(
+            and(
+              eq(fiscalProfiles.organizationId, organizationId),
+              eq(fiscalProfiles.unitId, unitId),
+            ),
+          )
+          .limit(1);
+        if (!profile) throw new NotFoundException({ code: "FISCAL_PROFILE_NOT_FOUND" });
+        const currentSettings = settingsOf(profile.settings);
+        if (currentSettings.focus?.idempotencyHash === keyHash) {
+          return { replayed: true, provider: providerStatusPayload(profile, true, true) };
+        }
+        const [legalEntity] = await tx
+          .select({
+            id: legalEntities.id,
+            legalName: legalEntities.legalName,
+            document: legalEntities.document,
+          })
+          .from(legalEntities)
+          .where(
+            and(
+              eq(legalEntities.organizationId, organizationId),
+              eq(legalEntities.id, profile.legalEntityId),
+            ),
+          )
+          .limit(1);
+        if (!legalEntity) throw new NotFoundException({ code: "LEGAL_ENTITY_NOT_FOUND" });
+        const setup = { profile, legalEntity };
+        this.assertFocusSetup(setup, input);
+        const payload = buildFocusCompanyInput(legalEntity, profile, input);
+        const listed = await this.focus.listCompanies(legalEntity.document);
+        let company = listed[0]
+          ? await this.focus.updateCompany(listed[0].id, payload)
+          : await this.focus.createCompany(payload);
+        company = await this.focus.company(company.id);
+        const connection = focusConnection(
+          company,
+          profile.environment,
+          keyHash,
+          encryption,
+          { organizationId, unitId },
+          currentSettings.focus,
+        );
+        const now = new Date();
+        const [updated] = await tx
+          .update(fiscalProfiles)
+          .set({
+            provider: "focus",
+            settings: { ...currentSettings, focus: connection },
+            updatedAt: now,
+          })
+          .where(eq(fiscalProfiles.id, profile.id))
+          .returning();
+        await tx
+          .update(legalEntities)
+          .set({
+            stateRegistration: input.stateRegistration,
+            fiscalProvider: "focus",
+            fiscalStatus: connection.status === "ready" ? "active" : "pending",
+            updatedAt: now,
+          })
+          .where(eq(legalEntities.id, legalEntity.id));
+        await tx.insert(auditEvents).values({
+          organizationId,
+          unitId,
+          actorIdentityId: identityId,
+          action: listed[0] ? "fiscal.focus_company.linked" : "fiscal.focus_company.created",
+          entityType: "fiscal_profile",
+          entityId: profile.id,
+          metadata: {
+            provider: "focus",
+            companyId: company.id,
+            cnpj: company.cnpj,
+            status: connection.status,
+          },
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "fiscal.focus_company.activated",
+          aggregateType: "fiscal_profile",
+          aggregateId: profile.id,
+          payload: { organizationId, unitId, profileId: profile.id, companyId: company.id },
+        });
+        if (!updated) throw new ConflictException({ code: "FISCAL_PROVIDER_UPDATE_FAILED" });
+        return {
+          replayed: false,
+          provider: providerStatusPayload(updated, true, true),
+        };
+      });
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  async checkFocusCompany(identityId: string, organizationId: string, unitId: string) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const encryption = encryptionKey(
+      process.env.FISCAL_CREDENTIALS_ENCRYPTION_KEY,
+      "FISCAL_CREDENTIALS_ENCRYPTION_KEY",
+    );
+    const [profile] = await this.database.db
+      .select()
+      .from(fiscalProfiles)
+      .where(
+        and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+      )
+      .limit(1);
+    const current = profile ? settingsOf(profile.settings).focus : undefined;
+    if (!profile || !current?.companyId) {
+      throw new ConflictException({
+        code: "FOCUS_COMPANY_NOT_CONNECTED",
+        message: "Conclua o cadastro da empresa na Focus NFe antes de testar a conexão.",
+      });
+    }
+    try {
+      const company = await this.focus.company(current.companyId);
+      const connection = focusConnection(
+        company,
+        profile.environment,
+        current.idempotencyHash,
+        encryption,
+        { organizationId, unitId },
+        current,
+      );
+      const [updated] = await this.database.db
+        .update(fiscalProfiles)
+        .set({
+          settings: { ...settingsOf(profile.settings), focus: connection },
+          updatedAt: new Date(),
+        })
+        .where(eq(fiscalProfiles.id, profile.id))
+        .returning();
+      return providerStatusPayload(updated ?? profile, true, true);
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  private async focusSetup(organizationId: string, unitId: string) {
+    const [row] = await this.database.db
+      .select({
+        profile: fiscalProfiles,
+        legalEntity: {
+          id: legalEntities.id,
+          legalName: legalEntities.legalName,
+          document: legalEntities.document,
+        },
+      })
+      .from(fiscalProfiles)
+      .innerJoin(
+        legalEntities,
+        and(
+          eq(legalEntities.organizationId, organizationId),
+          eq(legalEntities.id, fiscalProfiles.legalEntityId),
+        ),
+      )
+      .where(
+        and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+      )
+      .limit(1);
+    if (!row) {
+      throw new ConflictException({
+        code: "FISCAL_PROFILE_REQUIRED",
+        message: "Salve o perfil fiscal antes de cadastrar a empresa na Focus NFe.",
+      });
+    }
+    return row;
+  }
+
+  private assertFocusSetup(
+    setup: Awaited<ReturnType<FiscalService["focusSetup"]>>,
+    input: FocusCompanyOnboardingInput,
+  ) {
+    if (!/^\d{14}$/.test(setup.legalEntity.document)) {
+      throw new ConflictException({
+        code: "FOCUS_CNPJ_UNSUPPORTED",
+        message:
+          "A API de empresas da Focus NFe exige, neste momento, CNPJ numérico com 14 dígitos.",
+      });
+    }
+    if (input.enableNfce) {
+      const missingCsc =
+        setup.profile.environment === "production"
+          ? !input.cscProduction || !input.cscProductionId
+          : !input.cscHomologation || !input.cscHomologationId;
+      if (missingCsc) {
+        throw new ConflictException({
+          code: "FOCUS_NFCE_CSC_REQUIRED",
+          message: `Informe o CSC e o ID de ${setup.profile.environment === "production" ? "produção" : "homologação"} para habilitar NFC-e.`,
+        });
+      }
+    }
   }
 
   async taxRevisions(
@@ -364,6 +924,101 @@ export class FiscalService {
         payload: { organizationId, unitId, productId: product.id, revisionId: revision.id },
       });
       return revision;
+    });
+  }
+
+  async createTaxRevisionsBulk(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: ProductTaxRevisionBulkInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const productIds = [...new Set(input.productIds)].sort();
+    return this.database.db.transaction(async (tx) => {
+      const products = await tx
+        .select({ id: posProducts.id })
+        .from(posProducts)
+        .where(
+          and(eq(posProducts.organizationId, organizationId), inArray(posProducts.id, productIds)),
+        );
+      if (products.length !== productIds.length) {
+        throw new NotFoundException({
+          code: "FISCAL_PRODUCT_NOT_FOUND",
+          message: "Um ou mais produtos não pertencem a esta organização.",
+        });
+      }
+      const now = new Date();
+      const revisions = [];
+      for (const productId of productIds) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`tax:${organizationId}:${unitId}:${productId}`}, 0))`,
+        );
+        const [versionRow] = await tx
+          .select({
+            version: sql<number>`coalesce(max(${productTaxRevisions.version}), 0)::int + 1`,
+          })
+          .from(productTaxRevisions)
+          .where(
+            and(
+              eq(productTaxRevisions.organizationId, organizationId),
+              eq(productTaxRevisions.unitId, unitId),
+              eq(productTaxRevisions.productId, productId),
+            ),
+          );
+        if (input.status === "active") {
+          await tx
+            .update(productTaxRevisions)
+            .set({ status: "revoked", updatedAt: now })
+            .where(
+              and(
+                eq(productTaxRevisions.organizationId, organizationId),
+                eq(productTaxRevisions.unitId, unitId),
+                eq(productTaxRevisions.productId, productId),
+                eq(productTaxRevisions.status, "active"),
+              ),
+            );
+        }
+        const [revision] = await tx
+          .insert(productTaxRevisions)
+          .values({
+            organizationId,
+            unitId,
+            productId,
+            version: Number(versionRow?.version ?? 1),
+            status: input.status,
+            effectiveFrom: input.effectiveFrom,
+            effectiveUntil: input.effectiveUntil,
+            classification: input.classification,
+            createdByIdentityId: identityId,
+            approvedByIdentityId: input.status === "active" ? identityId : undefined,
+            approvedAt: input.status === "active" ? now : undefined,
+          })
+          .returning();
+        if (!revision) throw new ConflictException({ code: "FISCAL_REVISION_CREATE_FAILED" });
+        revisions.push(revision);
+      }
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "fiscal.product_tax_revision.bulk_created",
+        entityType: "product_tax_revision",
+        entityId: revisions[0]?.id ?? unitId,
+        metadata: { productIds, status: input.status, count: revisions.length },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "fiscal.product_tax_revision.bulk_created",
+        aggregateType: "fiscal_profile",
+        aggregateId: unitId,
+        payload: {
+          organizationId,
+          unitId,
+          productIds,
+          revisionIds: revisions.map((item) => item.id),
+        },
+      });
+      return { revisions };
     });
   }
 
@@ -846,6 +1501,209 @@ export class FiscalService {
         .orderBy(asc(fiscalDocumentEvents.occurredAt)),
     ]);
     return { ...document, items, events };
+  }
+
+  async reconcileDocument(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    documentId: string,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:documents:read");
+    const context = await this.focusDocumentContext(organizationId, unitId, documentId);
+    try {
+      const result = await this.focus.document(
+        context.document.model,
+        context.document.providerReference,
+        context.profile.environment,
+        this.focusToken(
+          context.profile.settings,
+          context.profile.environment,
+          organizationId,
+          unitId,
+        ),
+      );
+      return this.persistFocusDocumentResult(identityId, context.document, result, "reconciled");
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  async cancelDocument(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    documentId: string,
+    input: CancelFiscalDocumentInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const context = await this.focusDocumentContext(organizationId, unitId, documentId);
+    if (context.document.status === "canceled") {
+      return {
+        replayed: true,
+        document: context.document,
+        artifacts: { xmlUrl: null, pdfUrl: null },
+      };
+    }
+    if (context.document.status !== "authorized") {
+      throw new ConflictException({
+        code: "FISCAL_DOCUMENT_NOT_AUTHORIZED",
+        message: "Somente um documento autorizado pode ser cancelado.",
+      });
+    }
+    try {
+      const result = await this.focus.cancelDocument(
+        context.document.model,
+        context.document.providerReference,
+        input.justification,
+        context.profile.environment,
+        this.focusToken(
+          context.profile.settings,
+          context.profile.environment,
+          organizationId,
+          unitId,
+        ),
+      );
+      const persisted = await this.persistFocusDocumentResult(
+        identityId,
+        context.document,
+        result,
+        "cancel_result",
+        { justification: input.justification },
+      );
+      return { ...persisted, replayed: false };
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  private async focusDocumentContext(organizationId: string, unitId: string, documentId: string) {
+    const [row] = await this.database.db
+      .select({ document: fiscalDocuments, profile: fiscalProfiles })
+      .from(fiscalDocuments)
+      .innerJoin(
+        fiscalProfiles,
+        and(
+          eq(fiscalProfiles.organizationId, fiscalDocuments.organizationId),
+          eq(fiscalProfiles.unitId, fiscalDocuments.unitId),
+        ),
+      )
+      .where(
+        and(
+          eq(fiscalDocuments.organizationId, organizationId),
+          eq(fiscalDocuments.unitId, unitId),
+          eq(fiscalDocuments.id, documentId),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new NotFoundException({ code: "FISCAL_DOCUMENT_NOT_FOUND" });
+    if (row.profile.provider !== "focus" || !row.document.providerReference) {
+      throw new ConflictException({
+        code: "FOCUS_DOCUMENT_REFERENCE_REQUIRED",
+        message: "Este documento ainda não possui uma referência conciliável na Focus NFe.",
+      });
+    }
+    return {
+      ...row,
+      document: { ...row.document, providerReference: row.document.providerReference },
+    };
+  }
+
+  private focusToken(
+    value: unknown,
+    environment: "homologation" | "production",
+    organizationId: string,
+    unitId: string,
+  ) {
+    const connection = settingsOf(value).focus;
+    const envelope =
+      environment === "production" ? connection?.tokenProduction : connection?.tokenHomologation;
+    if (!envelope) {
+      throw new ServiceUnavailableException({
+        code: "FOCUS_COMPANY_TOKEN_MISSING",
+        message: `O token de ${environment === "production" ? "produção" : "homologação"} da empresa ainda não foi sincronizado.`,
+      });
+    }
+    const key = encryptionKey(
+      process.env.FISCAL_CREDENTIALS_ENCRYPTION_KEY,
+      "FISCAL_CREDENTIALS_ENCRYPTION_KEY",
+    );
+    return decryptSecret(envelope, key, `focus:${organizationId}:${unitId}:${environment}`);
+  }
+
+  private async persistFocusDocumentResult(
+    identityId: string,
+    document: typeof fiscalDocuments.$inferSelect,
+    result: FocusDocumentResult,
+    action: "reconciled" | "cancel_result",
+    auditMetadata: Record<string, unknown> = {},
+  ) {
+    const now = new Date();
+    return this.database.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(fiscalDocuments)
+        .set({
+          status: result.status,
+          accessKey: result.accessKey ?? document.accessKey,
+          number: result.number ?? document.number,
+          series: result.series ?? document.series,
+          taxCents: result.taxCents ?? document.taxCents,
+          authorizedAt:
+            result.status === "authorized" ? (document.authorizedAt ?? now) : document.authorizedAt,
+          canceledAt:
+            result.status === "canceled" ? (document.canceledAt ?? now) : document.canceledAt,
+          updatedAt: now,
+        })
+        .where(eq(fiscalDocuments.id, document.id))
+        .returning();
+      if (!updated) throw new ConflictException({ code: "FISCAL_DOCUMENT_UPDATE_FAILED" });
+      const eventFingerprint = createHash("sha256")
+        .update(
+          JSON.stringify({
+            status: result.status,
+            accessKey: result.accessKey,
+            number: result.number,
+            series: result.series,
+            taxCents: result.taxCents,
+          }),
+        )
+        .digest("hex")
+        .slice(0, 32);
+      await tx
+        .insert(fiscalDocumentEvents)
+        .values({
+          organizationId: document.organizationId,
+          unitId: document.unitId,
+          documentId: document.id,
+          providerEventId: `focus:${document.id}:${eventFingerprint}`,
+          type: `fiscal.document.${action}`,
+          status: result.status,
+          code: result.code,
+          message: result.message,
+          payload: {
+            accessKey: result.accessKey,
+            number: result.number,
+            series: result.series,
+            taxCents: result.taxCents,
+            artifacts: { xmlUrl: result.xmlUrl, pdfUrl: result.pdfUrl },
+          },
+          occurredAt: now,
+        })
+        .onConflictDoNothing();
+      await tx.insert(auditEvents).values({
+        organizationId: document.organizationId,
+        unitId: document.unitId,
+        actorIdentityId: identityId,
+        action: `fiscal.document.${action}`,
+        entityType: "fiscal_document",
+        entityId: document.id,
+        metadata: { status: result.status, ...auditMetadata },
+      });
+      return {
+        document: updated,
+        artifacts: { xmlUrl: result.xmlUrl, pdfUrl: result.pdfUrl },
+      };
+    });
   }
 
   async periods(identityId: string, organizationId: string, unitId: string) {

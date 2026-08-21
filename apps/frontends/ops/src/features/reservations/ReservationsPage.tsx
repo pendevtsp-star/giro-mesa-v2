@@ -1,4 +1,15 @@
-import { Badge, Button, Card, EmptyState, Icon, Modal } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  Input,
+  Modal,
+  NativeSelect,
+  Textarea,
+} from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import {
@@ -347,7 +358,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       <Card className="arrival-bar">
         <label className="search-field">
           <Icon name="search" size={18} />
-          <input
+          <Input
             onChange={(event) => setArrivalQuery(event.target.value)}
             placeholder="Buscar chegada por nome ou telefone"
             type="search"
@@ -356,7 +367,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         </label>
         <label>
           Agenda do dia
-          <input
+          <Input
             onChange={(event) => setAgendaDate(event.target.value)}
             type="date"
             value={agendaDate}
@@ -383,7 +394,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
           <form className="action-form" onSubmit={(event) => void createReservation(event)}>
             <label>
               Nome
-              <input
+              <Input
                 minLength={2}
                 onChange={(event) => setGuestName(event.target.value)}
                 ref={reservationNameRef}
@@ -393,7 +404,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Telefone
-              <input
+              <Input
                 minLength={8}
                 onChange={(event) => setGuestPhone(event.target.value)}
                 type="tel"
@@ -402,7 +413,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Pessoas
-              <input
+              <Input
                 min={1}
                 onChange={(event) => setPartySize(Number(event.target.value))}
                 required
@@ -412,7 +423,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Data e hora
-              <input
+              <Input
                 onChange={(event) => {
                   setScheduledAt(event.target.value);
                   if (event.target.value.length >= 10)
@@ -425,7 +436,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label className="action-form__wide">
               Preferências e observações
-              <textarea
+              <Textarea
                 maxLength={500}
                 onChange={(event) => setReservationNotes(event.target.value)}
                 rows={2}
@@ -463,7 +474,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
           <form className="action-form" onSubmit={(event) => void createWaitlistEntry(event)}>
             <label>
               Nome
-              <input
+              <Input
                 minLength={2}
                 onChange={(event) => setGuestName(event.target.value)}
                 ref={waitlistNameRef}
@@ -473,7 +484,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Telefone
-              <input
+              <Input
                 minLength={8}
                 onChange={(event) => setGuestPhone(event.target.value)}
                 type="tel"
@@ -482,7 +493,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Pessoas
-              <input
+              <Input
                 min={1}
                 onChange={(event) => setPartySize(Number(event.target.value))}
                 required
@@ -492,7 +503,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Espera informada (min)
-              <input
+              <Input
                 min={0}
                 onChange={(event) => setWaitMinutes(Number(event.target.value))}
                 type="number"
@@ -982,7 +993,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                   </p>
                   <label>
                     Mesa compatível
-                    <select
+                    <NativeSelect
                       onChange={(event) => setSelectedTableId(event.target.value)}
                       required
                       value={selectedTableId}
@@ -994,7 +1005,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                           {table.label} · {table.seats} lugares
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                   <Button
                     disabled={!selectedTableId || busy === `seat-${seatTarget.id}`}

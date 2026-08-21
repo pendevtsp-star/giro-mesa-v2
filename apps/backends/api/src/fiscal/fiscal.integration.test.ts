@@ -15,6 +15,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { FiscalService } from "./fiscal.service.js";
+import { FocusNfeClient } from "./focus-nfe.client.js";
 
 function hasCode(expected: string) {
   return (error: unknown) => {
@@ -40,7 +41,7 @@ it("blocks rejected documents and closes a fiscal period exactly once", async (c
   const identityIds: string[] = [];
   try {
     const scope = new ScopeService(database);
-    const fiscal = new FiscalService(database, scope);
+    const fiscal = new FiscalService(database, scope, new FocusNfeClient());
     const [organization] = await database.db
       .insert(organizations)
       .values({

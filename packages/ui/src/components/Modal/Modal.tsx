@@ -1,7 +1,9 @@
+"use client";
+
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { cn } from "../../lib/utils";
 import { Button } from "../Button/Button";
 import { Icon } from "../Icon/Icon";
-import "./Modal.css";
 
 export function Modal({
   isOpen,
@@ -46,7 +48,8 @@ export function Modal({
     // biome-ignore lint/a11y/useKeyWithClickEvents: O dialog nativo trata Escape via onCancel; o clique fecha apenas o backdrop.
     <dialog
       aria-labelledby={titleId}
-      className={`gm-modal-backdrop ${className}`.trim()}
+      className={cn("gm-modal-backdrop", className)}
+      data-slot="dialog"
       onCancel={(event) => {
         event.preventDefault();
         requestClose();
@@ -54,15 +57,23 @@ export function Modal({
       onClick={(event) => event.target === event.currentTarget && requestClose()}
       ref={dialogRef}
     >
-      <div className={`gm-modal gm-modal--${size}`}>
-        <div className="gm-modal__header">
-          <strong id={titleId}>{title}</strong>
-          {description && <div className="gm-modal__description">{description}</div>}
+      <div className={`gm-modal gm-modal--${size}`} data-slot="dialog-content">
+        <div className="gm-modal__header" data-slot="dialog-header">
+          <strong data-slot="dialog-title" id={titleId}>
+            {title}
+          </strong>
+          {description && (
+            <div className="gm-modal__description" data-slot="dialog-description">
+              {description}
+            </div>
+          )}
           <Button aria-label="Fechar" onClick={requestClose} size="sm" variant="ghost">
             <Icon name="x" size={16} />
           </Button>
         </div>
-        <div className="gm-modal__body">{children}</div>
+        <div className="gm-modal__body" data-slot="dialog-body">
+          {children}
+        </div>
       </div>
     </dialog>
   );

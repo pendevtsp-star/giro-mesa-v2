@@ -30,8 +30,18 @@ namespace GiroMesa.ApiClient.Models
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The operatingDays property</summary>
+        public int? OperatingDays { get; set; }
+        /// <summary>The organizationRevenueSharePercent property</summary>
+        public double? OrganizationRevenueSharePercent { get; set; }
+        /// <summary>The rank property</summary>
+        public int? Rank { get; set; }
         /// <summary>The revenueCents property</summary>
         public long? RevenueCents { get; set; }
+        /// <summary>The revenuePerOperatingDayCents property</summary>
+        public long? RevenuePerOperatingDayCents { get; set; }
+        /// <summary>The sameStoreChangePercent property</summary>
+        public double? SameStoreChangePercent { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_multiunit_units"/> and sets the default values.
         /// </summary>
@@ -62,7 +72,12 @@ namespace GiroMesa.ApiClient.Models
                 { "closedTabs", n => { ClosedTabs = n.GetIntValue(); } },
                 { "key", n => { Key = n.GetGuidValue(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "operatingDays", n => { OperatingDays = n.GetIntValue(); } },
+                { "organizationRevenueSharePercent", n => { OrganizationRevenueSharePercent = n.GetDoubleValue(); } },
+                { "rank", n => { Rank = n.GetIntValue(); } },
                 { "revenueCents", n => { RevenueCents = n.GetLongValue(); } },
+                { "revenuePerOperatingDayCents", n => { RevenuePerOperatingDayCents = n.GetLongValue(); } },
+                { "sameStoreChangePercent", n => { SameStoreChangePercent = n.GetDoubleValue(); } },
             };
         }
         /// <summary>
@@ -77,7 +92,12 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteIntValue("closedTabs", ClosedTabs);
             writer.WriteGuidValue("key", Key);
             writer.WriteStringValue("label", Label);
+            writer.WriteIntValue("operatingDays", OperatingDays);
+            writer.WriteDoubleValue("organizationRevenueSharePercent", OrganizationRevenueSharePercent);
+            writer.WriteIntValue("rank", Rank);
             writer.WriteLongValue("revenueCents", RevenueCents);
+            writer.WriteLongValue("revenuePerOperatingDayCents", RevenuePerOperatingDayCents);
+            writer.WriteDoubleValue("sameStoreChangePercent", SameStoreChangePercent);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

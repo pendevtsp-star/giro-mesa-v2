@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   auditEvents,
   type Database,
+  managementInventoryIssueRoutes,
   managementInventoryItems,
   managementInventoryLots,
   managementInventoryMovements,
@@ -9,6 +10,7 @@ import {
   managementProductReturnables,
   managementRecipeComponents,
   managementRecipeVersions,
+  managementReportCostSnapshots,
   managementReturnableCustodyMovements,
   managementStockBalances,
   outboxEvents,
@@ -113,7 +115,8 @@ interface InventoryIssue {
     | "INVENTORY_STOCK_BALANCE_MISSING"
     | "INVENTORY_STOCK_INSUFFICIENT"
     | "INVENTORY_STOCK_LOW"
-    | "INVENTORY_STOCK_NEGATIVE_ALLOWED";
+    | "INVENTORY_STOCK_NEGATIVE_ALLOWED"
+    | "INVENTORY_ISSUE_ROUTE_MISSING";
   componentId?: string;
   currentQuantity?: string;
   inventoryItemId?: string;
@@ -358,6 +361,7 @@ export async function consumeOrderSentInventory(
         id: posOrderItems.id,
         productId: posOrderItems.productId,
         quantity: posOrderItems.quantity,
+        stationId: posOrderItems.stationId,
       })
       .from(posOrderItems)
       .where(
@@ -370,7 +374,7 @@ export async function consumeOrderSentInventory(
       );
 
     const productIds = [...new Set(orderItems.map((item) => item.productId))];
-    const [components, inventoryRows] = await Promise.all([
+    const [components, inventoryRows, issueRoutes] = await Promise.all([
       tx
         .select({
           id: managementRecipeComponents.id,
@@ -421,6 +425,21 @@ export async function consumeOrderSentInventory(
             eq(managementInventoryItems.unitId, request.unitId),
           ),
         ),
+      tx
+        .select({
+          locationId: managementInventoryIssueRoutes.locationId,
+          productId: managementInventoryIssueRoutes.productId,
+          stationId: managementInventoryIssueRoutes.stationId,
+        })
+        .from(managementInventoryIssueRoutes)
+        .where(
+          and(
+            eq(managementInventoryIssueRoutes.organizationId, request.organizationId),
+            eq(managementInventoryIssueRoutes.unitId, request.unitId),
+            eq(managementInventoryIssueRoutes.active, true),
+            inArray(managementInventoryIssueRoutes.productId, productIds),
+          ),
+        ),
     ]);
     const inventoryItems = inventoryRows as InventoryItem[];
     const recipesByProduct = new Map<string, typeof components>();
@@ -458,6 +477,16 @@ export async function consumeOrderSentInventory(
         }
         const inventoryItem = directItems[0];
         if (!inventoryItem) continue;
+        const issueRoute =
+          issueRoutes.find(
+            (route) =>
+              route.productId === orderItem.productId &&
+              orderItem.stationId !== null &&
+              route.stationId === orderItem.stationId,
+          ) ??
+          issueRoutes.find(
+            (route) => route.productId === orderItem.productId && route.stationId === null,
+          );
         const sourceId = deterministicUuid(
           `inventory-direct:${request.organizationId}:${request.unitId}:${request.orderId}:${orderItem.id}:${inventoryItem.id}`,
         );
@@ -465,7 +494,7 @@ export async function consumeOrderSentInventory(
           componentId: inventoryItem.id,
           componentKind: "direct",
           inventoryItem,
-          locationId: null,
+          locationId: issueRoute?.locationId ?? null,
           orderItemId: orderItem.id,
           productId: orderItem.productId,
           requiredMilli: BigInt(orderItem.quantity) * 1_000n,
@@ -580,6 +609,17 @@ export async function consumeOrderSentInventory(
           return state;
         });
         balanceStates.set(taskBalanceKey, balances);
+      }
+      if (task.componentKind === "direct" && task.locationId === null && balances.length > 1) {
+        blockingIssues.push({
+          code: "INVENTORY_ISSUE_ROUTE_MISSING",
+          componentId: task.componentId,
+          inventoryItemId: task.inventoryItem.id,
+          orderItemId: task.orderItemId,
+          policy: "block_and_retry",
+          unit: task.inventoryItem.unit,
+        });
+        continue;
       }
       if (balances.length === 0) {
         blockingIssues.push({
@@ -756,6 +796,33 @@ export async function consumeOrderSentInventory(
             eq(posOrderItems.id, orderItemId),
           ),
         );
+      if (costCents !== null)
+        await tx
+          .insert(managementReportCostSnapshots)
+          .values({
+            organizationId: request.organizationId,
+            unitId: request.unitId,
+            orderItemId,
+            costCents,
+            source: "inventory_consumption",
+            confidence: "exact",
+            recordedByIdentityId: order.createdByIdentityId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              managementReportCostSnapshots.organizationId,
+              managementReportCostSnapshots.unitId,
+              managementReportCostSnapshots.orderItemId,
+            ],
+            set: {
+              backfillId: null,
+              costCents,
+              source: "inventory_consumption",
+              confidence: "exact",
+              recordedByIdentityId: order.createdByIdentityId,
+              recordedAt: new Date(),
+            },
+          });
     }
 
     for (const balance of balancesById.values()) {
@@ -816,33 +883,45 @@ export async function consumeOrderSentInventory(
       ]);
     }
     for (const orderItem of orderItems) {
+      const directPlan = plans.find(
+        (plan) => plan.task.orderItemId === orderItem.id && plan.task.componentKind === "direct",
+      );
+      const custodySources = directPlan
+        ? directPlan.allocations.map((allocation) => ({
+            locationId: allocation.balance.locationId,
+            soldQuantityMilli: allocation.quantityMilli,
+          }))
+        : [{ locationId: null, soldQuantityMilli: BigInt(orderItem.quantity) * 1_000n }];
       for (const mapping of returnablesByProduct.get(orderItem.productId) ?? []) {
-        const sourceId = deterministicUuid(
-          `returnable-issue:${request.organizationId}:${request.unitId}:${request.orderId}:${orderItem.id}:${mapping.id}`,
-        );
-        await tx
-          .insert(managementReturnableCustodyMovements)
-          .values({
-            actorIdentityId: order.createdByIdentityId,
-            containerInventoryItemId: mapping.containerInventoryItemId,
-            context: {
-              depositCents: mapping.depositCents,
-              outboxEventId: event.id,
-              tabId: request.tabId,
-            },
-            idempotencyKey: `returnable-issue:${sourceId}`,
-            orderId: request.orderId,
-            orderItemId: orderItem.id,
-            organizationId: request.organizationId,
-            quantityDelta: milliToQuantity(
-              quantityToMilli(mapping.quantityPerUnit) * BigInt(orderItem.quantity),
-            ),
-            sourceId,
-            sourceType: RETURNABLE_ISSUE_SOURCE_TYPE,
-            type: "issue",
-            unitId: request.unitId,
-          })
-          .onConflictDoNothing();
+        for (const source of custodySources) {
+          const sourceId = deterministicUuid(
+            `returnable-issue:${request.organizationId}:${request.unitId}:${request.orderId}:${orderItem.id}:${mapping.id}:${source.locationId ?? "unrouted"}`,
+          );
+          await tx
+            .insert(managementReturnableCustodyMovements)
+            .values({
+              actorIdentityId: order.createdByIdentityId,
+              containerInventoryItemId: mapping.containerInventoryItemId,
+              context: {
+                depositCents: mapping.depositCents,
+                outboxEventId: event.id,
+                tabId: request.tabId,
+              },
+              idempotencyKey: `returnable-issue:${sourceId}`,
+              locationId: source.locationId,
+              orderId: request.orderId,
+              orderItemId: orderItem.id,
+              organizationId: request.organizationId,
+              quantityDelta: milliToQuantity(
+                (quantityToMilli(mapping.quantityPerUnit) * source.soldQuantityMilli) / 1_000n,
+              ),
+              sourceId,
+              sourceType: RETURNABLE_ISSUE_SOURCE_TYPE,
+              type: "issue",
+              unitId: request.unitId,
+            })
+            .onConflictDoNothing();
+        }
       }
     }
     const movementCount = plans.reduce((total, plan) => total + plan.allocations.length, 0);

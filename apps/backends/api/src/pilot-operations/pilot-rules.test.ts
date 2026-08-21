@@ -184,6 +184,11 @@ describe("pilot POS rules", () => {
         totalCents: 8_550,
       },
     );
+    assert.equal(
+      tabTotals([{ grossCents: 10_000, discountCents: 1_000 }], 1_000, 0, "gross")
+        .serviceChargeCents,
+      1_000,
+    );
     assert.throws(() => itemAmounts(2, 2_147_483_647, 0), BadRequestException);
     assert.throws(
       () => tabTotals([{ grossCents: 2_147_483_647, discountCents: 0 }], 0, 1),
@@ -486,6 +491,7 @@ describe("pilot POS rules", () => {
     assert.throws(() => assertKdsOrderHandoff("expedition", [ready, preparing]), ConflictException);
     assert.throws(() => assertKdsOrderHandoff("served", [ready]), ConflictException);
     assert.doesNotThrow(() => assertKdsOrderHandoff("served", [expedition, expedition]));
+    assert.doesNotThrow(() => assertKdsOrderHandoff("runner", [expedition, expedition]));
     assert.throws(() => assertKdsOrderHandoff("expedition", [expedition]), ConflictException);
   });
 

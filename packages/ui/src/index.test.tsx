@@ -1,13 +1,37 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Checkbox,
   DataTable,
+  Input,
+  Label,
   Modal,
+  NativeSelect,
   Progress,
   SearchField,
   SegmentedTabs,
+  Separator,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
   Toast,
   Tooltip,
 } from "./index";
@@ -18,6 +42,43 @@ describe("componentes compartilhados", () => {
       <div>
         <Button disabled>Salvar</Button>
         <Badge tone="success">Sincronizado</Badge>
+        <Label htmlFor="nome">Nome</Label>
+        <Input id="nome" />
+        <Textarea aria-label="Observação" />
+        <NativeSelect aria-label="Unidade">
+          <option>Centro</option>
+        </NativeSelect>
+        <Separator />
+        <Checkbox aria-label="Selecionar item" defaultChecked />
+        <Switch aria-label="Loja aberta" checked />
+        <Alert>
+          <AlertTitle>Atenção</AlertTitle>
+          <AlertDescription>Revise o caixa.</AlertDescription>
+        </Alert>
+        <Card>
+          <CardHeader>
+            <CardTitle>Resumo</CardTitle>
+          </CardHeader>
+          <CardContent>Conteúdo</CardContent>
+        </Card>
+        <Accordion>
+          <AccordionItem open>
+            <AccordionTrigger>Detalhes</AccordionTrigger>
+            <AccordionContent>Conteúdo</AccordionContent>
+          </AccordionItem>
+        </Accordion>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>Mesa 1</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
         <Progress label="Implantação" value={140} />
         <DataTable caption="Resumo">
           <tbody>
@@ -48,6 +109,17 @@ describe("componentes compartilhados", () => {
 
     expect(html).toContain("<button");
     expect(html).toContain("disabled");
+    expect(html).toContain('data-slot="button"');
+    expect(html).toContain('data-slot="input"');
+    expect(html).toContain('data-slot="textarea"');
+    expect(html).toContain('data-slot="native-select"');
+    expect(html).toContain('data-slot="separator"');
+    expect(html).toContain('data-slot="checkbox"');
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('data-slot="alert"');
+    expect(html).toContain('data-slot="card-header"');
+    expect(html).toContain('data-slot="accordion-item"');
+    expect(html).toContain('data-slot="table-head"');
     expect(html).toContain('role="progressbar"');
     expect(html).toContain('aria-valuenow="100"');
     expect(html).toContain("<caption");

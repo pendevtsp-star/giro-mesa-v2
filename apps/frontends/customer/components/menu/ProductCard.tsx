@@ -1,8 +1,9 @@
+import { Button } from "@giromesa/ui";
 import { formatMoney, type MenuItem } from "../../lib/menu";
 
 export function ProductCard({ item, onOpen }: { item: MenuItem; onOpen: () => void }) {
   return (
-    <button
+    <Button
       type="button"
       className="menu-card"
       onClick={onOpen}
@@ -27,6 +28,6 @@ export function ProductCard({ item, onOpen }: { item: MenuItem; onOpen: () => vo
         </span>
         {!item.available && <span className="sold-out">Indisponível agora</span>}
       </span>
-    </button>
+    </Button>
   );
 }

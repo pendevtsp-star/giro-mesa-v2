@@ -15,6 +15,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TableGroups;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -103,6 +104,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.TabsRequestBuilder Tabs
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.TabsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The terminalProfiles property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.TerminalProfilesRequestBuilder TerminalProfiles
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.TerminalProfilesRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PilotRequestBuilder"/> and sets the default values.

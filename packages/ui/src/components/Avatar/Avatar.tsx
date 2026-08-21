@@ -1,5 +1,3 @@
-import "./Avatar.css";
-
 export function Avatar({
   initials,
   size = "md",
@@ -10,7 +8,7 @@ export function Avatar({
   src?: string | null;
 }) {
   return (
-    <span className={`gm-avatar gm-avatar--${size}`}>
+    <span className={`gm-avatar gm-avatar--${size}`} data-slot="avatar">
       {src ? <img alt="" src={src} /> : initials}
     </span>
   );

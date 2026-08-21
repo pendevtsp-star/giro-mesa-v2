@@ -315,21 +315,28 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       organization.id,
       unit.id,
       `destination-${randomUUID()}`,
-      { name: "Bar NF-e", code: `BAR${randomInt(1000, 9999)}` },
+      {
+        name: "Freezer NF-e",
+        code: `FRZ${randomInt(1000, 9999)}`,
+        kind: "freezer",
+        requireDistinctTransferReceiver: true,
+        transferSlaMinutes: 15,
+      },
     );
-    const transfer = await management.transferInventory(
+    const transferBatch = await management.transferInventoryBatch(
       inventoryIdentity.id,
       organization.id,
       unit.id,
       `transfer-${randomUUID()}`,
       {
-        inventoryItemId: container.id,
         sourceLocationId: location.id,
         destinationLocationId: destination.id,
-        quantity: "1",
         reason: "Reposição do bar.",
+        lines: [{ inventoryItemId: container.id, quantity: "1" }],
       },
     );
+    const transfer = transferBatch.transfers[0];
+    assert.ok(transfer);
     assert.equal(transfer.status, "in_transit");
     const balancesInTransit = await database.db
       .select()
@@ -343,13 +350,41 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       balancesInTransit.find((balance) => balance.locationId === destination.id)?.quantity,
       "0.000",
     );
+    await assert.rejects(
+      management.resolveInventoryTransfer(
+        inventoryIdentity.id,
+        organization.id,
+        unit.id,
+        transfer.id,
+        `transfer-self-${randomUUID()}`,
+        { decision: "received", quantityReceived: "1", note: "Auto conferência." },
+      ),
+      hasCode("TRANSFER_DISTINCT_RECEIVER_REQUIRED"),
+    );
     await management.resolveInventoryTransfer(
-      inventoryIdentity.id,
+      reviewerIdentity.id,
       organization.id,
       unit.id,
-      transfer.transferId,
+      transfer.id,
+      `transfer-partial-${randomUUID()}`,
+      { decision: "received", quantityReceived: "0.6", note: "Recebimento parcial conferido." },
+    );
+    const partialDashboard = await management.inventoryDashboard(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+    );
+    assert.equal(
+      partialDashboard.transfers.find((row) => row.id === transfer.id)?.status,
+      "partially_received",
+    );
+    await management.resolveInventoryTransfer(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+      transfer.id,
       `transfer-receive-${randomUUID()}`,
-      { decision: "received", note: "Recebido e conferido no bar." },
+      { decision: "received", quantityReceived: "0.4", note: "Saldo final conferido." },
     );
     const [destinationBalance] = await database.db
       .select()

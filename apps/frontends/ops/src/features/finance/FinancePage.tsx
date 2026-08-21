@@ -1,4 +1,5 @@
-import { Button, Card, EmptyState } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Card, EmptyState, Input, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import {
@@ -148,7 +149,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               <form className="action-form" onSubmit={(event) => void createPayable(event)}>
                 <label className="action-form__wide">
                   Descrição
-                  <input
+                  <Input
                     minLength={3}
                     onChange={(event) => setDescription(event.target.value)}
                     required
@@ -157,7 +158,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Valor
-                  <input
+                  <Input
                     inputMode="decimal"
                     onChange={(event) => setAmount(event.target.value)}
                     placeholder="0,00"
@@ -167,7 +168,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Competência
-                  <input
+                  <Input
                     onChange={(event) => setCompetenceDate(event.target.value)}
                     required
                     type="date"
@@ -176,7 +177,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 </label>
                 <label>
                   Vencimento
-                  <input
+                  <Input
                     onChange={(event) => setDueDate(event.target.value)}
                     required
                     type="date"
@@ -200,7 +201,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 <form className="action-form" onSubmit={(event) => void createReceivable(event)}>
                   <label className="action-form__wide">
                     Descrição
-                    <input
+                    <Input
                       minLength={3}
                       onChange={(event) => setReceivableDescription(event.target.value)}
                       required
@@ -209,7 +210,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Valor
-                    <input
+                    <Input
                       inputMode="decimal"
                       onChange={(event) => setReceivableAmount(event.target.value)}
                       required
@@ -218,7 +219,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Competência
-                    <input
+                    <Input
                       onChange={(event) => setReceivableCompetenceDate(event.target.value)}
                       required
                       type="date"
@@ -227,7 +228,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Vencimento
-                    <input
+                    <Input
                       onChange={(event) => setReceivableDueDate(event.target.value)}
                       required
                       type="date"
@@ -253,7 +254,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 <form className="action-form" onSubmit={(event) => void settleEntry(event)}>
                   <label className="action-form__wide">
                     Conta
-                    <select
+                    <NativeSelect
                       onChange={(event) => {
                         const [direction, id] = event.target.value.split(":");
                         setSettlementDirection(direction as "payable" | "receivable");
@@ -274,11 +275,11 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                             {entry.description}
                           </option>
                         ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                   <label>
                     Valor
-                    <input
+                    <Input
                       inputMode="decimal"
                       onChange={(event) => setSettlementAmount(event.target.value)}
                       required
@@ -287,7 +288,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Método
-                    <input
+                    <Input
                       minLength={2}
                       onChange={(event) => setSettlementMethod(event.target.value)}
                       placeholder="Pix, dinheiro, cartão"
@@ -297,7 +298,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label className="action-form__wide">
                     Referência
-                    <input
+                    <Input
                       onChange={(event) => setSettlementReference(event.target.value)}
                       value={settlementReference}
                     />

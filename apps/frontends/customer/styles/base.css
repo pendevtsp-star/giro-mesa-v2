@@ -4,9 +4,9 @@
   --cream: var(--gm-surface-soft);
   --paper: var(--gm-surface);
   --orange: var(--gm-accent);
-  --gold: #d8a34a;
+  --gold: var(--gm-accent);
   --ink: var(--gm-ink);
-  --muted: var(--gm-muted);
+  --legacy-muted: var(--gm-muted);
   --line: var(--gm-border);
   --shadow: var(--gm-shadow-xl);
 }
@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 html {
-  background: #dfe5df;
+  background: var(--gm-surface-soft);
   scroll-behavior: smooth;
 }
 body {
@@ -53,8 +53,8 @@ textarea:focus-visible {
   left: 16px;
   padding: 10px 14px;
   border-radius: 8px;
-  background: white;
-  color: #111;
+  background: var(--gm-surface);
+  color: var(--gm-ink);
 }
 .skip-link:focus {
   top: 12px;
@@ -75,7 +75,7 @@ textarea:focus-visible {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 15px;
-  color: #fff;
+  color: var(--gm-on-action);
   background:
     radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.26), transparent 32%), var(--green);
 }
@@ -142,16 +142,16 @@ textarea:focus-visible {
   margin-top: 2px;
 }
 .connection-banner.online {
-  background: #e2f2e2;
-  color: #245e38;
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
 }
 .connection-banner.checking {
-  background: #f2eedf;
-  color: #6d643f;
+  background: var(--gm-warning-soft);
+  color: var(--gm-warning);
 }
 .connection-banner.offline {
-  background: #fff0e7;
-  color: #8c3e21;
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
 }
 .connection-banner.offline > span {
   width: 18px;

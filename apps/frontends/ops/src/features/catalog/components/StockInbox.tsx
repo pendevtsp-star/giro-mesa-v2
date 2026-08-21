@@ -45,7 +45,7 @@ export function StockInbox({
             <Icon name="check" size={14} />
             <span>Adicionar Todos ({suggestions.length})</span>
           </Button>
-          <button
+          <Button
             aria-controls="catalog-stock-inbox-items"
             aria-expanded={isOpen}
             className="catalog-card-icon-btn"
@@ -54,7 +54,7 @@ export function StockInbox({
             type="button"
           >
             <Icon name={isOpen ? "arrow-up" : "arrow-down"} size={14} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export function StockInbox({
                     <Icon name="plus" size={13} />
                     <span>Configurar & Incluir</span>
                   </Button>
-                  <button
+                  <Button
                     aria-label={`Dispensar sugestão de ${suggestion.name}`}
                     className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                     onClick={() => onDismiss(suggestion.id)}
@@ -120,7 +120,7 @@ export function StockInbox({
                     type="button"
                   >
                     <Icon name="x" size={13} />
-                  </button>
+                  </Button>
                 </div>
               </article>
             );

@@ -42,7 +42,7 @@ export function CatalogCategoryHeader({
     <div className="catalog-category-header catalog-category-header--detailed">
       <div className="catalog-category-header__left">
         <div className="catalog-category-header__identity">
-          <button
+          <Button
             aria-expanded={!collapsed}
             className="catalog-card-icon-btn catalog-category-header__collapse"
             onClick={onToggleCollapsed}
@@ -52,7 +52,7 @@ export function CatalogCategoryHeader({
             type="button"
           >
             <Icon name={collapsed ? "arrow-down" : "arrow-up"} size={14} />
-          </button>
+          </Button>
           <div>
             <div className="catalog-category-header__title-row">
               <h2>{category.name}</h2>
@@ -126,7 +126,7 @@ export function CatalogCategoryHeader({
         {showReorder && (
           <fieldset className="catalog-category-header__order">
             <legend className="catalog-visually-hidden">Reordenar categoria</legend>
-            <button
+            <Button
               aria-label="Mover categoria para cima"
               className="catalog-card-icon-btn"
               onClick={() => onMove("up")}
@@ -134,8 +134,8 @@ export function CatalogCategoryHeader({
               type="button"
             >
               <Icon name="arrow-up" size={13} />
-            </button>
-            <button
+            </Button>
+            <Button
               aria-label="Mover categoria para baixo"
               className="catalog-card-icon-btn"
               onClick={() => onMove("down")}
@@ -143,11 +143,11 @@ export function CatalogCategoryHeader({
               type="button"
             >
               <Icon name="arrow-down" size={13} />
-            </button>
+            </Button>
           </fieldset>
         )}
 
-        <button
+        <Button
           aria-label={`Configurar ${category.name}`}
           className="catalog-card-icon-btn"
           onClick={onEdit}
@@ -155,8 +155,8 @@ export function CatalogCategoryHeader({
           type="button"
         >
           <Icon name="settings" size={14} />
-        </button>
-        <button
+        </Button>
+        <Button
           aria-label={`Excluir ${category.name}`}
           className="catalog-card-icon-btn catalog-card-icon-btn--danger"
           disabled={busy}
@@ -165,7 +165,7 @@ export function CatalogCategoryHeader({
           type="button"
         >
           <Icon name="x" size={14} />
-        </button>
+        </Button>
       </div>
     </div>
   );

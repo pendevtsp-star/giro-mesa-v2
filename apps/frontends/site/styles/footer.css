@@ -62,7 +62,7 @@
   padding: 12px 16px;
   border-radius: 30px;
   background: #116b3d;
-  color: #fff;
+  color: var(--gm-on-action);
   text-decoration: none;
   box-shadow: 0 12px 30px rgba(14, 75, 43, 0.32);
 }

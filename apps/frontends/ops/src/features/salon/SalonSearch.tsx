@@ -1,4 +1,5 @@
-import { Icon } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Icon, Input } from "@giromesa/ui";
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 
 export interface SalonSearchOption {
@@ -98,7 +99,7 @@ export function SalonSearch({
       ref={rootRef}
     >
       <Icon name="search" size={17} />
-      <input
+      <Input
         aria-activedescendant={open ? `${listId}-option-${activeIndex}` : undefined}
         aria-autocomplete="list"
         aria-controls={listId}
@@ -116,7 +117,7 @@ export function SalonSearch({
         role="combobox"
         value={value}
       />
-      <button
+      <Button
         aria-label="Focar busca. Atalho barra ou Control K"
         className="salon-search__shortcut"
         onClick={() => {
@@ -125,13 +126,14 @@ export function SalonSearch({
         }}
         title="Atalho: / ou Ctrl+K"
         type="button"
+        variant="ghost"
       >
         <kbd>/</kbd>
-      </button>
+      </Button>
       {open && visibleOptions.length > 0 && (
         <div className="salon-search__results" id={listId} role="listbox">
           {visibleOptions.map((option, index) => (
-            <button
+            <Button
               aria-selected={activeIndex === index}
               id={`${listId}-option-${index}`}
               key={option.id}
@@ -139,10 +141,11 @@ export function SalonSearch({
               onMouseEnter={() => setActiveIndex(index)}
               role="option"
               type="button"
+              variant="ghost"
             >
               <span>{option.label}</span>
               <small>{option.meta}</small>
-            </button>
+            </Button>
           ))}
         </div>
       )}

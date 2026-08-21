@@ -1,4 +1,4 @@
-import { Button, Icon, Modal } from "@giromesa/ui";
+import { Button, Icon, Input, Label, Modal, NativeSelect, Textarea } from "@giromesa/ui";
 import { type Dispatch, type FormEvent, type SetStateAction, useState } from "react";
 import type { CatalogProduct, PilotCatalog, SpicinessLevel } from "../../../operations.shared";
 import { formatMoney } from "../../../rules";
@@ -79,7 +79,7 @@ export function CatalogProductEditorModal({
                   Exibida no Cardápio Digital QR, no PDV e na impressão. (PNG, JPG ou WEBP até 5MB)
                 </span>
                 <div className="catalog-editor-photo__actions">
-                  <label className="gm-button gm-button--secondary gm-button--sm catalog-editor-photo__upload">
+                  <Label className="gm-button gm-button--secondary gm-button--sm catalog-editor-photo__upload">
                     <Icon name="upload" size={12} />
                     <span>{editingProduct.imageUrl ? "Substituir Foto" : "Enviar Foto"}</span>
                     <input
@@ -149,7 +149,7 @@ export function CatalogProductEditorModal({
                         reader.readAsDataURL(file);
                       }}
                     />
-                  </label>
+                  </Label>
                   {editingProduct.imageUrl && (
                     <Button
                       variant="ghost"
@@ -170,20 +170,20 @@ export function CatalogProductEditorModal({
 
             {/* Dados Básicos */}
             <div className="gm-form-grid gm-form-grid--split">
-              <label className="catalog-field catalog-field--standard">
+              <Label className="catalog-field catalog-field--standard">
                 Nome do Prato *
-                <input
+                <Input
                   minLength={2}
                   required
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                   className="gm-control"
                 />
-              </label>
+              </Label>
 
-              <label className="catalog-field catalog-field--standard">
+              <Label className="catalog-field catalog-field--standard">
                 Categoria *
-                <select
+                <NativeSelect
                   value={editingProduct.categoryId}
                   onChange={(e) =>
                     setEditingProduct({ ...editingProduct, categoryId: e.target.value })
@@ -195,8 +195,8 @@ export function CatalogProductEditorModal({
                       {cat.name}
                     </option>
                   ))}
-                </select>
-              </label>
+                </NativeSelect>
+              </Label>
             </div>
 
             <fieldset className="catalog-create-stations catalog-editor-stations">
@@ -209,25 +209,74 @@ export function CatalogProductEditorModal({
                 {catalog.stations.map((station) => {
                   const selected = editingProduct.stationIds.includes(station.id);
                   return (
-                    <button
+                    <Button
                       aria-pressed={selected}
                       className="catalog-create-station"
                       data-selected={selected || undefined}
                       key={station.id}
                       onClick={() =>
-                        setEditingProduct({
-                          ...editingProduct,
-                          stationIds: toggleCatalogStationId(editingProduct.stationIds, station.id),
+                        setEditingProduct((current) => {
+                          if (!current) return current;
+                          const stationIds = toggleCatalogStationId(current.stationIds, station.id);
+                          return {
+                            ...current,
+                            stationIds,
+                            stationRouting: stationIds.map((stationId) => ({
+                              stationId,
+                              stage:
+                                current.stationRouting?.find(
+                                  (route) => route.stationId === stationId,
+                                )?.stage ?? 1,
+                            })),
+                          };
                         })
                       }
                       type="button"
                     >
                       <span className="catalog-create-station__dot" />
                       {station.name}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
+              {editingProduct.stationIds.length > 1 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {editingProduct.stationIds.map((stationId) => (
+                    <Label key={stationId}>
+                      Etapa · {catalog.stations.find((station) => station.id === stationId)?.name}
+                      <NativeSelect
+                        onChange={(event) =>
+                          setEditingProduct((current) => ({
+                            ...(current ?? editingProduct),
+                            stationRouting: (current ?? editingProduct).stationIds.map(
+                              (currentStationId) => ({
+                                stationId: currentStationId,
+                                stage:
+                                  currentStationId === stationId
+                                    ? Number(event.target.value)
+                                    : ((current ?? editingProduct).stationRouting?.find(
+                                        (route) => route.stationId === currentStationId,
+                                      )?.stage ?? 1),
+                              }),
+                            ),
+                          }))
+                        }
+                        value={
+                          editingProduct.stationRouting?.find(
+                            (route) => route.stationId === stationId,
+                          )?.stage ?? 1
+                        }
+                      >
+                        {[1, 2, 3, 4, 5].map((stage) => (
+                          <option key={stage} value={stage}>
+                            Etapa {stage}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                  ))}
+                </div>
+              )}
               {!hasCatalogProductionStation(editingProduct.stationIds) && (
                 <span className="catalog-editor-stations__error" role="alert">
                   Selecione ao menos uma praça de produção para salvar.
@@ -237,40 +286,40 @@ export function CatalogProductEditorModal({
 
             {/* Preços e Motivo de Auditoria */}
             <div className="gm-form-grid gm-form-grid--3">
-              <label className="catalog-field catalog-field--standard">
+              <Label className="catalog-field catalog-field--standard">
                 Preço Salão & Balcão (R$) *
-                <input
+                <Input
                   value={editingProductPrice}
                   onChange={(e) => setEditingProductPrice(e.target.value)}
                   placeholder="Ex: 38,90"
                   className="gm-control gm-control--strong"
                 />
-              </label>
+              </Label>
 
-              <label className="catalog-field catalog-field--standard">
+              <Label className="catalog-field catalog-field--standard">
                 Preço Delivery (R$)
-                <input
+                <Input
                   value={editingProductDeliveryPrice}
                   onChange={(e) => setEditingProductDeliveryPrice(e.target.value)}
                   placeholder="Ex: 44,90"
                   className="gm-control"
                 />
-              </label>
+              </Label>
 
-              <label className="catalog-field catalog-field--standard">
+              <Label className="catalog-field catalog-field--standard">
                 Motivo do Ajuste (Auditoria)
-                <input
+                <Input
                   value={editingProductReason}
                   onChange={(e) => setEditingProductReason(e.target.value)}
                   placeholder="Ex: Reajuste insumos, nova safra..."
                   className="gm-control catalog-editor-control--audit"
                 />
-              </label>
+              </Label>
             </div>
 
-            <label className="catalog-field catalog-field--standard">
+            <Label className="catalog-field catalog-field--standard">
               Descrição & Ingredientes do Prato
-              <textarea
+              <Textarea
                 rows={2}
                 value={editingProduct.description || ""}
                 onChange={(e) =>
@@ -279,7 +328,7 @@ export function CatalogProductEditorModal({
                 placeholder="Descreva o sabor, ingredientes e detalhes do prato..."
                 className="gm-control gm-control--textarea"
               />
-            </label>
+            </Label>
 
             {/* Sanfonas com Configurações Adicionais */}
             <div className="catalog-stack catalog-stack--8">
@@ -302,7 +351,7 @@ export function CatalogProductEditorModal({
                       {catalog.groups.map((grp) => {
                         const isSelected = (editingProduct.modifierGroupIds || []).includes(grp.id);
                         return (
-                          <button
+                          <Button
                             key={grp.id}
                             type="button"
                             onClick={() => {
@@ -320,7 +369,7 @@ export function CatalogProductEditorModal({
                           >
                             <Icon name={isSelected ? "check" : "plus"} size={11} />
                             <span>{grp.name}</span>
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -342,9 +391,9 @@ export function CatalogProductEditorModal({
                   )}
                 </summary>
                 <div className="gm-disclosure__content catalog-sub-accordion__content">
-                  <label className="catalog-field catalog-field--compact catalog-editor-pairing">
+                  <Label className="catalog-field catalog-field--compact catalog-editor-pairing">
                     Harmonização Recomendada (Dica do Chef / Sommelier)
-                    <input
+                    <Input
                       value={editingProduct.pairingSuggestion || ""}
                       onChange={(e) =>
                         setEditingProduct({
@@ -355,12 +404,12 @@ export function CatalogProductEditorModal({
                       placeholder="Ex: Harmoniza perfeitamente com Vinho Pinot Noir ou Cerveja IPA"
                       className="catalog-control-36 catalog-editor-control--audit"
                     />
-                  </label>
+                  </Label>
 
                   <div className="catalog-grid-2 catalog-grid-2--compact">
-                    <label className="catalog-field catalog-field--compact">
+                    <Label className="catalog-field catalog-field--compact">
                       Nível de Picância
-                      <select
+                      <NativeSelect
                         value={editingProduct.spiciness || "none"}
                         onChange={(e) =>
                           setEditingProduct({
@@ -374,12 +423,12 @@ export function CatalogProductEditorModal({
                         <option value="mild">Picância Suave</option>
                         <option value="medium">Picante (Moderado)</option>
                         <option value="hot">Muito Picante (Intenso)</option>
-                      </select>
-                    </label>
+                      </NativeSelect>
+                    </Label>
 
-                    <label className="catalog-field catalog-field--compact">
+                    <Label className="catalog-field catalog-field--compact">
                       Tempo de Preparo Estimado (minutos)
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         value={editingProduct.estimatedPrepTimeMinutes ?? ""}
@@ -394,7 +443,7 @@ export function CatalogProductEditorModal({
                         placeholder="Ex: 15"
                         className="catalog-control-36"
                       />
-                    </label>
+                    </Label>
                   </div>
                 </div>
               </details>
@@ -412,9 +461,9 @@ export function CatalogProductEditorModal({
                 </summary>
                 <div className="gm-disclosure__content catalog-sub-accordion__content">
                   <div className="catalog-grid-main">
-                    <label className="catalog-field catalog-field--compact">
+                    <Label className="catalog-field catalog-field--compact">
                       NCM
-                      <input
+                      <Input
                         value={editingProduct.ncm || ""}
                         onChange={(e) =>
                           setEditingProduct({ ...editingProduct, ncm: e.target.value })
@@ -422,17 +471,17 @@ export function CatalogProductEditorModal({
                         placeholder="Ex: 2106.90.90"
                         className="catalog-control-34"
                       />
-                    </label>
-                    <label className="catalog-field catalog-field--compact">
+                    </Label>
+                    <Label className="catalog-field catalog-field--compact">
                       CFOP
-                      <input
+                      <Input
                         value={editingProduct.cfop || "5.102"}
                         onChange={(e) =>
                           setEditingProduct({ ...editingProduct, cfop: e.target.value })
                         }
                         className="catalog-control-34"
                       />
-                    </label>
+                    </Label>
                   </div>
                 </div>
               </details>
@@ -456,7 +505,7 @@ export function CatalogProductEditorModal({
                       Permita que turistas e clientes internacionais leiam o cardápio em seu idioma
                       nativo.
                     </span>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => {
                         const trans = autoTranslateProduct(
@@ -472,14 +521,14 @@ export function CatalogProductEditorModal({
                     >
                       <Icon name="catalog" size={12} />
                       <span>✨ Traduzir Automático</span>
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Inglês */}
                   <div className="catalog-editor-language catalog-editor-language--spaced">
                     <strong className="catalog-editor-language__title">🇺🇸 Inglês (English)</strong>
                     <div className="catalog-editor-language__fields">
-                      <input
+                      <Input
                         placeholder="Name in English (e.g. Artisanal Cheeseburger)"
                         value={editingProduct.translations?.en?.name || ""}
                         onChange={(e) =>
@@ -496,7 +545,7 @@ export function CatalogProductEditorModal({
                         }
                         className="catalog-editor-language__input"
                       />
-                      <textarea
+                      <Textarea
                         rows={1}
                         placeholder="Description in English..."
                         value={editingProduct.translations?.en?.description || ""}
@@ -523,7 +572,7 @@ export function CatalogProductEditorModal({
                       🇪🇸 Espanhol (Español)
                     </strong>
                     <div className="catalog-editor-language__fields">
-                      <input
+                      <Input
                         placeholder="Nombre en Español (ej. Hamburguesa Artesanal)"
                         value={editingProduct.translations?.es?.name || ""}
                         onChange={(e) =>
@@ -540,7 +589,7 @@ export function CatalogProductEditorModal({
                         }
                         className="catalog-editor-language__input"
                       />
-                      <textarea
+                      <Textarea
                         rows={1}
                         placeholder="Descripción en Español..."
                         value={editingProduct.translations?.es?.description || ""}

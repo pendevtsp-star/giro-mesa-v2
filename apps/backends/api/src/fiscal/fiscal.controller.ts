@@ -18,15 +18,21 @@ import {
   type AccountantRequestListQuery,
   accountantRequestListQuerySchema,
   accountantRequestSchema,
+  type CancelFiscalDocumentInput,
+  cancelFiscalDocumentSchema,
   competenceSchema,
   type FiscalDocumentListQuery,
   type FiscalPackageQuery,
   type FiscalProfileInput,
+  type FocusCompanyOnboardingInput,
   fiscalDocumentListQuerySchema,
   fiscalPackageQuerySchema,
   fiscalProfileSchema,
+  focusCompanyOnboardingSchema,
+  type ProductTaxRevisionBulkInput,
   type ProductTaxRevisionInput,
   type ProductTaxRevisionListQuery,
+  productTaxRevisionBulkSchema,
   productTaxRevisionListQuerySchema,
   productTaxRevisionSchema,
   type ReopenFiscalPeriodInput,
@@ -63,6 +69,51 @@ export class FiscalController {
     return this.fiscal.updateProfile(request.auth.identityId, organizationId, unitId, body);
   }
 
+  @Get("provider")
+  providerStatus(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.fiscal.providerStatus(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("provider/validate")
+  validateProvider(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(focusCompanyOnboardingSchema)) body: FocusCompanyOnboardingInput,
+  ) {
+    return this.fiscal.validateFocusCompany(request.auth.identityId, organizationId, unitId, body);
+  }
+
+  @Post("provider/activate")
+  activateProvider(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(focusCompanyOnboardingSchema)) body: FocusCompanyOnboardingInput,
+  ) {
+    return this.fiscal.activateFocusCompany(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("provider/check")
+  checkProvider(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.fiscal.checkFocusCompany(request.auth.identityId, organizationId, unitId);
+  }
+
   @Get("tax-revisions")
   taxRevisions(
     @Req() request: AuthenticatedRequest,
@@ -81,6 +132,21 @@ export class FiscalController {
     @Body(new ZodPipe(productTaxRevisionSchema)) body: ProductTaxRevisionInput,
   ) {
     return this.fiscal.createTaxRevision(request.auth.identityId, organizationId, unitId, body);
+  }
+
+  @Post("tax-revisions/bulk")
+  createTaxRevisionsBulk(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(productTaxRevisionBulkSchema)) body: ProductTaxRevisionBulkInput,
+  ) {
+    return this.fiscal.createTaxRevisionsBulk(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      body,
+    );
   }
 
   @Get("dashboard")
@@ -110,6 +176,38 @@ export class FiscalController {
     @Param("documentId", ParseUUIDPipe) documentId: string,
   ) {
     return this.fiscal.document(request.auth.identityId, organizationId, unitId, documentId);
+  }
+
+  @Post("documents/:documentId/reconcile")
+  reconcileDocument(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ) {
+    return this.fiscal.reconcileDocument(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      documentId,
+    );
+  }
+
+  @Post("documents/:documentId/cancel")
+  cancelDocument(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Body(new ZodPipe(cancelFiscalDocumentSchema)) body: CancelFiscalDocumentInput,
+  ) {
+    return this.fiscal.cancelDocument(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      documentId,
+      body,
+    );
   }
 
   @Get("periods")

@@ -35,11 +35,11 @@
 }
 .hero-lead {
   max-width: 600px;
-  color: #54615b;
+  color: var(--gm-muted);
   font-size: 18px;
 }
 .microcopy {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 12px;
 }
 .hero-product {
@@ -56,7 +56,7 @@
     var(--shadow);
   transform: rotate(1.2deg);
   padding: clamp(28px, 5vw, 64px);
-  color: #fff;
+  color: var(--gm-on-action);
 }
 .hero-product-frame .eyebrow {
   color: var(--lime);
@@ -77,7 +77,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 11px;
 }
 .segment-strip {
@@ -88,7 +88,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 12px;
 }
 .segment-strip span {
@@ -114,7 +114,7 @@
   font-weight: 600;
 }
 .section-heading > p:last-child {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 17px;
 }
 .section-heading.centered {
@@ -131,7 +131,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--gm-surface);
   box-shadow: 0 18px 45px rgba(26, 49, 39, 0.1);
 }
 .product-shot:first-child {
@@ -140,7 +140,7 @@
 .product-shot-frame {
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background: #e8ece7;
+  background: var(--gm-surface-soft);
 }
 .product-shot-frame img {
   width: 100%;
@@ -163,12 +163,12 @@
 }
 .product-shot-description {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 12px;
 }
 .capabilities {
   background: var(--forest-2);
-  color: #fff;
+  color: var(--gm-on-action);
 }
 .section-heading.light .eyebrow {
   color: var(--lime);
@@ -227,7 +227,7 @@
 }
 .steps p {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .plans-section {
   background: var(--cream);
@@ -278,7 +278,7 @@
   font-size: 32px;
 }
 .plan > p {
-  color: var(--muted);
+  color: var(--legacy-muted);
   min-height: 54px;
 }
 .price {
@@ -286,13 +286,13 @@
 }
 .price small {
   display: block;
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .price strong {
   font-size: 38px;
 }
 .price span {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 12px;
 }
 .plan .annual {
@@ -318,7 +318,7 @@
   width: 100%;
 }
 .trust-section {
-  background: #eef1e9;
+  background: var(--gm-surface-soft);
 }
 .trust-grid {
   display: grid;
@@ -331,7 +331,7 @@
   line-height: 1.05;
 }
 .trust-grid > div > p:last-child {
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .trust-cards {
   display: grid;
@@ -352,7 +352,7 @@
   margin-top: 36px;
 }
 .trust-cards p {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 14px;
 }
 .faq-list {
@@ -369,7 +369,7 @@
 .faq-list p {
   margin: 0;
   padding: 0 35px 25px 5px;
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .faq-list summary::marker {
   color: var(--orange);
@@ -378,7 +378,7 @@
   padding: 100px 0;
   text-align: center;
   background: var(--orange);
-  color: #fff;
+  color: var(--gm-on-action);
 }
 .final-cta h2 {
   margin: 15px 0 35px;
@@ -387,7 +387,7 @@
   line-height: 1;
 }
 .final-cta.final-cta .eyebrow {
-  color: #fff0e7;
+  color: var(--gm-danger-soft);
 }
 .final-cta .container > div {
   display: flex;

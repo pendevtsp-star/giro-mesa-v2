@@ -1,6 +1,6 @@
 @import "@giromesa/ui/styles.css";
-@import "../styles/base.css";
-@import "../styles/landing.css";
-@import "../styles/footer.css";
-@import "../styles/inner-pages.css";
-@import "../styles/responsive.css";
+@import "../styles/base.css" layer(legacy);
+@import "../styles/landing.css" layer(legacy);
+@import "../styles/footer.css" layer(legacy);
+@import "../styles/inner-pages.css" layer(legacy);
+@import "../styles/responsive.css" layer(legacy);

@@ -1,0 +1,79 @@
+.terminal-profile-settings {
+  display: grid;
+  gap: var(--gm-space-4);
+}
+
+.terminal-quick-actions {
+  display: flex;
+  gap: var(--gm-space-2);
+  margin-block: calc(-1 * var(--gm-space-2)) var(--gm-space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.terminal-quick-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.app-shell--terminal-compact .main-content {
+  padding-block: var(--gm-space-4) var(--gm-space-8);
+}
+
+.app-shell--terminal-compact .page-heading {
+  margin-bottom: var(--gm-space-4);
+}
+
+.terminal-profile-settings > p,
+.terminal-profile-toggle small {
+  color: var(--gm-muted);
+}
+
+.terminal-printer-health,
+.terminal-profile-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gm-space-2);
+}
+
+.terminal-profile-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-3);
+}
+
+.terminal-profile-toggle > span {
+  display: grid;
+}
+
+.terminal-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gm-space-2);
+  padding: 0;
+  border: 0;
+}
+
+.terminal-profile-actions legend {
+  grid-column: 1 / -1;
+  margin-bottom: var(--gm-space-1);
+  font-weight: 700;
+}
+
+.terminal-profile-actions label {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.terminal-profile-notice {
+  margin: 0;
+  color: var(--gm-muted);
+}
+
+@media (max-width: 480px) {
+  .terminal-profile-actions {
+    grid-template-columns: 1fr;
+  }
+}

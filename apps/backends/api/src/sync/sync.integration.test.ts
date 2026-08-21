@@ -27,6 +27,7 @@ import {
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { FiscalService } from "../fiscal/fiscal.service.js";
+import { FocusNfeClient } from "../fiscal/focus-nfe.client.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
 import { OperationalSnapshotService } from "./operational-snapshot.service.js";
@@ -52,7 +53,7 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
       database,
       pilot,
       new OperationalSnapshotService(database, pos),
-      new FiscalService(database, scope),
+      new FiscalService(database, scope, new FocusNfeClient()),
     );
     const suffix = randomBytes(6).toString("hex");
     const [organizationA, organizationB] = await database.db

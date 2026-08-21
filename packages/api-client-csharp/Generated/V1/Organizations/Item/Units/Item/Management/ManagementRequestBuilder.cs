@@ -9,6 +9,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Purchases;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reconciliations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Suppliers;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.WaiterSettlements;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -67,6 +68,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Suppliers.SuppliersRequestBuilder Suppliers
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Suppliers.SuppliersRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The waiterSettlements property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.WaiterSettlementsRequestBuilder WaiterSettlements
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.WaiterSettlementsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder"/> and sets the default values.

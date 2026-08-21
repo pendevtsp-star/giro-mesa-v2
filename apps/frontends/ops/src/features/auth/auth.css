@@ -5,8 +5,8 @@
   grid-template-columns: minmax(380px, 0.95fr) minmax(440px, 1.05fr);
 }
 .auth-story {
-  background: #123c2d;
-  color: #fff;
+  background: var(--gm-shell);
+  color: var(--gm-shell-text);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -15,7 +15,11 @@
   position: relative;
 }
 .auth-story::after {
-  background: radial-gradient(circle, rgba(229, 108, 50, 0.42) 0 2px, transparent 3px);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--gm-accent) 52%, transparent) 0 2px,
+    transparent 3px
+  );
   background-size: 26px 26px;
   content: "";
   height: 390px;
@@ -39,13 +43,13 @@
   max-width: 10ch;
 }
 .auth-story p:not(.eyebrow) {
-  color: #c8d8d1;
+  color: var(--gm-shell-muted);
   font-size: 1.08rem;
   line-height: 1.6;
   max-width: 50ch;
 }
 .auth-story .eyebrow {
-  color: #f0a07b;
+  color: color-mix(in srgb, var(--gm-accent) 68%, white);
 }
 .auth-story > .gm-badge {
   align-self: flex-start;
@@ -59,14 +63,14 @@
   padding: 0;
 }
 .auth-story__flow li {
-  border-left: 2px solid #ef8b5e;
-  color: #dfe9e4;
+  border-left: 2px solid var(--gm-accent);
+  color: var(--gm-shell-text);
   font-size: 0.76rem;
   font-weight: 750;
   padding: 0.8rem;
 }
 .auth-story small {
-  color: #90ab9f;
+  color: var(--gm-shell-muted);
 }
 .auth-panel {
   align-items: center;
@@ -101,7 +105,7 @@
 .form-stack select,
 .note-field textarea,
 .pin-field input {
-  background: #fff;
+  background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
   color: var(--gm-ink);
@@ -116,7 +120,7 @@
 .form-stack .password-field input {
   padding-right: 5.4rem;
 }
-.password-field button {
+.password-field .password-field__toggle {
   align-items: center;
   background: transparent;
   border: 0;
@@ -155,6 +159,8 @@
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 750;
+  min-height: 34px;
+  padding-inline: var(--gm-space-2);
 }
 .auth-footnote {
   border-top: 1px solid var(--gm-border);
@@ -173,11 +179,15 @@
   padding: 0.7rem;
 }
 .auth-message--error {
-  background: #fbe1e1;
-  color: var(--gm-danger);
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
 }
 .scope-screen {
-  background: linear-gradient(135deg, var(--gm-paper), #e4ece6);
+  background: linear-gradient(
+    135deg,
+    var(--gm-paper),
+    color-mix(in srgb, var(--gm-brand-soft) 45%, var(--gm-paper))
+  );
   min-height: 100vh;
   padding: 2rem;
 }

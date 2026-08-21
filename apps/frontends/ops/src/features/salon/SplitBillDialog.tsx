@@ -1,4 +1,4 @@
-import { Button, Icon, Modal } from "@giromesa/ui";
+import { Button, Card, Icon, Input, Label, Modal, NativeSelect } from "@giromesa/ui";
 import { useMemo, useState } from "react";
 import { formatMoney } from "../../rules";
 
@@ -152,33 +152,34 @@ export function SplitBillDialog({
         {/* Controls */}
         <div className="split-bill-controls">
           <div className="split-bill-toggle-group">
-            <button
+            <Button
               className={`split-bill-toggle-btn ${splitMode === "equal" ? "active" : ""}`}
               onClick={() => setSplitMode("equal")}
               type="button"
             >
               <Icon name="user" size={14} />
               <span>Divisão Igualitária</span>
-            </button>
-            <button
+            </Button>
+            <Button
               className={`split-bill-toggle-btn ${splitMode === "items" ? "active" : ""}`}
               onClick={() => setSplitMode("items")}
               type="button"
             >
               <Icon name="list" size={14} />
               <span>Por Itens Consumidos</span>
-            </button>
+            </Button>
           </div>
 
           <div className="split-bill-service-toggle">
-            <label className="split-bill-checkbox">
+            <Label className="split-bill-checkbox">
               <input
+                className="accent-primary"
                 checked={includeServiceFee}
                 onChange={(e) => setIncludeServiceFee(e.target.checked)}
                 type="checkbox"
               />
               <span>Incluir taxa de serviço (10%)</span>
-            </label>
+            </Label>
           </div>
         </div>
 
@@ -189,19 +190,19 @@ export function SplitBillDialog({
               <span>Dividir entre:</span>
               <div className="split-bill-stepper__btns">
                 {[2, 3, 4, 5, 6, 8, 10].map((num) => (
-                  <button
+                  <Button
                     className={`split-bill-pill ${peopleCount === num ? "active" : ""}`}
                     key={num}
                     onClick={() => setPeopleCount(num)}
                     type="button"
                   >
                     {num} pessoas
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
-            <div className="split-bill-card-highlight">
+            <Card className="split-bill-card-highlight">
               <div className="split-bill-card-highlight__content">
                 <small>Valor sugerido por pessoa ({peopleCount} pagantes)</small>
                 <strong>{formatMoney(perPersonCents)}</strong>
@@ -214,7 +215,7 @@ export function SplitBillDialog({
               >
                 Pagar 1 cota ({formatMoney(perPersonCents)})
               </Button>
-            </div>
+            </Card>
           </div>
         )}
 
@@ -223,7 +224,7 @@ export function SplitBillDialog({
           <div className="split-bill-items-section">
             <div className="split-bill-payers-bar">
               {payers.map((payer) => (
-                <button
+                <Button
                   className={`split-bill-payer-tab ${activePayerIndex === payer.index ? "active" : ""}`}
                   key={payer.id}
                   onClick={() => setActivePayerIndex(payer.index)}
@@ -231,7 +232,7 @@ export function SplitBillDialog({
                 >
                   <strong>{payer.label}</strong>
                   <small>{formatMoney(payerTotals[payer.index] ?? 0)}</small>
-                </button>
+                </Button>
               ))}
               <Button
                 onClick={() => setPeopleCount((c) => Math.min(12, c + 1))}
@@ -260,7 +261,7 @@ export function SplitBillDialog({
                       </div>
                       <div className="split-bill-item-row__assignee">
                         <span>Atribuído a:</span>
-                        <select
+                        <NativeSelect
                           aria-label={`Atribuir ${item.name}`}
                           onChange={(e) =>
                             setItemAssignments((curr) => ({
@@ -275,7 +276,7 @@ export function SplitBillDialog({
                               {payer.label}
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       </div>
                     </div>
                   );
@@ -306,9 +307,9 @@ export function SplitBillDialog({
         <div className="split-bill-payment-entry">
           <h4>Registrar Pagamento</h4>
           <div className="split-bill-payment-grid">
-            <label>
+            <Label>
               Método
-              <select
+              <NativeSelect
                 aria-label="Método de pagamento"
                 onChange={(e) => setSelectedMethod(e.target.value as PaymentMethod)}
                 value={selectedMethod}
@@ -318,27 +319,27 @@ export function SplitBillDialog({
                 <option value="debit">Cartão de Débito</option>
                 <option value="cash">Dinheiro</option>
                 <option value="voucher">Voucher / Vale-Refeição</option>
-              </select>
-            </label>
+              </NativeSelect>
+            </Label>
 
-            <label>
+            <Label>
               Identificação (opcional)
-              <input
+              <Input
                 onChange={(e) => setPayerNameInput(e.target.value)}
                 placeholder="Ex.: João Pix"
                 value={payerNameInput}
               />
-            </label>
+            </Label>
 
-            <label>
+            <Label>
               Valor (R$)
-              <input
+              <Input
                 onChange={(e) => setCustomAmount(e.target.value)}
                 placeholder={`Restante: ${formatMoney(remainingCents)}`}
                 type="number"
                 value={customAmount}
               />
-            </label>
+            </Label>
 
             <Button
               disabled={remainingCents === 0}
@@ -371,14 +372,14 @@ export function SplitBillDialog({
                   </div>
                   <div className="split-bill-history__actions">
                     <strong>{formatMoney(p.amountCents)}</strong>
-                    <button
+                    <Button
                       aria-label="Remover pagamento"
                       className="split-bill-remove-btn"
                       onClick={() => handleRemovePayment(p.id)}
                       type="button"
                     >
                       <Icon name="x" size={12} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}

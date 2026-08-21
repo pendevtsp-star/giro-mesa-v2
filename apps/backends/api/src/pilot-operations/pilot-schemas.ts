@@ -99,7 +99,30 @@ export const stationSchema = z.object({
     .max(40),
 });
 
-export const productSchema = z.object({
+const stationRoutingSchema = z
+  .array(z.object({ stationId: id, stage: z.number().int().min(1).max(20) }).strict())
+  .max(50)
+  .optional();
+
+const validateStationRouting = (
+  value: { stationIds: string[]; stationRouting?: { stationId: string; stage: number }[] },
+  context: z.RefinementCtx,
+) => {
+  if (!value.stationRouting) return;
+  const routeIds = value.stationRouting.map((route) => route.stationId);
+  if (
+    new Set(routeIds).size !== routeIds.length ||
+    [...new Set(value.stationIds)].sort().join(":") !== [...routeIds].sort().join(":")
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["stationRouting"],
+      message: "stationRouting deve conter exatamente uma etapa para cada praça selecionada.",
+    });
+  }
+};
+
+const productBaseSchema = z.object({
   categoryId: id,
   sku: z.string().trim().max(80).optional(),
   ean: z
@@ -115,6 +138,7 @@ export const productSchema = z.object({
   allergenIds: z.array(id).max(50).default([]),
   modifierGroupIds: z.array(id).max(50).default([]),
   stationIds: z.array(id).min(1).max(50),
+  stationRouting: stationRoutingSchema,
   recipe: z
     .array(
       z.object({
@@ -174,6 +198,8 @@ export const productSchema = z.object({
     .optional(),
 });
 
+export const productSchema = productBaseSchema.superRefine(validateStationRouting);
+
 export const updateProductSchema = z.object({
   categoryId: id.optional(),
   name: shortName.optional(),
@@ -182,16 +208,19 @@ export const updateProductSchema = z.object({
   estimatedPrepTimeMinutes: z.number().int().min(0).max(1440).nullable().optional(),
 });
 
-export const productUnitConfigSchema = z.object({
-  priceCents: cents,
-  deliveryPriceCents: cents.nullable().optional(),
-  costCents: cents.nullable().optional(),
-  available: z.boolean(),
-  availabilitySchedule: availabilityScheduleSchema.nullable().optional(),
-  stationIds: z.array(id).min(1).max(50),
-  dailyStock: z.number().int().min(0).max(1_000_000).nullable().optional(),
-  autoDeductStock: z.boolean().default(false),
-});
+export const productUnitConfigSchema = z
+  .object({
+    priceCents: cents,
+    deliveryPriceCents: cents.nullable().optional(),
+    costCents: cents.nullable().optional(),
+    available: z.boolean(),
+    availabilitySchedule: availabilityScheduleSchema.nullable().optional(),
+    stationIds: z.array(id).min(1).max(50),
+    stationRouting: stationRoutingSchema,
+    dailyStock: z.number().int().min(0).max(1_000_000).nullable().optional(),
+    autoDeductStock: z.boolean().default(false),
+  })
+  .superRefine(validateStationRouting);
 
 export const aggregateProductSchema = productSchema;
 export const reorderSchema = z
@@ -337,7 +366,7 @@ export const brandingSchema = z.object({
     .nullable()
     .optional(),
 });
-const catalogImportRowSchema = productSchema
+const catalogImportRowSchema = productBaseSchema
   .omit({ categoryId: true })
   .extend({
     productId: id.optional(),
@@ -859,9 +888,21 @@ export const kdsCourseStateSchema = z.object({
   state: z.enum(["held", "fired"]),
 });
 export const kdsOrderHandoffSchema = z.object({
-  target: z.enum(["expedition", "served"]),
+  target: z.enum(["expedition", "runner", "served"]),
   reason: z.string().trim().min(3).max(500).optional(),
 });
+export const kdsTicketClaimSchema = z
+  .object({
+    installationId: id,
+    leaseSeconds: z.number().int().min(30).max(300).default(120),
+  })
+  .strict();
+export const kdsChangeAcknowledgeSchema = z
+  .object({ revision: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+export const kdsRunnerClaimSchema = z
+  .object({ reason: z.string().trim().min(3).max(500).optional() })
+  .strict();
 export const kdsProductAvailabilitySchema = z
   .object({
     available: z.boolean(),
@@ -904,6 +945,35 @@ export const kdsTerminalProfileSchema = z
       });
     }
   });
+export const terminalProfileModeSchema = z.enum([
+  "waiter_mobile",
+  "reception",
+  "cashier",
+  "kds",
+  "expedition",
+  "shared",
+]);
+export const terminalProfileRouteSchema = z.enum([
+  "dashboard",
+  "reservations",
+  "salon",
+  "counter",
+  "cash",
+  "kds",
+]);
+export const terminalProfileSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120),
+    mode: terminalProfileModeSchema,
+    defaultRoute: terminalProfileRouteSchema,
+    printerId: z.string().trim().min(1).max(120).nullable(),
+    stationId: id.nullable(),
+    compact: z.boolean(),
+    quickActions: z
+      .array(z.enum(["open_tab", "new_order", "receive", "waitlist", "print", "search"]))
+      .max(8),
+  })
+  .strict();
 export const kdsBlockCodeSchema = z.enum([
   "missing_ingredient",
   "equipment_issue",
@@ -1021,6 +1091,9 @@ export const kdsTicketReadSchema = z.object({
   completedAt: nullableResponseDateTime,
   recallCount: z.number().int(),
   refireCount: z.number().int(),
+  claimedByInstallationId: id.nullable(),
+  claimedAt: nullableResponseDateTime,
+  claimExpiresAt: nullableResponseDateTime,
   createdAt: responseDateTime,
   updatedAt: responseDateTime,
   blocked: z.boolean(),
@@ -1041,6 +1114,9 @@ export const kdsTicketReadSchema = z.object({
     priorityReason: z.string().nullable(),
     priorityUpdatedAt: nullableResponseDateTime,
     priorityUpdatedByIdentityId: id.nullable(),
+    runnerIdentityId: id.nullable(),
+    runnerClaimedAt: nullableResponseDateTime,
+    runnerPickedUpAt: nullableResponseDateTime,
   }),
   tab: z.object({
     id,
@@ -1090,6 +1166,8 @@ export const kdsItemReadSchema = z.object({
   kds: z.object({
     quantity: z.number().int().positive(),
     readyQuantity: z.number().int().nonnegative(),
+    stage: z.number().int().min(1).max(20),
+    dependencyHeld: z.boolean(),
     status: kdsItemStatusSchema,
     held: z.boolean(),
     heldAt: nullableResponseDateTime,
@@ -1116,6 +1194,32 @@ export const kdsItemReadSchema = z.object({
       quantity: z.number().int().positive(),
       unitDeltaCents: z.number().int(),
       totalDeltaCents: z.number().int(),
+    }),
+  ),
+  recipe: z.array(
+    z.object({
+      id,
+      ingredientName: z.string(),
+      quantityMilli: z.number().int().positive(),
+      unit: z.string(),
+      lossBasisPoints: z.number().int().min(0).max(10_000),
+    }),
+  ),
+  changes: z.array(
+    z.object({
+      id,
+      organizationId: id,
+      unitId: id,
+      ticketId: id,
+      orderItemId: id,
+      kind: z.enum(["added", "updated", "removed"]),
+      revision: z.string().regex(/^[0-9a-f]{64}$/),
+      summary: z.string(),
+      details: z.record(z.string(), z.unknown()),
+      createdByIdentityId: id,
+      acknowledgedByIdentityId: id.nullable(),
+      acknowledgedAt: nullableResponseDateTime,
+      createdAt: responseDateTime,
     }),
   ),
 });
@@ -1152,6 +1256,13 @@ export const kdsReadModelSchema = z.object({
     automaticThrottling: z.literal(false),
     terminalProfileRead: z.boolean(),
     terminalProfileManage: z.boolean(),
+    sequentialStages: z.boolean(),
+    ticketClaim: z.boolean(),
+    orderChanges: z.boolean(),
+    runnerHandoff: z.boolean(),
+    productionGrid: z.boolean(),
+    recipes: z.boolean(),
+    demandControl: z.boolean(),
   }),
   tickets: z.array(kdsTicketReadSchema),
   items: z.array(kdsItemReadSchema),
@@ -1211,6 +1322,41 @@ export const kdsReadModelSchema = z.object({
     }),
   ),
   batches: z.array(kdsBatchReadSchema),
+  productionGrid: z.array(
+    z.object({
+      stationId: id,
+      productId: id,
+      productName: z.string(),
+      totalQuantity: z.number().int().nonnegative(),
+      queuedQuantity: z.number().int().nonnegative(),
+      preparingQuantity: z.number().int().nonnegative(),
+      readyQuantity: z.number().int().nonnegative(),
+      heldQuantity: z.number().int().nonnegative(),
+      assignments: z.array(
+        z.object({
+          ticketId: id,
+          orderItemId: id,
+          reference: z.string(),
+          quantity: z.number().int().positive(),
+          readyQuantity: z.number().int().nonnegative(),
+          status: kdsItemStatusSchema,
+          stage: z.number().int().min(1).max(20),
+        }),
+      ),
+    }),
+  ),
+  demand: z.object({
+    state: z.enum(["normal", "strained", "overloaded"]),
+    suggestedDelayMinutes: z.number().nonnegative(),
+    automatic: z.literal(false),
+    channels: z.array(
+      z.object({
+        channel: fulfillmentType,
+        activeOrders: z.number().int().nonnegative(),
+        suggestedDelayMinutes: z.number().nonnegative(),
+      }),
+    ),
+  }),
 });
 
 export const kdsBlockResponseSchema = z.object({
@@ -1275,13 +1421,25 @@ export const kdsMutationResponseSchema = z.object({
   ticketIds: z.array(id).optional(),
   orderId: id.optional(),
   orderItemId: id.optional(),
+  changeId: id.optional(),
+  installationId: id.optional(),
+  claimedAt: responseDateTime.optional(),
+  claimExpiresAt: responseDateTime.optional(),
+  releasedAt: responseDateTime.optional(),
+  revision: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  acknowledgedAt: responseDateTime.optional(),
+  runnerIdentityId: id.optional(),
+  runnerClaimedAt: responseDateTime.optional(),
   state: z
     .enum(["pending", "preparing", "ready", "done", "canceled", "held", "fired", "served"])
     .optional(),
   itemState: z.enum(["preparing", "ready"]).optional(),
   readyQuantity: z.number().int().nonnegative().optional(),
   course: orderCourse.optional(),
-  target: z.enum(["expedition", "served"]).optional(),
+  target: z.enum(["expedition", "runner", "served"]).optional(),
   priority: z.number().int().optional(),
   approvalId: id.optional(),
   orderStatuses: z
@@ -1354,6 +1512,24 @@ export const kdsTerminalProfileResponseSchema = z.object({
   updatedByIdentityId: id,
   idempotentReplay: z.boolean().optional(),
 });
+
+export const terminalProfileResponseSchema = z.object({
+  organizationId: id,
+  unitId: id,
+  installationId: id,
+  label: z.string(),
+  mode: terminalProfileModeSchema,
+  defaultRoute: terminalProfileRouteSchema,
+  printerId: z.string().nullable(),
+  stationId: id.nullable(),
+  compact: z.boolean(),
+  quickActions: z.array(z.string()),
+  createdAt: responseDateTime,
+  updatedAt: responseDateTime,
+  updatedByIdentityId: id,
+  idempotentReplay: z.boolean().optional(),
+});
+export const terminalProfileLookupResponseSchema = terminalProfileResponseSchema.nullable();
 
 export const kdsConflictResponseSchema = z.object({
   statusCode: z.number().int().optional(),
@@ -1469,8 +1645,12 @@ export type KdsPriorityInput = z.infer<typeof kdsPrioritySchema>;
 export type KdsOrderPriorityInput = z.infer<typeof kdsOrderPrioritySchema>;
 export type KdsCourseStateInput = z.infer<typeof kdsCourseStateSchema>;
 export type KdsOrderHandoffInput = z.infer<typeof kdsOrderHandoffSchema>;
+export type KdsTicketClaimInput = z.infer<typeof kdsTicketClaimSchema>;
+export type KdsChangeAcknowledgeInput = z.infer<typeof kdsChangeAcknowledgeSchema>;
+export type KdsRunnerClaimInput = z.infer<typeof kdsRunnerClaimSchema>;
 export type KdsProductAvailabilityInput = z.infer<typeof kdsProductAvailabilitySchema>;
 export type KdsTerminalProfileInput = z.infer<typeof kdsTerminalProfileSchema>;
+export type TerminalProfileInput = z.infer<typeof terminalProfileSchema>;
 export type KdsBlockInput = z.infer<typeof kdsBlockSchema>;
 export type KdsUnblockInput = z.infer<typeof kdsUnblockSchema>;
 export type KdsAttentionAcknowledgeInput = z.infer<typeof kdsAttentionAcknowledgeSchema>;

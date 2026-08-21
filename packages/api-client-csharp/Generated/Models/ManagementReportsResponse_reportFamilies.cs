@@ -22,6 +22,14 @@ namespace GiroMesa.ApiClient.Models
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_exceptions Exceptions { get; set; }
 #endif
+        /// <summary>The forecast property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast? Forecast { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast Forecast { get; set; }
+#endif
         /// <summary>The inventory property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -29,6 +37,14 @@ namespace GiroMesa.ApiClient.Models
 #nullable restore
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory Inventory { get; set; }
+#endif
+        /// <summary>The labor property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_labor? Labor { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_labor Labor { get; set; }
 #endif
         /// <summary>The multiunit property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -70,6 +86,14 @@ namespace GiroMesa.ApiClient.Models
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_quality Quality { get; set; }
 #endif
+        /// <summary>The reconciliation property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation? Reconciliation { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation Reconciliation { get; set; }
+#endif
         /// <summary>The sales property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -104,12 +128,15 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "exceptions", n => { Exceptions = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_exceptions>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_exceptions.CreateFromDiscriminatorValue); } },
+                { "forecast", n => { Forecast = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast.CreateFromDiscriminatorValue); } },
                 { "inventory", n => { Inventory = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory.CreateFromDiscriminatorValue); } },
+                { "labor", n => { Labor = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_labor>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_labor.CreateFromDiscriminatorValue); } },
                 { "multiunit", n => { Multiunit = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_multiunit>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_multiunit.CreateFromDiscriminatorValue); } },
                 { "operations", n => { Operations = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_operations>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_operations.CreateFromDiscriminatorValue); } },
                 { "profitability", n => { Profitability = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability.CreateFromDiscriminatorValue); } },
                 { "purchasing", n => { Purchasing = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_purchasing>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_purchasing.CreateFromDiscriminatorValue); } },
                 { "quality", n => { Quality = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_quality>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_quality.CreateFromDiscriminatorValue); } },
+                { "reconciliation", n => { Reconciliation = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation.CreateFromDiscriminatorValue); } },
                 { "sales", n => { Sales = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_sales>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_sales.CreateFromDiscriminatorValue); } },
             };
         }
@@ -121,12 +148,15 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_exceptions>("exceptions", Exceptions);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast>("forecast", Forecast);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory>("inventory", Inventory);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_labor>("labor", Labor);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_multiunit>("multiunit", Multiunit);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_operations>("operations", Operations);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability>("profitability", Profitability);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_purchasing>("purchasing", Purchasing);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_quality>("quality", Quality);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation>("reconciliation", Reconciliation);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_sales>("sales", Sales);
             writer.WriteAdditionalData(AdditionalData);
         }

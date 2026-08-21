@@ -24,6 +24,8 @@ namespace GiroMesa.ApiClient.Models
         public bool? Enabled { get; set; }
         /// <summary>The family property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportSchedule_family? Family { get; set; }
+        /// <summary>The format property</summary>
+        public global::GiroMesa.ApiClient.Models.ManagementReportSchedule_format? Format { get; set; }
         /// <summary>The frequency property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportSchedule_frequency? Frequency { get; set; }
         /// <summary>The id property</summary>
@@ -84,6 +86,7 @@ namespace GiroMesa.ApiClient.Models
                 { "delivery", n => { Delivery = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_delivery>(); } },
                 { "enabled", n => { Enabled = n.GetBoolValue(); } },
                 { "family", n => { Family = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_family>(); } },
+                { "format", n => { Format = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_format>(); } },
                 { "frequency", n => { Frequency = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_frequency>(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
                 { "lastRunAt", n => { LastRunAt = n.GetDateTimeOffsetValue(); } },
@@ -107,6 +110,7 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_delivery>("delivery", Delivery);
             writer.WriteBoolValue("enabled", Enabled);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_family>("family", Family);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_format>("format", Format);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportSchedule_frequency>("frequency", Frequency);
             writer.WriteGuidValue("id", Id);
             writer.WriteDateTimeOffsetValue("lastRunAt", LastRunAt);

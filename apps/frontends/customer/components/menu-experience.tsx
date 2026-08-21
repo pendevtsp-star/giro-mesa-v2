@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@giromesa/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicMenuBranding } from "../lib/api";
 import {
@@ -394,19 +395,24 @@ export function MenuExperience({
         onOpenCart={openCart}
       />
       {count > 0 && (
-        <button type="button" className="cart-bar" onClick={openCart}>
+        <Button type="button" className="cart-bar" onClick={openCart}>
           <span>
             <b>{count}</b> Ver seleção
           </span>
           <strong>{formatMoney(cartTotal(cart, fulfillment))}</strong>
-        </button>
+        </Button>
       )}
       {notice && (
         <div className={`toast ${notice.tone}`} role="status">
           <span>{notice.text}</span>
-          <button type="button" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Fechar aviso"
+            onClick={() => setNotice(null)}
+          >
             ×
-          </button>
+          </Button>
         </div>
       )}
       <ProductDetail

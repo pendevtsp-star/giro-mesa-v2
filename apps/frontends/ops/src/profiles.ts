@@ -36,6 +36,7 @@ export const profiles: Profile[] = [
     "accounting.view",
     "people.manage",
     "people.view",
+    "settlements.view",
     "delivery.operate",
     "reservations.manage",
     "growth.manage",
@@ -54,6 +55,7 @@ export const profiles: Profile[] = [
     "accounting.view",
     "people.manage",
     "people.view",
+    "settlements.view",
     "delivery.operate",
     "reservations.manage",
     "growth.manage",
@@ -69,6 +71,7 @@ export const profiles: Profile[] = [
     "counter.operate",
     "catalog.manage",
     "cash.operate",
+    "settlements.view",
   ]),
   profile("receptionist", "Recepcionista", "Reservas, espera e acomodação", [
     "reservations.manage",
@@ -90,6 +93,7 @@ export const profiles: Profile[] = [
     "fiscal.manage",
     "accounting.view",
     "people.view",
+    "settlements.view",
   ]),
   profile("accountant", "Contador", "Competências, pacotes e solicitações", ["accounting.view"]),
   profile("delivery", "Delivery", "Pedidos, prazos e despacho", [

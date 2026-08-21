@@ -50,6 +50,7 @@ import {
   type KdsBatchCreateInput,
   type KdsBlockInput,
   type KdsCancelInput,
+  type KdsChangeAcknowledgeInput,
   type KdsCourseStateInput,
   type KdsItemStateInput,
   type KdsOrderHandoffInput,
@@ -59,8 +60,10 @@ import {
   type KdsRecallInput,
   type KdsRefireInput,
   type KdsRerouteInput,
+  type KdsRunnerClaimInput,
   type KdsStateInput,
   type KdsTerminalProfileInput,
+  type KdsTicketClaimInput,
   type KdsUnblockInput,
   kdsAnalyticsQuerySchema,
   kdsAnalyticsResponseSchema,
@@ -73,6 +76,7 @@ import {
   kdsBlockResponseSchema,
   kdsBlockSchema,
   kdsCancelSchema,
+  kdsChangeAcknowledgeSchema,
   kdsConflictResponseSchema,
   kdsCourseStateSchema,
   kdsItemStateSchema,
@@ -89,9 +93,11 @@ import {
   kdsRefireSchema,
   kdsRerouteResponseSchema,
   kdsRerouteSchema,
+  kdsRunnerClaimSchema,
   kdsStateSchema,
   kdsTerminalProfileResponseSchema,
   kdsTerminalProfileSchema,
+  kdsTicketClaimSchema,
   kdsUnavailableResponseSchema,
   kdsUnblockSchema,
   type ManagerPinInput,
@@ -141,6 +147,7 @@ import {
   type TableInput,
   type TableTurnoverInput,
   type TemporaryTableTransferInput,
+  type TerminalProfileInput,
   type TipInput,
   type TransferTabInput,
   tableBatchSchema,
@@ -148,6 +155,9 @@ import {
   tableSchema,
   tableTurnoverSchema,
   temporaryTableTransferSchema,
+  terminalProfileLookupResponseSchema,
+  terminalProfileResponseSchema,
+  terminalProfileSchema,
   tipSchema,
   transferTabSchema,
   type UpdateTabInput,
@@ -952,6 +962,42 @@ export class PilotPosController {
     );
   }
 
+  @Get("terminal-profiles/:installationId")
+  @ApiOkResponse({ schema: toOpenApiSchema(terminalProfileLookupResponseSchema) })
+  getTerminalProfile(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+  ) {
+    return this.pos.getTerminalProfile(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      installationId,
+    );
+  }
+
+  @Put("terminal-profiles/:installationId")
+  @ApiOkResponse({ schema: toOpenApiSchema(terminalProfileResponseSchema) })
+  putTerminalProfile(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(terminalProfileSchema)) body: TerminalProfileInput,
+  ) {
+    return this.pos.putTerminalProfile(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      installationId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Get("kds")
   @ApiQuery({ name: "stationId", required: false, format: "uuid" })
   @ApiOkResponse({ schema: toOpenApiSchema(kdsReadModelSchema) })
@@ -1114,6 +1160,74 @@ export class PilotPosController {
       organizationId,
       unitId,
       ticketId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("kds/:ticketId/claim")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ schema: toOpenApiSchema(kdsMutationResponseSchema) })
+  @ApiConflictResponse({ schema: toOpenApiSchema(kdsConflictResponseSchema) })
+  claimKdsTicket(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("ticketId", ParseUUIDPipe) ticketId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(kdsTicketClaimSchema)) body: KdsTicketClaimInput,
+  ) {
+    return this.pos.claimKdsTicket(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      ticketId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("kds/:ticketId/claim/release")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ schema: toOpenApiSchema(kdsMutationResponseSchema) })
+  @ApiConflictResponse({ schema: toOpenApiSchema(kdsConflictResponseSchema) })
+  releaseKdsTicketClaim(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("ticketId", ParseUUIDPipe) ticketId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(kdsTicketClaimSchema)) body: KdsTicketClaimInput,
+  ) {
+    return this.pos.releaseKdsTicketClaim(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      ticketId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("kds/:ticketId/changes/:changeId/acknowledge")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ schema: toOpenApiSchema(kdsMutationResponseSchema) })
+  @ApiConflictResponse({ schema: toOpenApiSchema(kdsConflictResponseSchema) })
+  acknowledgeKdsChange(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("ticketId", ParseUUIDPipe) ticketId: string,
+    @Param("changeId", ParseUUIDPipe) changeId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(kdsChangeAcknowledgeSchema)) body: KdsChangeAcknowledgeInput,
+  ) {
+    return this.pos.acknowledgeKdsChange(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      ticketId,
+      changeId,
       idempotencyKey,
       body,
     );
@@ -1374,6 +1488,28 @@ export class PilotPosController {
     @Body(new ZodPipe(kdsOrderHandoffSchema)) body: KdsOrderHandoffInput,
   ) {
     return this.pos.handoffKdsOrder(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      orderId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("kds/orders/:orderId/runner/claim")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ schema: toOpenApiSchema(kdsMutationResponseSchema) })
+  @ApiConflictResponse({ schema: toOpenApiSchema(kdsConflictResponseSchema) })
+  claimKdsRunner(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("orderId", ParseUUIDPipe) orderId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(kdsRunnerClaimSchema)) body: KdsRunnerClaimInput,
+  ) {
+    return this.pos.claimKdsRunner(
       request.auth.identityId,
       organizationId,
       unitId,

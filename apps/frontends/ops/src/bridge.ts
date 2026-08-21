@@ -168,6 +168,43 @@ export async function sendShellPrintJob(
   }
 }
 
+export async function loadShellPrinters(): Promise<ShellOperationalStateResult | null> {
+  const invoke = window.HybridWebView?.InvokeDotNet;
+  if (!invoke) return null;
+  try {
+    const result = await invoke<Record<string, unknown>>("GetPrintersAsync");
+    return {
+      success: readBoolean(result, "Success", "success"),
+      payload: readUnknown(result, "Payload", "payload"),
+      errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
+    };
+  } catch {
+    return { success: false, errorCode: "SHELL_BRIDGE_UNAVAILABLE" };
+  }
+}
+
+export async function testShellPrinter(printerId: string): Promise<ShellPrintResult | null> {
+  const invoke = window.HybridWebView?.InvokeDotNet;
+  if (!invoke) return null;
+  try {
+    const result = await invoke<Record<string, unknown>>("TestPrinterAsync", [printerId]);
+    return {
+      success: readBoolean(result, "Success", "success"),
+      status: readString(result, "Status", "status") ?? "failed",
+      errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
+      printerId: readString(result, "PrinterId", "printerId") ?? undefined,
+      duplicate: readBoolean(result, "Duplicate", "duplicate"),
+    };
+  } catch {
+    return {
+      success: false,
+      status: "failed",
+      errorCode: "SHELL_BRIDGE_UNAVAILABLE",
+      duplicate: false,
+    };
+  }
+}
+
 function standaloneContext(): DeviceContext {
   let deviceId = localStorage.getItem(standaloneDeviceKey);
   if (!deviceId) {

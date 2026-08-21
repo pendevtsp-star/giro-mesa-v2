@@ -4,6 +4,7 @@ import {
   Card,
   EmptyState,
   Icon,
+  NativeSelect,
   SearchField,
   SegmentedTabs,
   StatCard,
@@ -44,6 +45,7 @@ export type InventoryDialog =
   | "returnable-incident"
   | "returnable-review"
   | "returnable-supplier-exchange"
+  | "returnable-supplier-resolution"
   | "inventory-review"
   | "transfer-resolution"
   | "asset"
@@ -54,7 +56,9 @@ export type InventoryDialog =
   | "production-complete"
   | "interunit-transfer"
   | "interunit-receive"
-  | "closing";
+  | "closing"
+  | "location-item-setting"
+  | "issue-route";
 
 const kindLabels: Record<InventoryItemKind, string> = {
   ingredient: "Insumo",
@@ -127,6 +131,7 @@ export function InventoryWorkspace({
   canResolveTransfers,
   canManageAssets,
   onReviewReturnableIncident,
+  onResolveSupplierExchange,
   onReviewInventoryRequest,
   onResolveTransfer,
   onEditAsset,
@@ -138,6 +143,7 @@ export function InventoryWorkspace({
   onGenerateCyclePlan,
   scannedCode,
   recipes,
+  realtimeStatus,
 }: {
   data: InventoryData;
   currentUnitId: string;
@@ -155,6 +161,7 @@ export function InventoryWorkspace({
   canResolveTransfers: boolean;
   canManageAssets: boolean;
   onReviewReturnableIncident: (incidentId: string) => void;
+  onResolveSupplierExchange: (exchangeId: string) => void;
   onReviewInventoryRequest: (requestId: string) => void;
   onResolveTransfer: (transferId: string) => void;
   onEditAsset: (assetId: string) => void;
@@ -166,6 +173,7 @@ export function InventoryWorkspace({
   onGenerateCyclePlan: () => void;
   scannedCode?: string;
   recipes: ReactNode;
+  realtimeStatus: "connecting" | "live" | "polling";
 }) {
   const [query, setQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -183,6 +191,18 @@ export function InventoryWorkspace({
     () => new Map(data.locations.map((location) => [location.id, location])),
     [data.locations],
   );
+  const returnableSectorPositions = [
+    ...new Set(
+      [
+        ...(data.physicalByLocation ?? []),
+        ...(data.custodyByLocation ?? []),
+        ...(data.fullContainersByLocation ?? []),
+      ].map((position) => `${position.inventoryItemId}:${position.locationId}`),
+    ),
+  ].map((key) => {
+    const [inventoryItemId, locationId] = key.split(":");
+    return { inventoryItemId: inventoryItemId ?? "", locationId: locationId ?? "" };
+  });
   const summaries = useMemo<ItemSummary[]>(
     () =>
       data.items.map((item) => {
@@ -276,6 +296,13 @@ export function InventoryWorkspace({
       </section>
 
       <div className="inventory-command-bar gm-toolbar">
+        <Badge tone={realtimeStatus === "live" ? "success" : "warning"}>
+          {realtimeStatus === "live"
+            ? "Saldo ao vivo"
+            : realtimeStatus === "polling"
+              ? "Atualização periódica"
+              : "Conectando"}
+        </Badge>
         <SegmentedTabs
           active={view}
           items={[
@@ -437,7 +464,7 @@ export function InventoryWorkspace({
                   .filter((summary) => summary.zero || summary.low)
                   .slice(0, 8)
                   .map((summary) => (
-                    <button
+                    <Button
                       key={summary.item.id}
                       onClick={() => {
                         setStatusFilter(summary.zero ? "zero" : "low");
@@ -459,7 +486,7 @@ export function InventoryWorkspace({
                           {summary.quantity.toLocaleString("pt-BR")} {summary.item.unit}
                         </strong>
                       </span>
-                    </button>
+                    </Button>
                   ))}
               </div>
             ) : (
@@ -485,7 +512,7 @@ export function InventoryWorkspace({
                 {expiringLots.slice(0, 8).map((lot) => {
                   const state = expiryState(lot.expiresAt);
                   return (
-                    <button key={lot.id} onClick={() => onViewChange("lots")} type="button">
+                    <Button key={lot.id} onClick={() => onViewChange("lots")} type="button">
                       <span>
                         <strong>{itemById.get(lot.inventoryItemId)?.name ?? "Item"}</strong>
                         <small>
@@ -496,7 +523,7 @@ export function InventoryWorkspace({
                         <Badge tone={state.tone}>{state.label}</Badge>
                         <strong>{lot.quantity.toLocaleString("pt-BR")}</strong>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -519,6 +546,127 @@ export function InventoryWorkspace({
               </Button>
             </div>
             <MovementList data={data} limit={6} />
+          </Card>
+          <Card className="inventory-data-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Fluxo físico por setor</p>
+                <h2>Cheios, vazios e fornecedor</h2>
+              </div>
+            </div>
+            <div className="inventory-settings-list">
+              {returnableSectorPositions.map((position) => {
+                const physical =
+                  (data.physicalByLocation ?? []).find(
+                    (value) =>
+                      value.inventoryItemId === position.inventoryItemId &&
+                      value.locationId === position.locationId,
+                  )?.physicalQuantity ?? 0;
+                const full =
+                  (data.fullContainersByLocation ?? []).find(
+                    (value) =>
+                      value.inventoryItemId === position.inventoryItemId &&
+                      value.locationId === position.locationId,
+                  )?.quantity ?? 0;
+                const expected =
+                  (data.custodyByLocation ?? []).find(
+                    (value) =>
+                      value.inventoryItemId === position.inventoryItemId &&
+                      value.locationId === position.locationId,
+                  )?.expectedQuantity ?? 0;
+                return (
+                  <div key={`${position.inventoryItemId}:${position.locationId}`}>
+                    <span>
+                      <strong>{itemById.get(position.inventoryItemId)?.name ?? "Vasilhame"}</strong>
+                      <small>{locationById.get(position.locationId)?.name ?? "Setor"}</small>
+                    </span>
+                    <span>
+                      <small>Cheios equivalentes {full.toLocaleString("pt-BR")}</small>
+                      <small>Retorno previsto {expected.toLocaleString("pt-BR")}</small>
+                      <strong>Vazios {physical.toLocaleString("pt-BR")}</strong>
+                    </span>
+                  </div>
+                );
+              })}
+              {(data.supplierExchanges ?? [])
+                .filter((exchange) => exchange.status === "in_transit")
+                .map((exchange) => (
+                  <div key={exchange.id}>
+                    <span>
+                      <strong>
+                        Fornecedor · {itemById.get(exchange.inventoryItemId)?.name ?? "Vasilhame"}
+                      </strong>
+                      <small>
+                        {exchange.quantity.toLocaleString("pt-BR")} em trânsito desde{" "}
+                        {dateLabel(exchange.sentAt)}
+                      </small>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onResolveSupplierExchange(exchange.id)}
+                    >
+                      Conferir retorno
+                    </Button>
+                  </div>
+                ))}
+              {(data.lossIndicators ?? []).map((indicator) => (
+                <div key={`${indicator.kind}:${indicator.locationId ?? "all"}`}>
+                  <span>
+                    <strong>{indicator.kind.replaceAll("_", " ")}</strong>
+                    <small>
+                      {locationById.get(indicator.locationId ?? "")?.name ?? "Todos os setores"} ·{" "}
+                      {indicator.incidentCount} ocorrência(s)
+                    </small>
+                  </span>
+                  <Badge tone="danger">
+                    {indicator.quantity.toLocaleString("pt-BR")} ·{" "}
+                    {formatMoney(indicator.estimatedCostCents)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="inventory-priority-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Mínimo por setor</p>
+                <h2>Reposição interna sugerida</h2>
+              </div>
+              <Badge tone={data.sectorReplenishmentSuggestions.length ? "warning" : "success"}>
+                {data.sectorReplenishmentSuggestions.length}
+              </Badge>
+            </div>
+            {data.sectorReplenishmentSuggestions.length ? (
+              <div className="inventory-priority-list">
+                {data.sectorReplenishmentSuggestions.map((suggestion) => (
+                  <article
+                    key={`${suggestion.inventoryItemId}:${suggestion.destinationLocationId}`}
+                  >
+                    <span>
+                      <strong>{itemById.get(suggestion.inventoryItemId)?.name ?? "Item"}</strong>
+                      <small>
+                        {locationById.get(suggestion.sourceLocationId)?.name ?? "Origem"} →{" "}
+                        {locationById.get(suggestion.destinationLocationId)?.name ?? "Destino"}
+                      </small>
+                    </span>
+                    <strong>
+                      {suggestion.suggestedQuantity.toLocaleString("pt-BR")}{" "}
+                      {suggestion.transferUnitLabel ?? "un"}
+                    </strong>
+                    <Button size="sm" variant="secondary" onClick={() => onOpen("transfer")}>
+                      Transferir
+                    </Button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Setores abastecidos"
+                description="Nenhum setor está abaixo do mínimo configurado."
+                icon="✓"
+              />
+            )}
           </Card>
         </div>
       )}
@@ -854,7 +1002,7 @@ export function InventoryWorkspace({
                 placeholder="Buscar item, SKU ou código"
                 value={query}
               />
-              <select
+              <NativeSelect
                 aria-label="Filtrar por tipo de item"
                 onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
                 value={kindFilter}
@@ -865,8 +1013,8 @@ export function InventoryWorkspace({
                     {label}
                   </option>
                 ))}
-              </select>
-              <select
+              </NativeSelect>
+              <NativeSelect
                 aria-label="Filtrar por local"
                 onChange={(event) => setLocationFilter(event.target.value)}
                 value={locationFilter}
@@ -877,8 +1025,8 @@ export function InventoryWorkspace({
                     {location.name}
                   </option>
                 ))}
-              </select>
-              <select
+              </NativeSelect>
+              <NativeSelect
                 aria-label="Filtrar por situação"
                 onChange={(event) => setStatusFilter(event.target.value)}
                 value={statusFilter}
@@ -888,7 +1036,7 @@ export function InventoryWorkspace({
                 <option value="low">Abaixo do mínimo</option>
                 <option value="normal">Normais</option>
                 <option value="inactive">Inativos</option>
-              </select>
+              </NativeSelect>
             </div>
           </div>
           {visibleSummaries.length ? (
@@ -1107,9 +1255,26 @@ export function InventoryWorkspace({
                       {locationById.get(transfer.destinationLocationId)?.name ?? "Destino"}
                     </small>
                     <small>{transfer.reason}</small>
+                    <small>
+                      Enviada por {transfer.sentByName ?? "usuário"} · prazo{" "}
+                      {dateLabel(transfer.deadlineAt)}
+                    </small>
                   </span>
                   <span>
-                    <strong>{transfer.quantity.toLocaleString("pt-BR")}</strong>
+                    <strong>
+                      {(
+                        transfer.quantity -
+                        transfer.quantityReceived -
+                        transfer.quantityDivergent
+                      ).toLocaleString("pt-BR")}{" "}
+                      em trânsito
+                    </strong>
+                    {(transfer.quantityReceived > 0 || transfer.quantityDivergent > 0) && (
+                      <small>
+                        Recebido {transfer.quantityReceived.toLocaleString("pt-BR")} · divergente{" "}
+                        {transfer.quantityDivergent.toLocaleString("pt-BR")}
+                      </small>
+                    )}
                     <small>{dateLabel(transfer.createdAt)}</small>
                   </span>
                   <Badge
@@ -1118,24 +1283,31 @@ export function InventoryWorkspace({
                         ? "success"
                         : transfer.status === "canceled"
                           ? "neutral"
-                          : "warning"
+                          : transfer.status === "divergent"
+                            ? "danger"
+                            : "warning"
                     }
                   >
                     {transfer.status === "received"
                       ? "Recebida"
                       : transfer.status === "canceled"
                         ? "Cancelada"
-                        : "Em trânsito"}
+                        : transfer.status === "divergent"
+                          ? "Com divergência"
+                          : transfer.status === "partially_received"
+                            ? "Parcial"
+                            : "Em trânsito"}
                   </Badge>
-                  {transfer.status === "in_transit" && canResolveTransfers && (
-                    <Button
-                      onClick={() => onResolveTransfer(transfer.id)}
-                      size="sm"
-                      variant="secondary"
-                    >
-                      Conferir
-                    </Button>
-                  )}
+                  {(transfer.status === "in_transit" || transfer.status === "partially_received") &&
+                    canResolveTransfers && (
+                      <Button
+                        onClick={() => onResolveTransfer(transfer.id)}
+                        size="sm"
+                        variant="secondary"
+                      >
+                        Conferir
+                      </Button>
+                    )}
                 </article>
               ))}
             </div>
@@ -1368,7 +1540,9 @@ export function InventoryWorkspace({
                 <div key={location.id}>
                   <span>
                     <strong>{location.name}</strong>
-                    <small>{location.code}</small>
+                    <small>
+                      {location.code} · {location.kind} · SLA {location.transferSlaMinutes} min
+                    </small>
                   </span>
                   <Badge tone={location.active ? "success" : "neutral"}>
                     {location.active ? "Ativo" : "Inativo"}
@@ -1414,6 +1588,54 @@ export function InventoryWorkspace({
                       Inativar
                     </Button>
                   )}
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="inventory-data-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Operação por setor</p>
+                <h2>Rotas e reposição</h2>
+              </div>
+              <div className="inventory-inline-actions">
+                <Button
+                  onClick={() => onOpen("location-item-setting")}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Meta por setor
+                </Button>
+                <Button onClick={() => onOpen("issue-route")} size="sm">
+                  Rota de venda
+                </Button>
+              </div>
+            </div>
+            <div className="inventory-settings-list">
+              {data.locationItemSettings.map((setting) => (
+                <div key={`${setting.locationId}:${setting.inventoryItemId}`}>
+                  <span>
+                    <strong>{itemById.get(setting.inventoryItemId)?.name ?? "Item"}</strong>
+                    <small>
+                      {locationById.get(setting.locationId)?.name ?? "Setor"} · mín.{" "}
+                      {setting.minimumQuantity} · meta {setting.targetQuantity}
+                    </small>
+                  </span>
+                  <Badge tone="info">Reposição</Badge>
+                </div>
+              ))}
+              {data.issueRoutes.map((route) => (
+                <div key={route.id}>
+                  <span>
+                    <strong>
+                      {data.items.find((item) => item.productId === route.productId)?.name ??
+                        "Produto"}
+                    </strong>
+                    <small>Baixa em {locationById.get(route.locationId)?.name ?? "Setor"}</small>
+                  </span>
+                  <Badge tone={route.active ? "success" : "neutral"}>
+                    {route.active ? "Ativa" : "Inativa"}
+                  </Badge>
                 </div>
               ))}
             </div>

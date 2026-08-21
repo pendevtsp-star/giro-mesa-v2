@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { auditEvents, type Database, managementReportExports, outboxEvents } from "@giromesa/db";
+import {
+  auditEvents,
+  buildReportArtifact,
+  type Database,
+  managementReportExports,
+  outboxEvents,
+  parseReportCsv,
+} from "@giromesa/db";
 import { hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
 import { sql } from "drizzle-orm";
 
@@ -16,7 +23,10 @@ type ReportFamily =
   | "operations"
   | "profitability"
   | "multiunit"
-  | "quality";
+  | "quality"
+  | "labor"
+  | "reconciliation"
+  | "forecast";
 
 interface DueReportSchedule extends Record<string, unknown> {
   id: string;
@@ -29,6 +39,7 @@ interface DueReportSchedule extends Record<string, unknown> {
   range: ReportRange;
   comparison_mode: string;
   family: ReportFamily;
+  format: "csv" | "pdf" | "xlsx";
   delivery: "in_app" | "email";
   recipient_identity_id: string | null;
   scheduled_for: Date | string;
@@ -444,7 +455,10 @@ export function buildScheduledReportCsv(
       ]),
     ),
     ...(report.familyRows ?? [])
-      .filter((row) => query.includeCosts || !["inventory", "profitability"].includes(row.section))
+      .filter(
+        (row) =>
+          query.includeCosts || !["inventory", "profitability", "labor"].includes(row.section),
+      )
       .map((row) => [
         `familia_${row.section}`,
         null,
@@ -477,6 +491,9 @@ export function buildScheduledReportCsv(
     profitability: new Set(["dre", "familia_profitability"]),
     multiunit: new Set(["familia_multiunit"]),
     quality: new Set(["familia_quality"]),
+    labor: new Set(["familia_labor"]),
+    reconciliation: new Set(["familia_reconciliation"]),
+    forecast: new Set(["familia_forecast"]),
   };
   const selected =
     family === "overview"
@@ -507,6 +524,7 @@ export async function processDueReportSchedules(
              schedules.range,
              schedules.comparison_mode,
              schedules.family,
+             schedules.format,
              schedules.delivery,
              schedules.recipient_identity_id,
              schedules.next_run_at as scheduled_for,
@@ -688,6 +706,21 @@ export async function processDueReportSchedules(
               and timezone(${schedule.timezone}, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
             group by products.id, products.name
             union all
+            select 'labor', 'worked_minutes', 'Minutos trabalhados',
+                   coalesce(round(sum(extract(epoch from (entries.clocked_out_at - entries.clocked_in_at)) / 60.0)), 0)::int,
+                   coalesce(round(sum(extract(epoch from (entries.clocked_out_at - entries.clocked_in_at)) / 60.0 * people.hourly_rate_cents / 60.0)), 0)::bigint
+            from management_time_entries entries
+            inner join management_people people on people.organization_id = entries.organization_id and people.unit_id = entries.unit_id and people.id = entries.person_id
+            where entries.organization_id = ${schedule.organization_id} and entries.unit_id = ${schedule.unit_id} and entries.clocked_out_at is not null
+              and timezone(${schedule.timezone}, entries.clocked_in_at)::date between ${period.from}::date and ${period.to}::date
+            union all
+            select 'reconciliation', 'fiscal_authorized', 'Documentos fiscais autorizados',
+                   count(*) filter (where status = 'authorized')::int,
+                   coalesce(sum(total_cents) filter (where status = 'authorized'), 0)::bigint
+            from fiscal_documents
+            where organization_id = ${schedule.organization_id} and unit_id = ${schedule.unit_id}
+              and timezone(${schedule.timezone}, issued_at)::date between ${period.from}::date and ${period.to}::date
+            union all
             select 'quality', 'sold_items_without_cost', 'Itens vendidos sem custo histÃ³rico', count(*)::int, 0::bigint
             from pos_order_items items
             inner join pos_orders orders on orders.organization_id = items.organization_id and orders.unit_id = items.unit_id and orders.id = items.order_id
@@ -748,6 +781,17 @@ export async function processDueReportSchedules(
           return byChannel;
         }, new Map())
         .values();
+      if (schedule.family === "forecast") {
+        const sampleDays = new Set(aggregate.map((row) => row.date)).size;
+        const revenue = aggregate.reduce((sum, row) => sum + Number(row.revenue_cents), 0);
+        familyRows.push({
+          section: "forecast",
+          key: "revenue_7_days",
+          label: "Previsão de receita em 7 dias",
+          quantity: sampleDays,
+          revenue_cents: sampleDays > 0 ? Math.round((revenue / sampleDays) * 7) : 0,
+        });
+      }
       const report: ScheduledReportData = {
         sales: [...aggregate],
         cashFlow: {
@@ -777,11 +821,25 @@ export async function processDueReportSchedules(
         range: schedule.range,
         comparisonMode: schedule.comparison_mode,
         family: schedule.family,
+        format: schedule.format,
         includeCosts,
       };
-      const content = buildScheduledReportCsv(query, report);
-      const sha256 = reportContentSha256(content);
-      const rowCount = Math.max(0, content.split("\r\n").length - 1);
+      const csvContent = buildScheduledReportCsv(query, report);
+      const rows = parseReportCsv(csvContent);
+      const artifact =
+        schedule.format === "csv"
+          ? {
+              content: csvContent,
+              contentEncoding: "utf8" as const,
+              mimeType: "text/csv; charset=utf-8",
+              sha256: reportContentSha256(csvContent),
+            }
+          : buildReportArtifact(
+              schedule.format,
+              rows,
+              `Relatório GiroMesa ${period.from} a ${period.to}`,
+            );
+      const rowCount = rows.length;
       const idempotencyKey = `report-schedule:${schedule.id}:${scheduledFor.toISOString()}`;
       const [reportExport] = await tx
         .insert(managementReportExports)
@@ -791,10 +849,12 @@ export async function processDueReportSchedules(
           scheduleId: schedule.id,
           idempotencyKey,
           query,
-          content,
+          content: artifact.content,
+          contentEncoding: artifact.contentEncoding,
+          mimeType: artifact.mimeType,
           status: "ready",
-          format: "csv",
-          sha256,
+          format: schedule.format,
+          sha256: artifact.sha256,
           rowCount,
           scheduledFor,
           completedAt: now,
@@ -836,8 +896,8 @@ export async function processDueReportSchedules(
         metadata: {
           scheduleId: schedule.id,
           scheduledFor: scheduledFor.toISOString(),
-          format: "csv",
-          sha256,
+          format: schedule.format,
+          sha256: artifact.sha256,
           rowCount,
         },
       });

@@ -752,6 +752,7 @@
   background: transparent;
   border: 0;
   border-radius: 999px;
+  color: var(--gm-ink);
   cursor: pointer;
   font-size: 0.7rem;
   font-weight: 750;

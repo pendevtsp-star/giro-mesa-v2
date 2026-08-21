@@ -4,6 +4,8 @@ import {
   auditEvents,
   type Database,
   identities,
+  managementOperationalLosses,
+  managementSettlementSettings,
   memberships,
   organizations,
   outboxEvents,
@@ -16,6 +18,7 @@ import {
   posKdsAttentionAcknowledgements,
   posKdsBatchAssignments,
   posKdsBatches,
+  posKdsItemChanges,
   posKdsTerminalProfiles,
   posKdsTicketItems,
   posKdsTickets,
@@ -34,6 +37,7 @@ import {
   posProductPrices,
   posProductStations,
   posProducts,
+  posRecipeComponents,
   posServiceCalls,
   posServiceSections,
   posServiceSectionTables,
@@ -46,6 +50,7 @@ import {
   posTabPayments,
   posTabPresence,
   posTabs,
+  posTerminalProfiles,
   reservations,
   roleBindings,
   units,
@@ -105,6 +110,7 @@ import type {
   KdsBatchCreateInput,
   KdsBlockInput,
   KdsCancelInput,
+  KdsChangeAcknowledgeInput,
   KdsCourseStateInput,
   KdsItemStateInput,
   KdsOrderHandoffInput,
@@ -114,8 +120,10 @@ import type {
   KdsRecallInput,
   KdsRefireInput,
   KdsRerouteInput,
+  KdsRunnerClaimInput,
   KdsStateInput,
   KdsTerminalProfileInput,
+  KdsTicketClaimInput,
   KdsUnblockInput,
   ManagerPinInput,
   MergeTabsInput,
@@ -143,6 +151,7 @@ import type {
   TableInput,
   TableTurnoverInput,
   TemporaryTableTransferInput,
+  TerminalProfileInput,
   TipInput,
   TransferTabInput,
   UpdateTabInput,
@@ -3487,8 +3496,23 @@ export class PilotPosService {
               eq(posTabPayments.tabId, tabId),
             ),
           );
+        const [lossTotals] = await tx
+          .select({
+            lossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}), 0)`,
+          })
+          .from(managementOperationalLosses)
+          .where(
+            and(
+              eq(managementOperationalLosses.organizationId, organizationId),
+              eq(managementOperationalLosses.unitId, unitId),
+              eq(managementOperationalLosses.tabId, tabId),
+              eq(managementOperationalLosses.status, "approved"),
+              eq(managementOperationalLosses.type, "unpaid_tab"),
+            ),
+          );
         const paidCents = Number(paymentTotals[0]?.paidCents ?? 0);
-        assertTabCanClose(tab.totalCents, paidCents);
+        const operationalLossCents = Number(lossTotals?.lossCents ?? 0);
+        assertTabCanClose(tab.totalCents, paidCents + operationalLossCents);
         const now = new Date();
         const [closed] = await tx
           .update(posTabs)
@@ -3575,6 +3599,7 @@ export class PilotPosService {
         }
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.closed", {
           paidCents,
+          operationalLossCents,
           printRequested: input.printRequested,
           releasedTableIds,
           turnoverStatus: releasedTableIds.length > 0 ? "needs_cleaning" : null,
@@ -3587,7 +3612,7 @@ export class PilotPosService {
               printerId: input.printOptions?.printerId,
             })
           : null;
-        return { tab: closed, paidCents, printJob };
+        return { tab: closed, paidCents, operationalLossCents, printJob };
       },
     );
   }
@@ -4389,6 +4414,7 @@ export class PilotPosService {
           .select({
             productId: posProductStations.productId,
             stationId: posProductStations.stationId,
+            stage: posProductStations.stage,
             active: posProductionStations.active,
           })
           .from(posProductStations)
@@ -4423,6 +4449,7 @@ export class PilotPosService {
           .select({
             productId: posProductStations.productId,
             stationId: posProductStations.stationId,
+            stage: posProductStations.stage,
             active: posProductionStations.active,
           })
           .from(posProductStations)
@@ -4443,9 +4470,11 @@ export class PilotPosService {
           )
           .orderBy(asc(posProductStations.productId), asc(posProductStations.stationId));
         const initialRouteKeys = initialRoutes.map(
-          (route) => `${route.productId}:${route.stationId}`,
+          (route) => `${route.productId}:${route.stationId}:${route.stage}`,
         );
-        const currentRouteKeys = routes.map((route) => `${route.productId}:${route.stationId}`);
+        const currentRouteKeys = routes.map(
+          (route) => `${route.productId}:${route.stationId}:${route.stage}`,
+        );
         if (
           currentRouteKeys.length !== initialRouteKeys.length ||
           currentRouteKeys.some((route, index) => route !== initialRouteKeys[index])
@@ -4456,11 +4485,13 @@ export class PilotPosService {
           throw new ConflictException({ code: "ORDER_HAS_INACTIVE_STATION" });
         }
         const stationIdsByProduct = new Map<string, string[]>();
+        const stageByProductStation = new Map<string, number>();
         for (const route of routes) {
           stationIdsByProduct.set(route.productId, [
             ...(stationIdsByProduct.get(route.productId) ?? []),
             route.stationId,
           ]);
+          stageByProductStation.set(`${route.productId}:${route.stationId}`, route.stage);
         }
         const stationIds = [...new Set(routes.map((route) => route.stationId))].sort();
         const now = new Date();
@@ -4517,7 +4548,18 @@ export class PilotPosService {
           const stationDispatch = stationItems.map((item) => ({
             item,
             ...initialKdsCourseDispatch(serviceMode, item.course),
+            stage: stageByProductStation.get(`${item.productId}:${stationId}`) ?? 1,
           }));
+          const minimumStageByItem = new Map(
+            stationItems.map((item) => [
+              item.id,
+              Math.min(
+                ...routes
+                  .filter((route) => route.productId === item.productId)
+                  .map((route) => route.stage),
+              ),
+            ]),
+          );
           const estimatedMinutes = Math.max(
             0,
             ...stationDispatch
@@ -4542,7 +4584,8 @@ export class PilotPosService {
           if (!ticket) throw new Error("KDS ticket insert did not return a row");
           ticketIds.push(ticket.id);
           await tx.insert(posKdsTicketItems).values(
-            stationDispatch.map(({ item, held }) => {
+            stationDispatch.map(({ item, held: courseHeld, stage }) => {
+              const dependencyHeld = stage > (minimumStageByItem.get(item.id) ?? 1);
               return {
                 organizationId,
                 unitId,
@@ -4550,9 +4593,12 @@ export class PilotPosService {
                 orderItemId: item.id,
                 quantity: item.quantity,
                 status: "queued" as const,
-                held,
-                heldAt: held ? now : null,
-                firedAt: held ? null : now,
+                stage,
+                courseHeld,
+                dependencyHeld,
+                held: courseHeld || dependencyHeld,
+                heldAt: courseHeld || dependencyHeld ? now : null,
+                firedAt: courseHeld || dependencyHeld ? null : now,
               };
             }),
           );
@@ -6289,6 +6335,22 @@ export class PilotPosService {
             ),
           );
         if (ticketIds.length > 0) {
+          await tx.insert(posKdsItemChanges).values(
+            ticketIds.map((ticketId) => ({
+              organizationId,
+              unitId,
+              ticketId,
+              orderItemId: itemId,
+              kind: "removed",
+              revision: createHash("sha256")
+                .update(`${ticketId}:removed:${itemId}:${now.toISOString()}`)
+                .digest("hex"),
+              summary: `${row.item.productName} foi cancelado após o envio`,
+              details: { reason: input.approval.reason, quantity: row.item.quantity },
+              createdByIdentityId: identityId,
+              createdAt: now,
+            })),
+          );
           await tx
             .update(posKdsTicketItems)
             .set({
@@ -6857,6 +6919,13 @@ export class PilotPosService {
       automaticThrottling: false,
       terminalProfileRead: true,
       terminalProfileManage: true,
+      sequentialStages: true,
+      ticketClaim: true,
+      orderChanges: true,
+      runnerHandoff: true,
+      productionGrid: true,
+      recipes: true,
+      demandControl: true,
     };
     const rows = await executor
       .select({
@@ -6874,6 +6943,9 @@ export class PilotPosService {
           priorityReason: posOrders.kdsPriorityReason,
           priorityUpdatedAt: posOrders.kdsPriorityUpdatedAt,
           priorityUpdatedByIdentityId: posOrders.kdsPriorityUpdatedByIdentityId,
+          runnerIdentityId: posOrders.runnerIdentityId,
+          runnerClaimedAt: posOrders.runnerClaimedAt,
+          runnerPickedUpAt: posOrders.runnerPickedUpAt,
         },
         tab: {
           id: posTabs.id,
@@ -6938,6 +7010,16 @@ export class PilotPosService {
         : 0;
       return {
         ...ticket,
+        claimedByInstallationId:
+          ticket.claimExpiresAt && ticket.claimExpiresAt > capturedAt
+            ? ticket.claimedByInstallationId
+            : null,
+        claimedAt:
+          ticket.claimExpiresAt && ticket.claimExpiresAt > capturedAt ? ticket.claimedAt : null,
+        claimExpiresAt:
+          ticket.claimExpiresAt && ticket.claimExpiresAt > capturedAt
+            ? ticket.claimExpiresAt
+            : null,
         rush: ticket.priority >= 50,
         station,
         order,
@@ -6988,6 +7070,35 @@ export class PilotPosService {
               ),
             )
             .orderBy(asc(posOrderItemModifiers.name));
+    const productIds = [...new Set(assignmentRows.map(({ item }) => item.productId))];
+    const recipeRows =
+      productIds.length === 0
+        ? []
+        : await executor
+            .select()
+            .from(posRecipeComponents)
+            .where(
+              and(
+                eq(posRecipeComponents.organizationId, organizationId),
+                inArray(posRecipeComponents.productId, productIds),
+              ),
+            )
+            .orderBy(asc(posRecipeComponents.ingredientName));
+    const changeRows =
+      ticketIds.length === 0
+        ? []
+        : await executor
+            .select()
+            .from(posKdsItemChanges)
+            .where(
+              and(
+                eq(posKdsItemChanges.organizationId, organizationId),
+                eq(posKdsItemChanges.unitId, unitId),
+                inArray(posKdsItemChanges.ticketId, ticketIds),
+              ),
+            )
+            .orderBy(desc(posKdsItemChanges.createdAt))
+            .limit(1_000);
     const acknowledgementRows =
       ticketIds.length === 0 || orderItemIds.length === 0
         ? []
@@ -7011,6 +7122,8 @@ export class PilotPosService {
       kds: {
         quantity: assignment.quantity,
         readyQuantity: assignment.readyQuantity,
+        stage: assignment.stage,
+        dependencyHeld: assignment.dependencyHeld,
         status: assignment.status,
         held: assignment.held,
         heldAt: assignment.heldAt,
@@ -7045,6 +7158,18 @@ export class PilotPosService {
         };
       }),
       modifiers: modifierRows.filter((modifier) => modifier.orderItemId === item.id),
+      recipe: recipeRows
+        .filter((component) => component.productId === item.productId)
+        .map(({ id, ingredientName, quantityMilli, unit, lossBasisPoints }) => ({
+          id,
+          ingredientName,
+          quantityMilli,
+          unit,
+          lossBasisPoints,
+        })),
+      changes: changeRows.filter(
+        (change) => change.ticketId === assignment.ticketId && change.orderItemId === item.id,
+      ),
     }));
     const historySince = new Date(capturedAt.getTime() - 28 * 24 * 60 * 60_000);
     const historicalWhere = [
@@ -7421,6 +7546,47 @@ export class PilotPosService {
       p90PrepMinutes: prepMetrics.p90,
       sampleSize: prepMetrics.sampleSize,
     };
+    const productionGrid = allDay.map((summary) => ({
+      ...summary,
+      assignments: items
+        .filter(
+          (entry) =>
+            entry.productId === summary.productId &&
+            stationByTicket.get(entry.ticketId) === summary.stationId,
+        )
+        .map((entry) => ({
+          ticketId: entry.ticketId,
+          orderItemId: entry.item.id,
+          reference:
+            readTickets.find((ticket) => ticket.id === entry.ticketId)?.tab.label ?? entry.ticketId,
+          quantity: entry.kds.quantity,
+          readyQuantity: entry.kds.readyQuantity,
+          status: entry.kds.status,
+          stage: entry.kds.stage,
+        })),
+    }));
+    const recommendationRank = { normal: 0, strained: 1, overloaded: 2 } as const;
+    const demandState = stations.reduce<"normal" | "strained" | "overloaded">(
+      (current, station) =>
+        recommendationRank[station.capacity.recommendation.state] > recommendationRank[current]
+          ? station.capacity.recommendation.state
+          : current,
+      "normal",
+    );
+    const suggestedDelayMinutes = Math.max(
+      0,
+      ...stations.map((station) => station.capacity.recommendation.suggestedDelayMinutes ?? 0),
+    );
+    const demand = {
+      state: demandState,
+      suggestedDelayMinutes,
+      automatic: false,
+      channels: (["dine_in", "pickup", "delivery"] as const).map((channel) => ({
+        channel,
+        activeOrders: tickets.filter((ticket) => ticket.tab.fulfillmentType === channel).length,
+        suggestedDelayMinutes,
+      })),
+    };
     const stableTicketForRevision = (ticket: (typeof tickets)[number]) => {
       const {
         sla: _sla,
@@ -7444,6 +7610,8 @@ export class PilotPosService {
           })),
           allDay,
           batches,
+          productionGrid,
+          demand,
           productAvailability,
           metrics: {
             total: metrics.total,
@@ -7476,7 +7644,189 @@ export class PilotPosService {
       productAvailability,
       allDay,
       batches,
+      productionGrid,
+      demand,
     };
+  }
+
+  async claimKdsTicket(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    ticketId: string,
+    idempotencyKey: string,
+    input: KdsTicketClaimInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "kds.ticket.claim",
+      { ticketId, ...input },
+      async (tx) => {
+        const ticket = await this.requireLockedKdsTicket(tx, organizationId, unitId, ticketId);
+        const [terminal] = await tx
+          .select({ installationId: posKdsTerminalProfiles.installationId })
+          .from(posKdsTerminalProfiles)
+          .where(
+            and(
+              eq(posKdsTerminalProfiles.organizationId, organizationId),
+              eq(posKdsTerminalProfiles.unitId, unitId),
+              eq(posKdsTerminalProfiles.installationId, input.installationId),
+              eq(posKdsTerminalProfiles.mode, "station"),
+              eq(posKdsTerminalProfiles.stationId, ticket.stationId),
+            ),
+          )
+          .limit(1);
+        if (!terminal) throw new ForbiddenException({ code: "KDS_TERMINAL_STATION_MISMATCH" });
+        const now = new Date();
+        if (
+          ticket.claimedByInstallationId &&
+          ticket.claimedByInstallationId !== input.installationId &&
+          ticket.claimExpiresAt &&
+          ticket.claimExpiresAt > now
+        ) {
+          throw new ConflictException({
+            code: "KDS_TICKET_CLAIMED",
+            claimedByInstallationId: ticket.claimedByInstallationId,
+            claimExpiresAt: ticket.claimExpiresAt,
+          });
+        }
+        const claimExpiresAt = new Date(now.getTime() + input.leaseSeconds * 1_000);
+        await tx
+          .update(posKdsTickets)
+          .set({
+            claimedByInstallationId: input.installationId,
+            claimedAt: now,
+            claimExpiresAt,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(posKdsTickets.organizationId, organizationId),
+              eq(posKdsTickets.unitId, unitId),
+              eq(posKdsTickets.id, ticketId),
+            ),
+          );
+        await this.recordKdsAction(tx, identityId, organizationId, unitId, ticketId, "claimed", {
+          installationId: input.installationId,
+          claimExpiresAt,
+        });
+        return { ticketId, installationId: input.installationId, claimedAt: now, claimExpiresAt };
+      },
+    );
+  }
+
+  async releaseKdsTicketClaim(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    ticketId: string,
+    idempotencyKey: string,
+    input: KdsTicketClaimInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "kds.ticket.claim.release",
+      { ticketId, installationId: input.installationId },
+      async (tx) => {
+        const ticket = await this.requireLockedKdsTicket(tx, organizationId, unitId, ticketId);
+        if (
+          ticket.claimedByInstallationId &&
+          ticket.claimedByInstallationId !== input.installationId
+        ) {
+          throw new ConflictException({ code: "KDS_TICKET_CLAIMED_BY_ANOTHER_TERMINAL" });
+        }
+        const now = new Date();
+        await tx
+          .update(posKdsTickets)
+          .set({
+            claimedByInstallationId: null,
+            claimedAt: null,
+            claimExpiresAt: null,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(posKdsTickets.organizationId, organizationId),
+              eq(posKdsTickets.unitId, unitId),
+              eq(posKdsTickets.id, ticketId),
+            ),
+          );
+        await this.recordKdsAction(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          ticketId,
+          "claim_released",
+          {
+            installationId: input.installationId,
+          },
+        );
+        return { ticketId, releasedAt: now };
+      },
+    );
+  }
+
+  async acknowledgeKdsChange(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    ticketId: string,
+    changeId: string,
+    idempotencyKey: string,
+    input: KdsChangeAcknowledgeInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "kds.change.acknowledge",
+      { ticketId, changeId, ...input },
+      async (tx) => {
+        await this.requireLockedKdsTicket(tx, organizationId, unitId, ticketId);
+        const [change] = await tx
+          .select()
+          .from(posKdsItemChanges)
+          .where(
+            and(
+              eq(posKdsItemChanges.organizationId, organizationId),
+              eq(posKdsItemChanges.unitId, unitId),
+              eq(posKdsItemChanges.ticketId, ticketId),
+              eq(posKdsItemChanges.id, changeId),
+            ),
+          )
+          .limit(1);
+        if (!change) throw new NotFoundException({ code: "KDS_CHANGE_NOT_FOUND" });
+        if (change.revision !== input.revision) {
+          throw new ConflictException({ code: "KDS_CHANGE_REVISION_CHANGED" });
+        }
+        const acknowledgedAt = change.acknowledgedAt ?? new Date();
+        if (!change.acknowledgedAt) {
+          await tx
+            .update(posKdsItemChanges)
+            .set({ acknowledgedAt, acknowledgedByIdentityId: identityId })
+            .where(
+              and(
+                eq(posKdsItemChanges.organizationId, organizationId),
+                eq(posKdsItemChanges.unitId, unitId),
+                eq(posKdsItemChanges.id, changeId),
+                isNull(posKdsItemChanges.acknowledgedAt),
+              ),
+            );
+        }
+        return { ticketId, changeId, revision: input.revision, acknowledgedAt };
+      },
+    );
   }
 
   async transitionKds(
@@ -7558,6 +7908,7 @@ export class PilotPosService {
               ),
             );
           for (const itemId of [...new Set(itemIds)].sort()) {
+            await this.releaseNextKdsStage(tx, organizationId, unitId, itemId, now);
             await this.syncOrderItemStatusFromKds(tx, organizationId, unitId, itemId, now);
           }
         }
@@ -7944,6 +8295,62 @@ export class PilotPosService {
     return status;
   }
 
+  private async releaseNextKdsStage(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    orderItemId: string,
+    now: Date,
+  ) {
+    const assignments = await tx
+      .select()
+      .from(posKdsTicketItems)
+      .where(
+        and(
+          eq(posKdsTicketItems.organizationId, organizationId),
+          eq(posKdsTicketItems.unitId, unitId),
+          eq(posKdsTicketItems.orderItemId, orderItemId),
+          ne(posKdsTicketItems.status, "canceled"),
+        ),
+      );
+    const waitingStages = [
+      ...new Set(
+        assignments
+          .filter((assignment) => assignment.dependencyHeld)
+          .map((assignment) => assignment.stage),
+      ),
+    ].sort((left, right) => left - right);
+    const nextStage = waitingStages[0];
+    if (!nextStage) return false;
+    if (
+      assignments.some(
+        (assignment) =>
+          assignment.stage < nextStage &&
+          (assignment.status !== "ready" || assignment.readyQuantity !== assignment.quantity),
+      )
+    ) {
+      return false;
+    }
+    await tx
+      .update(posKdsTicketItems)
+      .set({
+        dependencyHeld: false,
+        held: sql`${posKdsTicketItems.courseHeld}`,
+        heldAt: sql`case when ${posKdsTicketItems.courseHeld} then ${posKdsTicketItems.heldAt} else null end`,
+        firedAt: sql`case when ${posKdsTicketItems.courseHeld} then null else ${now.toISOString()}::timestamptz end`,
+      })
+      .where(
+        and(
+          eq(posKdsTicketItems.organizationId, organizationId),
+          eq(posKdsTicketItems.unitId, unitId),
+          eq(posKdsTicketItems.orderItemId, orderItemId),
+          eq(posKdsTicketItems.stage, nextStage),
+          eq(posKdsTicketItems.dependencyHeld, true),
+        ),
+      );
+    return true;
+  }
+
   private orderStatusFromItems(states: Array<typeof posOrderItems.$inferSelect.status>) {
     if (states.length === 0) return "sent" as const;
     if (states.every((state) => state === "canceled")) return "canceled" as const;
@@ -8245,6 +8652,9 @@ export class PilotPosService {
               eq(posKdsTicketItems.orderItemId, orderItemId),
             ),
           );
+        if (state === "ready") {
+          await this.releaseNextKdsStage(tx, organizationId, unitId, orderItemId, now);
+        }
         const itemState = await this.syncOrderItemStatusFromKds(
           tx,
           organizationId,
@@ -9042,6 +9452,7 @@ export class PilotPosService {
         for (const orderItemId of [
           ...new Set(memberships.map((membership) => membership.orderItemId)),
         ].sort()) {
+          await this.releaseNextKdsStage(tx, organizationId, unitId, orderItemId, now);
           await this.syncOrderItemStatusFromKds(tx, organizationId, unitId, orderItemId, now);
         }
         for (const ticketId of ticketIds.sort()) {
@@ -9532,9 +9943,13 @@ export class PilotPosService {
         await tx
           .update(posKdsTicketItems)
           .set({
-            held: input.state === "held",
+            courseHeld: input.state === "held",
+            held: input.state === "held" ? true : sql`${posKdsTicketItems.dependencyHeld}`,
             heldAt: input.state === "held" ? now : null,
-            firedAt: input.state === "fired" ? now : null,
+            firedAt:
+              input.state === "fired"
+                ? sql`case when ${posKdsTicketItems.dependencyHeld} then null else ${now.toISOString()}::timestamptz end`
+                : null,
           })
           .where(
             and(
@@ -10142,6 +10557,91 @@ export class PilotPosService {
     );
   }
 
+  async claimKdsRunner(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    orderId: string,
+    idempotencyKey: string,
+    input: KdsRunnerClaimInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "kds",
+    ]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "kds.runner.claim",
+      { orderId, ...input },
+      async (tx) => {
+        await this.lockKdsOrder(tx, organizationId, unitId, orderId);
+        const [order] = await tx
+          .select()
+          .from(posOrders)
+          .where(
+            and(
+              eq(posOrders.organizationId, organizationId),
+              eq(posOrders.unitId, unitId),
+              eq(posOrders.id, orderId),
+            ),
+          )
+          .limit(1);
+        if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+        if (order.status !== "ready") {
+          throw new ConflictException({ code: "KDS_ORDER_NOT_READY", status: order.status });
+        }
+        const tickets = await tx
+          .select()
+          .from(posKdsTickets)
+          .where(
+            and(
+              eq(posKdsTickets.organizationId, organizationId),
+              eq(posKdsTickets.unitId, unitId),
+              eq(posKdsTickets.orderId, orderId),
+              ne(posKdsTickets.status, "canceled"),
+            ),
+          );
+        if (
+          tickets.length === 0 ||
+          tickets.some((ticket) => !ticket.handedOffAt || ticket.servedAt)
+        ) {
+          throw new ConflictException({ code: "KDS_ORDER_NOT_AT_EXPEDITION" });
+        }
+        if (order.runnerIdentityId && order.runnerIdentityId !== identityId) {
+          throw new ConflictException({ code: "KDS_ORDER_CLAIMED_BY_ANOTHER_RUNNER" });
+        }
+        const runnerClaimedAt = order.runnerClaimedAt ?? new Date();
+        if (!order.runnerIdentityId) {
+          await tx
+            .update(posOrders)
+            .set({ runnerIdentityId: identityId, runnerClaimedAt, updatedAt: runnerClaimedAt })
+            .where(
+              and(
+                eq(posOrders.organizationId, organizationId),
+                eq(posOrders.unitId, unitId),
+                eq(posOrders.id, orderId),
+              ),
+            );
+        }
+        await tx.insert(auditEvents).values({
+          organizationId,
+          unitId,
+          actorIdentityId: identityId,
+          action: "pos.kds.runner_claimed",
+          entityType: "order",
+          entityId: orderId,
+          metadata: { reason: input.reason ?? null },
+        });
+        return { orderId, runnerIdentityId: identityId, runnerClaimedAt };
+      },
+    );
+  }
+
   async handoffKdsOrder(
     identityId: string,
     organizationId: string,
@@ -10295,7 +10795,28 @@ export class PilotPosService {
                 ne(posKdsTicketItems.status, "canceled"),
               ),
             );
+        } else if (input.target === "runner") {
+          if (!order.runnerIdentityId || !order.runnerClaimedAt) {
+            throw new ConflictException({ code: "KDS_RUNNER_NOT_CLAIMED" });
+          }
+          if (order.runnerPickedUpAt) {
+            throw new ConflictException({ code: "KDS_ORDER_ALREADY_WITH_RUNNER" });
+          }
+          await tx
+            .update(posOrders)
+            .set({ runnerPickedUpAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(posOrders.organizationId, organizationId),
+                eq(posOrders.unitId, unitId),
+                eq(posOrders.id, orderId),
+                isNull(posOrders.runnerPickedUpAt),
+              ),
+            );
         } else {
+          if (order.runnerIdentityId && !order.runnerPickedUpAt) {
+            throw new ConflictException({ code: "KDS_ORDER_NOT_PICKED_UP_BY_RUNNER" });
+          }
           await this.notifyOrderReadyOnce(tx, identityId, organizationId, unitId, orderId, now);
           const itemIds = active.map(({ item }) => item.id);
           await tx
@@ -10565,6 +11086,95 @@ export class PilotPosService {
         await tx.insert(outboxEvents).values({
           topic: "pos.kds_terminal_profile_changed",
           aggregateType: "kds_terminal_profile",
+          aggregateId: installationId,
+          payload: { organizationId, unitId, ...metadata },
+        });
+        return profile;
+      },
+    );
+  }
+
+  async getTerminalProfile(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, SYSTEM_ROLES);
+    const [profile] = await this.database.db
+      .select()
+      .from(posTerminalProfiles)
+      .where(
+        and(
+          eq(posTerminalProfiles.organizationId, organizationId),
+          eq(posTerminalProfiles.unitId, unitId),
+          eq(posTerminalProfiles.installationId, installationId),
+        ),
+      )
+      .limit(1);
+    return profile ?? null;
+  }
+
+  async putTerminalProfile(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+    idempotencyKey: string,
+    input: TerminalProfileInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "terminal.profile.put",
+      { installationId, ...input },
+      async (tx) => {
+        if (input.stationId) {
+          await this.lockAndAssertKdsStations(tx, organizationId, unitId, [input.stationId]);
+        }
+        const now = new Date();
+        const [profile] = await tx
+          .insert(posTerminalProfiles)
+          .values({
+            organizationId,
+            unitId,
+            installationId,
+            ...input,
+            createdByIdentityId: identityId,
+            updatedByIdentityId: identityId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [
+              posTerminalProfiles.organizationId,
+              posTerminalProfiles.unitId,
+              posTerminalProfiles.installationId,
+            ],
+            set: {
+              ...input,
+              updatedByIdentityId: identityId,
+              updatedAt: now,
+            },
+          })
+          .returning();
+        if (!profile) throw new Error("Terminal profile upsert did not return a row");
+        const metadata = { installationId, ...input };
+        await tx.insert(auditEvents).values({
+          organizationId,
+          unitId,
+          actorIdentityId: identityId,
+          action: "pos.terminal_profile_changed",
+          entityType: "terminal_profile",
+          entityId: installationId,
+          metadata,
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "pos.terminal_profile_changed",
+          aggregateType: "terminal_profile",
           aggregateId: installationId,
           payload: { organizationId, unitId, ...metadata },
         });
@@ -10930,20 +11540,32 @@ export class PilotPosService {
     unitId: string,
     tabId: string,
   ) {
-    const [tab] = await tx
-      .select({
-        serviceChargeBasisPoints: posTabs.serviceChargeBasisPoints,
-        tipCents: posTabs.tipCents,
-      })
-      .from(posTabs)
-      .where(
-        and(
-          eq(posTabs.organizationId, organizationId),
-          eq(posTabs.unitId, unitId),
-          eq(posTabs.id, tabId),
-        ),
-      )
-      .limit(1);
+    const [[tab], [settings]] = await Promise.all([
+      tx
+        .select({
+          serviceChargeBasisPoints: posTabs.serviceChargeBasisPoints,
+          tipCents: posTabs.tipCents,
+        })
+        .from(posTabs)
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.id, tabId),
+          ),
+        )
+        .limit(1),
+      tx
+        .select({ configuration: managementSettlementSettings.configuration })
+        .from(managementSettlementSettings)
+        .where(
+          and(
+            eq(managementSettlementSettings.organizationId, organizationId),
+            eq(managementSettlementSettings.unitId, unitId),
+          ),
+        )
+        .limit(1),
+    ]);
     if (!tab) throw new NotFoundException({ code: "TAB_NOT_FOUND" });
     const items = await tx
       .select({
@@ -10975,6 +11597,7 @@ export class PilotPosService {
       })),
       tab.serviceChargeBasisPoints,
       tab.tipCents,
+      settings?.configuration.serviceBase ?? "net_after_discounts",
     );
     await tx
       .update(posTabs)

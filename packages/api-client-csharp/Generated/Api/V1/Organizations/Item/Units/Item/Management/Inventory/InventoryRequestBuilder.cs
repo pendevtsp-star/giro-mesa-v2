@@ -5,7 +5,9 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Invento
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.CycleCountPlan;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Events;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.InterunitTransfers;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.IssueRoutes;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.LocationItemSettings;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Lots;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.ProductionBatches;
@@ -54,10 +56,20 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inv
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.InterunitTransfers.InterunitTransfersRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The issueRoutes property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.IssueRoutes.IssueRoutesRequestBuilder IssueRoutes
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.IssueRoutes.IssueRoutesRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The items property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsRequestBuilder Items
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Items.ItemsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The locationItemSettings property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.LocationItemSettings.LocationItemSettingsRequestBuilder LocationItemSettings
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.LocationItemSettings.LocationItemSettingsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The locations property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Inventory.Locations.LocationsRequestBuilder Locations

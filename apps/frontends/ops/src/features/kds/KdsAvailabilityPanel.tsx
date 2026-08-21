@@ -1,4 +1,5 @@
-import { Badge, Button, Card, EmptyState, Modal } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, EmptyState, Input, Modal, Textarea } from "@giromesa/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import type { KdsAllDayItem, KdsProductAvailability } from "../../operations.shared";
 
@@ -212,7 +213,7 @@ export function KdsAvailabilityPanel({
 
       <label className="gm-form-field" htmlFor="kds-availability-search">
         <span>Pesquisar produto</span>
-        <input
+        <Input
           className="gm-form-control"
           id="kds-availability-search"
           onChange={(event) => setQuery(event.target.value)}
@@ -312,7 +313,7 @@ export function KdsAvailabilityPanel({
             {targetStatus === "limited" && (
               <label className="gm-form-field" htmlFor="kds-availability-remaining">
                 <span>Quantidade restante que pode ser vendida</span>
-                <input
+                <Input
                   className="gm-form-control"
                   id="kds-availability-remaining"
                   min={0}
@@ -369,7 +370,7 @@ export function KdsAvailabilityPanel({
                     ? "Horário de encerramento deste turno"
                     : "Data e horário para voltar a vender"}
                 </span>
-                <input
+                <Input
                   className="gm-form-control"
                   id="kds-availability-reset-at"
                   min={toLocalDateTime(new Date().toISOString())}
@@ -383,7 +384,7 @@ export function KdsAvailabilityPanel({
 
             <label className="gm-form-field" htmlFor="kds-availability-reason">
               <span>Motivo</span>
-              <textarea
+              <Textarea
                 className="gm-form-control"
                 id="kds-availability-reason"
                 maxLength={500}

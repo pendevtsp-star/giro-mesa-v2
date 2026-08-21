@@ -1,4 +1,4 @@
-import "./SegmentedTabs.css";
+import { cn } from "../../lib/utils";
 
 export function SegmentedTabs<T extends string>({
   items,
@@ -14,12 +14,16 @@ export function SegmentedTabs<T extends string>({
   className?: string;
 }) {
   return (
-    <fieldset className={`gm-segmented-control ${className}`.trim()}>
+    <fieldset className={cn("gm-segmented-control", className)} data-slot="toggle-group">
       <legend className="gm-sr-only">{label}</legend>
       {items.map((item) => (
         <button
           aria-pressed={active === item.id}
-          className={`gm-segmented-control__item ${active === item.id ? "gm-segmented-control__item--active" : ""}`}
+          className={cn(
+            "gm-segmented-control__item",
+            active === item.id && "gm-segmented-control__item--active",
+          )}
+          data-slot="toggle-group-item"
           key={item.id}
           onClick={() => onChange(item.id)}
           type="button"
@@ -27,7 +31,11 @@ export function SegmentedTabs<T extends string>({
           <span>{item.label}</span>
           {typeof item.count === "number" && (
             <span
-              className={`gm-segmented-control__badge ${item.tone ? `gm-segmented-control__badge--${item.tone}` : ""}`}
+              className={cn(
+                "gm-segmented-control__badge",
+                item.tone && `gm-segmented-control__badge--${item.tone}`,
+              )}
+              data-slot="badge"
             >
               {item.count}
             </span>

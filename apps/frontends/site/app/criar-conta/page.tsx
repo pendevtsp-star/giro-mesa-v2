@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
@@ -76,8 +77,8 @@ export default function CreateAccountPage() {
         <p className="eyebrow">Identidade GiroMesa</p>
         <h1>Criar sua conta</h1>
         <p>A conta identifica você. A empresa só será criada após o fluxo de onboarding.</p>
-        <label className="check-label">
-          <input
+        <Label className="check-label">
+          <Input
             checked={termsAccepted}
             onChange={(event) => setTermsAccepted(event.target.checked)}
             type="checkbox"
@@ -86,40 +87,40 @@ export default function CreateAccountPage() {
             Li os <Link href="/termos">Termos</Link> e a{" "}
             <Link href="/privacidade">Política de Privacidade</Link>.
           </span>
-        </label>
-        <button
+        </Label>
+        <Button
           className="button google-button"
           type="button"
           onClick={startGoogleSignup}
           disabled={!termsAccepted}
         >
           <span aria-hidden="true">G</span> Criar com Google
-        </button>
+        </Button>
         <div className="divider">
           <span>ou com e-mail</span>
         </div>
         <form className="auth-form" onSubmit={submit}>
-          <label>
+          <Label>
             Nome completo
-            <input name="displayName" autoComplete="name" required />
-          </label>
-          <label>
+            <Input name="displayName" autoComplete="name" required />
+          </Label>
+          <Label>
             E-mail
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
+            <Input name="email" type="email" autoComplete="email" required />
+          </Label>
+          <Label>
             Senha
-            <input
+            <Input
               name="password"
               type="password"
               autoComplete="new-password"
               minLength={12}
               required
             />
-          </label>
-          <button className="button button-primary" type="submit">
+          </Label>
+          <Button className="button button-primary" type="submit">
             Criar conta
-          </button>
+          </Button>
         </form>
         <p className="form-status" role="status">
           {message}

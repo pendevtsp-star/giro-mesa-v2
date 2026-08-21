@@ -32,6 +32,24 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         public double? Longitude { get; set; }
         /// <summary>The mockLocationDetected property</summary>
         public bool? MockLocationDetected { get; set; }
+        /// <summary>The offline property</summary>
+        public bool? Offline { get; set; }
+        /// <summary>The offlineJustification property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? OfflineJustification { get; set; }
+#nullable restore
+#else
+        public string OfflineJustification { get; set; }
+#endif
+        /// <summary>The sessionId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? SessionId { get; set; }
+#nullable restore
+#else
+        public string SessionId { get; set; }
+#endif
         /// <summary>The type property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.Self.Breaks.BreaksPostRequestBody_type? Type { get; set; }
         /// <summary>
@@ -40,6 +58,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         public BreaksPostRequestBody()
         {
             AdditionalData = new Dictionary<string, object>();
+            Offline = false;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -65,6 +84,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
                 { "latitude", n => { Latitude = n.GetDoubleValue(); } },
                 { "longitude", n => { Longitude = n.GetDoubleValue(); } },
                 { "mockLocationDetected", n => { MockLocationDetected = n.GetBoolValue(); } },
+                { "offline", n => { Offline = n.GetBoolValue(); } },
+                { "offlineJustification", n => { OfflineJustification = n.GetStringValue(); } },
+                { "sessionId", n => { SessionId = n.GetStringValue(); } },
                 { "type", n => { Type = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.Self.Breaks.BreaksPostRequestBody_type>(); } },
             };
         }
@@ -81,6 +103,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
             writer.WriteDoubleValue("latitude", Latitude);
             writer.WriteDoubleValue("longitude", Longitude);
             writer.WriteBoolValue("mockLocationDetected", MockLocationDetected);
+            writer.WriteBoolValue("offline", Offline);
+            writer.WriteStringValue("offlineJustification", OfflineJustification);
+            writer.WriteStringValue("sessionId", SessionId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.Self.Breaks.BreaksPostRequestBody_type>("type", Type);
             writer.WriteAdditionalData(AdditionalData);
         }

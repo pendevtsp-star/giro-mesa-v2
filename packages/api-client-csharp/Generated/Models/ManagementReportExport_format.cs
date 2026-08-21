@@ -12,5 +12,13 @@ namespace GiroMesa.ApiClient.Models
         #pragma warning disable CS1591
         Csv,
         #pragma warning restore CS1591
+        [EnumMember(Value = "pdf")]
+        #pragma warning disable CS1591
+        Pdf,
+        #pragma warning restore CS1591
+        [EnumMember(Value = "xlsx")]
+        #pragma warning disable CS1591
+        Xlsx,
+        #pragma warning restore CS1591
     }
 }

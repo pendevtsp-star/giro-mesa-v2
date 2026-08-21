@@ -4,8 +4,10 @@ import { it } from "node:test";
 import { identities, memberships, organizations, roleBindings, units } from "@giromesa/db";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { MetricsService } from "../health/health.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
+import { ManagementReportService } from "./management-report.service.js";
 
 it("executes every management report family against PostgreSQL", async (context) => {
   const databaseUrl = process.env.MANAGEMENT_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -45,8 +47,10 @@ it("executes every management report family against PostgreSQL", async (context)
     assert.ok(membership);
     await database.db.insert(roleBindings).values({ membershipId: membership.id, role: "owner" });
 
-    const management = new ManagementService(database, new ScopeService(database));
-    const report = await management.reports(identityId, organizationId, unit.id, {
+    const scope = new ScopeService(database);
+    const management = new ManagementService(database, scope);
+    const reports = new ManagementReportService(database, scope, management, new MetricsService());
+    const report = await reports.reports(identityId, organizationId, unit.id, {
       from: "2026-08-01",
       to: "2026-08-17",
       comparisonMode: "previous_period",
@@ -58,6 +62,59 @@ it("executes every management report family against PostgreSQL", async (context)
     assert.equal(report.reportFamilies.purchasing.orderCount, 0);
     assert.equal(report.reportFamilies.operations.averageServiceMinutes, null);
     assert.equal(report.reportFamilies.profitability.productProfitabilityCoverage, "unavailable");
+    assert.equal(report.reportFamilies.labor.workedMinutes, 0);
+    assert.equal(report.reportFamilies.reconciliation.paymentDifferenceCents, 0);
+    assert.equal(report.reportFamilies.forecast.method, "historical_daily_average_v1");
+    assert.equal(report.reportFamilies.forecast.revenue.forecastCents, 0);
+
+    const view = await reports.createView(
+      identityId,
+      organizationId,
+      unit.id,
+      `view-${randomUUID()}`,
+      {
+        name: "Conferência mensal",
+        visibility: "unit",
+        query: {
+          from: "2026-08-01",
+          to: "2026-08-17",
+          comparisonMode: "previous_period",
+          family: "reconciliation",
+        },
+      },
+    );
+    assert.equal((await reports.views(identityId, organizationId, unit.id)).views[0]?.id, view.id);
+
+    const artifact = await reports.createExport(
+      identityId,
+      organizationId,
+      unit.id,
+      `export-${randomUUID()}`,
+      {
+        from: "2026-08-01",
+        to: "2026-08-17",
+        comparisonMode: "previous_period",
+        family: "forecast",
+        format: "xlsx",
+      },
+    );
+    const content = await reports.exportContent(identityId, organizationId, unit.id, artifact.id);
+    assert.equal(content.contentEncoding, "base64");
+    assert.equal(Buffer.from(content.content, "base64").subarray(0, 2).toString(), "PK");
+
+    const backfill = await reports.backfillCosts(
+      identityId,
+      organizationId,
+      unit.id,
+      `backfill-${randomUUID()}`,
+      {
+        from: "2026-08-01",
+        to: "2026-08-17",
+        comparisonMode: "previous_period",
+        allowEstimated: true,
+      },
+    );
+    assert.equal(backfill.estimatedCount, 0);
   } finally {
     if (organizationId)
       await database.db.delete(organizations).where(eq(organizations.id, organizationId));

@@ -1,4 +1,5 @@
-import { Badge, Button, Card, EmptyState, Icon } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, EmptyState, Icon, Input, NativeSelect, Textarea } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import {
@@ -211,7 +212,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
         <form className="action-form" onSubmit={(event) => void createCustomer(event)}>
           <label>
             Nome
-            <input
+            <Input
               minLength={2}
               onChange={(event) => setCustomerName(event.target.value)}
               required
@@ -220,7 +221,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           </label>
           <label>
             E-mail
-            <input
+            <Input
               onChange={(event) => setCustomerEmail(event.target.value)}
               type="email"
               value={customerEmail}
@@ -228,7 +229,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           </label>
           <label>
             Telefone
-            <input
+            <Input
               minLength={8}
               onChange={(event) => setCustomerPhone(event.target.value)}
               type="tel"
@@ -254,7 +255,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
         <form className="action-form" onSubmit={(event) => void recordConsent(event)}>
           <label className="action-form__wide">
             Cliente
-            <select
+            <NativeSelect
               onChange={(event) => setConsentCustomerId(event.target.value)}
               required
               value={consentCustomerId}
@@ -266,11 +267,11 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
                     {customer.name}
                   </option>
                 ))}
-            </select>
+            </NativeSelect>
           </label>
           <label>
             Decisão
-            <select
+            <NativeSelect
               onChange={(event) =>
                 setConsentDecision(event.target.value as "granted" | "withdrawn")
               }
@@ -278,11 +279,11 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             >
               <option value="granted">Conceder</option>
               <option value="withdrawn">Retirar</option>
-            </select>
+            </NativeSelect>
           </label>
           <label>
             Canal
-            <select
+            <NativeSelect
               onChange={(event) =>
                 setConsentChannel(event.target.value as "email" | "whatsapp" | "all")
               }
@@ -291,11 +292,11 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
               <option value="all">E-mail e WhatsApp</option>
               <option value="email">E-mail</option>
               <option value="whatsapp">WhatsApp</option>
-            </select>
+            </NativeSelect>
           </label>
           <label className="action-form__wide">
             Versão da política aceita
-            <input
+            <Input
               maxLength={40}
               onChange={(event) => setPolicyVersion(event.target.value)}
               placeholder="Ex.: privacidade-2026-08"
@@ -324,7 +325,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
         <form className="action-form" onSubmit={(event) => void createCampaign(event)}>
           <label>
             Nome interno
-            <input
+            <Input
               minLength={2}
               onChange={(event) => setCampaignName(event.target.value)}
               required
@@ -333,18 +334,18 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           </label>
           <label>
             Canal
-            <select
+            <NativeSelect
               onChange={(event) => setCampaignChannel(event.target.value as "email" | "whatsapp")}
               value={campaignChannel}
             >
               <option value="email">E-mail</option>
               <option value="whatsapp">WhatsApp</option>
-            </select>
+            </NativeSelect>
           </label>
           {campaignChannel === "email" && (
             <label className="action-form__wide">
               Assunto
-              <input
+              <Input
                 minLength={2}
                 onChange={(event) => setCampaignSubject(event.target.value)}
                 required
@@ -354,7 +355,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           )}
           <label className="action-form__wide">
             Conteúdo
-            <textarea
+            <Textarea
               maxLength={5000}
               minLength={2}
               onChange={(event) => setCampaignContent(event.target.value)}
@@ -388,17 +389,17 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           <form className="action-form" onSubmit={(event) => void createLoyaltyProgram(event)}>
             <label>
               Modalidade
-              <select
+              <NativeSelect
                 onChange={(event) => setLoyaltyMode(event.target.value as "points" | "cashback")}
                 value={loyaltyMode}
               >
                 <option value="points">Pontos</option>
                 <option value="cashback">Cashback</option>
-              </select>
+              </NativeSelect>
             </label>
             <label>
               Taxa
-              <input
+              <Input
                 inputMode="decimal"
                 onChange={(event) => setLoyaltyRate(event.target.value)}
                 required
@@ -407,7 +408,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Pedido mínimo
-              <input
+              <Input
                 inputMode="decimal"
                 onChange={(event) => setLoyaltyMinimum(event.target.value)}
                 required
@@ -433,7 +434,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           <form className="action-form" onSubmit={(event) => void createCoupon(event)}>
             <label>
               Código
-              <input
+              <Input
                 minLength={3}
                 onChange={(event) =>
                   setCouponCode(event.target.value.replace(/[^A-Za-z0-9_-]/g, ""))
@@ -444,17 +445,17 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Tipo
-              <select
+              <NativeSelect
                 onChange={(event) => setCouponType(event.target.value as "fixed" | "percentage")}
                 value={couponType}
               >
                 <option value="fixed">Valor fixo</option>
                 <option value="percentage">Percentual</option>
-              </select>
+              </NativeSelect>
             </label>
             <label>
               {couponType === "fixed" ? "Valor" : "Percentual"}
-              <input
+              <Input
                 inputMode="decimal"
                 onChange={(event) => setCouponValue(event.target.value)}
                 required
@@ -480,7 +481,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
           <form className="action-form" onSubmit={(event) => void createSegment(event)}>
             <label>
               Nome
-              <input
+              <Input
                 minLength={2}
                 onChange={(event) => setSegmentName(event.target.value)}
                 required
@@ -489,7 +490,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             </label>
             <label>
               Filtro
-              <select
+              <NativeSelect
                 onChange={(event) =>
                   setSegmentKind(event.target.value as "all" | "marketing_opt_in")
                 }
@@ -497,7 +498,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
               >
                 <option value="marketing_opt_in">Marketing autorizado</option>
                 <option value="all">Todos os clientes</option>
-              </select>
+              </NativeSelect>
             </label>
             <Button disabled={busy === "segment" || segmentName.trim().length < 2} type="submit">
               Salvar segmento

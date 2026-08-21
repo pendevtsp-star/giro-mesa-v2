@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, Input, Label } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { normalizeOptOutToken } from "../lib/public-contracts";
 
@@ -42,8 +43,8 @@ export function OptOutForm({ initialToken }: { initialToken: string }) {
 
   return (
     <form className="preference-form" onSubmit={submit}>
-      <label htmlFor="opt-out-token">Token do link de descadastro</label>
-      <input
+      <Label htmlFor="opt-out-token">Token do link de descadastro</Label>
+      <Input
         id="opt-out-token"
         name="token"
         type="text"
@@ -56,9 +57,9 @@ export function OptOutForm({ initialToken }: { initialToken: string }) {
         required
       />
       <small>O token é usado apenas nesta solicitação e não é salvo neste navegador.</small>
-      <button type="submit" disabled={submitting || completed}>
+      <Button type="submit" disabled={submitting || completed}>
         {completed ? "Preferência registrada" : submitting ? "Registrando…" : "Parar comunicações"}
-      </button>
+      </Button>
       <p className="preference-status" role="status" aria-live="polite">
         {message}
       </p>

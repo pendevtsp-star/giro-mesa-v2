@@ -165,6 +165,9 @@ export const managementReportsResponseSchema: SchemaObject = {
         "profitability",
         "multiunit",
         "quality",
+        "labor",
+        "reconciliation",
+        "forecast",
       ],
       properties: {
         sales: {
@@ -460,6 +463,11 @@ export const managementReportsResponseSchema: SchemaObject = {
                   "revenueCents",
                   "averageTicketCents",
                   "changePercent",
+                  "rank",
+                  "operatingDays",
+                  "revenuePerOperatingDayCents",
+                  "organizationRevenueSharePercent",
+                  "sameStoreChangePercent",
                 ],
                 properties: {
                   key: { type: "string", format: "uuid" },
@@ -468,6 +476,11 @@ export const managementReportsResponseSchema: SchemaObject = {
                   revenueCents: cents,
                   averageTicketCents: nullableCents,
                   changePercent: { type: "number", nullable: true },
+                  rank: { type: "integer" },
+                  operatingDays: { type: "integer" },
+                  revenuePerOperatingDayCents: nullableCents,
+                  organizationRevenueSharePercent: { type: "number", nullable: true },
+                  sameStoreChangePercent: { type: "number", nullable: true },
                 },
               },
             },
@@ -491,6 +504,83 @@ export const managementReportsResponseSchema: SchemaObject = {
                 },
               },
             },
+          },
+        },
+        labor: {
+          type: "object",
+          required: [
+            "coverage",
+            "costCoverage",
+            "scheduleCoverage",
+            "people",
+            "workedMinutes",
+            "scheduledMinutes",
+            "overtimeMinutes",
+            "laborCostCents",
+            "laborCostPercent",
+            "salesPerLaborHourCents",
+            "roles",
+          ],
+          properties: {
+            coverage,
+            costCoverage: coverage,
+            scheduleCoverage: coverage,
+            people: { type: "integer" },
+            workedMinutes: { type: "integer" },
+            scheduledMinutes: { type: "integer" },
+            overtimeMinutes: { type: "integer", nullable: true },
+            laborCostCents: nullableCents,
+            laborCostPercent: { type: "number", nullable: true },
+            salesPerLaborHourCents: nullableCents,
+            roles: { type: "array", items: { type: "object", additionalProperties: true } },
+          },
+        },
+        reconciliation: {
+          type: "object",
+          required: [
+            "coverage",
+            "posRevenueCents",
+            "paymentCents",
+            "paymentDifferenceCents",
+            "fiscalAuthorizedCents",
+            "fiscalDifferenceCents",
+            "taxCents",
+            "documents",
+            "external",
+          ],
+          properties: {
+            coverage,
+            posRevenueCents: cents,
+            paymentCents: cents,
+            paymentDifferenceCents: cents,
+            fiscalAuthorizedCents: cents,
+            fiscalDifferenceCents: cents,
+            taxCents: cents,
+            documents: { type: "object", additionalProperties: { type: "integer" } },
+            external: { type: "object", additionalProperties: { type: "integer" } },
+          },
+        },
+        forecast: {
+          type: "object",
+          required: [
+            "method",
+            "horizonDays",
+            "sampleDays",
+            "confidence",
+            "errorPercent",
+            "revenue",
+            "cash",
+            "purchases",
+          ],
+          properties: {
+            method: { type: "string", enum: ["historical_daily_average_v1"] },
+            horizonDays: { type: "integer" },
+            sampleDays: { type: "integer" },
+            confidence: { type: "string", enum: ["low", "medium", "high"] },
+            errorPercent: { type: "number", nullable: true },
+            revenue: { type: "object", additionalProperties: cents },
+            cash: { type: "object", additionalProperties: cents },
+            purchases: { type: "array", items: { type: "object", additionalProperties: true } },
           },
         },
       },
@@ -524,12 +614,11 @@ export const managementReportsResponseSchema: SchemaObject = {
         },
         coverage: {
           type: "object",
-          required: ["sales", "cashFlow", "costs", "budget"],
+          required: ["sales", "cashFlow", "costs", "budget", "labor", "reconciliation", "forecast"],
           properties: Object.fromEntries(
-            ["sales", "cashFlow", "costs", "budget"].map((key) => [
-              key,
-              { type: "string", enum: ["complete", "partial", "unavailable"] },
-            ]),
+            ["sales", "cashFlow", "costs", "budget", "labor", "reconciliation", "forecast"].map(
+              (key) => [key, { type: "string", enum: ["complete", "partial", "unavailable"] }],
+            ),
           ),
         },
       },
@@ -600,6 +689,9 @@ export const managementReportsResponseSchema: SchemaObject = {
         "export",
         "manageBudget",
         "manageSchedules",
+        "manageViews",
+        "manageAlerts",
+        "backfillCosts",
         "emailDeliveryConfigured",
       ],
       properties: Object.fromEntries(
@@ -609,6 +701,9 @@ export const managementReportsResponseSchema: SchemaObject = {
           "export",
           "manageBudget",
           "manageSchedules",
+          "manageViews",
+          "manageAlerts",
+          "backfillCosts",
           "emailDeliveryConfigured",
         ].map((key) => [key, { type: "boolean" }]),
       ),
@@ -638,6 +733,9 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
           "inventory",
           "purchase",
           "operation",
+          "labor",
+          "reconciliation",
+          "forecast",
         ],
       },
       key: { type: "string" },
@@ -693,7 +791,7 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
     properties: {
       id: { type: "string", format: "uuid" },
       status: { type: "string", enum: ["ready", "failed"] },
-      format: { type: "string", enum: ["csv"] },
+      format: { type: "string", enum: ["csv", "pdf", "xlsx"] },
       filename: { type: "string" },
       sha256: { type: "string", nullable: true },
       rowCount: { type: "integer" },
@@ -706,10 +804,12 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
   document.components.schemas.ManagementReportExport = exportMetadata;
   document.components.schemas.ManagementReportExportContent = {
     type: "object",
-    required: ["filename", "content", "sha256"],
+    required: ["filename", "content", "contentEncoding", "mimeType", "sha256"],
     properties: {
       filename: { type: "string" },
       content: { type: "string" },
+      contentEncoding: { type: "string", enum: ["utf8", "base64"] },
+      mimeType: { type: "string" },
       sha256: { type: "string" },
     },
   };
@@ -752,6 +852,7 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
       "range",
       "comparisonMode",
       "family",
+      "format",
       "delivery",
       "enabled",
       "nextRunAt",
@@ -781,13 +882,108 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
           "profitability",
           "multiunit",
           "quality",
+          "labor",
+          "reconciliation",
+          "forecast",
         ],
       },
+      format: { type: "string", enum: ["csv", "pdf", "xlsx"] },
       delivery: { type: "string", enum: ["in_app", "email"] },
       enabled: { type: "boolean" },
       nextRunAt: { type: "string", format: "date-time" },
       lastRunAt: { type: "string", format: "date-time", nullable: true },
       version: { type: "integer" },
+    },
+  };
+  document.components.schemas.ManagementReportView = {
+    type: "object",
+    required: ["id", "name", "visibility", "query", "ownerIdentityId", "version", "updatedAt"],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      name: { type: "string" },
+      visibility: { type: "string", enum: ["private", "unit", "organization"] },
+      query: { type: "object", additionalProperties: true },
+      ownerIdentityId: { type: "string", format: "uuid" },
+      version: { type: "integer" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  };
+  document.components.schemas.ManagementReportViewQuery = {
+    type: "object",
+    required: ["from", "to", "comparisonMode", "family"],
+    properties: {
+      from: date,
+      to: date,
+      comparisonMode: {
+        type: "string",
+        enum: ["previous_period", "previous_year", "none"],
+      },
+      family: {
+        type: "string",
+        enum: [
+          "overview",
+          "sales",
+          "exceptions",
+          "inventory",
+          "purchasing",
+          "operations",
+          "profitability",
+          "multiunit",
+          "quality",
+          "labor",
+          "reconciliation",
+          "forecast",
+        ],
+      },
+    },
+  };
+  document.components.schemas.ManagementReportViewInput = {
+    type: "object",
+    required: ["name", "visibility", "query"],
+    properties: {
+      name: { type: "string", maxLength: 80 },
+      visibility: { type: "string", enum: ["private", "unit", "organization"] },
+      query: { $ref: "#/components/schemas/ManagementReportViewQuery" },
+      version: { type: "integer", minimum: 1 },
+    },
+  };
+  document.components.schemas.ManagementReportViews = {
+    type: "object",
+    required: ["views"],
+    properties: {
+      views: {
+        type: "array",
+        items: { $ref: "#/components/schemas/ManagementReportView" },
+      },
+    },
+  };
+  document.components.schemas.ManagementReportAlert = {
+    type: "object",
+    required: ["id", "kind", "title", "detail", "severity", "status", "version", "updatedAt"],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      kind: { type: "string" },
+      title: { type: "string" },
+      detail: { type: "string" },
+      severity: { type: "string", enum: ["info", "warning", "critical"] },
+      status: { type: "string", enum: ["open", "claimed", "resolved", "dismissed"] },
+      actualCents: nullableCents,
+      targetCents: nullableCents,
+      assignedToIdentityId: { type: "string", format: "uuid", nullable: true },
+      dueAt: { type: "string", format: "date-time", nullable: true },
+      resolvedAt: { type: "string", format: "date-time", nullable: true },
+      version: { type: "integer" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  };
+  document.components.schemas.ManagementReportAlerts = {
+    type: "object",
+    required: ["alerts"],
+    properties: {
+      alerts: {
+        type: "array",
+        items: { $ref: "#/components/schemas/ManagementReportAlert" },
+      },
     },
   };
 
@@ -837,6 +1033,14 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
         content: { "application/json": { schema } },
       };
     };
+    const body = (suffix: string, method: "post" | "put" | "patch", schema: SchemaOrReference) => {
+      const target = document.paths[`${base}${suffix}`]?.[method];
+      if (!target) return;
+      target.requestBody = {
+        required: true,
+        content: { "application/json": { schema } },
+      };
+    };
     attach("/drill-down", "get", "200", {
       $ref: "#/components/schemas/ManagementReportDrillDownResponse",
     });
@@ -860,5 +1064,56 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
       $ref: "#/components/schemas/ManagementReportSchedule",
     });
     attach("/schedules/{scheduleId}", "delete", "200", { type: "object" });
+    attach("/views", "get", "200", { $ref: "#/components/schemas/ManagementReportViews" });
+    attach("/views", "post", "201", { $ref: "#/components/schemas/ManagementReportView" });
+    body("/views", "post", { $ref: "#/components/schemas/ManagementReportViewInput" });
+    attach("/views/{viewId}", "patch", "200", {
+      $ref: "#/components/schemas/ManagementReportView",
+    });
+    body("/views/{viewId}", "patch", { $ref: "#/components/schemas/ManagementReportViewInput" });
+    attach("/views/{viewId}", "delete", "200", { type: "object" });
+    attach("/alerts", "get", "200", { $ref: "#/components/schemas/ManagementReportAlerts" });
+    attach("/alerts/evaluate", "post", "201", { type: "object" });
+    body("/alerts/evaluate", "post", {
+      type: "object",
+      required: ["from", "to", "comparisonMode"],
+      properties: {
+        from: date,
+        to: date,
+        comparisonMode: {
+          type: "string",
+          enum: ["previous_period", "previous_year", "none"],
+        },
+        dueInDays: { type: "integer", minimum: 1, maximum: 90, default: 3 },
+      },
+    });
+    attach("/alerts/{alertId}", "patch", "200", {
+      $ref: "#/components/schemas/ManagementReportAlert",
+    });
+    body("/alerts/{alertId}", "patch", {
+      type: "object",
+      required: ["status", "version"],
+      properties: {
+        status: { type: "string", enum: ["open", "claimed", "resolved", "dismissed"] },
+        assignedToIdentityId: { type: "string", format: "uuid", nullable: true },
+        dueAt: { type: "string", format: "date-time", nullable: true },
+        version: { type: "integer", minimum: 1 },
+      },
+    });
+    attach("/costs/backfill", "post", "201", { type: "object" });
+    body("/costs/backfill", "post", {
+      type: "object",
+      required: ["from", "to", "allowEstimated"],
+      properties: {
+        from: date,
+        to: date,
+        comparisonMode: {
+          type: "string",
+          enum: ["previous_period", "previous_year", "none"],
+          default: "previous_period",
+        },
+        allowEstimated: { type: "boolean", enum: [true] },
+      },
+    });
   }
 }

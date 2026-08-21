@@ -1,4 +1,16 @@
-import { Badge, Button, EmptyState, Modal, Progress, SearchField, Toast } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  Modal,
+  NativeSelect,
+  Progress,
+  SearchField,
+  Textarea,
+  Toast,
+} from "@giromesa/ui";
 import { type FormEvent, useMemo, useRef, useState } from "react";
 import { api } from "../../api";
 import {
@@ -573,7 +585,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     />
                     <label className="gm-form-field purchases-toolbar__status">
                       <span>Status</span>
-                      <select
+                      <NativeSelect
                         onChange={(event) => {
                           setStatus(event.target.value);
                           setPage(1);
@@ -587,7 +599,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                         <option value="received">Recebido</option>
                         <option value="canceled">Cancelado</option>
                         <option value="rejected">Rejeitado</option>
-                      </select>
+                      </NativeSelect>
                     </label>
                   </div>
                   {visible.length ? (
@@ -844,7 +856,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   <form className="gm-form-stack" onSubmit={(event) => void submitSupplier(event)}>
                     <label className="gm-form-field">
                       <span>Nome</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierName(event.target.value)}
                         required
                         value={supplierName}
@@ -852,7 +864,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>E-mail</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierEmail(event.target.value)}
                         type="email"
                         value={supplierEmail}
@@ -860,35 +872,35 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>CPF/CNPJ</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierDocument(event.target.value)}
                         value={supplierDocument}
                       />
                     </label>
                     <label className="gm-form-field">
                       <span>Contato</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierContact(event.target.value)}
                         value={supplierContact}
                       />
                     </label>
                     <label className="gm-form-field">
                       <span>Telefone</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierPhone(event.target.value)}
                         value={supplierPhone}
                       />
                     </label>
                     <label className="gm-form-field">
                       <span>Endereço</span>
-                      <input
+                      <Input
                         onChange={(event) => setSupplierAddress(event.target.value)}
                         value={supplierAddress}
                       />
                     </label>
                     <label className="gm-form-field">
                       <span>Observações</span>
-                      <textarea
+                      <Textarea
                         onChange={(event) => setSupplierNotes(event.target.value)}
                         value={supplierNotes}
                       />
@@ -969,7 +981,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     <div className="gm-form-grid">
                       <label className="gm-form-field">
                         <span>Fornecedor</span>
-                        <select
+                        <NativeSelect
                           onChange={(event) => setSupplierId(event.target.value)}
                           required
                           value={supplierId}
@@ -980,11 +992,11 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                               {supplier.name}
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label className="gm-form-field">
                         <span>Previsão de entrega</span>
-                        <input
+                        <Input
                           onChange={(event) => setExpectedAt(event.target.value)}
                           type="datetime-local"
                           value={expectedAt}
@@ -999,7 +1011,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                           <div className="purchases-line" key={line.key}>
                             <label className="gm-form-field">
                               <span>Item de estoque</span>
-                              <select
+                              <NativeSelect
                                 onChange={(event) =>
                                   patchLine(line.key, { inventoryItemId: event.target.value })
                                 }
@@ -1014,7 +1026,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                                       {candidate.name}
                                     </option>
                                   ))}
-                              </select>
+                              </NativeSelect>
                               <small>
                                 {item?.purchaseUnit
                                   ? `${item.purchaseUnit}${item.purchaseToStockFactor !== 1 ? ` = ${item.purchaseToStockFactor} ${item.unit}` : ""}`
@@ -1023,7 +1035,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             </label>
                             <label className="gm-form-field">
                               <span>Quantidade</span>
-                              <input
+                              <Input
                                 inputMode="decimal"
                                 onChange={(event) =>
                                   patchLine(line.key, { quantity: event.target.value })
@@ -1034,7 +1046,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             </label>
                             <label className="gm-form-field">
                               <span>Custo unitário (R$)</span>
-                              <input
+                              <Input
                                 inputMode="decimal"
                                 onChange={(event) =>
                                   patchLine(line.key, { unitCost: event.target.value })
@@ -1161,7 +1173,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             </strong>
                             <label className="gm-form-field">
                               <span>Quantidade</span>
-                              <input
+                              <Input
                                 inputMode="decimal"
                                 onChange={(event) =>
                                   setReceipt((all) => ({
@@ -1174,7 +1186,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             </label>
                             <label className="gm-form-field">
                               <span>Local de entrada</span>
-                              <select
+                              <NativeSelect
                                 onChange={(event) =>
                                   setReceipt((all) => ({
                                     ...all,
@@ -1191,11 +1203,11 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                                       {location.name}
                                     </option>
                                   ))}
-                              </select>
+                              </NativeSelect>
                             </label>
                             <label className="gm-form-field">
                               <span>Lote</span>
-                              <input
+                              <Input
                                 onChange={(event) =>
                                   setReceipt((all) => ({
                                     ...all,
@@ -1207,7 +1219,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             </label>
                             <label className="gm-form-field">
                               <span>Validade</span>
-                              <input
+                              <Input
                                 onChange={(event) =>
                                   setReceipt((all) => ({
                                     ...all,
@@ -1250,7 +1262,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   <form className="gm-form-stack" onSubmit={(event) => void submitInvoice(event)}>
                     <label className="gm-form-field">
                       <span>Documento fiscal / fatura</span>
-                      <input
+                      <Input
                         onChange={(event) => setDocumentNumber(event.target.value)}
                         required
                         value={documentNumber}
@@ -1259,7 +1271,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     <div className="gm-form-grid">
                       <label className="gm-form-field">
                         <span>Chave de acesso NF-e (44 dígitos)</span>
-                        <input
+                        <Input
                           inputMode="numeric"
                           maxLength={44}
                           onChange={(event) =>
@@ -1272,7 +1284,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                       </label>
                       <label className="gm-form-field">
                         <span>Série</span>
-                        <input
+                        <Input
                           inputMode="numeric"
                           maxLength={3}
                           onChange={(event) =>
@@ -1283,17 +1295,17 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                       </label>
                       <label className="gm-form-field">
                         <span>Modelo fiscal</span>
-                        <select
+                        <NativeSelect
                           onChange={(event) => setInvoiceModel(event.target.value)}
                           value={invoiceModel}
                         >
                           <option value="55">55 · NF-e</option>
                           <option value="65">65 · NFC-e</option>
-                        </select>
+                        </NativeSelect>
                       </label>
                       <label className="gm-form-field">
                         <span>Total de tributos (R$)</span>
-                        <input
+                        <Input
                           inputMode="decimal"
                           onChange={(event) => setInvoiceTaxTotal(event.target.value)}
                           value={invoiceTaxTotal}
@@ -1333,7 +1345,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>Emissão</span>
-                      <input
+                      <Input
                         onChange={(event) => setInvoiceIssuedAt(event.target.value)}
                         required
                         type="date"
@@ -1342,7 +1354,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>Competência</span>
-                      <input
+                      <Input
                         onChange={(event) => setInvoiceCompetenceDate(event.target.value)}
                         required
                         type="date"
@@ -1351,7 +1363,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>Vencimento</span>
-                      <input
+                      <Input
                         onChange={(event) => setInvoiceDueDate(event.target.value)}
                         required
                         type="date"
@@ -1360,7 +1372,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>Tolerância para conciliação (R$)</span>
-                      <input
+                      <Input
                         inputMode="decimal"
                         onChange={(event) => setInvoiceTolerance(event.target.value)}
                         value={invoiceTolerance}
@@ -1368,7 +1380,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </label>
                     <label className="gm-form-field">
                       <span>Valor da fatura (R$)</span>
-                      <input
+                      <Input
                         inputMode="decimal"
                         onChange={(event) => setInvoiceAmount(event.target.value)}
                         required
@@ -1389,7 +1401,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                               <strong>{itemById.get(item.inventoryItemId)?.name ?? "Item"}</strong>
                               <label className="gm-form-field">
                                 <span>Quantidade</span>
-                                <input
+                                <Input
                                   inputMode="decimal"
                                   onChange={(event) =>
                                     setInvoiceLineDrafts((all) => ({
@@ -1402,7 +1414,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                               </label>
                               <label className="gm-form-field">
                                 <span>Custo (R$)</span>
-                                <input
+                                <Input
                                   inputMode="decimal"
                                   onChange={(event) =>
                                     setInvoiceLineDrafts((all) => ({
@@ -1590,7 +1602,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   >
                     <label className="gm-form-field">
                       <span>Motivo</span>
-                      <textarea
+                      <Textarea
                         minLength={3}
                         onChange={(event) => setTransitionReason(event.target.value)}
                         required
@@ -1654,7 +1666,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     </p>
                     <label className="gm-form-field">
                       <span>Motivo</span>
-                      <textarea
+                      <Textarea
                         minLength={3}
                         onChange={(event) => setCorrectionReason(event.target.value)}
                         required

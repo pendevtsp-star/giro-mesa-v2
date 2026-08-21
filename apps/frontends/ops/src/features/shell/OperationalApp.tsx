@@ -1,6 +1,6 @@
-import { Button, Card, Icon, type IconName, Modal } from "@giromesa/ui";
+import { Button, Card, Icon, type IconName, Modal, SearchField } from "@giromesa/ui";
 import { type ChangeEvent, Suspense, useCallback, useEffect, useState } from "react";
-import { api } from "../../api";
+import { api, type TerminalProfile } from "../../api";
 import { PageContent, PageHeading, pageMeta } from "../../app/PageContent";
 import type { Session, SyncState } from "../../app/types";
 import { connectShell, type DeviceContext, loadShellOperationalState } from "../../bridge";
@@ -19,6 +19,7 @@ import { type RealtimeStatus, subscribeScopeRealtime } from "../../realtime";
 import { parseRoute, routeHref } from "../../router";
 import { canAccess } from "../../rules";
 import { Brand } from "../auth/AuthScreens";
+import { CustomerDisplayPage, customerDisplayTabIdFromHash } from "../counter/CustomerDisplayPage";
 import {
   KDS_NAVIGATION_EVENT,
   type KdsArea,
@@ -27,19 +28,42 @@ import {
   parseKdsArea,
   readKdsLastOperationalArea,
   resolveKdsAreaPermission,
+  saveKdsLastOperationalArea,
 } from "../kds/kds.navigation";
 import { TimeClockBanner } from "../people/TimeClockBanner";
 import { HelpDrawer } from "./HelpDrawer";
 import { ManagerApprovalInbox } from "./ManagerApprovalInbox";
+import { OperationalAttentionInbox } from "./OperationalAttentionInbox";
 import {
   ProfileAvatar as Avatar,
   profileAvatarFileError,
   profileAvatarStorageKey,
 } from "./ProfileAvatar";
+import { TerminalProfileSettings } from "./TerminalProfileSettings";
+import { readActiveTerminalProfile, saveTerminalProfile } from "./terminal-profile";
+
+const browserInstallationId = () => {
+  if (typeof window === "undefined") return "00000000-0000-4000-8000-000000000000";
+  const key = "giromesa:browser-installation-id";
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (
+      stored &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)
+    ) {
+      return stored;
+    }
+    const created = crypto.randomUUID();
+    window.localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
+};
 
 const browserRuntime: DeviceContext = {
   embedded: false,
-  deviceId: "00000000-0000-4000-8000-000000000000",
+  deviceId: browserInstallationId(),
   deviceName: "Navegador atual",
   platform: "web",
 };
@@ -65,6 +89,12 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: string }
   { route: "fiscal", label: "Fiscal", icon: "finance", group: "Gestão" },
   { route: "accountant", label: "Contador", icon: "people", group: "Gestão" },
   { route: "people", label: "Pessoas", icon: "people", group: "Gestão" },
+  {
+    route: "waiter-settlements",
+    label: "Fechamento da equipe",
+    icon: "people",
+    group: "Gestão",
+  },
   { route: "crm", label: "Clientes & CRM", icon: "crm", group: "Gestão" },
   { route: "multiunit", label: "Multiunidade", icon: "multiunit", group: "Sistema" },
   { route: "platform", label: "Plataforma", icon: "platform", group: "Sistema" },
@@ -154,7 +184,9 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
     if (typeof window === "undefined") return session.platformAdmin ? "platform" : "dashboard";
     let storedRoute: string | null = null;
     try {
-      storedRoute = window.localStorage.getItem(lastRouteStorageKey);
+      storedRoute =
+        readActiveTerminalProfile(session.unitId)?.defaultRoute ??
+        window.localStorage.getItem(lastRouteStorageKey);
     } catch {}
     return resolveInitialOperationalRoute(window.location.hash, storedRoute, session);
   });
@@ -169,6 +201,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   const [centralOperationalOpen, setCentralOperationalOpen] = useState(true);
   const [centralMobileOpen, setCentralMobileOpen] = useState(false);
   const [receptionPendingCount, setReceptionPendingCount] = useState<number | null>(null);
+  const [scopeRevision, setScopeRevision] = useState(0);
   const [profileMenu, setProfileMenu] = useState(false);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -180,6 +213,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   });
 
   useEffect(() => {
+    void scopeRevision;
     if (!canAccess(session.profile, "reservations")) {
       setReceptionPendingCount(null);
       return;
@@ -213,12 +247,10 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
       }
     };
     void refresh();
-    const interval = window.setInterval(refresh, 30_000);
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
-  }, [session.organizationId, session.profile, session.unitId]);
+  }, [scopeRevision, session.organizationId, session.profile, session.unitId]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -339,18 +371,37 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   );
   const [syncState, setSyncState] = useState<SyncState>("online");
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
-  const [scopeRevision, setScopeRevision] = useState(0);
   const [peopleNavAllowed, setPeopleNavAllowed] = useState<boolean | null>(null);
   const [queuedCommands, setQueuedCommands] = useState(0);
   const [runtime, setRuntime] = useState<DeviceContext>(browserRuntime);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [reconciliationCount, setReconciliationCount] = useState(0);
+  const [terminalProfile, setTerminalProfile] = useState<TerminalProfile | null>(() =>
+    typeof window === "undefined" ? null : readActiveTerminalProfile(session.unitId),
+  );
+  const [terminalSettingsOpen, setTerminalSettingsOpen] = useState(false);
   const organization = session.organization;
   const unit = session.unit;
 
   useEffect(() => {
     document.getElementById("main-content")?.focus({ preventScroll: true });
   }, []);
+
+  useEffect(() => {
+    if (session.platformAdmin) return;
+    let active = true;
+    void api.pilot
+      .terminalProfile(session.organizationId, session.unitId, runtime.deviceId)
+      .then((profile) => {
+        if (!active || !profile) return;
+        saveTerminalProfile(profile);
+        setTerminalProfile(profile);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [runtime.deviceId, session.organizationId, session.platformAdmin, session.unitId]);
 
   useEffect(() => {
     try {
@@ -396,6 +447,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
         canManageKdsUnitSettings,
         readKdsLastOperationalArea(session.unitId),
       );
+      if (nextArea !== "settings") saveKdsLastOperationalArea(session.unitId, nextArea);
       setKdsArea(nextArea);
       setKdsNavigationOpen(true);
       if (window.location.hash !== kdsAreaHref(nextArea)) {
@@ -627,6 +679,25 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
         (route !== "people" || peopleNavAllowed !== false)
       ? route
       : "dashboard";
+  const terminalQuickActions = (terminalProfile?.quickActions ?? []).flatMap((action) => {
+    const definition =
+      action === "open_tab"
+        ? { label: "Abrir mesa", route: "salon" as const }
+        : action === "new_order"
+          ? { label: "Novo pedido", route: "counter" as const }
+          : action === "receive"
+            ? { label: "Receber", route: "counter" as const }
+            : action === "waitlist"
+              ? { label: "Fila", route: "reservations" as const }
+              : action === "print"
+                ? { label: "Imprimir", route: "counter" as const }
+                : action === "search"
+                  ? { label: "Buscar", route: null }
+                  : null;
+    if (!definition || (definition.route && !canAccess(session.profile, definition.route)))
+      return [];
+    return [{ action, ...definition }];
+  });
   const lastKdsOperationalArea =
     kdsArea === "settings" ? readKdsLastOperationalArea(session.unitId) : kdsArea;
 
@@ -702,6 +773,22 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
       .toLocaleLowerCase("pt-BR")
       .includes(normalizedCommandQuery);
   });
+  const customerDisplayTabId =
+    safeRoute === "counter" && typeof window !== "undefined"
+      ? customerDisplayTabIdFromHash(window.location.hash)
+      : null;
+
+  if (customerDisplayTabId) {
+    return (
+      <CustomerDisplayPage
+        organizationId={session.organizationId}
+        refreshToken={scopeRevision}
+        tabId={customerDisplayTabId}
+        unitId={session.unitId}
+        unitName={session.unit.name}
+      />
+    );
+  }
 
   function renderNavItem(item: (typeof navItems)[number]) {
     return (
@@ -748,7 +835,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             </span>
             <span className="nav-label">{item.label}</span>
           </a>
-          <button
+          <Button
             aria-controls="kds-navigation-children"
             aria-expanded={kdsNavigationOpen}
             aria-label={`${kdsNavigationOpen ? "Recolher" : "Expandir"} áreas do Produção KDS`}
@@ -757,7 +844,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             type="button"
           >
             <span aria-hidden="true">⌄</span>
-          </button>
+          </Button>
         </div>
         <div
           className="nav-submenu__children"
@@ -788,7 +875,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${terminalProfile?.compact ? "app-shell--terminal-compact" : ""}`}>
       <a className="skip-link" href="#main-content">
         Ir para o conteúdo
       </a>
@@ -798,7 +885,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
       >
         <div className="sidebar__brand">
           <Brand />
-          <button
+          <Button
             aria-controls="primary-sidebar"
             aria-label="Fechar menu"
             className="sidebar__close"
@@ -806,7 +893,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             type="button"
           >
             ×
-          </button>
+          </Button>
         </div>
         <div className="unit-chip">
           <span
@@ -854,39 +941,41 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
           </nav>
         )}
         <div className="sidebar__footer">
-          <button
+          <Button
             aria-pressed={sidebarIsCollapsed}
-            type="button"
             className="sidebar__toggle-btn"
             onClick={toggleSidebar}
+            size="sm"
             aria-label={sidebarIsCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
             title={
               sidebarIsCollapsed
                 ? "Expandir menu lateral (Ctrl+B)"
                 : "Recolher menu lateral (Ctrl+B)"
             }
+            variant="ghost"
           >
             <Icon name={sidebarIsCollapsed ? "arrow-down" : "arrow-up"} size={14} />
             {!sidebarIsCollapsed && <span>Recolher menu</span>}
-          </button>
+          </Button>
 
-          <button
+          <Button
             className="support-link"
             onClick={() => setHelpOpen(true)}
-            type="button"
+            size="sm"
             title="Central de ajuda"
+            variant="ghost"
           >
             <span aria-hidden="true" className="support-link__icon">
               ?
             </span>
             {!sidebarIsCollapsed && <span className="support-link__label">Central de ajuda</span>}
-          </button>
+          </Button>
           {!sidebarIsCollapsed && <small>GiroMesa Operação</small>}
         </div>
       </aside>
 
       {navOpen && (
-        <button
+        <Button
           aria-label="Fechar menu"
           className="nav-backdrop"
           onClick={() => setNavOpen(false)}
@@ -896,7 +985,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
 
       <div className={`workspace ${sidebarIsCollapsed ? "workspace--collapsed" : ""}`}>
         {hasAnyPopoverOpen && (
-          <button
+          <Button
             aria-label="Fechar menu aberto"
             className="popover-backdrop"
             onClick={closeAllPopovers}
@@ -906,16 +995,17 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
 
         <header className="topbar">
           <div className="topbar__left">
-            <button
+            <Button
               aria-controls="primary-sidebar"
               aria-expanded={navOpen}
               aria-label="Abrir menu"
               className="menu-button"
               onClick={() => setNavOpen(true)}
-              type="button"
+              size="sm"
+              variant="ghost"
             >
               ☰
-            </button>
+            </Button>
             <div className="topbar__scope">
               <span className="org-label">{organization.name}</span>
               <strong className="unit-label">{unit.name}</strong>
@@ -923,22 +1013,34 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
           </div>
 
           <div className="topbar__center">
-            <button
+            <Button
               className="topbar__command-bar"
               onClick={() => {
                 closeAllPopovers();
                 setCommandPaletteOpen(true);
               }}
+              variant="secondary"
               title="Ir para módulo (Ctrl+K)"
-              type="button"
             >
               <Icon name="search" size={14} />
               <span>Ir para módulo</span>
               <kbd>Ctrl + K</kbd>
-            </button>
+            </Button>
           </div>
 
           <div className="topbar__actions">
+            <OperationalAttentionInbox
+              canCounter={canAccess(session.profile, "counter")}
+              canSalon={canAccess(session.profile, "salon")}
+              onChanged={() => setScopeRevision((value) => value + 1)}
+              onNavigate={(target) => {
+                window.location.hash = routeHref(target);
+              }}
+              organizationId={session.organizationId}
+              realtimeStatus={realtimeStatus}
+              refreshToken={scopeRevision}
+              unitId={session.unitId}
+            />
             <ManagerApprovalInbox
               disabled={session.platformAdmin}
               onChanged={() => setScopeRevision((value) => value + 1)}
@@ -950,20 +1052,21 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             <OperationalClock timeZone={unit.timezone} />
 
             <div className="topbar__popover-anchor">
-              <button
+              <Button
                 aria-label={`Conectividade: ${networkLabel}`}
                 aria-controls="network-diagnostics"
                 aria-expanded={networkPopoverOpen}
                 className={`sync-pill sync-pill--${networkTone}`}
                 onClick={() => togglePopover("network")}
+                size="sm"
                 title="Diagnóstico de conectividade e fila de contingência"
-                type="button"
+                variant="secondary"
               >
                 <span aria-hidden="true" className="sync-pill__icon">
                   <Icon name={networkIcon} size={13} />
                 </span>
                 <span className="sync-pill__text">{networkLabel}</span>
-              </button>
+              </Button>
 
               {networkPopoverOpen && (
                 <section
@@ -1017,13 +1120,14 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             </div>
 
             <div className="profile-menu">
-              <button
+              <Button
                 aria-controls="profile-popover"
                 aria-expanded={profileMenu}
                 aria-label={`Abrir menu do perfil de ${session.profile.name}`}
                 className="profile-button"
                 onClick={() => togglePopover("profile")}
-                type="button"
+                size="sm"
+                variant="ghost"
               >
                 <Avatar imageUrl={avatarUrl} profile={session.profile} />
                 <span>
@@ -1031,7 +1135,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   <small>{session.profile.role}</small>
                 </span>
                 <span aria-hidden="true">⌄</span>
-              </button>
+              </Button>
               {profileMenu && (
                 <section
                   aria-label="Menu do perfil"
@@ -1055,9 +1159,9 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                           {avatarUrl ? "Trocar foto" : "Adicionar foto"}
                         </label>
                         {avatarUrl && (
-                          <button onClick={removeAvatar} type="button">
+                          <Button onClick={removeAvatar} size="sm" variant="ghost" type="button">
                             Remover
-                          </button>
+                          </Button>
                         )}
                       </span>
                     </span>
@@ -1072,11 +1176,29 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   )}
 
                   <div className="profile-popover__tools">
-                    <button
+                    {["owner", "manager"].includes(session.profile.id) && (
+                      <Button
+                        className="theme-toggle"
+                        onClick={() => {
+                          closeAllPopovers();
+                          setTerminalSettingsOpen(true);
+                        }}
+                        variant="ghost"
+                      >
+                        <span aria-hidden="true">
+                          <Icon name="settings" size={14} />
+                        </span>
+                        <span>
+                          <strong>Configurar terminal</strong>
+                          <small>Tela inicial, impressora e atalhos</small>
+                        </span>
+                      </Button>
+                    )}
+                    <Button
                       aria-pressed={theme === "dark"}
                       className="theme-toggle"
                       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                      type="button"
+                      variant="ghost"
                     >
                       <span aria-hidden="true" className="theme-toggle__glyph">
                         Aa
@@ -1085,15 +1207,15 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                         <strong>{theme === "dark" ? "Tema claro" : "Tema escuro"}</strong>
                         <small>Alternar aparência</small>
                       </span>
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
                       className="theme-toggle"
                       onClick={() => {
                         closeAllPopovers();
                         setShortcutsModalOpen(true);
                       }}
-                      type="button"
+                      variant="ghost"
                     >
                       <span aria-hidden="true">
                         <Icon name="list" size={14} />
@@ -1102,7 +1224,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                         <strong>Atalhos do teclado</strong>
                         <small>Ctrl + K e teclas F1–F4</small>
                       </span>
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="profile-popover__session-actions">
@@ -1129,21 +1251,18 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
           size="md"
           title="Ir para módulo"
         >
-          <label className="command-palette__search" htmlFor="shell-command-search">
-            <Icon name="search" size={18} />
-            <span className="sr-only">Buscar módulo</span>
-            <input
-              id="shell-command-search"
-              onChange={(event) => setCommandQuery(event.target.value)}
-              placeholder="Digite o nome do módulo"
-              type="search"
-              value={commandQuery}
-            />
-          </label>
+          <SearchField
+            aria-label="Buscar módulo"
+            className="command-palette__search"
+            id="shell-command-search"
+            onChange={(event) => setCommandQuery(event.target.value)}
+            placeholder="Digite o nome do módulo"
+            value={commandQuery}
+          />
           <div aria-live="polite" className="command-palette__results">
             <p className="command-palette__eyebrow">Navegação disponível</p>
             {commandResults.map((item) => (
-              <button
+              <Button
                 className="command-palette__result"
                 key={item.route}
                 onClick={() => {
@@ -1151,7 +1270,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   setCommandPaletteOpen(false);
                   setCommandQuery("");
                 }}
-                type="button"
+                variant="ghost"
               >
                 <span aria-hidden="true" className="command-palette__result-icon">
                   <Icon name={item.icon} size={16} />
@@ -1160,7 +1279,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   <strong>{item.label}</strong>
                   <small>{pageMeta[item.route]?.description}</small>
                 </span>
-              </button>
+              </Button>
             ))}
             {commandResults.length === 0 && (
               <p className="command-palette__empty">
@@ -1213,9 +1332,15 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
         {runtimeError && (
           <div className="runtime-error" role="alert">
             <strong>Atenção:</strong> {runtimeError}
-            <button aria-label="Fechar aviso" onClick={() => setRuntimeError(null)} type="button">
+            <Button
+              aria-label="Fechar aviso"
+              onClick={() => setRuntimeError(null)}
+              size="sm"
+              variant="ghost"
+              type="button"
+            >
               ×
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1224,6 +1349,23 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             title={page?.title ?? "Visão geral"}
             description={page?.description ?? "Resumo operacional da unidade."}
           />
+          {compactNavigation && terminalQuickActions.length > 0 && (
+            <nav aria-label="Atalhos deste terminal" className="terminal-quick-actions">
+              {terminalQuickActions.map((item) => (
+                <Button
+                  key={item.action}
+                  onClick={() => {
+                    if (item.route) window.location.hash = routeHref(item.route);
+                    else setCommandPaletteOpen(true);
+                  }}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </nav>
+          )}
           <TimeClockBanner
             identityId={session.identityId}
             scope={{
@@ -1259,7 +1401,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
           <nav aria-label="Navegação rápida mobile" className="mobile-bottom-nav">
             {mobileNav.map((item) =>
               isCentralOperationalRoute(item.route) ? (
-                <button
+                <Button
                   className={isCentralOperationalRoute(route) ? "active" : ""}
                   key="central-operational"
                   onClick={() => setCentralMobileOpen(true)}
@@ -1270,7 +1412,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   {receptionPendingCount !== null && receptionPendingCount > 0 && (
                     <small>{receptionPendingCount}</small>
                   )}
-                </button>
+                </Button>
               ) : (
                 <a
                   className={route === item.route ? "active" : ""}
@@ -1314,6 +1456,19 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
           ))}
         </nav>
       </Modal>
+      <TerminalProfileSettings
+        isOpen={terminalSettingsOpen}
+        onClose={() => setTerminalSettingsOpen(false)}
+        onSaved={(profile) => {
+          setTerminalProfile(profile);
+          if (canAccess(session.profile, profile.defaultRoute)) {
+            window.location.hash = routeHref(profile.defaultRoute);
+          }
+        }}
+        organizationId={session.organizationId}
+        runtime={runtime}
+        unitId={session.unitId}
+      />
     </div>
   );
 }

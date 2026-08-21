@@ -1,3 +1,4 @@
+import { Button } from "@giromesa/ui";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import type { CartItem } from "../../lib/menu";
 import type { PublicOrderReceipt } from "../../lib/public-order";
@@ -62,9 +63,9 @@ export function CartDialog({
               <p>Sua seleção</p>
               <h2>Revisar pedido</h2>
             </div>
-            <button type="button" aria-label="Fechar seleção" onClick={onClose}>
+            <Button type="button" variant="ghost" aria-label="Fechar seleção" onClick={onClose}>
               ×
-            </button>
+            </Button>
           </header>
           <CartSummary
             cart={cart}

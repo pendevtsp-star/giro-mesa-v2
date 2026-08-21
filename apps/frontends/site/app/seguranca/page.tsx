@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge, Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import {
@@ -132,7 +133,7 @@ export default function SecurityPage() {
             <p className="eyebrow">Segundo fator</p>
             <h2 id="mfa-title">Autenticação em dois fatores</h2>
           </div>
-          <span className={`security-state ${enabled === true ? "enabled" : ""}`}>
+          <Badge tone={enabled === true ? "success" : enabled === null ? "warning" : "neutral"}>
             {enabled === null
               ? message
                 ? "Acesso necessário"
@@ -140,18 +141,18 @@ export default function SecurityPage() {
               : enabled
                 ? "Ativo"
                 : "Inativo"}
-          </span>
+          </Badge>
         </div>
 
         {enabled === false && !setup && (
-          <button
+          <Button
             className="button button-primary"
             type="button"
             disabled={busy}
             onClick={beginSetup}
           >
             {busy ? "Preparando…" : "Ativar MFA"}
-          </button>
+          </Button>
         )}
 
         {setup && (
@@ -164,9 +165,9 @@ export default function SecurityPage() {
             <a className="security-authenticator-link" href={setup.otpauthUri} rel="noreferrer">
               Abrir no aplicativo autenticador
             </a>
-            <label>
+            <Label>
               Código de 6 dígitos
-              <input
+              <Input
                 name="code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -175,12 +176,12 @@ export default function SecurityPage() {
                 maxLength={6}
                 required
               />
-            </label>
+            </Label>
             <div className="security-actions">
-              <button className="button button-primary" type="submit" disabled={busy}>
+              <Button className="button button-primary" type="submit" disabled={busy}>
                 {busy ? "Confirmando…" : "Confirmar e ativar"}
-              </button>
-              <button
+              </Button>
+              <Button
                 className="button button-secondary"
                 type="button"
                 disabled={busy}
@@ -190,7 +191,7 @@ export default function SecurityPage() {
                 }}
               >
                 Cancelar
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -200,9 +201,9 @@ export default function SecurityPage() {
             <p className="security-form-copy">
               MFA ativo. Para desativar, confirme um código TOTP atual ou um código de recuperação.
             </p>
-            <label>
+            <Label>
               {disableWithRecovery ? "Código de recuperação" : "Código de 6 dígitos"}
-              <input
+              <Input
                 name="mfaProof"
                 inputMode={disableWithRecovery ? "text" : "numeric"}
                 autoComplete={disableWithRecovery ? "off" : "one-time-code"}
@@ -211,21 +212,21 @@ export default function SecurityPage() {
                 maxLength={disableWithRecovery ? 64 : 6}
                 required
               />
-            </label>
-            <button
+            </Label>
+            <Button
               className="button button-secondary"
               type="button"
               onClick={() => setDisableWithRecovery((value) => !value)}
             >
               {disableWithRecovery ? "Usar código do autenticador" : "Usar código de recuperação"}
-            </button>
-            <button
+            </Button>
+            <Button
               className="button button-secondary security-danger"
               type="submit"
               disabled={busy}
             >
               {busy ? "Validando…" : "Desativar MFA"}
-            </button>
+            </Button>
           </form>
         )}
 
@@ -242,7 +243,7 @@ export default function SecurityPage() {
                 </li>
               ))}
             </ul>
-            <button
+            <Button
               className="button button-primary"
               type="button"
               onClick={() => {
@@ -251,7 +252,7 @@ export default function SecurityPage() {
               }}
             >
               Já guardei — ocultar códigos
-            </button>
+            </Button>
           </div>
         )}
 

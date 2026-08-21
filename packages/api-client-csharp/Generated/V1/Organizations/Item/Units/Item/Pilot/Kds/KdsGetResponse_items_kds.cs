@@ -30,6 +30,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_completedAt CompletedAt { get; set; }
 #endif
+        /// <summary>The dependencyHeld property</summary>
+        public bool? DependencyHeld { get; set; }
         /// <summary>The firedAt property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -60,6 +62,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
 #endif
         /// <summary>The readyQuantity property</summary>
         public int? ReadyQuantity { get; set; }
+        /// <summary>The stage property</summary>
+        public int? Stage { get; set; }
         /// <summary>The startedAt property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -97,12 +101,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
             {
                 { "blocked", n => { Blocked = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds_blocked>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds_blocked.CreateFromDiscriminatorValue); } },
                 { "completedAt", n => { CompletedAt = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_completedAt>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_completedAt.CreateFromDiscriminatorValue); } },
+                { "dependencyHeld", n => { DependencyHeld = n.GetBoolValue(); } },
                 { "firedAt", n => { FiredAt = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_firedAt>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_firedAt.CreateFromDiscriminatorValue); } },
                 { "held", n => { Held = n.GetBoolValue(); } },
                 { "heldAt", n => { HeldAt = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_heldAt>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_heldAt.CreateFromDiscriminatorValue); } },
                 { "quantity", n => { Quantity = n.GetIntValue(); } },
                 { "readyAt", n => { ReadyAt = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_readyAt>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_readyAt.CreateFromDiscriminatorValue); } },
                 { "readyQuantity", n => { ReadyQuantity = n.GetIntValue(); } },
+                { "stage", n => { Stage = n.GetIntValue(); } },
                 { "startedAt", n => { StartedAt = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_startedAt>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_startedAt.CreateFromDiscriminatorValue); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds_status>(); } },
             };
@@ -116,12 +122,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds_blocked>("blocked", Blocked);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_completedAt>("completedAt", CompletedAt);
+            writer.WriteBoolValue("dependencyHeld", DependencyHeld);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_firedAt>("firedAt", FiredAt);
             writer.WriteBoolValue("held", Held);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_heldAt>("heldAt", HeldAt);
             writer.WriteIntValue("quantity", Quantity);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_readyAt>("readyAt", ReadyAt);
             writer.WriteIntValue("readyQuantity", ReadyQuantity);
+            writer.WriteIntValue("stage", Stage);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.KdsGetResponse_items_kds_startedAt>("startedAt", StartedAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds_status>("status", Status);
             writer.WriteAdditionalData(AdditionalData);

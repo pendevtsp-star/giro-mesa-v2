@@ -19,7 +19,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "biome check src drizzle.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm build && node --test dist/schema.test.js",
+    "test": "pnpm build && node --test dist/schema.test.js dist/report-artifacts.test.js",
     "db:generate": "pnpm build && drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "pnpm build && node dist/seed.js"

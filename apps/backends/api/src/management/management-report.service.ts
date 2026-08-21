@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   auditEvents,
+  buildReportArtifact,
   type Database,
   managementAccountsPayable,
   managementAccountsReceivable,
@@ -8,9 +9,13 @@ import {
   managementPayablePayments,
   managementReceivableLines,
   managementReceivablePayments,
+  managementReportAlerts,
   managementReportBudgets,
+  managementReportCostBackfills,
+  managementReportCostSnapshots,
   managementReportExports,
   managementReportSchedules,
+  managementReportViews,
   outboxEvents,
   posCatalogCategories,
   posOrderItems,
@@ -29,28 +34,34 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, eq, gte, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { MetricsService, reportEmailDeliveryConfigured } from "../health/health.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { managementReplay, managementRequestHash } from "./management.rules.js";
 import { ManagementService } from "./management.service.js";
 import {
+  buildReportForecast,
   nextReportRun,
   proratedBudgetTarget,
   reportBudgetCoverage,
-  reportCsv,
   reportNextCursor,
   reportPageOffset,
 } from "./management-report.rules.js";
 import type {
+  ReportAlertActionInput,
+  ReportAlertEvaluateInput,
+  ReportAlertListQuery,
   ReportBudgetInput,
+  ReportCostBackfillInput,
   ReportDrillDownQuery,
   ReportExportInput,
   ReportExportListQuery,
   ReportMetric,
   ReportScheduleCreateInput,
   ReportScheduleUpdateInput,
+  ReportViewCreateInput,
+  ReportViewUpdateInput,
 } from "./management-report.schemas.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -61,6 +72,9 @@ type PermissionSet = {
   export: boolean;
   manageBudget: boolean;
   manageSchedules: boolean;
+  manageViews: boolean;
+  manageAlerts: boolean;
+  backfillCosts: boolean;
   multiunit: boolean;
 };
 
@@ -105,6 +119,9 @@ export class ManagementReportService {
       export: allowed("reports:export"),
       manageBudget: allowed("reports:budget:manage"),
       manageSchedules: allowed("reports:schedule:manage"),
+      manageViews: allowed("reports:views:manage"),
+      manageAlerts: allowed("reports:alerts:manage"),
+      backfillCosts: allowed("reports:costs:backfill"),
       multiunit: roles.includes("owner"),
     } satisfies PermissionSet;
   }
@@ -260,11 +277,231 @@ export class ManagementReportService {
     };
   }
 
+  private async operationalIntelligence(
+    organizationId: string,
+    unitId: string,
+    query: { from: string; to: string },
+    report: Awaited<ReturnType<ManagementService["reports"]>>,
+    viewCosts: boolean,
+  ) {
+    type LaborRow = {
+      roleLabel: string;
+      people: number;
+      workedMinutes: number;
+      scheduledMinutes: number;
+      overtimeMinutes: number;
+      scheduledDays: number;
+      missingRates: number;
+      coveredCostCents: number;
+    };
+    type FiscalRow = {
+      documentCount: number;
+      authorizedCount: number;
+      rejectedCount: number;
+      canceledCount: number;
+      authorizedCents: number;
+      taxCents: number;
+    };
+    type ReconciliationRow = {
+      matchedCount: number;
+      unmatchedCount: number;
+      divergentCount: number;
+      resolvedCount: number;
+      unmatchedCents: number;
+      divergentCents: number;
+    };
+    const [laborRows, fiscalRows, reconciliationRows] = await Promise.all([
+      this.database.db.execute<LaborRow>(sql`
+        with breaks as (
+          select time_entry_id,
+                 coalesce(sum(extract(epoch from (ended_at - started_at)) / 60.0), 0) as minutes
+          from management_time_entry_breaks
+          where organization_id = ${organizationId}::uuid and unit_id = ${unitId}::uuid
+            and ended_at is not null
+          group by time_entry_id
+        ), actual_rows as (
+          select people.id as person_id, people.role_label,
+                 timezone(${report.timezone}, entries.clocked_in_at)::date as work_date,
+                 greatest(0, extract(epoch from (entries.clocked_out_at - entries.clocked_in_at)) / 60.0 - coalesce(breaks.minutes, 0)) as worked_minutes,
+                 people.hourly_rate_cents
+          from management_time_entries entries
+          inner join management_people people
+            on people.organization_id = entries.organization_id and people.unit_id = entries.unit_id and people.id = entries.person_id
+          left join breaks on breaks.time_entry_id = entries.id
+          where entries.organization_id = ${organizationId}::uuid and entries.unit_id = ${unitId}::uuid
+            and entries.clocked_out_at is not null
+            and timezone(${report.timezone}, entries.clocked_in_at)::date between ${query.from}::date and ${query.to}::date
+        ), actual as (
+          select person_id, role_label, work_date, sum(worked_minutes) as worked_minutes, hourly_rate_cents
+          from actual_rows group by person_id, role_label, work_date, hourly_rate_cents
+        ), scheduled_rows as (
+          select people.id as person_id, people.role_label,
+                 timezone(${report.timezone}, schedules.starts_at)::date as work_date,
+                 greatest(0, extract(epoch from (schedules.ends_at - schedules.starts_at)) / 60.0 - schedules.break_minutes) as scheduled_minutes
+          from management_schedules schedules
+          inner join management_people people
+            on people.organization_id = schedules.organization_id and people.unit_id = schedules.unit_id and people.id = schedules.person_id
+          where schedules.organization_id = ${organizationId}::uuid and schedules.unit_id = ${unitId}::uuid
+            and schedules.canceled_at is null
+            and timezone(${report.timezone}, schedules.starts_at)::date between ${query.from}::date and ${query.to}::date
+        ), scheduled as (
+          select person_id, role_label, work_date, sum(scheduled_minutes) as scheduled_minutes
+          from scheduled_rows group by person_id, role_label, work_date
+        ), combined as (
+          select coalesce(actual.person_id, scheduled.person_id) as person_id,
+                 coalesce(actual.role_label, scheduled.role_label) as role_label,
+                 actual.worked_minutes, scheduled.scheduled_minutes, actual.hourly_rate_cents
+          from actual full join scheduled
+            on scheduled.person_id = actual.person_id and scheduled.work_date = actual.work_date
+        )
+        select role_label as "roleLabel", count(distinct person_id)::int as people,
+               coalesce(round(sum(worked_minutes)), 0)::int as "workedMinutes",
+               coalesce(round(sum(scheduled_minutes)), 0)::int as "scheduledMinutes",
+               coalesce(round(sum(greatest(worked_minutes - scheduled_minutes, 0)) filter (where scheduled_minutes is not null)), 0)::int as "overtimeMinutes",
+               count(*) filter (where scheduled_minutes is not null)::int as "scheduledDays",
+               count(*) filter (where worked_minutes > 0 and hourly_rate_cents is null)::int as "missingRates",
+               coalesce(round(sum(worked_minutes * hourly_rate_cents / 60.0) filter (where hourly_rate_cents is not null)), 0)::int as "coveredCostCents"
+        from combined group by role_label order by "workedMinutes" desc, role_label
+      `),
+      this.database.db.execute<FiscalRow>(sql`
+        select count(*)::int as "documentCount",
+               count(*) filter (where status = 'authorized')::int as "authorizedCount",
+               count(*) filter (where status = 'rejected')::int as "rejectedCount",
+               count(*) filter (where status = 'canceled')::int as "canceledCount",
+               coalesce(sum(total_cents) filter (where status = 'authorized'), 0)::int as "authorizedCents",
+               coalesce(sum(tax_cents) filter (where status = 'authorized'), 0)::int as "taxCents"
+        from fiscal_documents
+        where organization_id = ${organizationId}::uuid and unit_id = ${unitId}::uuid
+          and timezone(${report.timezone}, issued_at)::date between ${query.from}::date and ${query.to}::date
+      `),
+      this.database.db.execute<ReconciliationRow>(sql`
+        select count(*) filter (where entries.status = 'matched')::int as "matchedCount",
+               count(*) filter (where entries.status = 'unmatched')::int as "unmatchedCount",
+               count(*) filter (where entries.status = 'divergent')::int as "divergentCount",
+               count(*) filter (where entries.status = 'resolved')::int as "resolvedCount",
+               coalesce(sum(entries.net_cents) filter (where entries.status = 'unmatched'), 0)::int as "unmatchedCents",
+               coalesce(sum(entries.net_cents) filter (where entries.status = 'divergent'), 0)::int as "divergentCents"
+        from management_reconciliation_entries entries
+        inner join management_reconciliation_imports imports
+          on imports.organization_id = entries.organization_id and imports.unit_id = entries.unit_id and imports.id = entries.import_id
+        where entries.organization_id = ${organizationId}::uuid and entries.unit_id = ${unitId}::uuid
+          and timezone(${report.timezone}, imports.imported_at)::date between ${query.from}::date and ${query.to}::date
+      `),
+    ]);
+    const laborRoles = laborRows.map((row) => ({
+      roleLabel: row.roleLabel,
+      people: Number(row.people),
+      workedMinutes: Number(row.workedMinutes),
+      scheduledMinutes: Number(row.scheduledMinutes),
+      overtimeMinutes: Number(row.overtimeMinutes),
+      laborCostCents:
+        viewCosts && Number(row.missingRates) === 0 ? Number(row.coveredCostCents) : null,
+      costCoverage:
+        Number(row.workedMinutes) === 0
+          ? ("unavailable" as const)
+          : Number(row.missingRates) === 0
+            ? ("complete" as const)
+            : ("partial" as const),
+    }));
+    const workedMinutes = laborRoles.reduce((sum, row) => sum + row.workedMinutes, 0);
+    const missingLaborCosts = laborRoles.some((row) => row.costCoverage === "partial");
+    const laborCostCents =
+      viewCosts && !missingLaborCosts
+        ? laborRoles.reduce((sum, row) => sum + (row.laborCostCents ?? 0), 0)
+        : null;
+    const fiscal = fiscalRows[0] ?? {
+      documentCount: 0,
+      authorizedCount: 0,
+      rejectedCount: 0,
+      canceledCount: 0,
+      authorizedCents: 0,
+      taxCents: 0,
+    };
+    const external = reconciliationRows[0] ?? {
+      matchedCount: 0,
+      unmatchedCount: 0,
+      divergentCount: 0,
+      resolvedCount: 0,
+      unmatchedCents: 0,
+      divergentCents: 0,
+    };
+    const posRevenueCents = report.reportFamilies.sales.netRevenueCents;
+    const paymentCents = report.breakdowns.paymentMethods.reduce(
+      (sum, row) => sum + row.revenueCents,
+      0,
+    );
+    const forecast = buildReportForecast({
+      dailySeries: report.dailySeries,
+      cashFlow: report.cashFlow,
+      inventory: report.reportFamilies.inventory.analysis,
+    });
+    return {
+      labor: {
+        coverage: workedMinutes > 0 ? ("complete" as const) : ("unavailable" as const),
+        costCoverage: !viewCosts
+          ? ("unavailable" as const)
+          : missingLaborCosts
+            ? ("partial" as const)
+            : workedMinutes > 0
+              ? ("complete" as const)
+              : ("unavailable" as const),
+        scheduleCoverage: laborRows.some((row) => Number(row.scheduledDays) > 0)
+          ? ("complete" as const)
+          : ("unavailable" as const),
+        people: laborRoles.reduce((sum, row) => sum + row.people, 0),
+        workedMinutes,
+        scheduledMinutes: laborRoles.reduce((sum, row) => sum + row.scheduledMinutes, 0),
+        overtimeMinutes: laborRows.some((row) => Number(row.scheduledDays) > 0)
+          ? laborRoles.reduce((sum, row) => sum + row.overtimeMinutes, 0)
+          : null,
+        laborCostCents,
+        laborCostPercent:
+          laborCostCents !== null && posRevenueCents > 0
+            ? Number(((laborCostCents / posRevenueCents) * 100).toFixed(2))
+            : null,
+        salesPerLaborHourCents:
+          workedMinutes > 0 ? Math.round((posRevenueCents * 60) / workedMinutes) : null,
+        roles: laborRoles,
+      },
+      reconciliation: {
+        coverage:
+          posRevenueCents === 0 && Number(fiscal.documentCount) === 0
+            ? ("unavailable" as const)
+            : Number(fiscal.authorizedCents) === posRevenueCents && paymentCents === posRevenueCents
+              ? ("complete" as const)
+              : ("partial" as const),
+        posRevenueCents,
+        paymentCents,
+        paymentDifferenceCents: paymentCents - posRevenueCents,
+        fiscalAuthorizedCents: Number(fiscal.authorizedCents),
+        fiscalDifferenceCents: Number(fiscal.authorizedCents) - posRevenueCents,
+        taxCents: Number(fiscal.taxCents),
+        documents: {
+          total: Number(fiscal.documentCount),
+          authorized: Number(fiscal.authorizedCount),
+          rejected: Number(fiscal.rejectedCount),
+          canceled: Number(fiscal.canceledCount),
+        },
+        external: {
+          matched: Number(external.matchedCount),
+          unmatched: Number(external.unmatchedCount),
+          divergent: Number(external.divergentCount),
+          resolved: Number(external.resolvedCount),
+          unmatchedCents: Number(external.unmatchedCents),
+          divergentCents: Number(external.divergentCents),
+        },
+      },
+      forecast,
+    };
+  }
+
   async reports(
     identityId: string,
     organizationId: string,
     unitId: string,
-    query: Omit<ReportExportInput, "family"> & { family?: ReportExportInput["family"] },
+    query: Omit<ReportExportInput, "family" | "format"> & {
+      family?: ReportExportInput["family"];
+    },
   ) {
     return this.measured("read", async () => {
       const permissions = await this.permissions(identityId, organizationId, unitId);
@@ -272,6 +509,13 @@ export class ManagementReportService {
         this.management.reports(identityId, organizationId, unitId, query),
         this.periodBudget(organizationId, unitId, query.from, query.to),
       ]);
+      const intelligence = await this.operationalIntelligence(
+        organizationId,
+        unitId,
+        query,
+        report,
+        permissions.viewCosts,
+      );
       const incomeStatement = permissions.viewCosts
         ? report.incomeStatement
         : {
@@ -376,12 +620,15 @@ export class ManagementReportService {
       return {
         ...report,
         incomeStatement,
-        reportFamilies,
+        reportFamilies: { ...reportFamilies, ...intelligence },
         meta: {
           ...report.meta,
           coverage: {
             ...report.meta.coverage,
             budget: budgetWithAlerts?.coverage ?? "unavailable",
+            labor: intelligence.labor.coverage,
+            reconciliation: intelligence.reconciliation.coverage,
+            forecast: intelligence.forecast.sampleDays > 0 ? "complete" : "unavailable",
           },
         },
         budget: budgetWithAlerts,
@@ -1358,8 +1605,11 @@ export class ManagementReportService {
         }
         const report = await this.reports(identityId, organizationId, unitId, query);
         const rows = this.exportRows(report, query.family);
-        const content = reportCsv(rows);
-        const sha256 = createHash("sha256").update(content).digest("hex");
+        const artifact = buildReportArtifact(
+          query.format,
+          rows,
+          `Relatório GiroMesa ${query.from} a ${query.to}`,
+        );
         const id = randomUUID();
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 30 * 86_400_000);
@@ -1371,10 +1621,12 @@ export class ManagementReportService {
             unitId,
             idempotencyKey: normalizedKey,
             query,
-            content,
+            content: artifact.content,
+            contentEncoding: artifact.contentEncoding,
+            mimeType: artifact.mimeType,
             status: "ready",
-            format: "csv",
-            sha256,
+            format: query.format,
+            sha256: artifact.sha256,
             rowCount: rows.length,
             requestedByIdentityId: identityId,
             completedAt: now,
@@ -1390,7 +1642,7 @@ export class ManagementReportService {
           "management.report_export.ready",
           "management_report_export",
           id,
-          { format: "csv", sha256, rowCount: rows.length },
+          { format: query.format, sha256: artifact.sha256, rowCount: rows.length },
         );
         return this.exportDto(created, false);
       });
@@ -1572,6 +1824,36 @@ export class ManagementReportService {
         value: families.profitability.grossMarginPercent,
         quantity: "",
       },
+      {
+        section: "labor",
+        key: "worked_minutes",
+        label: "Minutos trabalhados",
+        value: families.labor.workedMinutes,
+        amountCents: families.labor.laborCostCents,
+        quantity: families.labor.people,
+      },
+      {
+        section: "reconciliation",
+        key: "fiscal_difference",
+        label: "Diferença fiscal",
+        amountCents: families.reconciliation.fiscalDifferenceCents,
+        quantity: families.reconciliation.documents.total,
+      },
+      {
+        section: "reconciliation",
+        key: "payment_difference",
+        label: "Diferença de pagamentos",
+        amountCents: families.reconciliation.paymentDifferenceCents,
+        quantity: families.reconciliation.external.unmatched,
+      },
+      {
+        section: "forecast",
+        key: "revenue_forecast",
+        label: `Previsão de receita em ${families.forecast.horizonDays} dias`,
+        amountCents: families.forecast.revenue.forecastCents,
+        value: families.forecast.confidence,
+        quantity: families.forecast.sampleDays,
+      },
     );
     for (const reason of families.exceptions.cancellationReasons)
       rows.push({
@@ -1658,6 +1940,23 @@ export class ManagementReportService {
         quantity: issue.count,
         value: issue.severity,
       });
+    for (const role of families.labor.roles)
+      rows.push({
+        section: "labor",
+        key: role.roleLabel,
+        label: role.roleLabel,
+        amountCents: role.laborCostCents,
+        quantity: role.people,
+        value: role.workedMinutes,
+      });
+    for (const item of families.forecast.purchases)
+      rows.push({
+        section: "forecast",
+        key: item.key,
+        label: item.label,
+        quantity: item.suggestedQuantity,
+        value: item.dailyDemand,
+      });
     if (family === "overview") return rows;
     const sectionAliases: Record<ReportExportInput["family"], Set<string>> = {
       overview: new Set(),
@@ -1669,6 +1968,9 @@ export class ManagementReportService {
       profitability: new Set(["profitability", "incomeStatement"]),
       multiunit: new Set(["multiunit"]),
       quality: new Set(["quality", "coverage"]),
+      labor: new Set(["labor"]),
+      reconciliation: new Set(["reconciliation"]),
+      forecast: new Set(["forecast"]),
     };
     return rows.filter(
       (row) =>
@@ -1680,7 +1982,7 @@ export class ManagementReportService {
 
   private exportFilename(row: typeof managementReportExports.$inferSelect) {
     const query = row.query as Partial<ReportExportInput>;
-    return `relatorio-${String(query.from ?? "periodo")}-${String(query.to ?? "exportado")}.csv`;
+    return `relatorio-${String(query.from ?? "periodo")}-${String(query.to ?? "exportado")}.${row.format}`;
   }
 
   private exportDto(row: typeof managementReportExports.$inferSelect, idempotentReplay = false) {
@@ -1761,8 +2063,538 @@ export class ManagementReportService {
     return {
       filename: this.exportFilename(row),
       content: row.content,
+      contentEncoding: row.contentEncoding,
+      mimeType: row.mimeType,
       sha256: row.sha256,
     };
+  }
+
+  private viewDto(row: typeof managementReportViews.$inferSelect) {
+    return {
+      id: row.id,
+      name: row.name,
+      visibility: row.visibility,
+      query: row.query,
+      ownerIdentityId: row.ownerIdentityId,
+      version: row.version,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async views(identityId: string, organizationId: string, unitId: string) {
+    await this.permissions(identityId, organizationId, unitId);
+    const rows = await this.database.db
+      .select()
+      .from(managementReportViews)
+      .where(
+        and(
+          eq(managementReportViews.organizationId, organizationId),
+          or(
+            eq(managementReportViews.visibility, "organization"),
+            and(
+              eq(managementReportViews.unitId, unitId),
+              or(
+                eq(managementReportViews.visibility, "unit"),
+                eq(managementReportViews.ownerIdentityId, identityId),
+              ),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(managementReportViews.updatedAt));
+    return { views: rows.map((row) => this.viewDto(row)) };
+  }
+
+  async createView(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReportViewCreateInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    if (input.visibility !== "private") this.assertPermission(permissions.manageViews);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-view-create",
+      input,
+      async (tx) => {
+        const id = randomUUID();
+        const [row] = await tx
+          .insert(managementReportViews)
+          .values({
+            id,
+            organizationId,
+            unitId,
+            ownerIdentityId: identityId,
+            ...input,
+          })
+          .returning();
+        if (!row) throw new ConflictException({ code: "REPORT_VIEW_WRITE_FAILED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_view.created",
+          "management_report_view",
+          id,
+          { visibility: row.visibility, family: row.query.family },
+        );
+        return this.viewDto(row);
+      },
+    );
+  }
+
+  async updateView(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    viewId: string,
+    idempotencyKey: string,
+    input: ReportViewUpdateInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    if (input.visibility !== "private") this.assertPermission(permissions.manageViews);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-view-update",
+      { viewId, ...input },
+      async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(managementReportViews)
+          .where(
+            and(
+              eq(managementReportViews.organizationId, organizationId),
+              eq(managementReportViews.id, viewId),
+            ),
+          )
+          .limit(1);
+        if (!existing) throw new NotFoundException({ code: "REPORT_VIEW_NOT_FOUND" });
+        if (existing.ownerIdentityId !== identityId) this.assertPermission(permissions.manageViews);
+        if (existing.version !== input.version)
+          throw new ConflictException({ code: "REPORT_VIEW_VERSION_CONFLICT" });
+        const [row] = await tx
+          .update(managementReportViews)
+          .set({
+            name: input.name,
+            visibility: input.visibility,
+            query: input.query,
+            version: input.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(managementReportViews.id, viewId),
+              eq(managementReportViews.version, input.version),
+            ),
+          )
+          .returning();
+        if (!row) throw new ConflictException({ code: "REPORT_VIEW_VERSION_CONFLICT" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_view.updated",
+          "management_report_view",
+          viewId,
+          { visibility: row.visibility, version: row.version },
+        );
+        return this.viewDto(row);
+      },
+    );
+  }
+
+  async deleteView(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    viewId: string,
+    version: number,
+    idempotencyKey: string,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-view-delete",
+      { viewId, version },
+      async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(managementReportViews)
+          .where(
+            and(
+              eq(managementReportViews.organizationId, organizationId),
+              eq(managementReportViews.id, viewId),
+            ),
+          )
+          .limit(1);
+        if (!existing) throw new NotFoundException({ code: "REPORT_VIEW_NOT_FOUND" });
+        if (existing.ownerIdentityId !== identityId) this.assertPermission(permissions.manageViews);
+        if (existing.version !== version)
+          throw new ConflictException({ code: "REPORT_VIEW_VERSION_CONFLICT" });
+        const deleted = await tx
+          .delete(managementReportViews)
+          .where(
+            and(eq(managementReportViews.id, viewId), eq(managementReportViews.version, version)),
+          )
+          .returning({ id: managementReportViews.id });
+        if (deleted.length !== 1)
+          throw new ConflictException({ code: "REPORT_VIEW_VERSION_CONFLICT" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_view.deleted",
+          "management_report_view",
+          viewId,
+          { version },
+        );
+        return { id: viewId, deleted: true };
+      },
+    );
+  }
+
+  private alertDto(row: typeof managementReportAlerts.$inferSelect) {
+    return {
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      detail: row.detail,
+      severity: row.severity,
+      status: row.status,
+      actualCents: row.actualCents,
+      targetCents: row.targetCents,
+      source: row.source,
+      assignedToIdentityId: row.assignedToIdentityId,
+      dueAt: row.dueAt,
+      resolvedAt: row.resolvedAt,
+      version: row.version,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async alerts(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: ReportAlertListQuery,
+  ) {
+    await this.permissions(identityId, organizationId, unitId);
+    const rows = await this.database.db
+      .select()
+      .from(managementReportAlerts)
+      .where(
+        and(
+          eq(managementReportAlerts.organizationId, organizationId),
+          eq(managementReportAlerts.unitId, unitId),
+          query.status ? eq(managementReportAlerts.status, query.status) : undefined,
+        ),
+      )
+      .orderBy(managementReportAlerts.dueAt, desc(managementReportAlerts.updatedAt))
+      .limit(200);
+    return { alerts: rows.map((row) => this.alertDto(row)) };
+  }
+
+  async evaluateAlerts(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReportAlertEvaluateInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    this.assertPermission(permissions.manageAlerts);
+    const report = await this.reports(identityId, organizationId, unitId, input);
+    const candidates = [
+      ...(report.budget?.alerts ?? [])
+        .filter((alert) => alert.status === "attention")
+        .map((alert) => ({
+          kind: `budget:${alert.key}`,
+          title: "Meta fora do esperado",
+          detail: `O indicador ${alert.key} está fora da meta definida para o período.`,
+          severity: "warning" as const,
+          actualCents: alert.actualCents,
+          targetCents: alert.targetCents,
+        })),
+      ...report.reportFamilies.quality.issues.map((issue) => ({
+        kind: `quality:${issue.key}`,
+        title: issue.label,
+        detail: `${issue.count} ocorrência(s) exigem revisão.`,
+        severity: issue.severity,
+        actualCents: null,
+        targetCents: null,
+      })),
+      ...(report.reportFamilies.reconciliation.fiscalDifferenceCents === 0
+        ? []
+        : [
+            {
+              kind: "reconciliation:fiscal",
+              title: "Divergência entre vendas e documentos fiscais",
+              detail: "Revise documentos autorizados, rejeitados e cancelados do período.",
+              severity: "critical" as const,
+              actualCents: report.reportFamilies.reconciliation.fiscalAuthorizedCents,
+              targetCents: report.reportFamilies.reconciliation.posRevenueCents,
+            },
+          ]),
+      ...(report.reportFamilies.reconciliation.paymentDifferenceCents === 0
+        ? []
+        : [
+            {
+              kind: "reconciliation:payments",
+              title: "Divergência entre vendas e pagamentos",
+              detail: "Revise os pagamentos vinculados às contas fechadas.",
+              severity: "critical" as const,
+              actualCents: report.reportFamilies.reconciliation.paymentCents,
+              targetCents: report.reportFamilies.reconciliation.posRevenueCents,
+            },
+          ]),
+      ...(report.reportFamilies.labor.overtimeMinutes &&
+      report.reportFamilies.labor.overtimeMinutes > 0
+        ? [
+            {
+              kind: "labor:overtime",
+              title: "Horas extras no período",
+              detail: `${report.reportFamilies.labor.overtimeMinutes} minuto(s) acima das escalas registradas.`,
+              severity: "warning" as const,
+              actualCents: null,
+              targetCents: null,
+            },
+          ]
+        : []),
+    ];
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-alert-evaluate",
+      input,
+      async (tx) => {
+        const dueAt = new Date(Date.now() + input.dueInDays * 86_400_000);
+        let created = 0;
+        for (const candidate of candidates) {
+          const occurrenceKey = `${candidate.kind}:${input.from}:${input.to}`;
+          const inserted = await tx
+            .insert(managementReportAlerts)
+            .values({
+              organizationId,
+              unitId,
+              occurrenceKey,
+              ...candidate,
+              source: { period: { from: input.from, to: input.to } },
+              dueAt,
+              updatedByIdentityId: identityId,
+            })
+            .onConflictDoNothing()
+            .returning({ id: managementReportAlerts.id });
+          created += inserted.length;
+        }
+        const evaluationId = randomUUID();
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_alerts.evaluated",
+          "management_report_alert_evaluation",
+          evaluationId,
+          { period: { from: input.from, to: input.to }, candidates: candidates.length, created },
+        );
+        return { id: evaluationId, candidates: candidates.length, created };
+      },
+    );
+  }
+
+  async updateAlert(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    alertId: string,
+    idempotencyKey: string,
+    input: ReportAlertActionInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    this.assertPermission(permissions.manageAlerts);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-alert-update",
+      { alertId, ...input },
+      async (tx) => {
+        const now = new Date();
+        const [row] = await tx
+          .update(managementReportAlerts)
+          .set({
+            status: input.status,
+            assignedToIdentityId:
+              input.assignedToIdentityId === undefined
+                ? input.status === "claimed"
+                  ? identityId
+                  : undefined
+                : input.assignedToIdentityId,
+            dueAt:
+              input.dueAt === undefined ? undefined : input.dueAt ? new Date(input.dueAt) : null,
+            resolvedAt: input.status === "resolved" ? now : null,
+            resolvedByIdentityId: input.status === "resolved" ? identityId : null,
+            updatedByIdentityId: identityId,
+            version: input.version + 1,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(managementReportAlerts.organizationId, organizationId),
+              eq(managementReportAlerts.unitId, unitId),
+              eq(managementReportAlerts.id, alertId),
+              eq(managementReportAlerts.version, input.version),
+            ),
+          )
+          .returning();
+        if (!row) throw new ConflictException({ code: "REPORT_ALERT_VERSION_CONFLICT" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_alert.updated",
+          "management_report_alert",
+          alertId,
+          { status: row.status, assignedToIdentityId: row.assignedToIdentityId, dueAt: row.dueAt },
+        );
+        return this.alertDto(row);
+      },
+    );
+  }
+
+  async backfillCosts(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReportCostBackfillInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    this.assertPermission(permissions.viewCosts && permissions.backfillCosts);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-cost-backfill",
+      input,
+      async (tx) => {
+        const [unit] = await tx
+          .select({ timezone: units.timezone })
+          .from(units)
+          .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+          .limit(1);
+        if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+        const candidates = await tx.execute<{
+          id: string;
+          quantity: number;
+          catalogCostCents: number | null;
+        }>(sql`
+          select items.id, items.quantity, prices.cost_cents as "catalogCostCents"
+          from pos_order_items items
+          inner join pos_orders orders on orders.organization_id = items.organization_id and orders.unit_id = items.unit_id and orders.id = items.order_id
+          inner join pos_tabs tabs on tabs.organization_id = orders.organization_id and tabs.unit_id = orders.unit_id and tabs.id = orders.tab_id
+          left join pos_product_prices prices on prices.organization_id = items.organization_id and prices.unit_id = items.unit_id and prices.product_id = items.product_id
+          where items.organization_id = ${organizationId}::uuid and items.unit_id = ${unitId}::uuid
+            and items.status <> 'canceled' and items.cost_cents is null and tabs.status = 'closed'
+            and timezone(${unit.timezone}, tabs.closed_at)::date between ${input.from}::date and ${input.to}::date
+          order by items.id for update of items
+        `);
+        const [run] = await tx
+          .insert(managementReportCostBackfills)
+          .values({
+            organizationId,
+            unitId,
+            from: input.from,
+            to: input.to,
+            allowEstimated: input.allowEstimated,
+            requestedByIdentityId: identityId,
+          })
+          .returning();
+        if (!run) throw new ConflictException({ code: "REPORT_COST_BACKFILL_WRITE_FAILED" });
+        let estimatedCount = 0;
+        let unavailableCount = 0;
+        for (const candidate of candidates) {
+          const estimated =
+            candidate.catalogCostCents === null
+              ? null
+              : Number(candidate.catalogCostCents) * Number(candidate.quantity);
+          if (
+            !input.allowEstimated ||
+            estimated === null ||
+            !Number.isSafeInteger(estimated) ||
+            estimated < 0 ||
+            estimated > 2_147_483_647
+          ) {
+            unavailableCount += 1;
+            continue;
+          }
+          const updated = await tx.execute<{ id: string }>(sql`
+            update pos_order_items set cost_cents = ${estimated}, updated_at = now()
+            where organization_id = ${organizationId}::uuid and unit_id = ${unitId}::uuid
+              and id = ${candidate.id}::uuid and cost_cents is null returning id
+          `);
+          if (updated.length !== 1) continue;
+          await tx.insert(managementReportCostSnapshots).values({
+            organizationId,
+            unitId,
+            orderItemId: candidate.id,
+            backfillId: run.id,
+            costCents: estimated,
+            source: "catalog_cost_estimate",
+            confidence: "estimated",
+            recordedByIdentityId: identityId,
+          });
+          estimatedCount += 1;
+        }
+        unavailableCount += candidates.length - estimatedCount - unavailableCount;
+        await tx
+          .update(managementReportCostBackfills)
+          .set({ estimatedCount, unavailableCount, completedAt: new Date() })
+          .where(eq(managementReportCostBackfills.id, run.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.report_cost_backfill.completed",
+          "management_report_cost_backfill",
+          run.id,
+          {
+            period: { from: input.from, to: input.to },
+            allowEstimated: input.allowEstimated,
+            exactCount: 0,
+            estimatedCount,
+            unavailableCount,
+          },
+        );
+        return {
+          id: run.id,
+          exactCount: 0,
+          estimatedCount,
+          unavailableCount,
+          confidence: estimatedCount > 0 ? ("estimated" as const) : ("unavailable" as const),
+        };
+      },
+    );
   }
 
   private scheduleDto(row: typeof managementReportSchedules.$inferSelect) {
@@ -1776,6 +2608,7 @@ export class ManagementReportService {
       range: row.range,
       comparisonMode: row.comparisonMode,
       family: row.family,
+      format: row.format,
       delivery: row.delivery,
       enabled: row.enabled,
       nextRunAt: row.nextRunAt,
@@ -1868,7 +2701,12 @@ export class ManagementReportService {
           "management.report_schedule.created",
           "management_report_schedule",
           id,
-          { frequency: input.frequency, delivery: input.delivery, enabled: input.enabled },
+          {
+            frequency: input.frequency,
+            format: input.format,
+            delivery: input.delivery,
+            enabled: input.enabled,
+          },
         );
         return this.scheduleDto(row);
       },
@@ -1939,6 +2777,7 @@ export class ManagementReportService {
           scheduleId,
           {
             frequency: input.frequency,
+            format: input.format,
             delivery: input.delivery,
             enabled: input.enabled,
             version: row.version,

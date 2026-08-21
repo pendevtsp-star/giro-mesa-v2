@@ -55,6 +55,64 @@ public sealed class EscPosPrinterGatewayTests
     }
 
     [Fact]
+    public async Task RoutesByStationAndUsesFallbackOnlyWhenThePrimaryIsUnreachable()
+    {
+        var unavailable = new TcpListener(IPAddress.Loopback, 0);
+        unavailable.Start();
+        var unavailablePort = ((IPEndPoint)unavailable.LocalEndpoint).Port;
+        unavailable.Stop();
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var fallbackPort = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var received = Task.Run(async () =>
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            await using var stream = client.GetStream();
+            var buffer = new byte[4096];
+            return await stream.ReadAsync(buffer);
+        });
+        var gateway = new EscPosPrinterGateway(
+            Options.Create(new HubOptions
+            {
+                Printers =
+                [
+                    new PrinterOptions
+                    {
+                        Enabled = true,
+                        Id = "bar-primary",
+                        Host = IPAddress.Loopback.ToString(),
+                        Port = unavailablePort,
+                        PaperWidthMm = 58,
+                        CharactersPerLine = 32,
+                        Stations = ["bar"],
+                        FallbackPrinterId = "bar-backup",
+                    },
+                    new PrinterOptions
+                    {
+                        Enabled = true,
+                        Id = "bar-backup",
+                        Host = IPAddress.Loopback.ToString(),
+                        Port = fallbackPort,
+                        PaperWidthMm = 58,
+                        CharactersPerLine = 32,
+                    },
+                ],
+            }),
+            NullLogger<EscPosPrinterGateway>.Instance);
+        var payload = JsonDocument.Parse("{\"tab\":{},\"totals\":{},\"items\":[],\"payments\":[]}")
+            .RootElement.Clone();
+
+        var result = await gateway.PrintAsync(
+            new PrintRequest("job-route:1", null, "bar", "partial_statement", payload));
+        var receivedBytes = await received;
+        listener.Stop();
+
+        Assert.True(result.Success);
+        Assert.Equal("bar-backup", result.PrinterId);
+        Assert.True(receivedBytes > 20);
+    }
+
+    [Fact]
     public void FormatsACompactReceiptWithinTheConfiguredPaperWidth()
     {
         var payload = JsonDocument.Parse("""

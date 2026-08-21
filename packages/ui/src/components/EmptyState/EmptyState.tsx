@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import "./EmptyState.css";
 
 export function EmptyState({
   icon,
@@ -13,7 +12,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="gm-empty">
+    <div className="gm-empty" data-slot="empty">
       <span aria-hidden="true" className="gm-empty__icon">
         {icon}
       </span>

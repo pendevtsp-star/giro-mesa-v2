@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Storage;
 using Microsoft.Extensions.Options;
 
@@ -9,6 +10,7 @@ namespace GiroMesa.EdgeHub.Sync;
 public sealed class CloudSyncWorker(
     HttpClient httpClient,
     HubStore store,
+    FocusCredentialStore fiscalCredentials,
     IOptions<HubOptions> options,
     ILogger<CloudSyncWorker> logger) : BackgroundService
 {
@@ -103,6 +105,7 @@ public sealed class CloudSyncWorker(
 
     private async Task ApplyResponseAsync(SyncResponse response)
     {
+        fiscalCredentials.Apply(response.FiscalConfiguration);
         await store.SaveCloudCommandsAsync(response.Commands);
         foreach (var eventId in response.AcceptedEventIds)
         {
@@ -223,4 +226,5 @@ public sealed record SyncResponse(
     DateTimeOffset ServerTime,
     OperationalSnapshot? Snapshot = null,
     string? SnapshotRevision = null,
-    bool SnapshotUnchanged = false);
+    bool SnapshotUnchanged = false,
+    FocusRuntimeConfiguration? FiscalConfiguration = null);

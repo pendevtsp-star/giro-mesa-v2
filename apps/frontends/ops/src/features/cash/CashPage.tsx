@@ -1,4 +1,5 @@
-import { Button, Card } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Button, Card, Input, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import {
@@ -107,7 +108,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
               <form className="inline-action-form" onSubmit={openShift}>
                 <label>
                   Fundo de caixa (R$)
-                  <input
+                  <Input
                     inputMode="decimal"
                     onChange={(event) => setOpening(event.target.value)}
                     placeholder="0,00"
@@ -166,7 +167,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 >
                   <label>
                     Tipo
-                    <select
+                    <NativeSelect
                       onChange={(event) =>
                         setMovementType(event.target.value as "supply" | "withdrawal")
                       }
@@ -174,11 +175,11 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                     >
                       <option value="withdrawal">Sangria</option>
                       <option value="supply">Suprimento</option>
-                    </select>
+                    </NativeSelect>
                   </label>
                   <label>
                     Valor
-                    <input
+                    <Input
                       inputMode="decimal"
                       onChange={(event) => setMovementAmount(event.target.value)}
                       placeholder="0,00"
@@ -188,7 +189,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label className="action-form__wide">
                     Motivo
-                    <input
+                    <Input
                       minLength={3}
                       onChange={(event) => setMovementReason(event.target.value)}
                       required
@@ -211,7 +212,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 <form className="action-form" onSubmit={(event) => void closeShift(event, open.id)}>
                   <label>
                     Valor contado
-                    <input
+                    <Input
                       inputMode="decimal"
                       onChange={(event) => setCounted(event.target.value)}
                       placeholder="0,00"
@@ -221,7 +222,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Observação
-                    <input
+                    <Input
                       onChange={(event) => setCloseReason(event.target.value)}
                       value={closeReason}
                     />

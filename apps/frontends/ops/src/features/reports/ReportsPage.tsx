@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import {
   Button,
   Callout,
@@ -5,7 +6,9 @@ import {
   DataTable,
   EmptyState,
   Icon,
+  Input,
   Modal,
+  NativeSelect,
   SegmentedTabs,
 } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
@@ -32,6 +35,13 @@ import {
 } from "../../management.shared";
 import { parseRoute, routeHref } from "../../router";
 import { formatMoney } from "../../rules";
+import {
+  EnhancedReportFamilyView,
+  ReportActionCenter,
+  ReportCostBackfill,
+  type ReportViewFamily,
+  ReportViewManager,
+} from "./ReportEnhancements";
 import "./reports.css";
 
 export interface ReportPeriod {
@@ -58,7 +68,10 @@ type ReportFamilyId =
   | "operations"
   | "profitability"
   | "multiunit"
-  | "quality";
+  | "quality"
+  | "labor"
+  | "reconciliation"
+  | "forecast";
 
 const breakdownTabs: Array<{ id: BreakdownId; label: string }> = [
   { id: "products", label: "Produtos" },
@@ -76,6 +89,9 @@ const reportFamilyTabs: Array<{ id: ReportFamilyId; label: string }> = [
   { id: "operations", label: "Operação" },
   { id: "profitability", label: "Rentabilidade" },
   { id: "multiunit", label: "Multiunidade" },
+  { id: "labor", label: "Mão de obra" },
+  { id: "reconciliation", label: "Fiscal e pagamentos" },
+  { id: "forecast", label: "Previsão" },
   { id: "quality", label: "Qualidade dos dados" },
 ];
 
@@ -387,7 +403,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
         <form className="reports-filter-form" onSubmit={applyPeriod}>
           <label className="gm-field">
             Data inicial
-            <input
+            <Input
               className="gm-control"
               max={draftPeriod.to}
               onChange={(event) =>
@@ -400,7 +416,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
           </label>
           <label className="gm-field">
             Data final
-            <input
+            <Input
               className="gm-control"
               max={today}
               min={draftPeriod.from}
@@ -414,7 +430,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
           </label>
           <label className="gm-field reports-comparison-field">
             Comparar com
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) =>
                 setDraftComparisonMode(event.target.value as ReportComparisonMode)
@@ -426,7 +442,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
                   {mode.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <div className="reports-filter-actions">
             <Button disabled={!filtersChanged} size="sm" type="submit">
@@ -450,20 +466,20 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
             {savedFilters.length ? (
               savedFilters.map((saved) => (
                 <span className="reports-saved-filter" key={saved.id}>
-                  <button
+                  <Button
                     aria-pressed={saved.id === favoriteId({ period, comparisonMode })}
                     onClick={() => commit(saved)}
                     type="button"
                   >
                     {favoriteLabel(saved)}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     aria-label={`Remover filtro ${favoriteLabel(saved)}`}
                     onClick={() => removeSavedFilter(saved.id)}
                     type="button"
                   >
                     ×
-                  </button>
+                  </Button>
                 </span>
               ))
             ) : (
@@ -490,6 +506,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
       <ReportPeriodView
         comparisonMode={comparisonMode}
         key={`${period.from}:${period.to}:${comparisonMode}`}
+        onApplyFilters={commit}
         onTimezone={setTimezone}
         period={period}
         scope={scope}
@@ -502,11 +519,13 @@ function ReportPeriodView({
   scope,
   period,
   comparisonMode,
+  onApplyFilters,
   onTimezone,
 }: {
   scope: ManagementScope;
   period: ReportPeriod;
   comparisonMode: ReportComparisonMode;
+  onApplyFilters: (filters: ReportFilters) => void;
   onTimezone: (timezone: string) => void;
 }) {
   const loader = useCallback(
@@ -535,7 +554,14 @@ function ReportPeriodView({
   return (
     <div aria-live="polite" className="reports-results">
       <RemoteGate remote={remote}>
-        {(data) => <ReportContent data={data} onRefresh={remote.retry} scope={scope} />}
+        {(data) => (
+          <ReportContent
+            data={data}
+            onApplyFilters={onApplyFilters}
+            onRefresh={remote.retry}
+            scope={scope}
+          />
+        )}
       </RemoteGate>
     </div>
   );
@@ -589,10 +615,12 @@ interface DrillDownTarget {
 
 export function ReportContent({
   data,
+  onApplyFilters,
   scope,
   onRefresh,
 }: {
   data: ReportData;
+  onApplyFilters?: (filters: ReportFilters) => void;
   scope?: ManagementScope;
   onRefresh?: () => void;
 }) {
@@ -648,6 +676,24 @@ export function ReportContent({
             data-open={moreActionsOpen}
             id="reports-secondary-actions"
           >
+            {scope && (
+              <ReportViewManager
+                onApply={(query) => {
+                  setActiveFamily(query.family);
+                  onApplyFilters?.({
+                    period: { from: query.from, to: query.to },
+                    comparisonMode: query.comparisonMode,
+                  });
+                }}
+                query={{
+                  ...data.period,
+                  comparisonMode: data.comparison?.mode ?? "previous_period",
+                  family: activeFamily as ReportViewFamily,
+                }}
+                scope={scope}
+              />
+            )}
+            {scope && <ReportActionCenter data={data} scope={scope} />}
             {scope && data.capabilities.export ? (
               <ReportExportActions data={data} family={activeFamily} scope={scope} />
             ) : !scope ? (
@@ -814,6 +860,12 @@ export function ReportContent({
             </Callout>
           )}
 
+          {scope &&
+            data.capabilities.backfillCosts &&
+            !data.incomeStatement.costCoverage.completeForRevenue && (
+              <ReportCostBackfill data={data} onRefresh={onRefresh} scope={scope} />
+            )}
+
           <BudgetSummary budget={data.budget} />
           <DailyRevenueChart data={data} />
           <Breakdowns data={data} onDrillDown={setDrillDownTarget} />
@@ -951,6 +1003,10 @@ function ReportFamilyView({
   const report = data.reportFamilies;
   const number = (value: number) =>
     new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 }).format(value);
+
+  if (family === "labor" || family === "reconciliation" || family === "forecast") {
+    return <EnhancedReportFamilyView data={data} family={family} />;
+  }
 
   if (family === "sales") {
     return (
@@ -1530,27 +1586,37 @@ function ReportFamilyView({
         </div>
         {report.multiunit.units.length ? (
           <Card className="reports-section-card">
-            <DataTable caption="Receita e ticket médio por unidade">
+            <DataTable caption="Ranking e desempenho comparável por unidade">
               <thead>
                 <tr>
+                  <th>Posição</th>
                   <th>Unidade</th>
                   <th>Contas</th>
                   <th>Receita</th>
                   <th>Ticket médio</th>
-                  <th>Variação</th>
+                  <th>Receita/dia</th>
+                  <th>Participação</th>
+                  <th>Mesma loja</th>
                 </tr>
               </thead>
               <tbody>
                 {report.multiunit.units.map((row) => (
                   <tr key={row.key}>
+                    <td>{row.rank > 0 ? `${row.rank}º` : "—"}</td>
                     <th scope="row">{row.label}</th>
                     <td>{number(row.closedTabs)}</td>
                     <td>{formatMoney(row.revenueCents)}</td>
                     <td>{moneyOrUnavailable(row.averageTicketCents)}</td>
+                    <td>{moneyOrUnavailable(row.revenuePerOperatingDayCents)}</td>
                     <td>
-                      {row.changePercent === null
+                      {row.organizationRevenueSharePercent === null
                         ? "Indisponível"
-                        : `${number(row.changePercent)}%`}
+                        : `${number(row.organizationRevenueSharePercent)}%`}
+                    </td>
+                    <td>
+                      {row.sameStoreChangePercent === null
+                        ? "Indisponível"
+                        : `${number(row.sameStoreChangePercent)}%`}
                     </td>
                   </tr>
                 ))}
@@ -1894,7 +1960,7 @@ function Breakdowns({
               <tr key={row.key}>
                 <th scope="row">
                   {data.capabilities.drillDown ? (
-                    <button
+                    <Button
                       className="reports-drilldown-link"
                       onClick={() =>
                         onDrillDown({
@@ -1906,7 +1972,7 @@ function Breakdowns({
                       type="button"
                     >
                       {row.label}
-                    </button>
+                    </Button>
                   ) : (
                     row.label
                   )}
@@ -2274,6 +2340,7 @@ function ReportExportActions({
   scope: ManagementScope;
 }) {
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState<"csv" | "pdf" | "xlsx">("csv");
   const [status, setStatus] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ReportExportData[]>([]);
@@ -2293,7 +2360,7 @@ function ReportExportActions({
         throw new Error("O conteúdo recebido não corresponde ao hash auditado.");
       }
       saveBlob(content.blob, content.filename ?? item.filename);
-      setStatus(`CSV auditado baixado. SHA-256 ${checksum.slice(0, 12)}…`);
+      setStatus(`${item.format.toUpperCase()} auditado baixado. SHA-256 ${checksum.slice(0, 12)}…`);
     } catch (cause) {
       setStatus(errorMessage(cause));
     } finally {
@@ -2309,6 +2376,7 @@ function ReportExportActions({
         ...data.period,
         comparisonMode: data.comparison?.mode ?? "previous_period",
         family,
+        format,
       });
       const item = parseReportExport(payload);
       if (item.status === "failed") throw new Error("A exportação auditada falhou no servidor.");
@@ -2332,15 +2400,28 @@ function ReportExportActions({
 
   return (
     <div className="reports-export-actions">
+      <label className="gm-field reports-export-format">
+        <span className="sr-only">Formato da exportação</span>
+        <NativeSelect
+          aria-label="Formato da exportação"
+          disabled={busy}
+          onChange={(event) => setFormat(event.target.value as "csv" | "pdf" | "xlsx")}
+          value={format}
+        >
+          <option value="csv">CSV</option>
+          <option value="xlsx">Excel (XLSX)</option>
+          <option value="pdf">PDF</option>
+        </NativeSelect>
+      </label>
       <Button
-        aria-label="Exportar CSV auditado"
+        aria-label={`Exportar ${format.toUpperCase()} auditado`}
         disabled={busy}
         onClick={() => void createExport()}
         size="sm"
         variant="secondary"
       >
         <Icon name="download" size={14} />
-        {busy ? "Preparando CSV…" : "CSV auditado"}
+        {busy ? "Preparando…" : `${format.toUpperCase()} auditado`}
       </Button>
       <Button onClick={() => void openHistory()} size="sm" variant="ghost">
         Histórico
@@ -2359,6 +2440,7 @@ function ReportExportActions({
             <thead>
               <tr>
                 <th>Arquivo</th>
+                <th>Formato</th>
                 <th>Linhas</th>
                 <th>Solicitada</th>
                 <th>Integridade</th>
@@ -2369,6 +2451,7 @@ function ReportExportActions({
               {history.map((item) => (
                 <tr key={item.id}>
                   <th scope="row">{item.filename}</th>
+                  <td>{item.format.toUpperCase()}</td>
                   <td>{item.rowCount}</td>
                   <td>{formatTimestamp(item.requestedAt, data.timezone)}</td>
                   <td>
@@ -2486,7 +2569,7 @@ function BudgetManager({ scope }: { scope: ManagementScope }) {
         <form className="reports-dialog-form" onSubmit={save} aria-busy={busy}>
           <label className="gm-field">
             Mês
-            <input
+            <Input
               className="gm-control"
               onChange={(event) => setMonth(event.target.value)}
               required
@@ -2496,7 +2579,7 @@ function BudgetManager({ scope }: { scope: ManagementScope }) {
           </label>
           <label className="gm-field">
             Indicador
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) => setMetric(event.target.value as ReportBudgetMetric)}
               value={metric}
@@ -2506,11 +2589,11 @@ function BudgetManager({ scope }: { scope: ManagementScope }) {
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label className="gm-field">
             Meta em reais
-            <input
+            <Input
               className="gm-control"
               inputMode="decimal"
               onChange={(event) => setAmount(event.target.value)}
@@ -2549,6 +2632,7 @@ function emptySchedule(): ScheduleDraft {
     range: "previous_week",
     comparisonMode: "previous_period",
     family: "overview",
+    format: "csv",
     delivery: "in_app",
     enabled: true,
   };
@@ -2597,6 +2681,7 @@ function ScheduleManager({
       range: draft.frequency === "weekly" ? "previous_week" : "previous_month",
       comparisonMode: draft.comparisonMode,
       family: draft.family,
+      format: draft.format,
       delivery: draft.delivery,
       enabled: draft.enabled,
       ...(draft.version === undefined ? {} : { version: draft.version }),
@@ -2667,6 +2752,7 @@ function ScheduleManager({
             <tr>
               <th>Nome</th>
               <th>Relatório</th>
+              <th>Formato</th>
               <th>Frequência</th>
               <th>Entrega</th>
               <th>Próxima execução</th>
@@ -2678,6 +2764,7 @@ function ScheduleManager({
               <tr key={item.id}>
                 <th scope="row">{item.name}</th>
                 <td>{reportFamilyTabs.find((family) => family.id === item.family)?.label}</td>
+                <td>{item.format.toUpperCase()}</td>
                 <td>
                   {item.frequency === "weekly" ? "Semanal" : "Mensal"}, {item.localTime}
                 </td>
@@ -2721,7 +2808,7 @@ function ScheduleManager({
         <form className="reports-dialog-form" onSubmit={save}>
           <label className="gm-field">
             Nome
-            <input
+            <Input
               className="gm-control"
               maxLength={80}
               onChange={(event) => setDraft((value) => ({ ...value, name: event.target.value }))}
@@ -2731,7 +2818,7 @@ function ScheduleManager({
           </label>
           <label className="gm-field">
             Frequência
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) =>
                 setDraft((value) => ({
@@ -2743,12 +2830,12 @@ function ScheduleManager({
             >
               <option value="weekly">Semanal</option>
               <option value="monthly">Mensal</option>
-            </select>
+            </NativeSelect>
           </label>
           {draft.frequency === "weekly" ? (
             <label className="gm-field">
               Dia da semana
-              <select
+              <NativeSelect
                 className="gm-control"
                 onChange={(event) =>
                   setDraft((value) => ({ ...value, weekday: Number(event.target.value) }))
@@ -2762,12 +2849,12 @@ function ScheduleManager({
                     </option>
                   ),
                 )}
-              </select>
+              </NativeSelect>
             </label>
           ) : (
             <label className="gm-field">
               Dia do mês
-              <input
+              <Input
                 className="gm-control"
                 max={28}
                 min={1}
@@ -2782,7 +2869,7 @@ function ScheduleManager({
           )}
           <label className="gm-field">
             Horário da unidade
-            <input
+            <Input
               className="gm-control"
               onChange={(event) =>
                 setDraft((value) => ({ ...value, localTime: event.target.value }))
@@ -2794,7 +2881,7 @@ function ScheduleManager({
           </label>
           <label className="gm-field">
             Comparação
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) =>
                 setDraft((value) => ({
@@ -2809,11 +2896,11 @@ function ScheduleManager({
                   {mode.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label className="gm-field">
             Tipo de relatório
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) =>
                 setDraft((value) => ({
@@ -2828,11 +2915,28 @@ function ScheduleManager({
                   {item.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
+          </label>
+          <label className="gm-field">
+            Formato
+            <NativeSelect
+              className="gm-control"
+              onChange={(event) =>
+                setDraft((value) => ({
+                  ...value,
+                  format: event.target.value as "csv" | "pdf" | "xlsx",
+                }))
+              }
+              value={draft.format}
+            >
+              <option value="csv">CSV</option>
+              <option value="xlsx">Excel (XLSX)</option>
+              <option value="pdf">PDF</option>
+            </NativeSelect>
           </label>
           <label className="gm-field">
             Entrega
-            <select
+            <NativeSelect
               className="gm-control"
               onChange={(event) =>
                 setDraft((value) => ({
@@ -2844,7 +2948,7 @@ function ScheduleManager({
             >
               <option value="in_app">No GiroMesa</option>
               {emailDeliveryConfigured && <option value="email">E-mail do usuário</option>}
-            </select>
+            </NativeSelect>
           </label>
           <label className="reports-checkbox">
             <input

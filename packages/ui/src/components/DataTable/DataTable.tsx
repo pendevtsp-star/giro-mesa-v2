@@ -1,5 +1,5 @@
 import type { ReactNode, TableHTMLAttributes } from "react";
-import "./DataTable.css";
+import { cn } from "../../lib/utils";
 
 export function DataTable({
   caption,
@@ -8,9 +8,11 @@ export function DataTable({
   ...props
 }: TableHTMLAttributes<HTMLTableElement> & { caption: string; children: ReactNode }) {
   return (
-    <div className="gm-data-table__scroll">
-      <table className={`gm-data-table ${className}`} {...props}>
-        <caption className="gm-sr-only">{caption}</caption>
+    <div className="gm-data-table__scroll" data-slot="table-container">
+      <table className={cn("gm-data-table", className)} data-slot="table" {...props}>
+        <caption className="gm-sr-only" data-slot="table-caption">
+          {caption}
+        </caption>
         {children}
       </table>
     </div>

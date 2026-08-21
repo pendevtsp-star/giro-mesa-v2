@@ -1,4 +1,14 @@
-import { Badge, Button, Card, EmptyState, Modal } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Modal,
+  NativeSelect,
+  Textarea,
+} from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { sendShellPrintJob } from "../../bridge";
@@ -27,6 +37,7 @@ import {
   type RealtimeStatus,
   subscribeScopeRealtime,
 } from "../../realtime";
+import { KdsAdvancedPanels } from "./KdsAdvancedPanels";
 import type { KdsAvailabilityChange } from "./KdsAvailabilityPanel";
 import type { KdsPrinterPreferences } from "./KdsHardwareSettings";
 import { type KdsDensity, KdsSettingsPage } from "./KdsSettingsPage";
@@ -513,7 +524,7 @@ function TicketCard({
                           <label htmlFor={`kds-partial-${ticket.id}-${item.id}`}>
                             Quantidade pronta
                           </label>
-                          <input
+                          <Input
                             aria-label={`Quantidade pronta de ${item.productName}`}
                             id={`kds-partial-${ticket.id}-${item.id}`}
                             inputMode="numeric"
@@ -818,6 +829,7 @@ export function RealKdsPage({
   const previousAlertsRef = useRef<Set<string> | null>(null);
   const previousPendingRef = useRef<Set<string> | null>(null);
   const previousReadyOrdersRef = useRef<Set<string> | null>(null);
+  const previousChangesRef = useRef<Set<string> | null>(null);
   const terminalProfileLoadedRef = useRef<string | null>(null);
   const availabilityLoadRef = useRef<string | null>(null);
 
@@ -1079,6 +1091,21 @@ export function RealKdsPage({
       if (soundEnabled) void playKdsSound();
     }
     previousPendingRef.current = pendingIds;
+
+    const pendingChanges = new Set(
+      data.items.flatMap(({ item }) =>
+        item.changes.filter((change) => !change.acknowledgedAt).map((change) => change.id),
+      ),
+    );
+    const previousChanges = previousChangesRef.current;
+    const newChanges = previousChanges
+      ? [...pendingChanges].filter((changeId) => !previousChanges.has(changeId))
+      : [];
+    if (newChanges.length > 0) {
+      setLiveMessage(`${newChanges.length} alteração(ões) após o envio aguardando ciência.`);
+      if (soundEnabled) void playKdsSound();
+    }
+    previousChangesRef.current = pendingChanges;
 
     const ticketsByOrder = new Map<string, KdsTicket[]>();
     for (const ticket of data.tickets.filter((ticket) => ticket.status !== "canceled")) {
@@ -2601,6 +2628,14 @@ export function RealKdsPage({
                   </details>
                 </div>
 
+                <KdsAdvancedPanels
+                  data={data}
+                  installationId={terminalInstallationId}
+                  mode={operationalViewMode}
+                  refresh={remote.refresh}
+                  scope={scope}
+                />
+
                 {data.capabilities.batches && (
                   <KdsBatchesPanel
                     batches={data.batches}
@@ -2642,7 +2677,7 @@ export function RealKdsPage({
                 {itemOperation?.kind === "block" && (
                   <label>
                     Tipo de bloqueio
-                    <select
+                    <NativeSelect
                       onChange={(event) => setItemOperationCode(event.target.value as KdsBlockCode)}
                       required
                       value={itemOperationCode}
@@ -2652,13 +2687,13 @@ export function RealKdsPage({
                           {label}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                 )}
                 {itemOperation?.kind === "reroute" && (
                   <label>
                     Praça de destino
-                    <select
+                    <NativeSelect
                       onChange={(event) => setItemOperationStationId(event.target.value)}
                       required
                       value={itemOperationStationId}
@@ -2671,12 +2706,12 @@ export function RealKdsPage({
                             {station.name}
                           </option>
                         ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                 )}
                 <label>
                   Motivo
-                  <textarea
+                  <Textarea
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setItemOperationReason(event.target.value)}
@@ -2731,7 +2766,7 @@ export function RealKdsPage({
                 </p>
                 <label>
                   Motivo do cancelamento
-                  <textarea
+                  <Textarea
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setCancelReason(event.target.value)}
@@ -2742,7 +2777,7 @@ export function RealKdsPage({
                 </label>
                 <label>
                   PIN gerencial
-                  <input
+                  <Input
                     autoComplete="one-time-code"
                     inputMode="numeric"
                     maxLength={8}

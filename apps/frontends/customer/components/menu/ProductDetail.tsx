@@ -1,3 +1,4 @@
+import { Button, Input, Label, Textarea } from "@giromesa/ui";
 import type { RefObject } from "react";
 import { formatMoney, type MenuItem, type Modifier, type ModifierGroup } from "../../lib/menu";
 
@@ -41,9 +42,9 @@ export function ProductDetail({
                 selected.visual
               )}
             </span>
-            <button type="button" aria-label="Fechar" onClick={onClose}>
+            <Button type="button" variant="ghost" aria-label="Fechar" onClick={onClose}>
               ×
-            </button>
+            </Button>
           </div>
           <div className="dialog-content">
             <p className="overline">{selected.category}</p>
@@ -57,8 +58,8 @@ export function ProductDetail({
                   <small>{group.required ? "Obrigatório" : `Até ${group.maxSelections}`}</small>
                 </legend>
                 {group.options.map((option) => (
-                  <label key={option.id}>
-                    <input
+                  <Label key={option.id}>
+                    <Input
                       type={group.maxSelections === 1 ? "radio" : "checkbox"}
                       name={group.id}
                       checked={Boolean(selection[group.id]?.some((item) => item.id === option.id))}
@@ -66,40 +67,40 @@ export function ProductDetail({
                     />
                     <span>{option.name}</span>
                     <b>{option.priceCents ? `+ ${formatMoney(option.priceCents)}` : "incluído"}</b>
-                  </label>
+                  </Label>
                 ))}
               </fieldset>
             ))}
-            <label className="notes">
+            <Label className="notes">
               Alguma observação?
-              <textarea
+              <Textarea
                 rows={2}
                 maxLength={180}
                 value={notes}
                 onChange={(event) => onNotes(event.target.value)}
                 placeholder="Ex.: sem cebola"
               />
-            </label>
+            </Label>
             <div className="add-row">
               <div className="quantity">
                 <span className="sr-only">Quantidade</span>
-                <button
+                <Button
                   type="button"
                   aria-label="Diminuir quantidade"
                   onClick={() => onQuantity(Math.max(1, quantity - 1))}
                 >
                   −
-                </button>
+                </Button>
                 <output>{quantity}</output>
-                <button
+                <Button
                   type="button"
                   aria-label="Aumentar quantidade"
                   onClick={() => onQuantity(quantity + 1)}
                 >
                   +
-                </button>
+                </Button>
               </div>
-              <button
+              <Button
                 className="add-button"
                 type="button"
                 disabled={!selected.available}
@@ -112,7 +113,7 @@ export function ProductDetail({
                 ) : (
                   "Indisponível agora"
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

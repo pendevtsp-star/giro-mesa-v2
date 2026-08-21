@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BadRequestException } from "@nestjs/common";
 import {
+  buildReportForecast,
   csvCell,
   nextReportRun,
   proratedBudgetTarget,
@@ -54,6 +55,26 @@ describe("management report rules", () => {
 
   it("rejects malformed pagination cursors", () => {
     assert.throws(() => reportPageOffset("not-a-cursor"), BadRequestException);
+  });
+
+  it("labels short forecasts as low confidence and never suggests negative purchases", () => {
+    const forecast = buildReportForecast({
+      dailySeries: [
+        { revenueCents: 10_000, previousRevenueCents: 8_000 },
+        { revenueCents: 12_000, previousRevenueCents: 10_000 },
+      ],
+      cashFlow: { inflowsCents: 20_000, outflowsCents: 8_000 },
+      inventory: [
+        { key: "rice", label: "Arroz", consumedQuantity: 10, currentQuantity: 2 },
+        { key: "salt", label: "Sal", consumedQuantity: 1, currentQuantity: 20 },
+      ],
+    });
+    assert.equal(forecast.confidence, "low");
+    assert.equal(forecast.revenue.forecastCents, 77_000);
+    assert.deepEqual(
+      forecast.purchases.map((row) => row.key),
+      ["rice"],
+    );
   });
 
   it("calculates the next weekly run in the unit timezone", () => {

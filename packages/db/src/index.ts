@@ -4,17 +4,24 @@ import * as fiscalSchema from "./fiscal-schema.js";
 import * as growthSchema from "./growth-schema.js";
 import * as managementSchema from "./management-schema.js";
 import * as operationsSchema from "./operations-schema.js";
+import * as reportSchema from "./report-schema.js";
 import * as baseSchema from "./schema.js";
+import * as settlementSchema from "./settlement-schema.js";
 
 export * from "./fiscal-schema.js";
 export * from "./growth-schema.js";
 export * from "./management-schema.js";
 export * from "./operations-schema.js";
+export * from "./report-artifacts.js";
+export * from "./report-schema.js";
 export * from "./schema.js";
+export * from "./settlement-schema.js";
 
 const schema = {
   ...baseSchema,
   ...operationsSchema,
+  ...reportSchema,
+  ...settlementSchema,
   ...managementSchema,
   ...growthSchema,
   ...fiscalSchema,

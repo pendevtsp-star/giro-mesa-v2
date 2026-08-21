@@ -6,6 +6,29 @@ export interface ApiHealth {
   integrations: Record<string, string>;
 }
 
+export interface FocusCompanyOnboardingBody {
+  tradeName: string;
+  stateRegistration: string;
+  email: string;
+  phone: string;
+  street: string;
+  number: number;
+  complement?: string;
+  district: string;
+  city: string;
+  postalCode: string;
+  accountantDocument?: string;
+  certificateBase64: string;
+  certificatePassword: string;
+  enableNfce: boolean;
+  enableNfe: boolean;
+  enableNfse: boolean;
+  cscProduction?: string;
+  cscProductionId?: string;
+  cscHomologation?: string;
+  cscHomologationId?: string;
+}
+
 export type LoginResponse =
   | {
       mfaRequired: true;
@@ -46,6 +69,47 @@ export interface PosPrintJob {
   updatedAt: string;
 }
 
+export type TerminalProfileMode =
+  | "waiter_mobile"
+  | "reception"
+  | "cashier"
+  | "kds"
+  | "expedition"
+  | "shared";
+export type TerminalProfileRoute =
+  | "dashboard"
+  | "reservations"
+  | "salon"
+  | "counter"
+  | "cash"
+  | "kds";
+export type TerminalQuickAction =
+  | "open_tab"
+  | "new_order"
+  | "receive"
+  | "waitlist"
+  | "print"
+  | "search";
+export interface TerminalProfile {
+  organizationId: string;
+  unitId: string;
+  installationId: string;
+  label: string;
+  mode: TerminalProfileMode;
+  defaultRoute: TerminalProfileRoute;
+  printerId: string | null;
+  stationId: string | null;
+  compact: boolean;
+  quickActions: TerminalQuickAction[];
+  createdAt: string;
+  updatedAt: string;
+  updatedByIdentityId: string;
+}
+export type TerminalProfileInput = Pick<
+  TerminalProfile,
+  "label" | "mode" | "defaultRoute" | "printerId" | "stationId" | "compact" | "quickActions"
+>;
+
 export interface CatalogProductAggregateInput {
   categoryId: string;
   sku?: string;
@@ -61,6 +125,7 @@ export interface CatalogProductAggregateInput {
   costCents?: number | null;
   available: boolean;
   stationIds: string[];
+  stationRouting?: Array<{ stationId: string; stage: number }>;
   availabilitySchedule?: {
     windows: Array<{ dayOfWeek: number; start: string; end: string }>;
   } | null;
@@ -303,11 +368,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 async function requestDownload(
   path: string,
 ): Promise<{ blob: Blob; filename: string | null; sha256: string | null }> {
-  const payload = await request<{ filename: string; content: string; sha256?: string | null }>(
-    path,
-  );
+  const payload = await request<{
+    filename: string;
+    content: string;
+    contentEncoding?: "utf8" | "base64";
+    mimeType?: string;
+    sha256?: string | null;
+  }>(path);
+  const content =
+    payload.contentEncoding === "base64"
+      ? Uint8Array.from(atob(payload.content), (character) => character.charCodeAt(0))
+      : payload.content;
   return {
-    blob: new Blob([payload.content], { type: "text/csv;charset=utf-8" }),
+    blob: new Blob([content], { type: payload.mimeType ?? "text/csv;charset=utf-8" }),
     filename: payload.filename,
     sha256: payload.sha256 ?? null,
   };
@@ -441,6 +514,23 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    provider: (organizationId: string, unitId: string) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "provider")),
+    validateProvider: (organizationId: string, unitId: string, body: FocusCompanyOnboardingBody) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "provider/validate"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    activateProvider: (organizationId: string, unitId: string, body: FocusCompanyOnboardingBody) =>
+      idempotentRequest<unknown>(
+        fiscalPath(organizationId, unitId, "provider/activate"),
+        "POST",
+        body,
+      ),
+    checkProvider: (organizationId: string, unitId: string) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "provider/check"), {
+        method: "POST",
+      }),
     taxRevisions: (organizationId: string, unitId: string) =>
       request<unknown>(fiscalPath(organizationId, unitId, "tax-revisions")),
     createTaxRevision: (
@@ -463,10 +553,70 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    createTaxRevisionsBulk: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        productIds: string[];
+        status: "draft" | "active";
+        effectiveFrom: string;
+        classification: {
+          ncm: string;
+          cfop: string;
+          origin: number;
+          csosn?: string;
+          cstIcms?: string;
+        };
+      },
+    ) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "tax-revisions/bulk"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     dashboard: (organizationId: string, unitId: string) =>
       request<unknown>(fiscalPath(organizationId, unitId, "dashboard")),
-    documents: (organizationId: string, unitId: string) =>
-      request<unknown>(fiscalPath(organizationId, unitId, "documents")),
+    documents: (
+      organizationId: string,
+      unitId: string,
+      filters?: {
+        status?: string;
+        model?: string;
+        from?: string;
+        to?: string;
+        search?: string;
+        page?: number;
+      },
+    ) => {
+      const query = new URLSearchParams();
+      if (filters?.status) query.set("status", filters.status);
+      if (filters?.model) query.set("model", filters.model);
+      if (filters?.from) query.set("from", filters.from);
+      if (filters?.to) query.set("to", filters.to);
+      if (filters?.search) query.set("search", filters.search);
+      if (filters?.page) query.set("page", String(filters.page));
+      query.set("pageSize", "50");
+      const path = fiscalPath(organizationId, unitId, "documents");
+      return request<unknown>(`${path}?${query}`);
+    },
+    document: (organizationId: string, unitId: string, documentId: string) =>
+      request<unknown>(
+        fiscalPath(organizationId, unitId, `documents/${encodeURIComponent(documentId)}`),
+      ),
+    reconcileDocument: (organizationId: string, unitId: string, documentId: string) =>
+      request<unknown>(
+        fiscalPath(organizationId, unitId, `documents/${encodeURIComponent(documentId)}/reconcile`),
+        { method: "POST" },
+      ),
+    cancelDocument: (
+      organizationId: string,
+      unitId: string,
+      documentId: string,
+      justification: string,
+    ) =>
+      request<unknown>(
+        fiscalPath(organizationId, unitId, `documents/${encodeURIComponent(documentId)}/cancel`),
+        { method: "POST", body: JSON.stringify({ justification }) },
+      ),
     periods: (organizationId: string, unitId: string) =>
       request<unknown>(fiscalPath(organizationId, unitId, "periods")),
     closePeriod: (organizationId: string, unitId: string, competence: string) =>
@@ -701,7 +851,7 @@ export const api = {
     closeInventoryPeriod: (
       organizationId: string,
       unitId: string,
-      body: { period: string; notes?: string },
+      body: { period: string; locationId?: string; shiftReference?: string; notes?: string },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -803,6 +953,20 @@ export const api = {
         organizationId,
         unitId,
         "inventory/returnables/supplier-exchanges",
+        body,
+        idempotencyKey,
+      ),
+    resolveReturnableSupplierExchange: (
+      organizationId: string,
+      unitId: string,
+      exchangeId: string,
+      body: { decision: "received" | "canceled"; note: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/returnables/supplier-exchanges/${encodeURIComponent(exchangeId)}/resolve`,
         body,
         idempotencyKey,
       ),
@@ -927,7 +1091,10 @@ export const api = {
           | "exception"
           | "inventory"
           | "purchase"
-          | "operation";
+          | "operation"
+          | "labor"
+          | "reconciliation"
+          | "forecast";
         key: string;
         cursor?: string;
         limit?: string;
@@ -969,7 +1136,11 @@ export const api = {
           | "operations"
           | "profitability"
           | "multiunit"
-          | "quality";
+          | "quality"
+          | "labor"
+          | "reconciliation"
+          | "forecast";
+        format: "csv" | "pdf" | "xlsx";
       },
       idempotencyKey?: string,
     ) =>
@@ -986,6 +1157,96 @@ export const api = {
           unitId,
           `reports/exports/${encodeURIComponent(exportId)}/content`,
         ),
+      ),
+    reportViews: (organizationId: string, unitId: string) =>
+      request<unknown>(managementPath(organizationId, unitId, "reports/views")),
+    createReportView: (
+      organizationId: string,
+      unitId: string,
+      body: Record<string, unknown>,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "reports/views"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    updateReportView: (
+      organizationId: string,
+      unitId: string,
+      viewId: string,
+      body: Record<string, unknown>,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, `reports/views/${encodeURIComponent(viewId)}`),
+        "PATCH",
+        body,
+        idempotencyKey,
+      ),
+    deleteReportView: (
+      organizationId: string,
+      unitId: string,
+      viewId: string,
+      version: number,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<void>(
+        `${managementPath(
+          organizationId,
+          unitId,
+          `reports/views/${encodeURIComponent(viewId)}`,
+        )}?${new URLSearchParams({ version: String(version) })}`,
+        "DELETE",
+        undefined,
+        idempotencyKey,
+      ),
+    reportAlerts: (organizationId: string, unitId: string, status = "open") =>
+      request<unknown>(
+        `${managementPath(organizationId, unitId, "reports/alerts")}?${new URLSearchParams({ status })}`,
+      ),
+    evaluateReportAlerts: (
+      organizationId: string,
+      unitId: string,
+      body: { from: string; to: string; comparisonMode: string; dueInDays?: number },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "reports/alerts/evaluate"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    updateReportAlert: (
+      organizationId: string,
+      unitId: string,
+      alertId: string,
+      body: Record<string, unknown>,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, `reports/alerts/${encodeURIComponent(alertId)}`),
+        "PATCH",
+        body,
+        idempotencyKey,
+      ),
+    backfillReportCosts: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        from: string;
+        to: string;
+        comparisonMode: string;
+        allowEstimated: boolean;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "reports/costs/backfill"),
+        "POST",
+        body,
+        idempotencyKey,
       ),
     reportSchedules: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "reports/schedules")),
@@ -1037,6 +1298,144 @@ export const api = {
       ),
     cashShifts: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "cash-shifts")),
+    waiterSettlements: (organizationId: string, unitId: string) =>
+      request<unknown>(managementPath(organizationId, unitId, "waiter-settlements")),
+    waiterSettlementLossCandidates: (organizationId: string, unitId: string, query: string) =>
+      request<unknown>(
+        managementListPath(
+          organizationId,
+          unitId,
+          "waiter-settlements/operational-losses/candidates",
+          { query },
+        ),
+      ),
+    updateWaiterSettlementSettings: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        attributionMode: "final_responsible" | "order_creator";
+        transferMode: "move_to_final" | "preserve_origin";
+        serviceBase: "gross" | "net_after_discounts";
+        eligibleTabs: "closed" | "fully_paid";
+        serviceDistribution: "individual_sales" | "equal_pool";
+        serviceTeamShareBasisPoints: number;
+        partnershipBase: "gross" | "net" | "received" | "net_excluding_service";
+        tierApplication: "all_revenue" | "progressive";
+        discountTreatment: "deduct" | "ignore";
+        cancellationTreatment: "exclude" | "deduct";
+        refundTreatment: "deduct" | "informational";
+        periodMode: "calendar_month" | "custom";
+        customPeriodStartDay: number;
+        aggregateAcrossUnits: boolean;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "waiter-settlements/settings"),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    updateWaiterPartnershipPlan: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        name: string;
+        effectiveFrom: string;
+        tiers: Array<{
+          minimumCents: number;
+          maximumCents: number | null;
+          rewardType: "percentage" | "fixed";
+          rewardValue: number;
+        }>;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "waiter-settlements/partnership-plan"),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    createWaiterOperationalLoss: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        tabId: string;
+        type: "unpaid_tab" | "refund" | "chargeback" | "other";
+        reason: string;
+        amountCents?: number;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "waiter-settlements/operational-losses",
+        body,
+        idempotencyKey,
+      ),
+    decideWaiterOperationalLoss: (
+      organizationId: string,
+      unitId: string,
+      lossId: string,
+      body: { action: "approve" | "reject" | "reverse"; note: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `waiter-settlements/losses/${encodeURIComponent(lossId)}/decision`,
+        body,
+        idempotencyKey,
+      ),
+    previewWaiterSettlement: (
+      organizationId: string,
+      unitId: string,
+      body: { from: string; to: string; operationalShiftId?: string },
+    ) =>
+      request<unknown>(
+        managementPath(organizationId, unitId, "waiter-settlements/settlements/preview"),
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+    createWaiterSettlement: (
+      organizationId: string,
+      unitId: string,
+      body: { from: string; to: string; operationalShiftId?: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "waiter-settlements/settlements",
+        body,
+        idempotencyKey,
+      ),
+    transitionWaiterSettlement: (
+      organizationId: string,
+      unitId: string,
+      settlementId: string,
+      body: { action: "approve" | "pay" | "cancel"; note: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `waiter-settlements/settlements/${encodeURIComponent(settlementId)}/transition`,
+        body,
+        idempotencyKey,
+      ),
+    waiterSettlementExport: (organizationId: string, unitId: string, settlementId: string) =>
+      requestDownload(
+        `${managementPath(
+          organizationId,
+          unitId,
+          `waiter-settlements/settlements/${encodeURIComponent(settlementId)}/export`,
+        )}?format=csv`,
+      ),
     people: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "people")),
     peopleDirectory: (
@@ -1089,16 +1488,33 @@ export const api = {
         mode: "off" | "all" | "selected";
         geofenceEnabled: boolean;
         locationLabel?: string;
+        locationAddress?: string;
         latitude?: number;
         longitude?: number;
         radiusMeters: number;
         accuracyToleranceMeters: number;
+        maxLocationAccuracyMeters: number;
+        lowAccuracyPolicy: "block" | "flag";
+        additionalLocations: Array<{
+          id?: string;
+          label: string;
+          address?: string;
+          latitude: number;
+          longitude: number;
+          radiusMeters: number;
+          accuracyToleranceMeters: number;
+        }>;
         managerCanView: boolean;
         financeCanView: boolean;
         antiFraudEnabled: boolean;
         offlineEnabled: boolean;
+        offlineMaxDelayMinutes: number;
+        offlineRequiresJustification: boolean;
         notificationsEnabled: boolean;
+        emailAlertsEnabled: boolean;
         managerAlertOnAnomaly: boolean;
+        locationRetentionDays: number;
+        locationChangeReason?: string;
         lateToleranceMinutes: number;
         minimumBreakMinutes: number;
         maxOvertimeMinutes: number;
@@ -1112,6 +1528,18 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    timeTrackingSettingsHistory: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        managementPath(organizationId, unitId, "people/time-tracking/settings/history"),
+      ),
+    timeTrackingLocationAnomalies: (
+      organizationId: string,
+      unitId: string,
+      period: { from: string; to: string },
+    ) =>
+      request<unknown>(
+        `${managementPath(organizationId, unitId, "people/time-tracking/location-anomalies")}?${new URLSearchParams({ ...period, comparisonMode: "none" })}`,
+      ),
     timeTrackingReport: (
       organizationId: string,
       unitId: string,
@@ -1150,7 +1578,15 @@ export const api = {
     createStockLocation: (
       organizationId: string,
       unitId: string,
-      body: { name: string; code: string },
+      body: {
+        name: string;
+        code: string;
+        barcode?: string;
+        kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+        responsibleIdentityId?: string | null;
+        requireDistinctTransferReceiver?: boolean;
+        transferSlaMinutes?: number;
+      },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -1164,7 +1600,16 @@ export const api = {
       organizationId: string,
       unitId: string,
       locationId: string,
-      body: { name?: string; code?: string; active?: boolean },
+      body: {
+        name?: string;
+        code?: string;
+        barcode?: string | null;
+        kind?: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+        responsibleIdentityId?: string | null;
+        requireDistinctTransferReceiver?: boolean;
+        transferSlaMinutes?: number;
+        active?: boolean;
+      },
     ) =>
       request<unknown>(
         managementPath(
@@ -1276,11 +1721,65 @@ export const api = {
         body,
         idempotencyKey,
       ),
+    transferInventoryBatch: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        sourceLocationId: string;
+        destinationLocationId: string;
+        reason: string;
+        lines: Array<{ inventoryItemId: string; quantity: string; lotId?: string }>;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/transfers/batches",
+        body,
+        idempotencyKey,
+      ),
+    configureInventoryIssueRoute: (
+      organizationId: string,
+      unitId: string,
+      body: { productId: string; stationId?: string; locationId: string; active: boolean },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/issue-routes",
+        body,
+        idempotencyKey,
+      ),
+    configureStockLocationItemSetting: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        locationId: string;
+        inventoryItemId: string;
+        minimumQuantity: string;
+        targetQuantity: string;
+        transferUnitLabel?: string;
+        unitsPerTransferUnit: string;
+      },
+    ) =>
+      request<unknown>(managementPath(organizationId, unitId, "inventory/location-item-settings"), {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
     resolveInventoryTransfer: (
       organizationId: string,
       unitId: string,
       transferId: string,
-      body: { decision: "received" | "canceled"; note: string },
+      body: {
+        decision: "received" | "canceled";
+        quantityReceived?: string;
+        quantityDivergent?: string;
+        divergenceReason?: string;
+        evidence?: string[];
+        note: string;
+      },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -1738,6 +2237,9 @@ export const api = {
         accuracyMeters?: number;
         capturedAt?: string;
         deviceId?: string;
+        sessionId?: string;
+        offline?: boolean;
+        offlineJustification?: string;
       },
       idempotencyKey?: string,
     ) =>
@@ -1758,6 +2260,9 @@ export const api = {
         accuracyMeters?: number;
         capturedAt?: string;
         deviceId?: string;
+        sessionId?: string;
+        offline?: boolean;
+        offlineJustification?: string;
       },
       idempotencyKey?: string,
     ) =>
@@ -1778,6 +2283,9 @@ export const api = {
         accuracyMeters?: number;
         capturedAt?: string;
         deviceId?: string;
+        sessionId?: string;
+        offline?: boolean;
+        offlineJustification?: string;
       },
       idempotencyKey?: string,
     ) =>
@@ -1797,6 +2305,9 @@ export const api = {
         accuracyMeters?: number;
         capturedAt?: string;
         deviceId?: string;
+        sessionId?: string;
+        offline?: boolean;
+        offlineJustification?: string;
       },
       idempotencyKey?: string,
     ) =>
@@ -1988,6 +2499,14 @@ export const api = {
     kdsTerminalProfile: (organizationId: string, unitId: string, installationId: string) =>
       request<unknown>(
         pilotPath(organizationId, unitId, `kds/terminals/${encodeURIComponent(installationId)}`),
+      ),
+    terminalProfile: (organizationId: string, unitId: string, installationId: string) =>
+      request<TerminalProfile | null>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `terminal-profiles/${encodeURIComponent(installationId)}`,
+        ),
       ),
     createCategory: (
       organizationId: string,
@@ -2297,6 +2816,7 @@ export const api = {
         priceCents: number;
         available: boolean;
         stationIds: string[];
+        stationRouting?: Array<{ stationId: string; stage: number }>;
         deliveryPriceCents?: number | null;
         costCents?: number | null;
         dailyStock?: number | null;
@@ -3077,6 +3597,50 @@ export const api = {
         { state },
         idempotencyKey,
       ),
+    claimKdsTicket: (
+      organizationId: string,
+      unitId: string,
+      ticketId: string,
+      installationId: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(organizationId, unitId, `kds/${encodeURIComponent(ticketId)}/claim`),
+        "POST",
+        { installationId, leaseSeconds: 120 },
+        idempotencyKey,
+      ),
+    releaseKdsTicketClaim: (
+      organizationId: string,
+      unitId: string,
+      ticketId: string,
+      installationId: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(organizationId, unitId, `kds/${encodeURIComponent(ticketId)}/claim/release`),
+        "POST",
+        { installationId, leaseSeconds: 120 },
+        idempotencyKey,
+      ),
+    acknowledgeKdsChange: (
+      organizationId: string,
+      unitId: string,
+      ticketId: string,
+      changeId: string,
+      revision: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `kds/${encodeURIComponent(ticketId)}/changes/${encodeURIComponent(changeId)}/acknowledge`,
+        ),
+        "POST",
+        { revision },
+        idempotencyKey,
+      ),
     transitionKdsItem: (
       organizationId: string,
       unitId: string,
@@ -3174,7 +3738,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       orderId: string,
-      target: "expedition" | "served",
+      target: "expedition" | "runner" | "served",
       reason?: string,
       idempotencyKey?: string,
     ) =>
@@ -3182,6 +3746,19 @@ export const api = {
         pilotPath(organizationId, unitId, `kds/orders/${encodeURIComponent(orderId)}/handoff`),
         "POST",
         { target, ...(reason ? { reason } : {}) },
+        idempotencyKey,
+      ),
+    claimKdsRunner: (
+      organizationId: string,
+      unitId: string,
+      orderId: string,
+      reason?: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(organizationId, unitId, `kds/orders/${encodeURIComponent(orderId)}/runner/claim`),
+        "POST",
+        { ...(reason ? { reason } : {}) },
         idempotencyKey,
       ),
     setKdsProductAvailability: (
@@ -3218,6 +3795,23 @@ export const api = {
     ) =>
       idempotentRequest<unknown>(
         pilotPath(organizationId, unitId, `kds/terminals/${encodeURIComponent(installationId)}`),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    updateTerminalProfile: (
+      organizationId: string,
+      unitId: string,
+      installationId: string,
+      body: TerminalProfileInput,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<TerminalProfile>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `terminal-profiles/${encodeURIComponent(installationId)}`,
+        ),
         "PUT",
         body,
         idempotencyKey,

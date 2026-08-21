@@ -30,6 +30,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
         public bool? Enabled { get; set; }
         /// <summary>The family property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_family? Family { get; set; }
+        /// <summary>The format property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_format? Format { get; set; }
         /// <summary>The frequency property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_frequency? Frequency { get; set; }
         /// <summary>The localTime property</summary>
@@ -69,6 +71,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
             Delivery = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_delivery.In_app;
             Enabled = true;
             Family = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_family.Overview;
+            Format = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_format.Csv;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -93,6 +96,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
                 { "delivery", n => { Delivery = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_delivery>(); } },
                 { "enabled", n => { Enabled = n.GetBoolValue(); } },
                 { "family", n => { Family = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_family>(); } },
+                { "format", n => { Format = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_format>(); } },
                 { "frequency", n => { Frequency = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_frequency>(); } },
                 { "localTime", n => { LocalTime = n.GetStringValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
@@ -113,6 +117,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_delivery>("delivery", Delivery);
             writer.WriteBoolValue("enabled", Enabled);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_family>("family", Family);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_format>("format", Format);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.Item.WithSchedulePatchRequestBody_frequency>("frequency", Frequency);
             writer.WriteStringValue("localTime", LocalTime);
             writer.WriteStringValue("name", Name);

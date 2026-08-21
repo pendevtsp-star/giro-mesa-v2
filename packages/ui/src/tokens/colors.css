@@ -1,4 +1,23 @@
 :root {
+  --background: var(--gm-paper);
+  --foreground: var(--gm-ink);
+  --card: var(--gm-surface);
+  --card-foreground: var(--gm-ink);
+  --popover: var(--gm-surface);
+  --popover-foreground: var(--gm-ink);
+  --primary: var(--gm-action);
+  --primary-foreground: var(--gm-on-action);
+  --secondary: var(--gm-surface-soft);
+  --secondary-foreground: var(--gm-ink);
+  --muted: var(--gm-surface-soft);
+  --muted-foreground: var(--gm-muted);
+  --accent: var(--gm-accent-soft);
+  --accent-foreground: var(--gm-ink);
+  --destructive: var(--gm-danger-action);
+  --border: var(--gm-border);
+  --input: var(--gm-border);
+  --ring: var(--gm-focus);
+  --radius: 0.75rem;
   /* Brand */
   --gm-brand: hsl(155, 68%, 25%);
   --gm-brand-strong: hsl(155, 70%, 17%);

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@giromesa/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { resolveOpsUrl } from "../../lib/auth-navigation";
@@ -59,14 +60,14 @@ export default function AcceptInvitationPage() {
         <h1>Aceitar convite</h1>
         <p>O convite é pessoal e só funciona com a conta vinculada ao e-mail que o recebeu.</p>
         {!completed && !authenticationRequired && (
-          <button
+          <Button
             className="button button-primary"
             type="button"
             onClick={accept}
             disabled={!token}
           >
             Validar e aceitar convite
-          </button>
+          </Button>
         )}
         {authenticationRequired && (
           <div className="auth-form">
@@ -79,9 +80,9 @@ export default function AcceptInvitationPage() {
           </div>
         )}
         {completed && (
-          <button className="button button-primary" type="button" onClick={openOperations}>
+          <Button className="button button-primary" type="button" onClick={openOperations}>
             Abrir GiroMesa
-          </button>
+          </Button>
         )}
         <p className="form-status" role="status">
           {message}

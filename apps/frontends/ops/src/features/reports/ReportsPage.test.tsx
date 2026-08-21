@@ -6,6 +6,7 @@ import {
   RemoteGate,
   type ReportData,
 } from "../../management.shared";
+import { EnhancedReportFamilyView } from "./ReportEnhancements";
 import {
   csvCell,
   parseSavedReportFilters,
@@ -53,6 +54,9 @@ const emptyReport: ReportData = {
       cashFlow: "complete",
       costs: "unavailable",
       budget: "unavailable",
+      labor: "unavailable",
+      reconciliation: "unavailable",
+      forecast: "unavailable",
     },
   },
   capabilities: {
@@ -61,6 +65,9 @@ const emptyReport: ReportData = {
     export: false,
     manageBudget: false,
     manageSchedules: false,
+    manageViews: false,
+    manageAlerts: false,
+    backfillCosts: false,
     emailDeliveryConfigured: false,
   },
   budget: null,
@@ -130,6 +137,52 @@ const emptyReport: ReportData = {
     },
     multiunit: { coverage: "unavailable", units: [] },
     quality: { scorePercent: 100, issues: [] },
+    labor: {
+      coverage: "unavailable",
+      costCoverage: "unavailable",
+      scheduleCoverage: "unavailable",
+      people: 0,
+      workedMinutes: 0,
+      scheduledMinutes: 0,
+      overtimeMinutes: null,
+      laborCostCents: null,
+      laborCostPercent: null,
+      salesPerLaborHourCents: null,
+      roles: [],
+    },
+    reconciliation: {
+      coverage: "unavailable",
+      posRevenueCents: 0,
+      paymentCents: 0,
+      paymentDifferenceCents: 0,
+      fiscalAuthorizedCents: 0,
+      fiscalDifferenceCents: 0,
+      taxCents: 0,
+      documents: { total: 0, authorized: 0, rejected: 0, canceled: 0 },
+      external: {
+        matched: 0,
+        unmatched: 0,
+        divergent: 0,
+        resolved: 0,
+        unmatchedCents: 0,
+        divergentCents: 0,
+      },
+    },
+    forecast: {
+      method: "historical_daily_average_v1",
+      horizonDays: 7,
+      sampleDays: 0,
+      confidence: "low",
+      errorPercent: null,
+      revenue: {
+        dailyAverageCents: 0,
+        forecastCents: 0,
+        lowerBoundCents: 0,
+        upperBoundCents: 0,
+      },
+      cash: { inflowsCents: 0, outflowsCents: 0, netCents: 0 },
+      purchases: [],
+    },
   },
 };
 
@@ -145,6 +198,24 @@ describe("relatórios operacionais", () => {
     expect(html).toContain("Atualização e cobertura dos dados");
     expect(html).toContain("Biblioteca de relatórios");
     expect(html).toContain("Descontos e cancelamentos");
+    expect(html).toContain("Mão de obra");
+    expect(html).toContain("Fiscal e pagamentos");
+    expect(html).toContain("Previsão");
+  });
+
+  it("renderiza mão de obra, conciliação e previsão sem inventar cobertura", () => {
+    const labor = renderToStaticMarkup(
+      <EnhancedReportFamilyView data={emptyReport} family="labor" />,
+    );
+    const reconciliation = renderToStaticMarkup(
+      <EnhancedReportFamilyView data={emptyReport} family="reconciliation" />,
+    );
+    const forecast = renderToStaticMarkup(
+      <EnhancedReportFamilyView data={emptyReport} family="forecast" />,
+    );
+    expect(labor).toContain("Indisponível");
+    expect(reconciliation).toContain("Fiscal e pagamentos");
+    expect(forecast).toContain("Confiança baixa");
   });
 
   it("persiste filtros e escopo antes do hash e restaura apenas o escopo correspondente", () => {

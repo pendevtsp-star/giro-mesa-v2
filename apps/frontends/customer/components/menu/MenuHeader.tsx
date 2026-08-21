@@ -1,3 +1,5 @@
+import { Button } from "@giromesa/ui";
+
 type HubState = "checking" | "online" | "offline";
 
 export function MenuHeader({
@@ -22,14 +24,14 @@ export function MenuHeader({
           <h1>{branding?.displayName ?? "Cardápio da unidade"}</h1>
           <span>{branding?.slogan ?? "Consulte os dados informados pela equipe"}</span>
         </div>
-        <button
+        <Button
           type="button"
           className="icon-button"
           aria-label="Ver informações do restaurante"
           onClick={onInfo}
         >
           i
-        </button>
+        </Button>
       </header>
 
       <div className={`connection-banner ${hub}`} role="status">

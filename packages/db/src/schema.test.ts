@@ -32,12 +32,14 @@ import {
   managementInventoryClosingLines,
   managementInventoryClosings,
   managementInventoryCountSchedules,
+  managementInventoryIssueRoutes,
   managementInventoryItemKind,
   managementInventoryItems,
   managementInventoryReservations,
   managementInventoryReviewRequests,
   managementInventoryReviewStatus,
   managementInventorySupplierAliases,
+  managementInventoryTransferReceipts,
   managementInventoryTransferStatus,
   managementInventoryTransfers,
   managementNfeImportLineStatus,
@@ -53,7 +55,11 @@ import {
   managementReturnableCustodyMovementType,
   managementReturnableIncidentStatus,
   managementReturnableIncidents,
+  managementReturnableSupplierExchanges,
   managementSchedules,
+  managementStockLocationItemSettings,
+  managementStockLocationKind,
+  managementStockLocations,
   managementSupplierInvoiceStatus,
   managementSupplierInvoices,
   managementTimeTrackingClosureStatus,
@@ -66,6 +72,7 @@ import {
   posKdsAttentionAcknowledgements,
   posKdsBatchAssignments,
   posKdsBatches,
+  posKdsItemChanges,
   posKdsTerminalProfiles,
   posKdsTicketItems,
   posKdsTickets,
@@ -74,12 +81,14 @@ import {
   posOrders,
   posProductAvailability,
   posProductPrices,
+  posProductStations,
   posProducts,
   posServiceSections,
   posShiftSectionTables,
   posShiftTableLayouts,
   posShiftTableTransfers,
   posTabs,
+  posTerminalProfiles,
 } from "./operations-schema.js";
 import { operationalCommands, organizations, units } from "./schema.js";
 
@@ -100,6 +109,21 @@ describe("database schema", () => {
       assert.ok(table.organizationId);
       assert.ok(table.unitId);
     }
+  });
+
+  it("persists unit-scoped terminal profiles", async () => {
+    assert.ok(posTerminalProfiles.organizationId);
+    assert.ok(posTerminalProfiles.unitId);
+    assert.ok(posTerminalProfiles.installationId);
+    assert.ok(posTerminalProfiles.printerId);
+    assert.ok(posTerminalProfiles.quickActions);
+
+    const migration = await readFile(
+      new URL("../drizzle/0043_tricky_diamondback.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE "pos_terminal_profiles"/);
+    assert.match(migration, /pos_terminal_profiles_station_fk/);
   });
 
   it("persists unit-scoped advanced catalog state", () => {
@@ -142,6 +166,8 @@ describe("database schema", () => {
     assert.ok(posOrders.readyNotifiedAt);
     assert.ok(posOrders.kdsPriority);
     assert.ok(posOrders.kdsPriorityUpdatedByIdentityId);
+    assert.ok(posOrders.runnerIdentityId);
+    assert.ok(posOrders.runnerPickedUpAt);
     assert.ok(posProductAvailability.operationalReason);
     assert.ok(posProductAvailability.operationalResetAt);
     assert.ok(posKdsTerminalProfiles.installationId);
@@ -152,11 +178,15 @@ describe("database schema", () => {
     assert.ok(posKdsTickets.dueAt);
     assert.ok(posKdsTickets.handedOffAt);
     assert.ok(posKdsTickets.servedAt);
+    assert.ok(posKdsTickets.claimedByInstallationId);
+    assert.ok(posKdsTickets.claimExpiresAt);
     assert.ok(posKdsTicketItems.quantity);
     assert.ok(posKdsTicketItems.readyQuantity);
     assert.ok(posKdsTicketItems.status);
     assert.ok(posKdsTicketItems.held);
     assert.ok(posKdsTicketItems.firedAt);
+    assert.ok(posKdsTicketItems.stage);
+    assert.ok(posKdsTicketItems.dependencyHeld);
     assert.ok(posKdsTicketItems.blockCode);
     assert.ok(posKdsTicketItems.blockedAt);
     assert.ok(posKdsTicketItems.blockedByIdentityId);
@@ -167,6 +197,9 @@ describe("database schema", () => {
     assert.ok(posKdsBatches.stationId);
     assert.ok(posKdsBatchAssignments.position);
     assert.ok(posKdsBatchAssignments.releasedAt);
+    assert.ok(posKdsItemChanges.revision);
+    assert.ok(posKdsItemChanges.acknowledgedAt);
+    assert.ok(posProductStations.stage);
   });
 
   it("persists inventory extensions with tenant scope and auditable staging", () => {
@@ -198,9 +231,13 @@ describe("database schema", () => {
     ]);
     assert.deepEqual(managementInventoryTransferStatus.enumValues, [
       "in_transit",
+      "partially_received",
       "received",
+      "divergent",
       "canceled",
     ]);
+    assert.ok(managementStockLocationKind.enumValues.includes("cooler"));
+    assert.ok(managementStockLocationKind.enumValues.includes("returnables"));
     assert.deepEqual(managementInventoryAssetCondition.enumValues, [
       "good",
       "fair",
@@ -219,6 +256,10 @@ describe("database schema", () => {
       managementInventoryAssets,
       managementInventoryReviewRequests,
       managementInventoryTransfers,
+      managementInventoryTransferReceipts,
+      managementInventoryIssueRoutes,
+      managementStockLocationItemSettings,
+      managementReturnableSupplierExchanges,
       managementInventoryReservations,
       managementInventoryCountSchedules,
       managementProductionBatches,
@@ -245,11 +286,20 @@ describe("database schema", () => {
     assert.ok(managementInventoryAssets.assetTag);
     assert.ok(managementInventoryReviewRequests.riskSummary);
     assert.ok(managementInventoryTransfers.status);
+    assert.ok(managementInventoryTransfers.quantityReceived);
+    assert.ok(managementInventoryTransfers.deadlineAt);
+    assert.ok(managementInventoryTransferReceipts.quantityDivergent);
+    assert.ok(managementInventoryIssueRoutes.locationId);
+    assert.ok(managementStockLocationItemSettings.targetQuantity);
+    assert.ok(managementStockLocations.requireDistinctTransferReceiver);
+    assert.ok(managementReturnableSupplierExchanges.status);
     assert.ok(managementInventoryReservations.status);
     assert.ok(managementInventoryCountSchedules.nextDueAt);
     assert.ok(managementProductionBatches.actualQuantity);
     assert.ok(managementProductionBatchInputs.actualQuantity);
     assert.ok(managementInventoryClosings.period);
+    assert.ok(managementInventoryClosings.locationId);
+    assert.ok(managementInventoryClosings.shiftReference);
     assert.ok(managementInventoryClosingLines.reservedQuantity);
     assert.ok(managementInterunitTransfers.destinationUnitId);
     assert.ok(managementInterunitTransferLines.quantityReceived);

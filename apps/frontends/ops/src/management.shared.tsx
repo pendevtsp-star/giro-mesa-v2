@@ -92,7 +92,38 @@ export interface StockLocation {
   id: string;
   name: string;
   code: string;
+  barcode: string | null;
+  kind: "warehouse" | "cooler" | "freezer" | "bar" | "kitchen" | "returnables" | "other";
+  responsibleIdentityId: string | null;
+  requireDistinctTransferReceiver: boolean;
+  transferSlaMinutes: number;
   active: boolean;
+}
+
+export interface StockLocationItemSetting {
+  locationId: string;
+  inventoryItemId: string;
+  minimumQuantity: number;
+  targetQuantity: number;
+  transferUnitLabel: string | null;
+  unitsPerTransferUnit: number;
+}
+
+export interface InventoryIssueRoute {
+  id: string;
+  productId: string;
+  stationId: string | null;
+  locationId: string;
+  active: boolean;
+}
+
+export interface SectorReplenishmentSuggestion {
+  inventoryItemId: string;
+  sourceLocationId: string;
+  destinationLocationId: string;
+  suggestedQuantity: number;
+  transferUnitLabel: string | null;
+  unitsPerTransferUnit: number;
 }
 
 export interface StockBalance {
@@ -191,6 +222,8 @@ export interface InterunitTransfer {
 export interface InventoryClosing {
   id: string;
   period: string;
+  locationId: string | null;
+  shiftReference: string | null;
   totalValueCents: number;
   totalReservedValueCents: number;
   lineCount: number;
@@ -260,12 +293,29 @@ export interface InventoryTransfer {
   sourceLotId: string | null;
   destinationLotId: string | null;
   quantity: number;
+  quantityReceived: number;
+  quantityDivergent: number;
+  batchId: string | null;
+  lineNumber: number;
   reason: string;
-  status: "in_transit" | "received" | "canceled";
+  status: "in_transit" | "partially_received" | "received" | "divergent" | "canceled";
+  sentByName: string | null;
+  receivedByName: string | null;
+  canceledByName: string | null;
+  deadlineAt: string;
   createdAt: string;
   receivedAt: string | null;
   canceledAt: string | null;
   resolutionNote: string | null;
+  receipts: Array<{
+    id: string;
+    quantityReceived: number;
+    quantityDivergent: number;
+    divergenceReason: string | null;
+    note: string;
+    receivedByName: string | null;
+    receivedAt: string;
+  }>;
 }
 
 export interface InventoryPendingAction {
@@ -298,6 +348,11 @@ export interface InventoryData {
   assets: InventoryAsset[];
   inventoryReviewRequests: InventoryReviewRequest[];
   transfers: InventoryTransfer[];
+  inTransitBalances: Array<{ inventoryItemId: string; quantity: number }>;
+  locationItemSettings: StockLocationItemSetting[];
+  issueRoutes: InventoryIssueRoute[];
+  sectorReplenishmentSuggestions: SectorReplenishmentSuggestion[];
+  inventoryOperators: Array<{ id: string; name: string }>;
   reservations: InventoryReservation[];
   countSchedules: InventoryCountSchedule[];
   productionBatches: ProductionBatch[];
@@ -319,6 +374,11 @@ export interface InventoryData {
   pendingActions: InventoryPendingAction[];
   returnables?: ReturnablePosition[];
   returnableIncidents?: ReturnableIncident[];
+  physicalByLocation?: ReturnablesData["physicalByLocation"];
+  custodyByLocation?: ReturnablesData["custodyByLocation"];
+  fullContainersByLocation?: ReturnablesData["fullContainersByLocation"];
+  supplierExchanges?: ReturnablesData["supplierExchanges"];
+  lossIndicators?: ReturnablesData["lossIndicators"];
   capabilities?: InventoryCapabilities | null;
 }
 
@@ -327,6 +387,39 @@ export interface ReturnablesData {
   returnableIncidents: ReturnableIncident[];
   capabilities: InventoryCapabilities | null;
   recentReturnableMovements: ReturnableMovement[];
+  physicalByLocation: Array<{
+    inventoryItemId: string;
+    locationId: string;
+    physicalQuantity: number;
+  }>;
+  custodyByLocation: Array<{
+    inventoryItemId: string;
+    locationId: string;
+    expectedQuantity: number;
+  }>;
+  fullContainersByLocation: Array<{
+    inventoryItemId: string;
+    locationId: string;
+    quantity: number;
+  }>;
+  supplierExchanges: Array<{
+    id: string;
+    inventoryItemId: string;
+    locationId: string;
+    supplierId: string;
+    quantity: number;
+    status: "in_transit" | "received" | "canceled";
+    note: string;
+    sentAt: string;
+    resolvedAt: string | null;
+  }>;
+  lossIndicators: Array<{
+    kind: ReturnableIncident["kind"];
+    locationId: string | null;
+    quantity: number;
+    estimatedCostCents: number;
+    incidentCount: number;
+  }>;
 }
 
 export interface RecipeProduct {
@@ -581,6 +674,9 @@ export interface ReportData {
       cashFlow: ReportCoverage;
       costs: ReportCoverage;
       budget: ReportCoverage;
+      labor: ReportCoverage;
+      reconciliation: ReportCoverage;
+      forecast: ReportCoverage;
     };
   } | null;
   capabilities: ReportCapabilities;
@@ -721,6 +817,11 @@ export interface ReportFamilies {
       revenueCents: number;
       averageTicketCents: number | null;
       changePercent: number | null;
+      rank: number;
+      operatingDays: number;
+      revenuePerOperatingDayCents: number | null;
+      organizationRevenueSharePercent: number | null;
+      sameStoreChangePercent: number | null;
     }>;
   };
   quality: {
@@ -730,6 +831,65 @@ export interface ReportFamilies {
       label: string;
       count: number;
       severity: "info" | "warning" | "critical";
+    }>;
+  };
+  labor: {
+    coverage: ReportCoverage;
+    costCoverage: ReportCoverage;
+    scheduleCoverage: ReportCoverage;
+    people: number;
+    workedMinutes: number;
+    scheduledMinutes: number;
+    overtimeMinutes: number | null;
+    laborCostCents: number | null;
+    laborCostPercent: number | null;
+    salesPerLaborHourCents: number | null;
+    roles: Array<{
+      roleLabel: string;
+      people: number;
+      workedMinutes: number;
+      scheduledMinutes: number;
+      overtimeMinutes: number;
+      laborCostCents: number | null;
+      costCoverage: ReportCoverage;
+    }>;
+  };
+  reconciliation: {
+    coverage: ReportCoverage;
+    posRevenueCents: number;
+    paymentCents: number;
+    paymentDifferenceCents: number;
+    fiscalAuthorizedCents: number;
+    fiscalDifferenceCents: number;
+    taxCents: number;
+    documents: { total: number; authorized: number; rejected: number; canceled: number };
+    external: {
+      matched: number;
+      unmatched: number;
+      divergent: number;
+      resolved: number;
+      unmatchedCents: number;
+      divergentCents: number;
+    };
+  };
+  forecast: {
+    method: "historical_daily_average_v1";
+    horizonDays: number;
+    sampleDays: number;
+    confidence: "low" | "medium" | "high";
+    errorPercent: number | null;
+    revenue: {
+      dailyAverageCents: number;
+      forecastCents: number;
+      lowerBoundCents: number;
+      upperBoundCents: number;
+    };
+    cash: { inflowsCents: number; outflowsCents: number; netCents: number };
+    purchases: Array<{
+      key: string;
+      label: string;
+      suggestedQuantity: number;
+      dailyDemand: number;
     }>;
   };
 }
@@ -753,6 +913,9 @@ export interface ReportCapabilities {
   export: boolean;
   manageBudget: boolean;
   manageSchedules: boolean;
+  manageViews: boolean;
+  manageAlerts: boolean;
+  backfillCosts: boolean;
   emailDeliveryConfigured: boolean;
 }
 
@@ -772,7 +935,10 @@ export type ReportDrillDownDimension =
   | "exception"
   | "inventory"
   | "purchase"
-  | "operation";
+  | "operation"
+  | "labor"
+  | "reconciliation"
+  | "forecast";
 
 export interface ReportDrillDownData {
   period: { from: string; to: string };
@@ -817,7 +983,7 @@ export interface ReportBudgetMonth {
 export interface ReportExportData {
   id: string;
   status: "ready" | "failed";
-  format: "csv";
+  format: "csv" | "pdf" | "xlsx";
   filename: string;
   rowCount: number;
   sha256: string | null;
@@ -844,7 +1010,11 @@ export interface ReportScheduleData {
     | "operations"
     | "profitability"
     | "multiunit"
-    | "quality";
+    | "quality"
+    | "labor"
+    | "reconciliation"
+    | "forecast";
+  format: "csv" | "pdf" | "xlsx";
   delivery: "in_app" | "email";
   enabled: boolean;
   nextRunAt: string | null;
@@ -964,22 +1134,40 @@ export interface TimeTrackingSettings {
   mode: "off" | "all" | "selected";
   geofenceEnabled: boolean;
   locationLabel: string | null;
+  locationAddress: string | null;
   latitude: number | null;
   longitude: number | null;
   radiusMeters: number;
   accuracyToleranceMeters: number;
+  maxLocationAccuracyMeters: number;
+  lowAccuracyPolicy: "block" | "flag";
+  additionalLocations: TimeTrackingLocation[];
   managerCanView: boolean;
   financeCanView: boolean;
   antiFraudEnabled: boolean;
   offlineEnabled: boolean;
+  offlineMaxDelayMinutes: number;
+  offlineRequiresJustification: boolean;
   notificationsEnabled: boolean;
+  emailAlertsEnabled: boolean;
   managerAlertOnAnomaly: boolean;
+  locationRetentionDays: number;
   lateToleranceMinutes: number;
   minimumBreakMinutes: number;
   maxOvertimeMinutes: number;
   longShiftAlertMinutes: number;
   reminderBeforeShiftMinutes: number;
   reminderAfterShiftMinutes: number;
+}
+
+export interface TimeTrackingLocation {
+  id: string;
+  label: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  accuracyToleranceMeters: number;
 }
 
 export interface TimeTrackingAlert {
@@ -1279,6 +1467,17 @@ function inventoryItemKind(value: unknown): InventoryItemKind {
     : "ingredient";
 }
 
+function stockLocationKind(value: unknown): StockLocation["kind"] {
+  return value === "cooler" ||
+    value === "freezer" ||
+    value === "bar" ||
+    value === "kitchen" ||
+    value === "returnables" ||
+    value === "other"
+    ? value
+    : "warehouse";
+}
+
 function returnableIncidentKind(value: unknown): ReturnableIncident["kind"] {
   return value === "breakage" ||
     value === "suspected_theft" ||
@@ -1299,6 +1498,11 @@ export function parseInventory(value: unknown): InventoryData {
       id: requiredString(location.id),
       name: requiredString(location.name),
       code: requiredString(location.code),
+      barcode: optionalString(location.barcode),
+      kind: stockLocationKind(location.kind),
+      responsibleIdentityId: optionalString(location.responsibleIdentityId),
+      requireDistinctTransferReceiver: boolean(location.requireDistinctTransferReceiver ?? false),
+      transferSlaMinutes: integer(location.transferSlaMinutes ?? 30),
       active: boolean(location.active),
     })),
     items: rows(payload, "items").map((item) => ({
@@ -1369,12 +1573,67 @@ export function parseInventory(value: unknown): InventoryData {
       sourceLotId: optionalString(transfer.sourceLotId),
       destinationLotId: optionalString(transfer.destinationLotId),
       quantity: numeric(transfer.quantity) ?? 0,
+      quantityReceived: numeric(transfer.quantityReceived, true) ?? 0,
+      quantityDivergent: numeric(transfer.quantityDivergent, true) ?? 0,
+      batchId: optionalString(transfer.batchId),
+      lineNumber: integer(transfer.lineNumber ?? 1),
       reason: requiredString(transfer.reason),
       status: requiredString(transfer.status) as InventoryTransfer["status"],
+      sentByName: optionalString(transfer.sentByName),
+      receivedByName: optionalString(transfer.receivedByName),
+      canceledByName: optionalString(transfer.canceledByName),
+      deadlineAt: requiredString(transfer.deadlineAt ?? transfer.createdAt),
       createdAt: requiredString(transfer.createdAt),
       receivedAt: optionalString(transfer.receivedAt),
       canceledAt: optionalString(transfer.canceledAt),
       resolutionNote: optionalString(transfer.resolutionNote),
+      receipts: Array.isArray(transfer.receipts)
+        ? transfer.receipts.map((value) => {
+            const receipt = record(value);
+            return {
+              id: requiredString(receipt.id),
+              quantityReceived: numeric(receipt.quantityReceived) ?? 0,
+              quantityDivergent: numeric(receipt.quantityDivergent) ?? 0,
+              divergenceReason: optionalString(receipt.divergenceReason),
+              note: requiredString(receipt.note),
+              receivedByName: optionalString(receipt.receivedByName),
+              receivedAt: requiredString(receipt.receivedAt),
+            };
+          })
+        : [],
+    })),
+    inTransitBalances: optionalRows(payload, "inTransitBalances").map((balance) => ({
+      inventoryItemId: requiredString(balance.inventoryItemId),
+      quantity: numeric(balance.quantity) ?? 0,
+    })),
+    locationItemSettings: optionalRows(payload, "locationItemSettings").map((setting) => ({
+      locationId: requiredString(setting.locationId),
+      inventoryItemId: requiredString(setting.inventoryItemId),
+      minimumQuantity: numeric(setting.minimumQuantity) ?? 0,
+      targetQuantity: numeric(setting.targetQuantity) ?? 0,
+      transferUnitLabel: optionalString(setting.transferUnitLabel),
+      unitsPerTransferUnit: numeric(setting.unitsPerTransferUnit) ?? 1,
+    })),
+    issueRoutes: optionalRows(payload, "issueRoutes").map((route) => ({
+      id: requiredString(route.id),
+      productId: requiredString(route.productId),
+      stationId: optionalString(route.stationId),
+      locationId: requiredString(route.locationId),
+      active: boolean(route.active),
+    })),
+    sectorReplenishmentSuggestions: optionalRows(payload, "sectorReplenishmentSuggestions").map(
+      (suggestion) => ({
+        inventoryItemId: requiredString(suggestion.inventoryItemId),
+        sourceLocationId: requiredString(suggestion.sourceLocationId),
+        destinationLocationId: requiredString(suggestion.destinationLocationId),
+        suggestedQuantity: numeric(suggestion.suggestedQuantity) ?? 0,
+        transferUnitLabel: optionalString(suggestion.transferUnitLabel),
+        unitsPerTransferUnit: numeric(suggestion.unitsPerTransferUnit) ?? 1,
+      }),
+    ),
+    inventoryOperators: optionalRows(payload, "inventoryOperators").map((operator) => ({
+      id: requiredString(operator.id),
+      name: requiredString(operator.name),
     })),
     reservations: optionalRows(payload, "reservations").map((reservation) => ({
       id: requiredString(reservation.id),
@@ -1450,6 +1709,8 @@ export function parseInventory(value: unknown): InventoryData {
     closings: optionalRows(payload, "closings").map((closing) => ({
       id: requiredString(closing.id),
       period: requiredString(closing.period),
+      locationId: optionalString(closing.locationId),
+      shiftReference: optionalString(closing.shiftReference),
       totalValueCents: integer(closing.totalValueCents),
       totalReservedValueCents: integer(closing.totalReservedValueCents),
       lineCount: integer(closing.lineCount),
@@ -1637,6 +1898,41 @@ export function parseReturnables(value: unknown): ReturnablesData {
       quantityDelta: numeric(movement.quantityDelta) ?? 0,
       context: movement.context === undefined ? {} : record(movement.context),
       occurredAt: requiredString(movement.occurredAt),
+    })),
+    physicalByLocation: optionalRows(payload, "physicalByLocation").map((position) => ({
+      inventoryItemId: requiredString(position.containerInventoryItemId),
+      locationId: requiredString(position.locationId),
+      physicalQuantity: numeric(position.physicalQuantity) ?? 0,
+    })),
+    custodyByLocation: optionalRows(payload, "custodyByLocation").map((position) => ({
+      inventoryItemId: requiredString(position.containerInventoryItemId),
+      locationId: requiredString(position.locationId),
+      expectedQuantity: numeric(position.expectedQuantity) ?? 0,
+    })),
+    fullContainersByLocation: optionalRows(payload, "fullContainersByLocation").map((position) => ({
+      inventoryItemId: requiredString(position.containerInventoryItemId),
+      locationId: requiredString(position.locationId),
+      quantity: numeric(position.quantity) ?? 0,
+    })),
+    supplierExchanges: optionalRows(payload, "supplierExchanges").map((exchange) => ({
+      id: requiredString(exchange.id),
+      inventoryItemId: requiredString(exchange.containerInventoryItemId),
+      locationId: requiredString(exchange.locationId),
+      supplierId: requiredString(exchange.supplierId),
+      quantity: numeric(exchange.quantity) ?? 0,
+      status: requiredString(
+        exchange.status,
+      ) as ReturnablesData["supplierExchanges"][number]["status"],
+      note: requiredString(exchange.note),
+      sentAt: requiredString(exchange.sentAt),
+      resolvedAt: optionalString(exchange.resolvedAt),
+    })),
+    lossIndicators: optionalRows(payload, "lossIndicators").map((indicator) => ({
+      kind: returnableIncidentKind(indicator.type),
+      locationId: optionalString(indicator.locationId),
+      quantity: numeric(indicator.quantity) ?? 0,
+      estimatedCostCents: integer(indicator.estimatedCostCents),
+      incidentCount: integer(indicator.incidentCount),
     })),
   };
 }
@@ -1958,6 +2254,17 @@ export function parseReports(value: unknown): ReportData {
   const profitabilityFamily = family("profitability");
   const multiunitFamily = family("multiunit");
   const qualityFamily = family("quality");
+  const laborFamily = family("labor");
+  const reconciliationFamily = family("reconciliation");
+  const forecastFamily = family("forecast");
+  const reconciliationDocuments = reconciliationFamily.documents
+    ? record(reconciliationFamily.documents)
+    : {};
+  const reconciliationExternal = reconciliationFamily.external
+    ? record(reconciliationFamily.external)
+    : {};
+  const forecastRevenue = forecastFamily.revenue ? record(forecastFamily.revenue) : {};
+  const forecastCash = forecastFamily.cash ? record(forecastFamily.cash) : {};
   const parseFamilyComparison = (source: Row): ReportFamilyComparison =>
     Object.fromEntries(
       Object.entries(
@@ -2039,6 +2346,9 @@ export function parseReports(value: unknown): ReportData {
             cashFlow: reportCoverage(metaCoverage.cashFlow),
             costs: reportCoverage(metaCoverage.costs),
             budget: reportCoverage(metaCoverage.budget),
+            labor: reportCoverage(metaCoverage.labor),
+            reconciliation: reportCoverage(metaCoverage.reconciliation),
+            forecast: reportCoverage(metaCoverage.forecast),
           },
         }
       : null,
@@ -2048,6 +2358,9 @@ export function parseReports(value: unknown): ReportData {
       export: capabilities.export === true,
       manageBudget: capabilities.manageBudget === true,
       manageSchedules: capabilities.manageSchedules === true,
+      manageViews: capabilities.manageViews === true,
+      manageAlerts: capabilities.manageAlerts === true,
+      backfillCosts: capabilities.backfillCosts === true,
       emailDeliveryConfigured: capabilities.emailDeliveryConfigured === true,
     },
     budget: budget
@@ -2199,6 +2512,11 @@ export function parseReports(value: unknown): ReportData {
           revenueCents: numeric(entry.revenueCents) ?? 0,
           averageTicketCents: numeric(entry.averageTicketCents, true),
           changePercent: numeric(entry.changePercent, true),
+          rank: integer(entry.rank ?? 0),
+          operatingDays: integer(entry.operatingDays ?? 0),
+          revenuePerOperatingDayCents: numeric(entry.revenuePerOperatingDayCents, true),
+          organizationRevenueSharePercent: numeric(entry.organizationRevenueSharePercent, true),
+          sameStoreChangePercent: numeric(entry.sameStoreChangePercent, true),
         })),
       },
       quality: {
@@ -2213,6 +2531,79 @@ export function parseReports(value: unknown): ReportData {
               : entry.severity === "warning"
                 ? "warning"
                 : "info",
+        })),
+      },
+      labor: {
+        coverage: reportCoverage(laborFamily.coverage),
+        costCoverage: reportCoverage(laborFamily.costCoverage),
+        scheduleCoverage: reportCoverage(laborFamily.scheduleCoverage),
+        people: integer(laborFamily.people ?? 0),
+        workedMinutes: integer(laborFamily.workedMinutes ?? 0),
+        scheduledMinutes: integer(laborFamily.scheduledMinutes ?? 0),
+        overtimeMinutes: numeric(laborFamily.overtimeMinutes, true),
+        laborCostCents: numeric(laborFamily.laborCostCents, true),
+        laborCostPercent: numeric(laborFamily.laborCostPercent, true),
+        salesPerLaborHourCents: numeric(laborFamily.salesPerLaborHourCents, true),
+        roles: optionalRows(laborFamily, "roles").map((entry) => ({
+          roleLabel: requiredString(entry.roleLabel),
+          people: integer(entry.people ?? 0),
+          workedMinutes: integer(entry.workedMinutes ?? 0),
+          scheduledMinutes: integer(entry.scheduledMinutes ?? 0),
+          overtimeMinutes: integer(entry.overtimeMinutes ?? 0),
+          laborCostCents: numeric(entry.laborCostCents, true),
+          costCoverage: reportCoverage(entry.costCoverage),
+        })),
+      },
+      reconciliation: {
+        coverage: reportCoverage(reconciliationFamily.coverage),
+        posRevenueCents: numeric(reconciliationFamily.posRevenueCents ?? 0) ?? 0,
+        paymentCents: numeric(reconciliationFamily.paymentCents ?? 0) ?? 0,
+        paymentDifferenceCents: numeric(reconciliationFamily.paymentDifferenceCents ?? 0) ?? 0,
+        fiscalAuthorizedCents: numeric(reconciliationFamily.fiscalAuthorizedCents ?? 0) ?? 0,
+        fiscalDifferenceCents: numeric(reconciliationFamily.fiscalDifferenceCents ?? 0) ?? 0,
+        taxCents: numeric(reconciliationFamily.taxCents ?? 0) ?? 0,
+        documents: {
+          total: integer(reconciliationDocuments.total ?? 0),
+          authorized: integer(reconciliationDocuments.authorized ?? 0),
+          rejected: integer(reconciliationDocuments.rejected ?? 0),
+          canceled: integer(reconciliationDocuments.canceled ?? 0),
+        },
+        external: {
+          matched: integer(reconciliationExternal.matched ?? 0),
+          unmatched: integer(reconciliationExternal.unmatched ?? 0),
+          divergent: integer(reconciliationExternal.divergent ?? 0),
+          resolved: integer(reconciliationExternal.resolved ?? 0),
+          unmatchedCents: numeric(reconciliationExternal.unmatchedCents ?? 0) ?? 0,
+          divergentCents: numeric(reconciliationExternal.divergentCents ?? 0) ?? 0,
+        },
+      },
+      forecast: {
+        method: "historical_daily_average_v1",
+        horizonDays: integer(forecastFamily.horizonDays ?? 7),
+        sampleDays: integer(forecastFamily.sampleDays ?? 0),
+        confidence:
+          forecastFamily.confidence === "high"
+            ? "high"
+            : forecastFamily.confidence === "medium"
+              ? "medium"
+              : "low",
+        errorPercent: numeric(forecastFamily.errorPercent, true),
+        revenue: {
+          dailyAverageCents: numeric(forecastRevenue.dailyAverageCents ?? 0) ?? 0,
+          forecastCents: numeric(forecastRevenue.forecastCents ?? 0) ?? 0,
+          lowerBoundCents: numeric(forecastRevenue.lowerBoundCents ?? 0) ?? 0,
+          upperBoundCents: numeric(forecastRevenue.upperBoundCents ?? 0) ?? 0,
+        },
+        cash: {
+          inflowsCents: numeric(forecastCash.inflowsCents ?? 0) ?? 0,
+          outflowsCents: numeric(forecastCash.outflowsCents ?? 0) ?? 0,
+          netCents: numeric(forecastCash.netCents ?? 0) ?? 0,
+        },
+        purchases: optionalRows(forecastFamily, "purchases").map((entry) => ({
+          key: requiredString(entry.key),
+          label: requiredString(entry.label),
+          suggestedQuantity: numeric(entry.suggestedQuantity) ?? 0,
+          dailyDemand: numeric(entry.dailyDemand) ?? 0,
         })),
       },
     },
@@ -2241,6 +2632,9 @@ export function parseReportDrillDown(value: unknown): ReportDrillDownData {
       "inventory",
       "purchase",
       "operation",
+      "labor",
+      "reconciliation",
+      "forecast",
     ].includes(dimension)
   ) {
     throw new InvalidManagementPayloadError();
@@ -2325,8 +2719,8 @@ export function parseReportExport(value: unknown): ReportExportData {
   return {
     id: requiredString(payload.id),
     status,
-    format: "csv",
-    filename: optionalString(payload.filename) ?? "relatorio-giromesa.csv",
+    format: payload.format === "pdf" ? "pdf" : payload.format === "xlsx" ? "xlsx" : "csv",
+    filename: optionalString(payload.filename) ?? `relatorio-giromesa.${payload.format ?? "csv"}`,
     rowCount: integer(payload.rowCount),
     sha256: optionalString(payload.sha256),
     requestedAt: requiredString(payload.requestedAt),
@@ -2359,9 +2753,13 @@ export function parseReportSchedules(value: unknown): ReportScheduleData[] {
       entry.family === "operations" ||
       entry.family === "profitability" ||
       entry.family === "multiunit" ||
-      entry.family === "quality"
+      entry.family === "quality" ||
+      entry.family === "labor" ||
+      entry.family === "reconciliation" ||
+      entry.family === "forecast"
         ? entry.family
         : "overview",
+    format: entry.format === "pdf" ? "pdf" : entry.format === "xlsx" ? "xlsx" : "csv",
     delivery: entry.delivery === "email" ? "email" : "in_app",
     enabled: entry.enabled !== false,
     nextRunAt: optionalString(entry.nextRunAt),
@@ -2724,22 +3122,38 @@ function parseTimeTrackingSettings(value: unknown): TimeTrackingSettings {
     mode: mode as TimeTrackingSettings["mode"],
     geofenceEnabled: settings.geofenceEnabled !== false,
     locationLabel: optionalString(settings.locationLabel),
+    locationAddress: optionalString(settings.locationAddress),
     latitude: numeric(settings.latitude, true),
     longitude: numeric(settings.longitude, true),
-    radiusMeters: numeric(settings.radiusMeters) ?? 100,
-    accuracyToleranceMeters: numeric(settings.accuracyToleranceMeters) ?? 50,
+    radiusMeters: numeric(settings.radiusMeters, true) ?? 100,
+    accuracyToleranceMeters: numeric(settings.accuracyToleranceMeters, true) ?? 50,
+    maxLocationAccuracyMeters: numeric(settings.maxLocationAccuracyMeters, true) ?? 100,
+    lowAccuracyPolicy: settings.lowAccuracyPolicy === "flag" ? "flag" : "block",
+    additionalLocations: optionalRows(settings, "additionalLocations").map((location) => ({
+      id: requiredString(location.id),
+      label: requiredString(location.label),
+      address: optionalString(location.address),
+      latitude: numeric(location.latitude, true) ?? 0,
+      longitude: numeric(location.longitude, true) ?? 0,
+      radiusMeters: numeric(location.radiusMeters, true) ?? 100,
+      accuracyToleranceMeters: numeric(location.accuracyToleranceMeters, true) ?? 50,
+    })),
     managerCanView: settings.managerCanView === true,
     financeCanView: settings.financeCanView === true,
     antiFraudEnabled: settings.antiFraudEnabled !== false,
     offlineEnabled: settings.offlineEnabled !== false,
+    offlineMaxDelayMinutes: numeric(settings.offlineMaxDelayMinutes, true) ?? 120,
+    offlineRequiresJustification: settings.offlineRequiresJustification !== false,
     notificationsEnabled: settings.notificationsEnabled !== false,
+    emailAlertsEnabled: settings.emailAlertsEnabled === true,
     managerAlertOnAnomaly: settings.managerAlertOnAnomaly !== false,
-    lateToleranceMinutes: numeric(settings.lateToleranceMinutes) ?? 15,
-    minimumBreakMinutes: numeric(settings.minimumBreakMinutes) ?? 0,
-    maxOvertimeMinutes: numeric(settings.maxOvertimeMinutes) ?? 120,
-    longShiftAlertMinutes: numeric(settings.longShiftAlertMinutes) ?? 720,
-    reminderBeforeShiftMinutes: numeric(settings.reminderBeforeShiftMinutes) ?? 15,
-    reminderAfterShiftMinutes: numeric(settings.reminderAfterShiftMinutes) ?? 15,
+    locationRetentionDays: numeric(settings.locationRetentionDays, true) ?? 365,
+    lateToleranceMinutes: numeric(settings.lateToleranceMinutes, true) ?? 15,
+    minimumBreakMinutes: numeric(settings.minimumBreakMinutes, true) ?? 0,
+    maxOvertimeMinutes: numeric(settings.maxOvertimeMinutes, true) ?? 120,
+    longShiftAlertMinutes: numeric(settings.longShiftAlertMinutes, true) ?? 720,
+    reminderBeforeShiftMinutes: numeric(settings.reminderBeforeShiftMinutes, true) ?? 15,
+    reminderAfterShiftMinutes: numeric(settings.reminderAfterShiftMinutes, true) ?? 15,
   };
 }
 

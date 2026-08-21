@@ -22,6 +22,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
 #else
         public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_attention> Attention { get; set; }
 #endif
+        /// <summary>The changes property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_changes>? Changes { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_changes> Changes { get; set; }
+#endif
         /// <summary>The item property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -48,6 +56,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
 #endif
         /// <summary>The productId property</summary>
         public Guid? ProductId { get; set; }
+        /// <summary>The recipe property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_recipe>? Recipe { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_recipe> Recipe { get; set; }
+#endif
         /// <summary>The ticketId property</summary>
         public Guid? TicketId { get; set; }
         /// <summary>
@@ -76,10 +92,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "attention", n => { Attention = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_attention>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_attention.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "changes", n => { Changes = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_changes>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_changes.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "item", n => { Item = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_item>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_item.CreateFromDiscriminatorValue); } },
                 { "kds", n => { Kds = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds.CreateFromDiscriminatorValue); } },
                 { "modifiers", n => { Modifiers = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_modifiers>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_modifiers.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
+                { "recipe", n => { Recipe = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_recipe>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_recipe.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "ticketId", n => { TicketId = n.GetGuidValue(); } },
             };
         }
@@ -91,10 +109,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_attention>("attention", Attention);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_changes>("changes", Changes);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_item>("item", Item);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_kds>("kds", Kds);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_modifiers>("modifiers", Modifiers);
             writer.WriteGuidValue("productId", ProductId);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_items_recipe>("recipe", Recipe);
             writer.WriteGuidValue("ticketId", TicketId);
             writer.WriteAdditionalData(AdditionalData);
         }

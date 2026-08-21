@@ -5,6 +5,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Dashboard;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Documents;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Periods;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Profile;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Provider;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.TaxRevisions;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
@@ -44,6 +45,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Profile.ProfileRequestBuilder Profile
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Profile.ProfileRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The provider property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Provider.ProviderRequestBuilder Provider
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Provider.ProviderRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The taxRevisions property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.TaxRevisions.TaxRevisionsRequestBuilder TaxRevisions

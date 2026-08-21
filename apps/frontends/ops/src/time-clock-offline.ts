@@ -16,6 +16,9 @@ export type TimeClockOfflineAction =
         accuracyMeters?: number;
         capturedAt: string;
         deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
       };
       idempotencyKey: string;
       queuedAt: string;
@@ -32,6 +35,28 @@ export type TimeClockOfflineAction =
         accuracyMeters?: number;
         capturedAt: string;
         deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
+      };
+      idempotencyKey: string;
+      queuedAt: string;
+      status: "pending" | "rejected";
+      error?: string;
+    }
+  | {
+      id: string;
+      kind: "break-end";
+      breakId: string;
+      body: {
+        latitude: number;
+        longitude: number;
+        accuracyMeters?: number;
+        capturedAt: string;
+        deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
       };
       idempotencyKey: string;
       queuedAt: string;
@@ -48,6 +73,9 @@ export type TimeClockOfflineActionInput =
         accuracyMeters?: number;
         capturedAt: string;
         deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
       };
       idempotencyKey: string;
     }
@@ -60,12 +88,41 @@ export type TimeClockOfflineActionInput =
         accuracyMeters?: number;
         capturedAt: string;
         deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
+      };
+      idempotencyKey: string;
+    }
+  | {
+      kind: "break-end";
+      breakId: string;
+      body: {
+        latitude: number;
+        longitude: number;
+        accuracyMeters?: number;
+        capturedAt: string;
+        deviceId?: string;
+        sessionId?: string;
+        offline: true;
+        offlineJustification: string;
       };
       idempotencyKey: string;
     };
 
 function storageKey(scope: TimeClockOfflineScope) {
   return `giromesa.time-clock.offline.v1:${scope.organizationId}:${scope.unitId}:${scope.identityId}`;
+}
+
+function isOfflineBody(value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const body = value as Record<string, unknown>;
+  return (
+    body.offline === true &&
+    typeof body.capturedAt === "string" &&
+    typeof body.offlineJustification === "string" &&
+    body.offlineJustification.trim().length >= 5
+  );
 }
 
 export function timeClockDeviceId(scope: TimeClockOfflineScope) {
@@ -85,13 +142,27 @@ function read(scope: TimeClockOfflineScope): TimeClockOfflineAction[] {
     return value.filter((item): item is TimeClockOfflineAction => {
       if (typeof item !== "object" || item === null) return false;
       const candidate = item as Record<string, unknown>;
-      return (
+      const validEnvelope =
         typeof candidate.id === "string" &&
-        typeof candidate.kind === "string" &&
+        (candidate.kind === "clock-in" ||
+          candidate.kind === "clock-out" ||
+          candidate.kind === "break-start" ||
+          candidate.kind === "break-end") &&
         typeof candidate.idempotencyKey === "string" &&
         typeof candidate.queuedAt === "string" &&
-        (candidate.status === "pending" || candidate.status === "rejected")
-      );
+        (candidate.status === "pending" || candidate.status === "rejected");
+      if (!validEnvelope) return false;
+      if (
+        !isOfflineBody(candidate.body) ||
+        (candidate.kind === "break-end" && typeof candidate.breakId !== "string")
+      ) {
+        Object.assign(candidate, {
+          status: "rejected",
+          error:
+            "Marcação offline antiga precisa de revisão: faltam a justificativa ou os dados exigidos pela política atual.",
+        });
+      }
+      return true;
     });
   } catch {
     return [];
@@ -145,6 +216,14 @@ export async function replayTimeClockQueue(scope: TimeClockOfflineScope) {
           action.body,
           action.idempotencyKey,
         );
+      } else if (action.kind === "break-end") {
+        await api.management.selfCompleteBreak(
+          scope.organizationId,
+          scope.unitId,
+          action.breakId,
+          action.body,
+          action.idempotencyKey,
+        );
       } else {
         await api.management.selfStartBreak(
           scope.organizationId,
@@ -155,6 +234,10 @@ export async function replayTimeClockQueue(scope: TimeClockOfflineScope) {
             longitude: number;
             accuracyMeters?: number;
             capturedAt: string;
+            deviceId?: string;
+            sessionId?: string;
+            offline: true;
+            offlineJustification: string;
           },
           action.idempotencyKey,
         );

@@ -2,7 +2,9 @@ import {
   Controller,
   Get,
   Header,
+  Inject,
   Injectable,
+  Logger,
   Module,
   ServiceUnavailableException,
   UseGuards,
@@ -82,7 +84,9 @@ export class MetricsService {
 
 @Injectable()
 export class DatabaseReadinessService {
-  constructor(private readonly database: DatabaseService) {}
+  private readonly logger = new Logger(DatabaseReadinessService.name);
+
+  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   async assertReady() {
     let relation: string | null;
@@ -91,7 +95,11 @@ export class DatabaseReadinessService {
         sql`select to_regclass('public.management_time_tracking_settings')::text as relation`,
       );
       relation = row?.relation ?? null;
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        "Database readiness check failed.",
+        error instanceof Error ? `${error.name}: ${error.message}` : "Unknown database error",
+      );
       throw new ServiceUnavailableException({
         code: "DATABASE_UNAVAILABLE",
         message: "Banco de dados indisponível.",
@@ -121,7 +129,10 @@ export const reportEmailDeliveryConfigured = () =>
 
 @Controller(["api/v1/health", "health"])
 class HealthController {
-  constructor(private readonly readiness: DatabaseReadinessService) {}
+  constructor(
+    @Inject(DatabaseReadinessService)
+    private readonly readiness: DatabaseReadinessService,
+  ) {}
 
   @Get()
   async health() {
@@ -144,7 +155,7 @@ class HealthController {
 @Controller(["api/v1/metrics", "metrics"])
 @UseGuards(InternalKeyGuard)
 class MetricsController {
-  constructor(private readonly metrics: MetricsService) {}
+  constructor(@Inject(MetricsService) private readonly metrics: MetricsService) {}
 
   @Get()
   @Header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")

@@ -36,6 +36,9 @@ export const reportFamilySchema = z.enum([
   "profitability",
   "multiunit",
   "quality",
+  "labor",
+  "reconciliation",
+  "forecast",
 ]);
 
 export const reportDrillDownQuerySchema = reportPeriodSchema
@@ -50,6 +53,9 @@ export const reportDrillDownQuerySchema = reportPeriodSchema
       "inventory",
       "purchase",
       "operation",
+      "labor",
+      "reconciliation",
+      "forecast",
     ]),
     key: z.string().trim().min(1).max(160),
     cursor: z.string().max(512).optional(),
@@ -68,7 +74,11 @@ export const reportDrillDownQuerySchema = reportPeriodSchema
       (value.dimension === "inventory" && ["loss", "stockout", "low_stock"].includes(value.key)) ||
       (value.dimension === "purchase" &&
         (["orders", "receipts"].includes(value.key) || id.safeParse(value.key).success)) ||
-      (value.dimension === "operation" && ["closed_tabs", "table_turnovers"].includes(value.key));
+      (value.dimension === "operation" && ["closed_tabs", "table_turnovers"].includes(value.key)) ||
+      (value.dimension === "labor" && ["summary", "overtime"].includes(value.key)) ||
+      (value.dimension === "reconciliation" &&
+        ["fiscal", "payments", "unmatched"].includes(value.key)) ||
+      (value.dimension === "forecast" && ["revenue", "cash", "purchases"].includes(value.key));
     if (!valid) context.addIssue({ code: "custom", path: ["key"], message: "Chave inválida." });
   });
 
@@ -81,6 +91,7 @@ export const reportBudgetInputSchema = z.object({
 
 export const reportExportInputSchema = reportPeriodSchema.extend({
   family: reportFamilySchema.default("overview"),
+  format: z.enum(["csv", "pdf", "xlsx"]).default("csv"),
 });
 export const reportExportListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -97,6 +108,7 @@ const scheduleBaseSchema = z
     range: z.enum(["previous_week", "previous_month"]),
     comparisonMode: z.enum(["previous_period", "previous_year", "none"]),
     family: reportFamilySchema.default("overview"),
+    format: z.enum(["csv", "pdf", "xlsx"]).default("csv"),
     delivery: z.enum(["in_app", "email"]).default("in_app"),
     enabled: z.boolean().default(true),
   })
@@ -113,6 +125,32 @@ export const reportScheduleDeleteSchema = z.object({
   version: z.coerce.number().int().min(1).optional(),
 });
 
+const reportViewBaseSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  visibility: z.enum(["private", "unit", "organization"]).default("private"),
+  query: reportPeriodSchema.extend({ family: reportFamilySchema.default("overview") }),
+});
+export const reportViewCreateSchema = reportViewBaseSchema;
+export const reportViewUpdateSchema = reportViewBaseSchema.extend({ version });
+export const reportViewDeleteSchema = z.object({ version: z.coerce.number().int().min(1) });
+
+export const reportAlertListQuerySchema = z.object({
+  status: z.enum(["open", "claimed", "resolved", "dismissed"]).optional(),
+});
+export const reportAlertEvaluateSchema = reportPeriodSchema.extend({
+  dueInDays: z.number().int().min(0).max(90).default(2),
+});
+export const reportAlertActionSchema = z.object({
+  status: z.enum(["open", "claimed", "resolved", "dismissed"]),
+  assignedToIdentityId: id.nullable().optional(),
+  dueAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  version,
+});
+
+export const reportCostBackfillSchema = reportPeriodSchema.extend({
+  allowEstimated: z.literal(true),
+});
+
 export type ReportMetric = z.infer<typeof reportMetricSchema>;
 export type ReportDrillDownQuery = z.infer<typeof reportDrillDownQuerySchema>;
 export type ReportBudgetInput = z.infer<typeof reportBudgetInputSchema>;
@@ -121,3 +159,10 @@ export type ReportExportListQuery = z.infer<typeof reportExportListQuerySchema>;
 export type ReportScheduleCreateInput = z.infer<typeof reportScheduleCreateSchema>;
 export type ReportScheduleUpdateInput = z.infer<typeof reportScheduleUpdateSchema>;
 export type ReportScheduleDeleteInput = z.infer<typeof reportScheduleDeleteSchema>;
+export type ReportViewCreateInput = z.infer<typeof reportViewCreateSchema>;
+export type ReportViewUpdateInput = z.infer<typeof reportViewUpdateSchema>;
+export type ReportViewDeleteInput = z.infer<typeof reportViewDeleteSchema>;
+export type ReportAlertListQuery = z.infer<typeof reportAlertListQuerySchema>;
+export type ReportAlertEvaluateInput = z.infer<typeof reportAlertEvaluateSchema>;
+export type ReportAlertActionInput = z.infer<typeof reportAlertActionSchema>;
+export type ReportCostBackfillInput = z.infer<typeof reportCostBackfillSchema>;

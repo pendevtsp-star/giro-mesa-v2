@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import "./FormField.css";
 
 export function FormField({
   label,
@@ -15,14 +14,14 @@ export function FormField({
   htmlFor: string;
 }) {
   return (
-    <div className="gm-form-field">
-      <span className="gm-form-field__label">
+    <div className="gm-form-field" data-slot="form-item">
+      <span className="gm-form-field__label" data-slot="form-label">
         <label htmlFor={htmlFor}>{label}</label>
         {required && <span aria-hidden="true"> *</span>}
       </span>
       {children}
       {error && (
-        <span className="gm-form-field__error" role="alert">
+        <span className="gm-form-field__error" data-slot="form-message" role="alert">
           {error}
         </span>
       )}

@@ -22,12 +22,12 @@ export function PublicActions({
         </div>
         {tableAuthorized ? (
           <div>
-            <button type="button" disabled={pending} onClick={onCallWaiter}>
+            <Button type="button" disabled={pending} onClick={onCallWaiter}>
               <span aria-hidden="true">♢</span>Chamar garçom
-            </button>
-            <button type="button" disabled={pending} onClick={onRequestCheck}>
+            </Button>
+            <Button type="button" disabled={pending} onClick={onRequestCheck}>
               <span aria-hidden="true">▤</span>Pedir a conta
-            </button>
+            </Button>
           </div>
         ) : (
           <p>Leia o QR Code da mesa para chamar a equipe ou pedir a conta.</p>
@@ -74,7 +74,7 @@ export function PublicActions({
             recebimento. Preços e taxa são validados pela unidade.
           </Service>
           <article className="service-card service-card-locked">
-            <span className="service-state">Prova de posse pendente</span>
+            <Badge tone="warning">Prova de posse pendente</Badge>
             <h3 className="service-card-title">Saldo de fidelidade</h3>
             <p className="service-card-copy">
               A consulta exige OTP por e-mail ou WhatsApp para não expor perfil e saldo de
@@ -119,7 +119,7 @@ function Service({
 }) {
   return (
     <article className="service-card service-card-public">
-      <span className="service-state">{state}</span>
+      <Badge tone="info">{state}</Badge>
       <h3 className="service-card-title">{title}</h3>
       <p className="service-card-copy">{children}</p>
       {href ? (
@@ -127,14 +127,16 @@ function Service({
           {action}
         </a>
       ) : (
-        <button
+        <Button
           className="service-card-action service-card-button"
           type="button"
           onClick={onAction}
         >
           {action}
-        </button>
+        </Button>
       )}
     </article>
   );
 }
+
+import { Badge, Button } from "@giromesa/ui";

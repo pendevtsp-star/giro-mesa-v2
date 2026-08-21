@@ -1,4 +1,15 @@
-﻿import { Button, EmptyState, Icon, Modal, Toast } from "@giromesa/ui";
+﻿import {
+  Button,
+  DataTable,
+  EmptyState,
+  Icon,
+  Input,
+  Label,
+  Modal,
+  NativeSelect,
+  Textarea,
+  Toast,
+} from "@giromesa/ui";
 import QRCode from "qrcode";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
@@ -2434,6 +2445,7 @@ export function CatalogExperience({
             costCents: editingProduct.costCents ?? null,
             available: currentProduct.available,
             stationIds: normalizeCatalogStationIds(editingProduct.stationIds),
+            stationRouting: editingProduct.stationRouting,
             availabilitySchedule: editingProduct.availabilitySchedule ?? null,
             dailyStock: editingProduct.dailyStockLimit ?? null,
             autoDeductStock: editingProduct.autoDeductStock,
@@ -3437,7 +3449,7 @@ export function CatalogExperience({
                     ou ponto-e-vírgula).
                   </span>
 
-                  <label
+                  <Label
                     className="gm-button gm-button--primary gm-button--sm"
                     style={{
                       display: "inline-flex",
@@ -3452,12 +3464,13 @@ export function CatalogExperience({
                       {csvFileName ? `Arquivo: ${csvFileName}` : "Selecionar Arquivo CSV"}
                     </span>
                     <input
+                      className="border-input bg-background"
                       type="file"
                       accept=".csv,text/csv"
                       onChange={handleCsvFileUpload}
                       style={{ display: "none" }}
                     />
-                  </label>
+                  </Label>
                 </div>
 
                 {/* Pré-visualização dos Itens Lidos */}
@@ -3479,7 +3492,8 @@ export function CatalogExperience({
                         background: "var(--gm-surface)",
                       }}
                     >
-                      <table
+                      <DataTable
+                        caption="Pré-visualização dos produtos do CSV"
                         style={{
                           width: "100%",
                           borderCollapse: "collapse",
@@ -3528,7 +3542,7 @@ export function CatalogExperience({
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </DataTable>
                     </div>
 
                     <div className="catalog-modal-actions">
@@ -3571,54 +3585,54 @@ export function CatalogExperience({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   {/* Controles de Configuração */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    <label className="catalog-field catalog-field--standard">
+                    <Label className="catalog-field catalog-field--standard">
                       Modo de Seleção de Mesas
-                      <select
+                      <NativeSelect
                         value={qrMode}
                         onChange={(e) => setQrMode(e.target.value as any)}
                         className="catalog-control-36"
                       >
                         <option value="range">Faixa Sequencial Numérica (Ex: Mesa 1 a 20)</option>
                         <option value="custom">Nomes e Balcões Personalizados</option>
-                      </select>
-                    </label>
+                      </NativeSelect>
+                    </Label>
 
                     {qrMode === "range" ? (
                       <div className="catalog-grid-2 catalog-grid-2--compact">
-                        <label className="catalog-field catalog-field--standard">
+                        <Label className="catalog-field catalog-field--standard">
                           Mesa Inicial
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             value={qrStartTable}
                             onChange={(e) => setQrStartTable(parseInt(e.target.value) || 1)}
                             className="catalog-control-36"
                           />
-                        </label>
-                        <label className="catalog-field catalog-field--standard">
+                        </Label>
+                        <Label className="catalog-field catalog-field--standard">
                           Mesa Final
-                          <input
+                          <Input
                             type="number"
                             min={1}
                             value={qrEndTable}
                             onChange={(e) => setQrEndTable(parseInt(e.target.value) || 1)}
                             className="catalog-control-36"
                           />
-                        </label>
+                        </Label>
                       </div>
                     ) : (
-                      <label className="catalog-field catalog-field--standard">
+                      <Label className="catalog-field catalog-field--standard">
                         Lista de Mesas / Balcões (separados por vírgula)
-                        <input
+                        <Input
                           value={qrCustomLabels}
                           onChange={(e) => setQrCustomLabels(e.target.value)}
                           placeholder="Ex: Mesa 01, Mesa 02, Balcão 1, Deck VIP"
                           className="catalog-control-36"
                         />
-                      </label>
+                      </Label>
                     )}
 
-                    <label
+                    <Label
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -3630,12 +3644,13 @@ export function CatalogExperience({
                       }}
                     >
                       <input
+                        className="accent-primary"
                         type="checkbox"
                         checked={qrIncludeWifi}
                         onChange={(e) => setQrIncludeWifi(e.target.checked)}
                       />
                       <span>Incluir dados do Wi-Fi no rodapé da placa</span>
-                    </label>
+                    </Label>
 
                     <div
                       style={{
@@ -3804,15 +3819,15 @@ export function CatalogExperience({
                   <Icon name="plus" size={18} />
                 </summary>
                 <form className="action-form" onSubmit={(event) => void createCategory(event)}>
-                  <label>
+                  <Label>
                     Nome
-                    <input
+                    <Input
                       minLength={2}
                       onChange={(event) => setCategoryName(event.target.value)}
                       required
                       value={categoryName}
                     />
-                  </label>
+                  </Label>
                   <Button
                     disabled={busy === "category" || categoryName.trim().length < 2}
                     type="submit"
@@ -3830,16 +3845,16 @@ export function CatalogExperience({
                   <Icon name="plus" size={18} />
                 </summary>
                 <form className="action-form" onSubmit={(event) => void createStation(event)}>
-                  <label>
+                  <Label>
                     Nome
-                    <input
+                    <Input
                       minLength={2}
                       onChange={(event) => setStationName(event.target.value)}
                       placeholder="Ex.: Cozinha quente"
                       required
                       value={stationName}
                     />
-                  </label>
+                  </Label>
                   <Button
                     disabled={busy === "station" || stationName.trim().length < 2}
                     type="submit"
@@ -3859,16 +3874,16 @@ export function CatalogExperience({
                 <Icon name="plus" size={18} />
               </summary>
               <form className="action-form" onSubmit={(event) => void createAllergen(event)}>
-                <label>
+                <Label>
                   Nome do Alergênico
-                  <input
+                  <Input
                     minLength={2}
                     onChange={(e) => setAllergenName(e.target.value)}
                     required
                     value={allergenName}
                     placeholder="Ex: Contém Glúten, Lactose, Frutos do Mar"
                   />
-                </label>
+                </Label>
                 <Button
                   disabled={busy === "allergen" || allergenName.trim().length < 2}
                   type="submit"
@@ -3917,7 +3932,7 @@ export function CatalogExperience({
                       >
                         <Icon name="alert-circle" size={13} />
                         <span>{alg.name}</span>
-                        <button
+                        <Button
                           type="button"
                           disabled={busy === `allergen-${alg.id}`}
                           onClick={() => void removeAllergen(alg.id)}
@@ -3936,7 +3951,7 @@ export function CatalogExperience({
                           }}
                         >
                           <Icon name="x" size={12} />
-                        </button>
+                        </Button>
                       </span>
                     ))}
                   </div>
@@ -3953,45 +3968,45 @@ export function CatalogExperience({
                 <Icon name="plus" size={18} />
               </summary>
               <form className="action-form" onSubmit={(event) => void _createModifierGroup(event)}>
-                <label>
+                <Label>
                   Nome do Grupo
-                  <input
+                  <Input
                     minLength={2}
                     onChange={(e) => setModifierName(e.target.value)}
                     required
                     value={modifierName}
                     placeholder="Ex: Ponto da Carne, Adicionais do Hambúrguer"
                   />
-                </label>
+                </Label>
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <label className="catalog-grow">
+                  <Label className="catalog-grow">
                     Mínimo
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       value={modifierMin}
                       onChange={(e) => setModifierMin(parseInt(e.target.value, 10) || 0)}
                     />
-                  </label>
-                  <label className="catalog-grow">
+                  </Label>
+                  <Label className="catalog-grow">
                     Máximo
-                    <input
+                    <Input
                       type="number"
                       min={1}
                       value={modifierMax}
                       onChange={(e) => setModifierMax(parseInt(e.target.value, 10) || 1)}
                     />
-                  </label>
+                  </Label>
                 </div>
-                <label className="action-form__wide">
+                <Label className="action-form__wide">
                   Opções (Nome, Preço em centavos - uma por linha)
-                  <textarea
+                  <Textarea
                     rows={3}
                     onChange={(e) => setModifierOptionsText(e.target.value)}
                     value={modifierOptionsText}
                     placeholder="Bacon Extra, 400&#10;Queijo Cheddar, 350&#10;Molho Especial, 0"
                   />
-                </label>
+                </Label>
                 <Button
                   disabled={busy === "modifier" || modifierName.trim().length < 2}
                   type="submit"
@@ -4042,7 +4057,7 @@ export function CatalogExperience({
                         <span>
                           {grp.name} ({grp.minimumSelections}-{grp.maximumSelections})
                         </span>
-                        <button
+                        <Button
                           type="button"
                           disabled={busy === `modifier-group-${grp.id}`}
                           onClick={() => void removeModifierGroup(grp.id)}
@@ -4061,7 +4076,7 @@ export function CatalogExperience({
                           }}
                         >
                           <Icon name="x" size={12} />
-                        </button>
+                        </Button>
                       </span>
                     ))}
                   </div>
@@ -4079,7 +4094,7 @@ export function CatalogExperience({
               </summary>
               <form className="action-form" onSubmit={(event) => void createProduct(event)}>
                 <div className="action-form__wide catalog-product-type">
-                  <button
+                  <Button
                     className="catalog-product-type__option"
                     data-selected={productType === "prepared" || undefined}
                     type="button"
@@ -4087,8 +4102,8 @@ export function CatalogExperience({
                   >
                     <Icon name="salon" size={14} />
                     <span>Produto Preparado / Cozinha</span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="catalog-product-type__option"
                     data-selected={productType === "resale" || undefined}
                     type="button"
@@ -4096,12 +4111,12 @@ export function CatalogExperience({
                   >
                     <Icon name="catalog" size={14} />
                     <span>Produto de Revenda (Bebidas / Estoque Direto)</span>
-                  </button>
+                  </Button>
                 </div>
 
-                <label>
+                <Label>
                   Nome do Produto
-                  <input
+                  <Input
                     minLength={2}
                     onChange={(event) => setProductName(event.target.value)}
                     required
@@ -4112,64 +4127,64 @@ export function CatalogExperience({
                     }
                     value={productName}
                   />
-                </label>
+                </Label>
 
                 {productType === "resale" && (
                   <>
-                    <label>
+                    <Label>
                       Código de Barras / EAN
-                      <input
+                      <Input
                         value={eanBarcode}
                         onChange={(e) => setEanBarcode(e.target.value)}
                         placeholder="Ex: 7896045506216"
                       />
-                    </label>
-                    <label>
+                    </Label>
+                    <Label>
                       Estoque Físico Atual (Unidades)
-                      <input
+                      <Input
                         type="number"
                         min="0"
                         value={currentStockUnits}
                         onChange={(e) => setCurrentStockUnits(e.target.value)}
                         placeholder="Ex: 48"
                       />
-                    </label>
+                    </Label>
                   </>
                 )}
 
-                <label>
+                <Label>
                   Preço Salão (R$)
-                  <input
+                  <Input
                     inputMode="decimal"
                     onChange={(event) => setPrice(event.target.value)}
                     placeholder="0,00"
                     required
                     value={price}
                   />
-                </label>
-                <label>
+                </Label>
+                <Label>
                   Preço Delivery (Opcional)
-                  <input
+                  <Input
                     inputMode="decimal"
                     onChange={(event) => setDeliveryPrice(event.target.value)}
                     placeholder="Ex: 35,00"
                     value={deliveryPrice}
                   />
-                </label>
-                <label>
+                </Label>
+                <Label>
                   {productType === "resale"
                     ? "Custo de Compra Unitário (R$)"
                     : "Custo Unitário / Insumos (R$)"}
-                  <input
+                  <Input
                     inputMode="decimal"
                     onChange={(event) => setCost(event.target.value)}
                     placeholder="Ex: 8,50"
                     value={cost}
                   />
-                </label>
-                <label>
+                </Label>
+                <Label>
                   Categoria
-                  <select
+                  <NativeSelect
                     onChange={(event) => setCategoryId(event.target.value)}
                     required
                     value={categoryId || catalog.categories[0]?.id || ""}
@@ -4182,8 +4197,8 @@ export function CatalogExperience({
                         {item.name}
                       </option>
                     ))}
-                  </select>
-                </label>
+                  </NativeSelect>
+                </Label>
 
                 {/* Praças de produção */}
                 <div className="action-form__wide catalog-create-stations">
@@ -4196,7 +4211,7 @@ export function CatalogExperience({
                     {catalog.stations.map((item) => {
                       const selected = stationIds.includes(item.id);
                       return (
-                        <button
+                        <Button
                           className="catalog-create-station"
                           data-selected={selected || undefined}
                           key={item.id}
@@ -4208,25 +4223,26 @@ export function CatalogExperience({
                         >
                           <span className="catalog-create-station__dot" />
                           {item.name}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
                 </div>
 
-                <label className="action-form__wide">
+                <Label className="action-form__wide">
                   Descrição do Prato / Item
-                  <textarea
+                  <Textarea
                     onChange={(event) => setDescription(event.target.value)}
                     rows={2}
                     placeholder="Descreva os ingredientes principais, sabor e apresentação do prato..."
                     value={description}
                   />
-                </label>
+                </Label>
 
-                <label className="action-form__wide">
+                <Label className="action-form__wide">
                   Foto do Prato (Opcional)
                   <input
+                    className="border-input bg-background"
                     type="file"
                     accept="image/*"
                     onChange={(event) => {
@@ -4287,7 +4303,7 @@ export function CatalogExperience({
                       }}
                     />
                   )}
-                </label>
+                </Label>
 
                 {/* Sub-grupos Recolhíveis de Configuração */}
                 <div
@@ -4344,7 +4360,7 @@ export function CatalogExperience({
                                   <strong className="catalog-ink">
                                     {formatMoney(ing.costCents)}
                                   </strong>
-                                  <button
+                                  <Button
                                     type="button"
                                     className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                     style={{ width: "24px", height: "24px" }}
@@ -4352,7 +4368,7 @@ export function CatalogExperience({
                                     title="Remover insumo"
                                   >
                                     <Icon name="x" size={11} />
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             ))}
@@ -4367,13 +4383,13 @@ export function CatalogExperience({
                             alignItems: "center",
                           }}
                         >
-                          <input
+                          <Input
                             placeholder="Insumo (ex: Filé Mignon)"
                             value={ingName}
                             onChange={(e) => setIngName(e.target.value)}
                             className="catalog-input-compact"
                           />
-                          <input
+                          <Input
                             type="number"
                             min="0.1"
                             step="any"
@@ -4382,7 +4398,7 @@ export function CatalogExperience({
                             onChange={(e) => setIngQty(e.target.value)}
                             className="catalog-input-compact"
                           />
-                          <select
+                          <NativeSelect
                             value={ingUnit}
                             onChange={(e) => setIngUnit(e.target.value as any)}
                             style={{
@@ -4399,8 +4415,8 @@ export function CatalogExperience({
                             <option value="ml">ml</option>
                             <option value="l">L</option>
                             <option value="un">un</option>
-                          </select>
-                          <input
+                          </NativeSelect>
+                          <Input
                             placeholder="Custo R$ (9,50)"
                             value={ingCost}
                             onChange={(e) => setIngCost(e.target.value)}
@@ -4445,7 +4461,7 @@ export function CatalogExperience({
                                   <span className="catalog-ink">Markup Alvo:</span>
                                   <div className="catalog-inline-4">
                                     {[2.5, 3.0, 3.5, 4.0].map((m) => (
-                                      <button
+                                      <Button
                                         key={m}
                                         type="button"
                                         onClick={() => setTargetMarkup(m)}
@@ -4467,7 +4483,7 @@ export function CatalogExperience({
                                         }}
                                       >
                                         {m.toFixed(1)}x
-                                      </button>
+                                      </Button>
                                     ))}
                                   </div>
                                 </div>
@@ -4479,7 +4495,7 @@ export function CatalogExperience({
                                       {formatMoney(suggestedPriceCents)}
                                     </strong>
                                   </span>
-                                  <button
+                                  <Button
                                     type="button"
                                     className="catalog-card-btn catalog-card-btn--active"
                                     style={{ height: "26px", fontSize: "0.74rem" }}
@@ -4487,7 +4503,7 @@ export function CatalogExperience({
                                   >
                                     <Icon name="check" size={12} />
                                     <span>Usar no Preço</span>
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             );
@@ -4513,9 +4529,9 @@ export function CatalogExperience({
                     </summary>
                     <div className="catalog-sub-accordion__content">
                       <div className="catalog-grid-2">
-                        <label style={{ margin: 0 }}>
+                        <Label style={{ margin: 0 }}>
                           Tempo de Preparo Estimado (min)
-                          <input
+                          <Input
                             type="number"
                             min="0"
                             onChange={(event) =>
@@ -4526,17 +4542,17 @@ export function CatalogExperience({
                             value={estimatedPrepTimeMinutes}
                             placeholder="Ex: 15"
                           />
-                        </label>
-                        <label style={{ margin: 0 }}>
+                        </Label>
+                        <Label style={{ margin: 0 }}>
                           Limite Diário de Porções (Opcional)
-                          <input
+                          <Input
                             type="number"
                             min="1"
                             onChange={(event) => setDailyStockLimit(event.target.value)}
                             value={dailyStockLimit}
                             placeholder="Ex: 25 porções/dia"
                           />
-                        </label>
+                        </Label>
                       </div>
 
                       <div
@@ -4551,9 +4567,9 @@ export function CatalogExperience({
                           Agendamento de Disponibilidade por Horário (Opcional)
                         </span>
                         <div className="catalog-schedule-grid">
-                          <label className="catalog-small-copy">
+                          <Label className="catalog-small-copy">
                             Início
-                            <input
+                            <Input
                               type="time"
                               value={scheduleStart}
                               onChange={(e) => setScheduleStart(e.target.value)}
@@ -4563,10 +4579,10 @@ export function CatalogExperience({
                                 border: "1px solid var(--gm-border)",
                               }}
                             />
-                          </label>
-                          <label className="catalog-small-copy">
+                          </Label>
+                          <Label className="catalog-small-copy">
                             Término
-                            <input
+                            <Input
                               type="time"
                               value={scheduleEnd}
                               onChange={(e) => setScheduleEnd(e.target.value)}
@@ -4576,10 +4592,10 @@ export function CatalogExperience({
                                 border: "1px solid var(--gm-border)",
                               }}
                             />
-                          </label>
-                          <label className="catalog-small-copy">
+                          </Label>
+                          <Label className="catalog-small-copy">
                             Dias
-                            <select
+                            <NativeSelect
                               value={scheduleDays}
                               onChange={(e) => setScheduleDays(e.target.value as any)}
                               style={{
@@ -4593,8 +4609,8 @@ export function CatalogExperience({
                               <option value="all">Todos os Dias</option>
                               <option value="weekdays">Segunda a Sexta</option>
                               <option value="weekend">Fim de Semana</option>
-                            </select>
-                          </label>
+                            </NativeSelect>
+                          </Label>
                         </div>
                       </div>
                     </div>
@@ -4619,7 +4635,7 @@ export function CatalogExperience({
                           {catalog.allergens.map((alg) => {
                             const selected = selectedAllergens.includes(alg.id);
                             return (
-                              <button
+                              <Button
                                 key={alg.id}
                                 type="button"
                                 onClick={() => {
@@ -4650,7 +4666,7 @@ export function CatalogExperience({
                               >
                                 <Icon name="alert-circle" size={13} />
                                 <span>{alg.name}</span>
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -4677,7 +4693,7 @@ export function CatalogExperience({
                           {catalog.groups.map((grp) => {
                             const selected = selectedModifiers.includes(grp.id);
                             return (
-                              <button
+                              <Button
                                 key={grp.id}
                                 type="button"
                                 onClick={() => {
@@ -4708,7 +4724,7 @@ export function CatalogExperience({
                               >
                                 <Icon name="plus" size={13} />
                                 <span>{grp.name}</span>
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -4729,18 +4745,18 @@ export function CatalogExperience({
                     </summary>
                     <div className="catalog-sub-accordion__content">
                       <div className="catalog-grid-main">
-                        <label className="catalog-field catalog-field--compact">
+                        <Label className="catalog-field catalog-field--compact">
                           NCM (Nomenclatura Comum do Mercosul)
-                          <input
+                          <Input
                             value={productNcm}
                             onChange={(e) => setProductNcm(e.target.value)}
                             placeholder="Ex: 2106.90.90"
                             className="catalog-control-34"
                           />
-                        </label>
-                        <label className="catalog-field catalog-field--compact">
+                        </Label>
+                        <Label className="catalog-field catalog-field--compact">
                           CFOP Padrão
-                          <select
+                          <NativeSelect
                             value={productCfop}
                             onChange={(e) => setProductCfop(e.target.value)}
                             className="catalog-control-34"
@@ -4748,8 +4764,8 @@ export function CatalogExperience({
                             <option value="5.102">5.102 - Revenda de Mercadoria</option>
                             <option value="5.101">5.101 - Produção do Estabelecimento</option>
                             <option value="5.405">5.405 - Venda com Subst. Tributária</option>
-                          </select>
-                        </label>
+                          </NativeSelect>
+                        </Label>
                       </div>
 
                       <div
@@ -4762,7 +4778,7 @@ export function CatalogExperience({
                           { label: "Refrigerantes & Sucos (2202.10.00)", code: "2202.10.00" },
                           { label: "Sobremesas & Doces (1905.90.90)", code: "1905.90.90" },
                         ].map((preset) => (
-                          <button
+                          <Button
                             key={preset.code}
                             type="button"
                             onClick={() => setProductNcm(preset.code)}
@@ -4777,7 +4793,7 @@ export function CatalogExperience({
                             }}
                           >
                             {preset.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -4830,7 +4846,7 @@ export function CatalogExperience({
                           ].map((tag) => {
                             const selected = selectedTags.includes(tag.id);
                             return (
-                              <button
+                              <Button
                                 key={tag.id}
                                 type="button"
                                 onClick={() => {
@@ -4857,7 +4873,7 @@ export function CatalogExperience({
                               >
                                 <Icon name={tag.icon} size={13} />
                                 <span>{tag.label}</span>
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -4886,7 +4902,7 @@ export function CatalogExperience({
                             {catalog.products.slice(0, 10).map((prod) => {
                               const selected = suggestedProducts.includes(prod.id);
                               return (
-                                <button
+                                <Button
                                   key={prod.id}
                                   type="button"
                                   onClick={() => {
@@ -4916,7 +4932,7 @@ export function CatalogExperience({
                                 >
                                   <Icon name={selected ? "check" : "plus"} size={11} />
                                   <span>{prod.name}</span>
-                                </button>
+                                </Button>
                               );
                             })}
                           </div>
@@ -5002,9 +5018,9 @@ export function CatalogExperience({
                     Aplique um reajuste percentual ou valor fixo em múltiplos pratos de uma só vez.
                   </p>
 
-                  <label className="catalog-field catalog-field--medium">
+                  <Label className="catalog-field catalog-field--medium">
                     Categoria Alvo
-                    <select
+                    <NativeSelect
                       value={bulkCategory}
                       onChange={(e) => setBulkCategory(e.target.value)}
                       className="catalog-control-padded"
@@ -5018,12 +5034,12 @@ export function CatalogExperience({
                           itens)
                         </option>
                       ))}
-                    </select>
-                  </label>
+                    </NativeSelect>
+                  </Label>
 
-                  <label className="catalog-field catalog-field--medium">
+                  <Label className="catalog-field catalog-field--medium">
                     Canal de Venda
-                    <select
+                    <NativeSelect
                       value={bulkChannel}
                       onChange={(e) => setBulkChannel(e.target.value as any)}
                       className="catalog-control-padded"
@@ -5031,25 +5047,25 @@ export function CatalogExperience({
                       <option value="both">Salão e Delivery</option>
                       <option value="salon">Apenas Preço do Salão</option>
                       <option value="delivery">Apenas Preço do Delivery</option>
-                    </select>
-                  </label>
+                    </NativeSelect>
+                  </Label>
 
                   <div className="catalog-grid-2">
-                    <label className="catalog-field catalog-field--medium">
+                    <Label className="catalog-field catalog-field--medium">
                       Tipo de Ajuste
-                      <select
+                      <NativeSelect
                         value={bulkType}
                         onChange={(e) => setBulkType(e.target.value as any)}
                         className="catalog-control-padded"
                       >
                         <option value="percentage">Percentual (%)</option>
                         <option value="fixed">Definir preço final (R$)</option>
-                      </select>
-                    </label>
+                      </NativeSelect>
+                    </Label>
 
-                    <label className="catalog-field catalog-field--medium">
+                    <Label className="catalog-field catalog-field--medium">
                       Valor do Ajuste
-                      <input
+                      <Input
                         type="number"
                         step="any"
                         value={bulkValue}
@@ -5057,7 +5073,7 @@ export function CatalogExperience({
                         placeholder={bulkType === "percentage" ? "Ex: 10 para +10%" : "Ex: 2.50"}
                         className="catalog-control-padded"
                       />
-                    </label>
+                    </Label>
                   </div>
 
                   <div
@@ -5137,7 +5153,7 @@ export function CatalogExperience({
                   className="catalog-form-stack"
                 >
                   {/* Nome da Categoria */}
-                  <label
+                  <Label
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -5148,7 +5164,7 @@ export function CatalogExperience({
                     }}
                   >
                     Nome da Categoria *
-                    <input
+                    <Input
                       minLength={2}
                       onChange={(event) =>
                         setEditingCategory({ ...editingCategory, name: event.target.value })
@@ -5169,12 +5185,12 @@ export function CatalogExperience({
                         boxSizing: "border-box",
                       }}
                     />
-                  </label>
+                  </Label>
 
                   {
                     <>
                       {/* Subtítulo / Descrição da Categoria */}
-                      <label
+                      <Label
                         style={{
                           display: "flex",
                           flexDirection: "column",
@@ -5185,7 +5201,7 @@ export function CatalogExperience({
                         }}
                       >
                         Subtítulo / Descrição da Categoria
-                        <textarea
+                        <Textarea
                           rows={2}
                           onChange={(event) =>
                             setEditingCategory({
@@ -5214,7 +5230,7 @@ export function CatalogExperience({
                           Texto exibido abaixo do título da categoria no cardápio digital do
                           cliente.
                         </span>
-                      </label>
+                      </Label>
 
                       {/* Canais de Venda da Categoria */}
                       <div className="catalog-stack catalog-stack--8">
@@ -5241,7 +5257,7 @@ export function CatalogExperience({
                             width: "100%",
                           }}
                         >
-                          <button
+                          <Button
                             type="button"
                             onClick={() =>
                               setEditingCategory({
@@ -5282,9 +5298,9 @@ export function CatalogExperience({
                             >
                               {editingCategory.salonChannel ? "✓ Ativo" : "✕ Oculto"}
                             </span>
-                          </button>
+                          </Button>
 
-                          <button
+                          <Button
                             type="button"
                             onClick={() =>
                               setEditingCategory({
@@ -5327,9 +5343,9 @@ export function CatalogExperience({
                             >
                               {editingCategory.qrMesaChannel ? "✓ Ativo" : "✕ Oculto"}
                             </span>
-                          </button>
+                          </Button>
 
-                          <button
+                          <Button
                             type="button"
                             onClick={() =>
                               setEditingCategory({
@@ -5372,12 +5388,12 @@ export function CatalogExperience({
                             >
                               {editingCategory.deliveryChannel ? "✓ Ativo" : "✕ Oculto"}
                             </span>
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
                       {/* Praça de Produção Padrão */}
-                      <label
+                      <Label
                         style={{
                           display: "flex",
                           flexDirection: "column",
@@ -5388,7 +5404,7 @@ export function CatalogExperience({
                         }}
                       >
                         Praça de Produção Padrão para Novos Itens
-                        <select
+                        <NativeSelect
                           value={editingCategory.defaultStationId}
                           onChange={(e) =>
                             setEditingCategory({
@@ -5416,8 +5432,8 @@ export function CatalogExperience({
                               {st.name}
                             </option>
                           ))}
-                        </select>
-                      </label>
+                        </NativeSelect>
+                      </Label>
 
                       {/* Programação por Horário */}
                       <div
@@ -5428,7 +5444,7 @@ export function CatalogExperience({
                           background: "var(--gm-surface-soft)",
                         }}
                       >
-                        <label
+                        <Label
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -5440,6 +5456,7 @@ export function CatalogExperience({
                           }}
                         >
                           <input
+                            className="accent-primary"
                             type="checkbox"
                             checked={editingCategory.hasSchedule}
                             onChange={(e) =>
@@ -5451,7 +5468,7 @@ export function CatalogExperience({
                             style={{ width: "16px", height: "16px", cursor: "pointer" }}
                           />
                           <span>Restringir Horário de Venda Desta Categoria</span>
-                        </label>
+                        </Label>
 
                         {editingCategory.hasSchedule ? (
                           <div
@@ -5462,7 +5479,7 @@ export function CatalogExperience({
                               marginTop: "10px",
                             }}
                           >
-                            <label
+                            <Label
                               style={{
                                 display: "flex",
                                 flexDirection: "column",
@@ -5473,7 +5490,7 @@ export function CatalogExperience({
                               }}
                             >
                               Início
-                              <input
+                              <Input
                                 type="time"
                                 value={editingCategory.startTime}
                                 onChange={(e) =>
@@ -5493,8 +5510,8 @@ export function CatalogExperience({
                                   boxSizing: "border-box",
                                 }}
                               />
-                            </label>
-                            <label
+                            </Label>
+                            <Label
                               style={{
                                 display: "flex",
                                 flexDirection: "column",
@@ -5505,7 +5522,7 @@ export function CatalogExperience({
                               }}
                             >
                               Término
-                              <input
+                              <Input
                                 type="time"
                                 value={editingCategory.endTime}
                                 onChange={(e) =>
@@ -5525,7 +5542,7 @@ export function CatalogExperience({
                                   boxSizing: "border-box",
                                 }}
                               />
-                            </label>
+                            </Label>
                           </div>
                         ) : (
                           <span
@@ -6165,7 +6182,7 @@ export function CatalogExperience({
                                   }}
                                 >
                                   {qty > 0 && (
-                                    <button
+                                    <Button
                                       type="button"
                                       onClick={() =>
                                         setClientSimulatorCart({
@@ -6184,14 +6201,14 @@ export function CatalogExperience({
                                       }}
                                     >
                                       -
-                                    </button>
+                                    </Button>
                                   )}
                                   {qty > 0 && (
                                     <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
                                       {qty}
                                     </span>
                                   )}
-                                  <button
+                                  <Button
                                     type="button"
                                     onClick={() =>
                                       setClientSimulatorCart({
@@ -6211,7 +6228,7 @@ export function CatalogExperience({
                                     }}
                                   >
                                     + Adicionar
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -6245,7 +6262,7 @@ export function CatalogExperience({
                           </span>
                         </div>
                       )}
-                      <label
+                      <Label
                         style={{
                           fontSize: "0.82rem",
                           fontWeight: 700,
@@ -6254,7 +6271,7 @@ export function CatalogExperience({
                         }}
                       >
                         Selecione a Mesa para Gerar o QR Code
-                        <select
+                        <NativeSelect
                           value={selectedQrTable}
                           onChange={(e) => setSelectedQrTable(Number(e.target.value))}
                           style={{
@@ -6278,8 +6295,8 @@ export function CatalogExperience({
                                   Mesa {m}
                                 </option>
                               ))}
-                        </select>
-                      </label>
+                        </NativeSelect>
+                      </Label>
 
                       <div
                         style={{
@@ -6526,13 +6543,13 @@ export function CatalogExperience({
                   {/* Form de Ajuste de Preço e Categoria */}
                   <div className="catalog-grid-2">
                     <div>
-                      <label
+                      <Label
                         htmlFor="resale-stock-cost"
                         className="catalog-label-block catalog-label-block--078"
                       >
                         Custo de Compra (Estoque)
-                      </label>
-                      <input
+                      </Label>
+                      <Input
                         disabled
                         id="resale-stock-cost"
                         value={formatMoney(resaleSuggestion.stockCostCents)}
@@ -6548,13 +6565,13 @@ export function CatalogExperience({
                       />
                     </div>
                     <div>
-                      <label
+                      <Label
                         htmlFor="resale-salon-price"
                         className="catalog-label-block catalog-label-block--078"
                       >
                         Preço Salão (R$) *
-                      </label>
-                      <input
+                      </Label>
+                      <Input
                         id="resale-salon-price"
                         inputMode="decimal"
                         value={resaleSalonPrice}
@@ -6615,13 +6632,13 @@ export function CatalogExperience({
 
                   <div className="catalog-grid-2">
                     <div>
-                      <label
+                      <Label
                         htmlFor="resale-delivery-price"
                         className="catalog-label-block catalog-label-block--078"
                       >
                         Preço Delivery (Opcional)
-                      </label>
-                      <input
+                      </Label>
+                      <Input
                         id="resale-delivery-price"
                         inputMode="decimal"
                         value={resaleDeliveryPrice}
@@ -6637,13 +6654,13 @@ export function CatalogExperience({
                     </div>
 
                     <div>
-                      <label
+                      <Label
                         htmlFor="resale-category"
                         className="catalog-label-block catalog-label-block--078"
                       >
                         Categoria de Exibição
-                      </label>
-                      <select
+                      </Label>
+                      <NativeSelect
                         id="resale-category"
                         value={resaleCategory}
                         onChange={(e) => setResaleCategory(e.target.value)}
@@ -6664,18 +6681,18 @@ export function CatalogExperience({
                         <option value={resaleSuggestion.suggestedCategoryName}>
                           + Criar Categoria "{resaleSuggestion.suggestedCategoryName}"
                         </option>
-                      </select>
+                      </NativeSelect>
                     </div>
                   </div>
 
                   <div>
-                    <label
+                    <Label
                       htmlFor="resale-station"
                       className="catalog-label-block catalog-label-block--078"
                     >
                       Praça de Atendimento / Saída
-                    </label>
-                    <select
+                    </Label>
+                    <NativeSelect
                       id="resale-station"
                       value={resaleStation}
                       onChange={(e) => setResaleStation(e.target.value)}
@@ -6693,18 +6710,19 @@ export function CatalogExperience({
                           {s.name}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </div>
 
                   {/* Foto Upload */}
                   <div>
-                    <label
+                    <Label
                       htmlFor="resale-image"
                       className="catalog-label-block catalog-label-block--078"
                     >
                       Foto do Produto (Opcional)
-                    </label>
+                    </Label>
                     <input
+                      className="border-input bg-background"
                       id="resale-image"
                       type="file"
                       accept="image/*"
@@ -6766,13 +6784,14 @@ export function CatalogExperience({
                     }}
                   >
                     <input
+                      className="accent-primary"
                       type="checkbox"
                       id="modal-auto-deduct"
                       checked={resaleAutoDeduct}
                       onChange={(e) => setResaleAutoDeduct(e.target.checked)}
                       style={{ width: "16px", height: "16px", cursor: "pointer" }}
                     />
-                    <label
+                    <Label
                       htmlFor="modal-auto-deduct"
                       style={{
                         margin: 0,
@@ -6783,7 +6802,7 @@ export function CatalogExperience({
                       }}
                     >
                       Habilitar baixa automática 1-para-1 no estoque na venda deste item
-                    </label>
+                    </Label>
                   </div>
 
                   {/* Footer actions */}
@@ -6866,7 +6885,7 @@ export function CatalogExperience({
                             }}
                           >
                             <div className="catalog-inline-center-10">
-                              <button
+                              <Button
                                 type="button"
                                 className="catalog-card-icon-btn"
                                 style={{ width: "26px", height: "26px" }}
@@ -6879,7 +6898,7 @@ export function CatalogExperience({
                                   name={item.isExpanded ? "arrow-up" : "arrow-down"}
                                   size={12}
                                 />
-                              </button>
+                              </Button>
                               <div>
                                 <strong
                                   style={{
@@ -6913,7 +6932,7 @@ export function CatalogExperience({
                                   {priceCents > 0 ? formatMoney(priceCents) : "R$ 0,00"}
                                 </strong>
                               </div>
-                              <button
+                              <Button
                                 type="button"
                                 className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                 style={{ width: "28px", height: "28px" }}
@@ -6924,7 +6943,7 @@ export function CatalogExperience({
                                 title="Remover este item do lote"
                               >
                                 <Icon name="x" size={13} />
-                              </button>
+                              </Button>
                             </div>
                           </div>
 
@@ -7011,13 +7030,13 @@ export function CatalogExperience({
                                 }}
                               >
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-cost-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Custo de Compra (Estoque)
-                                  </label>
-                                  <input
+                                  </Label>
+                                  <Input
                                     disabled
                                     id={`bulk-resale-cost-${item.suggestion.id}`}
                                     value={formatMoney(item.suggestion.stockCostCents)}
@@ -7033,13 +7052,13 @@ export function CatalogExperience({
                                   />
                                 </div>
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-salon-price-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Preço Salão (R$) *
-                                  </label>
-                                  <input
+                                  </Label>
+                                  <Input
                                     id={`bulk-resale-salon-price-${item.suggestion.id}`}
                                     inputMode="decimal"
                                     value={item.salonPrice}
@@ -7101,13 +7120,13 @@ export function CatalogExperience({
                                 }}
                               >
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-delivery-price-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Preço Delivery (Opcional)
-                                  </label>
-                                  <input
+                                  </Label>
+                                  <Input
                                     id={`bulk-resale-delivery-price-${item.suggestion.id}`}
                                     inputMode="decimal"
                                     value={item.deliveryPrice}
@@ -7128,13 +7147,13 @@ export function CatalogExperience({
                                 </div>
 
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-category-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Categoria
-                                  </label>
-                                  <select
+                                  </Label>
+                                  <NativeSelect
                                     id={`bulk-resale-category-${item.suggestion.id}`}
                                     value={item.category}
                                     onChange={(e) =>
@@ -7160,7 +7179,7 @@ export function CatalogExperience({
                                     <option value={item.suggestion.suggestedCategoryName}>
                                       + Criar "{item.suggestion.suggestedCategoryName}"
                                     </option>
-                                  </select>
+                                  </NativeSelect>
                                 </div>
                               </div>
 
@@ -7173,13 +7192,13 @@ export function CatalogExperience({
                                 }}
                               >
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-station-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Praça de Saída
-                                  </label>
-                                  <select
+                                  </Label>
+                                  <NativeSelect
                                     id={`bulk-resale-station-${item.suggestion.id}`}
                                     value={item.station}
                                     onChange={(e) =>
@@ -7202,17 +7221,18 @@ export function CatalogExperience({
                                         {s.name}
                                       </option>
                                     ))}
-                                  </select>
+                                  </NativeSelect>
                                 </div>
 
                                 <div>
-                                  <label
+                                  <Label
                                     htmlFor={`bulk-resale-image-${item.suggestion.id}`}
                                     className="catalog-label-block catalog-label-block--076"
                                   >
                                     Foto do Produto (Opcional)
-                                  </label>
+                                  </Label>
                                   <input
+                                    className="border-input bg-background"
                                     id={`bulk-resale-image-${item.suggestion.id}`}
                                     type="file"
                                     accept="image/*"
@@ -7270,7 +7290,7 @@ export function CatalogExperience({
                                       objectFit: "cover",
                                     }}
                                   />
-                                  <button
+                                  <Button
                                     type="button"
                                     className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                     style={{
@@ -7286,7 +7306,7 @@ export function CatalogExperience({
                                     title="Remover foto"
                                   >
                                     <Icon name="x" size={10} />
-                                  </button>
+                                  </Button>
                                 </div>
                               )}
 
@@ -7302,6 +7322,7 @@ export function CatalogExperience({
                                 }}
                               >
                                 <input
+                                  className="accent-primary"
                                   type="checkbox"
                                   id={`bulk-auto-deduct-${item.suggestion.id}`}
                                   checked={item.autoDeduct}
@@ -7312,7 +7333,7 @@ export function CatalogExperience({
                                   }
                                   style={{ width: "16px", height: "16px", cursor: "pointer" }}
                                 />
-                                <label
+                                <Label
                                   htmlFor={`bulk-auto-deduct-${item.suggestion.id}`}
                                   style={{
                                     margin: 0,
@@ -7324,7 +7345,7 @@ export function CatalogExperience({
                                 >
                                   Habilitar baixa automática 1-para-1 no estoque físico na venda
                                   deste item
-                                </label>
+                                </Label>
                               </div>
                             </div>
                           )}
@@ -7409,9 +7430,9 @@ export function CatalogExperience({
                         alignItems: "flex-end",
                       }}
                     >
-                      <label className="catalog-field catalog-field--compact">
+                      <Label className="catalog-field catalog-field--compact">
                         Nome do Grupo *
-                        <input
+                        <Input
                           placeholder="Ex: Ponto da Carne, Adicionais..."
                           value={newGroupName}
                           onChange={(e) => setNewGroupName(e.target.value)}
@@ -7424,10 +7445,10 @@ export function CatalogExperience({
                             color: "var(--gm-ink)",
                           }}
                         />
-                      </label>
-                      <label className="catalog-field catalog-field--compact">
+                      </Label>
+                      <Label className="catalog-field catalog-field--compact">
                         Mínimo de Escolhas
-                        <input
+                        <Input
                           type="number"
                           min={0}
                           value={newGroupMin}
@@ -7441,10 +7462,10 @@ export function CatalogExperience({
                             color: "var(--gm-ink)",
                           }}
                         />
-                      </label>
-                      <label className="catalog-field catalog-field--compact">
+                      </Label>
+                      <Label className="catalog-field catalog-field--compact">
                         Máximo de Escolhas
-                        <input
+                        <Input
                           type="number"
                           min={1}
                           value={newGroupMax}
@@ -7458,7 +7479,7 @@ export function CatalogExperience({
                             color: "var(--gm-ink)",
                           }}
                         />
-                      </label>
+                      </Label>
                       <Button
                         variant="primary"
                         size="sm"
@@ -7522,15 +7543,15 @@ export function CatalogExperience({
                               </span>
                             </div>
                             <div style={{ display: "flex", gap: "6px" }}>
-                              <button
+                              <Button
                                 type="button"
                                 className="catalog-card-icon-btn"
                                 onClick={() => setEditingGroupId(isEditing ? null : grp.id)}
                                 title="Adicionar / Editar opções deste grupo"
                               >
                                 <Icon name="plus" size={14} />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
                                 className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                 disabled={busy === `modifier-group-${grp.id}`}
@@ -7538,7 +7559,7 @@ export function CatalogExperience({
                                 title="Excluir Grupo"
                               >
                                 <Icon name="x" size={14} />
-                              </button>
+                              </Button>
                             </div>
                           </div>
 
@@ -7578,7 +7599,7 @@ export function CatalogExperience({
                                     ? `+${formatMoney(opt.priceDeltaCents)}`
                                     : "Grátis"}
                                 </span>
-                                <button
+                                <Button
                                   type="button"
                                   disabled={busy === `modifier-option-${opt.id}`}
                                   onClick={() => void removeModifierOption(opt.id)}
@@ -7592,7 +7613,7 @@ export function CatalogExperience({
                                   title="Remover opção"
                                 >
                                   <Icon name="x" size={11} />
-                                </button>
+                                </Button>
                               </div>
                             ))}
                             {groupOptions.length === 0 && (
@@ -7620,7 +7641,7 @@ export function CatalogExperience({
                                 borderTop: "1px dashed var(--gm-border)",
                               }}
                             >
-                              <input
+                              <Input
                                 placeholder="Nome da Opção (ex: Bacon Extra)"
                                 value={newOptionName}
                                 onChange={(e) => setNewOptionName(e.target.value)}
@@ -7634,7 +7655,7 @@ export function CatalogExperience({
                                   fontSize: "0.82rem",
                                 }}
                               />
-                              <input
+                              <Input
                                 placeholder="Preço Adicional (ex: 5,00)"
                                 value={newOptionPrice}
                                 onChange={(e) => setNewOptionPrice(e.target.value)}
@@ -7761,7 +7782,7 @@ export function CatalogExperience({
                             {grpOpts.map((opt) => {
                               const isSelected = currentSelected.includes(opt.id);
                               return (
-                                <button
+                                <Button
                                   key={opt.id}
                                   type="button"
                                   onClick={() => {
@@ -7811,7 +7832,7 @@ export function CatalogExperience({
                                       ? `+${formatMoney(opt.priceDeltaCents)}`
                                       : "Grátis"}
                                   </span>
-                                </button>
+                                </Button>
                               );
                             })}
                           </div>
@@ -7853,7 +7874,7 @@ export function CatalogExperience({
                       gap: "8px",
                     }}
                   >
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setPromoTab("combos")}
                       style={{
@@ -7871,9 +7892,9 @@ export function CatalogExperience({
                       }}
                     >
                       Combos Especiais ({catalog.combos.length})
-                    </button>
+                    </Button>
                     {
-                      <button
+                      <Button
                         type="button"
                         onClick={() => setPromoTab("happyhour")}
                         style={{
@@ -7891,7 +7912,7 @@ export function CatalogExperience({
                         }}
                       >
                         Promoções & Happy Hour
-                      </button>
+                      </Button>
                     }
                   </div>
 
@@ -7917,7 +7938,7 @@ export function CatalogExperience({
                           + Criar Novo Combo Inteligente
                         </strong>
                         <div className="catalog-combo-form-grid">
-                          <input
+                          <Input
                             placeholder="Nome do Combo (Ex: Combo Casal, Burger + Refri...)"
                             aria-label="Nome do combo"
                             value={newComboName}
@@ -7932,7 +7953,7 @@ export function CatalogExperience({
                               fontSize: "0.86rem",
                             }}
                           />
-                          <input
+                          <Input
                             placeholder="Preço Promocional do Combo (R$)"
                             aria-label="Preço promocional do combo"
                             inputMode="decimal"
@@ -7950,7 +7971,7 @@ export function CatalogExperience({
                             }}
                           />
                         </div>
-                        <input
+                        <Input
                           placeholder="Descrição do combo (Ex: 1 Hambúrguer + 1 Batata + 1 Bebida com 20% de economia)"
                           aria-label="Descrição do combo"
                           value={newComboDesc}
@@ -7987,7 +8008,7 @@ export function CatalogExperience({
                               .map((p) => {
                                 const isSelected = newComboProductIds.includes(p.id);
                                 return (
-                                  <button
+                                  <Button
                                     key={p.id}
                                     type="button"
                                     aria-pressed={isSelected}
@@ -8015,7 +8036,7 @@ export function CatalogExperience({
                                   >
                                     {isSelected ? "✓ " : "+ "}
                                     {p.name} ({formatMoney(p.priceCents)})
-                                  </button>
+                                  </Button>
                                 );
                               })}
                           </div>
@@ -8153,7 +8174,7 @@ export function CatalogExperience({
                             </div>
 
                             {
-                              <button
+                              <Button
                                 type="button"
                                 className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                 disabled={busy === `combo-${cmb.id}`}
@@ -8161,7 +8182,7 @@ export function CatalogExperience({
                                 title="Excluir combo"
                               >
                                 <Icon name="x" size={14} />
-                              </button>
+                              </Button>
                             }
                           </div>
                         ))}
@@ -8195,9 +8216,9 @@ export function CatalogExperience({
                             gap: "10px",
                           }}
                         >
-                          <label className="catalog-field catalog-field--compact">
+                          <Label className="catalog-field catalog-field--compact">
                             Nome da Campanha *
-                            <input
+                            <Input
                               placeholder="Ex: Happy Hour Chopp & Petiscos..."
                               value={promoName}
                               onChange={(e) => setPromoName(e.target.value)}
@@ -8211,11 +8232,11 @@ export function CatalogExperience({
                                 fontSize: "0.85rem",
                               }}
                             />
-                          </label>
+                          </Label>
 
-                          <label className="catalog-field catalog-field--compact">
+                          <Label className="catalog-field catalog-field--compact">
                             Tipo de Desconto
-                            <select
+                            <NativeSelect
                               value={promoType}
                               onChange={(e) => setPromoType(e.target.value as any)}
                               style={{
@@ -8231,14 +8252,14 @@ export function CatalogExperience({
                             >
                               <option value="percentage">% de Desconto</option>
                               <option value="fixed_price">Preço Fixo Promocional (R$)</option>
-                            </select>
-                          </label>
+                            </NativeSelect>
+                          </Label>
 
-                          <label className="catalog-field catalog-field--compact">
+                          <Label className="catalog-field catalog-field--compact">
                             {promoType === "percentage"
                               ? "% de desconto *"
                               : "Preço promocional final (R$) *"}
-                            <input
+                            <Input
                               placeholder={
                                 promoType === "percentage" ? "Ex: 25 (para 25%)" : "Ex: 12,00"
                               }
@@ -8255,7 +8276,7 @@ export function CatalogExperience({
                                 fontWeight: 700,
                               }}
                             />
-                          </label>
+                          </Label>
                         </div>
 
                         {/* Dias da Semana Interativos */}
@@ -8283,7 +8304,7 @@ export function CatalogExperience({
                             ].map((d) => {
                               const isChecked = promoDays.includes(d.day);
                               return (
-                                <button
+                                <Button
                                   key={d.day}
                                   type="button"
                                   onClick={() => {
@@ -8307,7 +8328,7 @@ export function CatalogExperience({
                                   }}
                                 >
                                   {d.label}
-                                </button>
+                                </Button>
                               );
                             })}
                           </div>
@@ -8322,25 +8343,25 @@ export function CatalogExperience({
                             alignItems: "flex-end",
                           }}
                         >
-                          <label className="catalog-field catalog-field--compact">
+                          <Label className="catalog-field catalog-field--compact">
                             Horário de Início
-                            <input
+                            <Input
                               type="time"
                               value={promoStart}
                               onChange={(e) => setPromoStart(e.target.value)}
                               className="catalog-control-36"
                             />
-                          </label>
+                          </Label>
 
-                          <label className="catalog-field catalog-field--compact">
+                          <Label className="catalog-field catalog-field--compact">
                             Horário de Fim
-                            <input
+                            <Input
                               type="time"
                               value={promoEnd}
                               onChange={(e) => setPromoEnd(e.target.value)}
                               className="catalog-control-36"
                             />
-                          </label>
+                          </Label>
 
                           <div
                             style={{
@@ -8350,7 +8371,7 @@ export function CatalogExperience({
                               height: "36px",
                             }}
                           >
-                            <label
+                            <Label
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -8361,13 +8382,14 @@ export function CatalogExperience({
                               }}
                             >
                               <input
+                                className="accent-primary"
                                 type="checkbox"
                                 checked={promoSalon}
                                 onChange={(e) => setPromoSalon(e.target.checked)}
                               />
                               Salão
-                            </label>
-                            <label
+                            </Label>
+                            <Label
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -8378,13 +8400,14 @@ export function CatalogExperience({
                               }}
                             >
                               <input
+                                className="accent-primary"
                                 type="checkbox"
                                 checked={promoQr}
                                 onChange={(e) => setPromoQr(e.target.checked)}
                               />
                               QR Mesa
-                            </label>
-                            <label
+                            </Label>
+                            <Label
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -8395,12 +8418,13 @@ export function CatalogExperience({
                               }}
                             >
                               <input
+                                className="accent-primary"
                                 type="checkbox"
                                 checked={promoDelivery}
                                 onChange={(e) => setPromoDelivery(e.target.checked)}
                               />
                               Delivery
-                            </label>
+                            </Label>
                           </div>
                         </div>
 
@@ -8420,7 +8444,7 @@ export function CatalogExperience({
                             {catalog.categories.map((cat) => {
                               const isSelected = promoCategoryIds.includes(cat.id);
                               return (
-                                <button
+                                <Button
                                   key={cat.id}
                                   type="button"
                                   onClick={() => {
@@ -8447,7 +8471,7 @@ export function CatalogExperience({
                                 >
                                   {isSelected ? "✓ Categoria: " : "+ Categoria: "}
                                   {cat.name}
-                                </button>
+                                </Button>
                               );
                             })}
                           </div>
@@ -8470,7 +8494,7 @@ export function CatalogExperience({
                               >
                                 2. Ou Selecionar Produtos Específicos:
                               </span>
-                              <input
+                              <Input
                                 placeholder="Filtrar prato..."
                                 value={promoProductSearch}
                                 onChange={(e) => setPromoProductSearch(e.target.value)}
@@ -8511,7 +8535,7 @@ export function CatalogExperience({
                                     (c) => c.id === p.categoryId,
                                   )?.name;
                                   return (
-                                    <button
+                                    <Button
                                       key={p.id}
                                       type="button"
                                       onClick={() => {
@@ -8541,7 +8565,7 @@ export function CatalogExperience({
                                       <small style={{ opacity: 0.7 }}>
                                         ({catName} • {formatMoney(p.priceCents)})
                                       </small>
-                                    </button>
+                                    </Button>
                                   );
                                 })}
                             </div>
@@ -8633,7 +8657,7 @@ export function CatalogExperience({
                               </div>
 
                               <div style={{ display: "flex", gap: "6px" }}>
-                                <button
+                                <Button
                                   type="button"
                                   className={`catalog-card-btn ${p.active ? "catalog-card-btn--pause" : "catalog-card-btn--active"}`}
                                   style={{ height: "30px", fontSize: "0.74rem" }}
@@ -8642,8 +8666,8 @@ export function CatalogExperience({
                                 >
                                   <Icon name={p.active ? "minus" : "check"} size={12} />
                                   <span>{p.active ? "Pausar" : "Ativar"}</span>
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   type="button"
                                   className="catalog-card-icon-btn catalog-card-icon-btn--danger"
                                   disabled={busy === `promotion-${p.id}`}
@@ -8651,7 +8675,7 @@ export function CatalogExperience({
                                   title="Excluir campanha"
                                 >
                                   <Icon name="x" size={13} />
-                                </button>
+                                </Button>
                               </div>
                             </div>
                           );
@@ -8683,7 +8707,7 @@ export function CatalogExperience({
                     Digital (QR) e nas impressões.
                   </p>
 
-                  <label
+                  <Label
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -8694,7 +8718,7 @@ export function CatalogExperience({
                     }}
                   >
                     Nome Fantasia do Estabelecimento *
-                    <input
+                    <Input
                       value={restaurantName}
                       onChange={(e) => setRestaurantName(e.target.value)}
                       placeholder="Ex: GiroMesa Bistrô & Bar..."
@@ -8708,9 +8732,9 @@ export function CatalogExperience({
                         fontSize: "0.9rem",
                       }}
                     />
-                  </label>
+                  </Label>
 
-                  <label
+                  <Label
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -8721,7 +8745,7 @@ export function CatalogExperience({
                     }}
                   >
                     Slogan / Subtítulo da Casa
-                    <input
+                    <Input
                       value={restaurantSlogan}
                       onChange={(e) => setRestaurantSlogan(e.target.value)}
                       placeholder="Ex: Cardápio Autoral & Gastronomia Artesanal..."
@@ -8735,7 +8759,7 @@ export function CatalogExperience({
                         fontSize: "0.85rem",
                       }}
                     />
-                  </label>
+                  </Label>
 
                   {/* Cor da Marca */}
                   <div>
@@ -8759,7 +8783,7 @@ export function CatalogExperience({
                         { color: "#3b82f6", name: "Azul Real" },
                         { color: "#334155", name: "Grafite" },
                       ].map((c) => (
-                        <button
+                        <Button
                           key={c.color}
                           type="button"
                           onClick={() => setBrandColor(c.color)}
@@ -8798,9 +8822,10 @@ export function CatalogExperience({
                     </strong>
 
                     <div className="catalog-grid-2 catalog-grid-2--compact">
-                      <label className="catalog-helper-stack">
+                      <Label className="catalog-helper-stack">
                         Logo da Casa (Upload de Imagem)
                         <input
+                          className="border-input bg-background"
                           type="file"
                           accept="image/*"
                           style={{ fontSize: "0.76rem", padding: "4px 0" }}
@@ -8832,50 +8857,50 @@ export function CatalogExperience({
                             reader.readAsDataURL(file);
                           }}
                         />
-                      </label>
+                      </Label>
 
-                      <label className="catalog-helper-stack">
+                      <Label className="catalog-helper-stack">
                         Telefone / WhatsApp para Contato
-                        <input
+                        <Input
                           value={restaurantPhone}
                           onChange={(e) => setRestaurantPhone(e.target.value)}
                           placeholder="(11) 98765-4321"
                           className="catalog-control-34"
                         />
-                      </label>
+                      </Label>
                     </div>
 
                     <div className="catalog-grid-main">
-                      <label className="catalog-helper-stack">
+                      <Label className="catalog-helper-stack">
                         Endereço Completo do Estabelecimento
-                        <input
+                        <Input
                           value={restaurantAddress}
                           onChange={(e) => setRestaurantAddress(e.target.value)}
                           placeholder="Rua, Número - Bairro, Cidade - UF"
                           className="catalog-control-34"
                         />
-                      </label>
+                      </Label>
 
-                      <label className="catalog-helper-stack">
+                      <Label className="catalog-helper-stack">
                         Instagram / Redes Sociais
-                        <input
+                        <Input
                           value={restaurantInstagram}
                           onChange={(e) => setRestaurantInstagram(e.target.value)}
                           placeholder="@seurestaurante"
                           className="catalog-control-34"
                         />
-                      </label>
+                      </Label>
                     </div>
 
-                    <label className="catalog-helper-stack">
+                    <Label className="catalog-helper-stack">
                       Horário de Atendimento da Casa
-                      <input
+                      <Input
                         value={restaurantOpeningHours}
                         onChange={(e) => setRestaurantOpeningHours(e.target.value)}
                         placeholder="Ex: Terça a Domingo: 12h às 23h30"
                         className="catalog-control-34"
                       />
-                    </label>
+                    </Label>
                   </div>
 
                   {/* Avisos de Mesa */}
@@ -8894,32 +8919,32 @@ export function CatalogExperience({
                       Avisos de Rodapé & Informações ao Cliente
                     </strong>
 
-                    <label className="catalog-helper-stack">
+                    <Label className="catalog-helper-stack">
                       Taxa de Serviço / Informação Fiscal
-                      <input
+                      <Input
                         value={serviceTaxNotice}
                         onChange={(e) => setServiceTaxNotice(e.target.value)}
                         className="catalog-control-34"
                       />
-                    </label>
+                    </Label>
 
-                    <label className="catalog-helper-stack">
+                    <Label className="catalog-helper-stack">
                       Aviso de Wi-Fi para Clientes
-                      <input
+                      <Input
                         value={wifiNotice}
                         onChange={(e) => setWifiNotice(e.target.value)}
                         className="catalog-control-34"
                       />
-                    </label>
+                    </Label>
 
-                    <label className="catalog-helper-stack">
+                    <Label className="catalog-helper-stack">
                       Taxa de Rolha / Observação Especial
-                      <input
+                      <Input
                         value={corkageNotice}
                         onChange={(e) => setCorkageNotice(e.target.value)}
                         className="catalog-control-34"
                       />
-                    </label>
+                    </Label>
                   </div>
 
                   <div
@@ -8969,24 +8994,26 @@ export function CatalogExperience({
                     </strong>
 
                     <div className="catalog-stack catalog-stack--8">
-                      <label className="catalog-clickable-row">
+                      <Label className="catalog-clickable-row">
                         <input
+                          className="accent-primary"
                           type="radio"
                           name="pdfLayout"
                           checked={pdfLayoutMode === "modern"}
                           onChange={() => setPdfLayoutMode("modern")}
                         />
                         <span>Moderno Gastronômico (com fotos)</span>
-                      </label>
-                      <label className="catalog-clickable-row">
+                      </Label>
+                      <Label className="catalog-clickable-row">
                         <input
+                          className="accent-primary"
                           type="radio"
                           name="pdfLayout"
                           checked={pdfLayoutMode === "bistro"}
                           onChange={() => setPdfLayoutMode("bistro")}
                         />
                         <span>Bistrô Minimalista (2 Colunas)</span>
-                      </label>
+                      </Label>
                     </div>
 
                     <strong
@@ -8996,30 +9023,33 @@ export function CatalogExperience({
                     </strong>
 
                     <div className="catalog-stack catalog-stack--8">
-                      <label className="catalog-clickable-row">
+                      <Label className="catalog-clickable-row">
                         <input
+                          className="accent-primary"
                           type="checkbox"
                           checked={pdfShowPhotos}
                           onChange={(e) => setPdfShowPhotos(e.target.checked)}
                         />
                         <span>Incluir Fotos dos Pratos</span>
-                      </label>
-                      <label className="catalog-clickable-row">
+                      </Label>
+                      <Label className="catalog-clickable-row">
                         <input
+                          className="accent-primary"
                           type="checkbox"
                           checked={pdfShowDescriptions}
                           onChange={(e) => setPdfShowDescriptions(e.target.checked)}
                         />
                         <span>Incluir Descrições & Ingredientes</span>
-                      </label>
-                      <label className="catalog-clickable-row">
+                      </Label>
+                      <Label className="catalog-clickable-row">
                         <input
+                          className="accent-primary"
                           type="checkbox"
                           checked={pdfShowQr}
                           onChange={(e) => setPdfShowQr(e.target.checked)}
                         />
                         <span>Incluir QR Code de Autoatendimento</span>
-                      </label>
+                      </Label>
                     </div>
 
                     <div

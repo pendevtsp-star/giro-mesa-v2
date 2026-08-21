@@ -1,4 +1,5 @@
-import { Badge, Button, Modal } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Input, Modal, NativeSelect, Textarea } from "@giromesa/ui";
 import { useRef, useState } from "react";
 import { api } from "../../api";
 import {
@@ -275,7 +276,10 @@ export function InvoiceImportModal({
           <>
             <label className="gm-form-field">
               <span>Fornecedor, se já cadastrado</span>
-              <select onChange={(event) => setSupplierId(event.target.value)} value={supplierId}>
+              <NativeSelect
+                onChange={(event) => setSupplierId(event.target.value)}
+                value={supplierId}
+              >
                 <option value="">Identificar pelo CNPJ da NF-e</option>
                 {suppliers
                   .filter((supplier) => supplier.active)
@@ -284,7 +288,7 @@ export function InvoiceImportModal({
                       {supplier.name}
                     </option>
                   ))}
-              </select>
+              </NativeSelect>
             </label>
             <label className="gm-form-field">
               <span>Arquivo XML da NF-e</span>
@@ -311,7 +315,7 @@ export function InvoiceImportModal({
             </div>
             <label className="gm-form-field">
               <span>Fornecedor</span>
-              <select
+              <NativeSelect
                 onChange={(event) => {
                   setSupplierId(event.target.value);
                   setReviewed(false);
@@ -327,7 +331,7 @@ export function InvoiceImportModal({
                       {supplier.name}
                     </option>
                   ))}
-              </select>
+              </NativeSelect>
             </label>
             <ul className="nfe-review-lines" aria-label="Linhas da NF-e">
               {draft.lines.map((line) => {
@@ -344,7 +348,7 @@ export function InvoiceImportModal({
                     <Badge tone={status.tone}>{status.label}</Badge>
                     <label className="gm-form-field">
                       <span>Vínculo</span>
-                      <select
+                      <NativeSelect
                         onChange={(event) => {
                           const inventoryItemId = event.target.value;
                           patchLine(line.id, {
@@ -362,13 +366,13 @@ export function InvoiceImportModal({
                               {item.name}
                             </option>
                           ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     {!line.inventoryItemId && line.status !== "ignored" && (
                       <div className="nfe-new-item-fields">
                         <label className="gm-form-field">
                           <span>Tipo</span>
-                          <select
+                          <NativeSelect
                             onChange={(event) =>
                               patchLine(line.id, { kind: event.target.value as InventoryItemKind })
                             }
@@ -379,11 +383,11 @@ export function InvoiceImportModal({
                             <option value="resale">Revenda</option>
                             <option value="reusable">Utensílio/mobiliário</option>
                             <option value="returnable_container">Vasilhame</option>
-                          </select>
+                          </NativeSelect>
                         </label>
                         <label className="gm-form-field">
                           <span>Unidade de estoque</span>
-                          <input
+                          <Input
                             onChange={(event) =>
                               patchLine(line.id, { stockUnit: event.target.value })
                             }
@@ -392,7 +396,7 @@ export function InvoiceImportModal({
                         </label>
                         <label className="gm-form-field">
                           <span>Conversão</span>
-                          <input
+                          <Input
                             inputMode="decimal"
                             onChange={(event) => patchLine(line.id, { factor: event.target.value })}
                             value={line.factor}
@@ -401,7 +405,7 @@ export function InvoiceImportModal({
                         {line.kind === "resale" && (
                           <label className="gm-form-field">
                             <span>Produto do Cardápio</span>
-                            <select
+                            <NativeSelect
                               onChange={(event) =>
                                 patchLine(line.id, { productId: event.target.value })
                               }
@@ -416,7 +420,7 @@ export function InvoiceImportModal({
                                     {product.name}
                                   </option>
                                 ))}
-                            </select>
+                            </NativeSelect>
                           </label>
                         )}
                       </div>
@@ -441,7 +445,7 @@ export function InvoiceImportModal({
               <>
                 <label className="gm-form-field">
                   <span>Local de entrada</span>
-                  <select
+                  <NativeSelect
                     onChange={(event) => setLocationId(event.target.value)}
                     required
                     value={locationId}
@@ -454,7 +458,7 @@ export function InvoiceImportModal({
                           {location.name}
                         </option>
                       ))}
-                  </select>
+                  </NativeSelect>
                 </label>
                 {divergence !== 0 && (
                   <div className="gm-form-stack purchases-divergence" role="status">
@@ -473,7 +477,7 @@ export function InvoiceImportModal({
                     </label>
                     <label className="gm-form-field">
                       <span>Motivo</span>
-                      <textarea
+                      <Textarea
                         minLength={5}
                         onChange={(event) => setDivergenceReason(event.target.value)}
                         required

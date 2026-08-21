@@ -7,6 +7,7 @@ import {
   buildTimeTrackingAlerts,
   reportMetricComparison,
   summarizeTimeEntries,
+  timeTrackingEntryForRead,
 } from "./management.service.js";
 
 function hasCode(expected: string) {
@@ -226,6 +227,26 @@ describe("management sales reports", () => {
 });
 
 describe("time tracking read policy", () => {
+  it("keeps raw location and device data out of regular time-entry payloads", () => {
+    const entry = timeTrackingEntryForRead({
+      id: "entry-1",
+      personId: "person-1",
+      clockedInAt: new Date("2026-08-20T12:00:00.000Z"),
+      clockedOutAt: null,
+      source: "self",
+      clockInLatitude: -19.9167,
+      clockInLongitude: -43.9345,
+      clockInDeviceId: "device-1",
+    });
+    assert.deepEqual(entry, {
+      id: "entry-1",
+      personId: "person-1",
+      clockedInAt: new Date("2026-08-20T12:00:00.000Z"),
+      clockedOutAt: null,
+      source: "self",
+    });
+  });
+
   it("applies configured manager and finance visibility", () => {
     assert.doesNotThrow(() =>
       assertTimeTrackingReadPolicy("owner", {

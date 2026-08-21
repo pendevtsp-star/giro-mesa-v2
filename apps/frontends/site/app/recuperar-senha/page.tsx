@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -71,29 +72,29 @@ export default function ForgotPasswordPage() {
             <p>Use uma senha nova com pelo menos 12 caracteres.</p>
             {!completed && (
               <form className="auth-form" onSubmit={confirm}>
-                <label>
+                <Label>
                   Nova senha
-                  <input
+                  <Input
                     type="password"
                     name="password"
                     autoComplete="new-password"
                     minLength={12}
                     required
                   />
-                </label>
-                <label>
+                </Label>
+                <Label>
                   Confirmar nova senha
-                  <input
+                  <Input
                     type="password"
                     name="passwordConfirmation"
                     autoComplete="new-password"
                     minLength={12}
                     required
                   />
-                </label>
-                <button className="button button-primary" type="submit">
+                </Label>
+                <Button className="button button-primary" type="submit">
                   Atualizar senha
-                </button>
+                </Button>
               </form>
             )}
           </>
@@ -101,13 +102,13 @@ export default function ForgotPasswordPage() {
           <>
             <p>Informe seu e-mail. Por segurança, a resposta não confirma se existe uma conta.</p>
             <form className="auth-form" onSubmit={submit}>
-              <label>
+              <Label>
                 E-mail
-                <input type="email" name="email" autoComplete="email" required />
-              </label>
-              <button className="button button-primary" type="submit">
+                <Input type="email" name="email" autoComplete="email" required />
+              </Label>
+              <Button className="button button-primary" type="submit">
                 Enviar instruções
-              </button>
+              </Button>
             </form>
           </>
         )}

@@ -8,6 +8,7 @@ import {
   organizations,
   outboxEvents,
   posCatalogCategories,
+  posKdsTicketItems,
   posKdsTickets,
   posOrders,
   posProductAvailability,
@@ -15,6 +16,7 @@ import {
   posProductPrices,
   posProductStations,
   posProducts,
+  posRecipeComponents,
   posTabs,
   roleBindings,
   units,
@@ -140,14 +142,23 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
         unitId: unit.id,
         productId: product.id,
         stationId: hotStation.id,
+        stage: 1,
       },
       {
         organizationId: organization.id,
         unitId: unit.id,
         productId: product.id,
         stationId: coldStation.id,
+        stage: 2,
       },
     ]);
+    await database.db.insert(posRecipeComponents).values({
+      organizationId: organization.id,
+      productId: product.id,
+      ingredientName: "Base preparada",
+      quantityMilli: 250,
+      unit: "g",
+    });
     const [tab] = await database.db
       .insert(posTabs)
       .values({
@@ -373,6 +384,111 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       )?.status,
       "limited",
     );
+    const snapshotItems = snapshot.items as Array<{
+      ticketId: string;
+      item: { id: string };
+      kds: { stage: number; dependencyHeld: boolean; held: boolean };
+      recipe: Array<{ ingredientName: string }>;
+    }>;
+    const hotAssignment = snapshotItems.find(
+      (entry) =>
+        (snapshot.tickets as Array<{ id: string; stationId: string }>).find(
+          (ticket) => ticket.id === entry.ticketId,
+        )?.stationId === hotStation.id,
+    );
+    const coldAssignment = snapshotItems.find((entry) => entry !== hotAssignment);
+    assert.ok(hotAssignment && coldAssignment);
+    assert.deepEqual([hotAssignment.kds.stage, coldAssignment.kds.stage], [1, 2]);
+    assert.equal(coldAssignment.kds.dependencyHeld, true);
+    assert.equal(coldAssignment.recipe[0]?.ingredientName, "Base preparada");
+
+    await pos.claimKdsTicket(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      hotAssignment.ticketId,
+      `claim-${runId}`,
+      { installationId: stationInstallationId, leaseSeconds: 120 },
+    );
+    await pos.transitionKdsItem(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      hotAssignment.ticketId,
+      hotAssignment.item.id,
+      `hot-start-${runId}`,
+      { state: "preparing" },
+    );
+    await pos.transitionKdsItem(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      hotAssignment.ticketId,
+      hotAssignment.item.id,
+      `hot-ready-${runId}`,
+      { state: "ready" },
+    );
+    const [releasedCold] = await database.db
+      .select({ held: posKdsTicketItems.held, dependencyHeld: posKdsTicketItems.dependencyHeld })
+      .from(posKdsTicketItems)
+      .where(
+        and(
+          eq(posKdsTicketItems.ticketId, coldAssignment.ticketId),
+          eq(posKdsTicketItems.orderItemId, coldAssignment.item.id),
+        ),
+      );
+    assert.deepEqual(releasedCold, { held: false, dependencyHeld: false });
+    await pos.transitionKdsItem(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      coldAssignment.ticketId,
+      coldAssignment.item.id,
+      `cold-start-${runId}`,
+      { state: "preparing" },
+    );
+    await pos.transitionKdsItem(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      coldAssignment.ticketId,
+      coldAssignment.item.id,
+      `cold-ready-${runId}`,
+      { state: "ready" },
+    );
+    await pos.handoffKdsOrder(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      order.id,
+      `expedition-${runId}`,
+      { target: "expedition" },
+    );
+    await pos.claimKdsRunner(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      order.id,
+      `runner-claim-${runId}`,
+      {},
+    );
+    await pos.handoffKdsOrder(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      order.id,
+      `runner-pickup-${runId}`,
+      { target: "runner" },
+    );
+    const served = await pos.handoffKdsOrder(
+      kdsOperator.id,
+      organization.id,
+      unit.id,
+      order.id,
+      `runner-served-${runId}`,
+      { target: "served" },
+    );
+    assert.equal(served.target, "served");
   } finally {
     await database.onModuleDestroy();
   }

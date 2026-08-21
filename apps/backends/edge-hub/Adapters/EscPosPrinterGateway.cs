@@ -7,28 +7,67 @@ namespace GiroMesa.EdgeHub.Adapters;
 public sealed class EscPosPrinterGateway(IOptions<HubOptions> options, ILogger<EscPosPrinterGateway> logger)
     : IPrinterGateway
 {
-    private readonly PrinterOptions _options = options.Value.Printer;
+    private readonly IReadOnlyList<PrinterOptions> _printers = options.Value.AvailablePrinters;
 
-    public CapabilityState Capability => PrinterConfiguration.IsValid(_options)
-        ? new(true, "escpos-tcp", $"ESC/POS {_options.PaperWidthMm} mm at {_options.Host}:{_options.Port}.")
-        : new(false, "escpos-tcp", "Configure Hub:Printer with a paired network printer.");
+    public CapabilityState Capability
+    {
+        get
+        {
+            var count = _printers.Count(PrinterConfiguration.IsValid);
+            return count > 0
+                ? new(true, "escpos-tcp", $"{count} ESC/POS network printer(s) configured.")
+                : new(false, "escpos-tcp", "Configure Hub:Printers with at least one paired network printer.");
+        }
+    }
 
     public async Task<PrintResult> PrintAsync(
         PrintRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!PrinterConfiguration.IsValid(_options))
-            return new(false, "unavailable", "PRINTER_NOT_CONFIGURED");
-        if (!string.IsNullOrWhiteSpace(request.PrinterId) &&
-            request.PrinterId != "default" &&
-            request.PrinterId != _options.Id)
-            return new(false, "rejected", "PRINTER_NOT_FOUND");
         if (request.Copies is < 1 or > 5 ||
             request.Payload.ValueKind != System.Text.Json.JsonValueKind.Object ||
             request.Payload.GetRawText().Length > 128_000)
             return new(false, "rejected", "PRINT_JOB_INVALID");
 
-        var charactersPerLine = Math.Clamp(_options.CharactersPerLine, 24, 64);
+        var printer = SelectPrinter(request);
+        if (printer is null)
+            return new(false, "rejected", "PRINTER_NOT_FOUND");
+        var result = await PrintToAsync(printer, request, cancellationToken);
+        if (result.ErrorCode is not ("PRINTER_UNREACHABLE" or "PRINTER_TIMEOUT") ||
+            string.IsNullOrWhiteSpace(printer.FallbackPrinterId))
+            return result;
+        var fallback = _printers.FirstOrDefault(candidate =>
+            PrinterConfiguration.IsValid(candidate) &&
+            candidate.Id.Equals(printer.FallbackPrinterId, StringComparison.OrdinalIgnoreCase));
+        return fallback is null
+            ? result
+            : await PrintToAsync(fallback, request, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PrinterStatus>> GetStatusesAsync(
+        CancellationToken cancellationToken = default) =>
+        await Task.WhenAll(_printers.Select(printer => ProbeAsync(printer, cancellationToken)));
+
+    private PrinterOptions? SelectPrinter(PrintRequest request)
+    {
+        var configured = _printers.Where(PrinterConfiguration.IsValid).ToArray();
+        if (configured.Length == 0) return null;
+        if (!string.IsNullOrWhiteSpace(request.PrinterId) && request.PrinterId != "default")
+            return configured.FirstOrDefault(candidate =>
+                candidate.Id.Equals(request.PrinterId, StringComparison.OrdinalIgnoreCase));
+        return configured.FirstOrDefault(candidate =>
+                   Matches(candidate.Stations, request.Station) &&
+                   Matches(candidate.DocumentTypes, request.DocumentType))
+               ?? configured.FirstOrDefault(candidate => candidate.Default)
+               ?? configured[0];
+    }
+
+    private async Task<PrintResult> PrintToAsync(
+        PrinterOptions printer,
+        PrintRequest request,
+        CancellationToken cancellationToken)
+    {
+        var charactersPerLine = Math.Clamp(printer.CharactersPerLine, 24, 64);
         var content = ThermalReceiptFormatter.Format(
             request.DocumentType,
             request.Payload,
@@ -36,14 +75,26 @@ public sealed class EscPosPrinterGateway(IOptions<HubOptions> options, ILogger<E
         var payload = EscPosDocument.Render(
             content,
             charactersPerLine,
-            Math.Clamp(_options.CodeTable, 0, 255),
-            _options.Cut);
+            Math.Clamp(printer.CodeTable, 0, 255),
+            printer.Cut);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.TimeoutSeconds, 1, 30)));
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(printer.TimeoutSeconds, 1, 30)));
+        using var client = new TcpClient();
         try
         {
-            using var client = new TcpClient();
-            await client.ConnectAsync(_options.Host, _options.Port, timeout.Token);
+            await client.ConnectAsync(printer.Host, printer.Port, timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return new(false, "failed", "PRINTER_TIMEOUT", PrinterId: printer.Id);
+        }
+        catch (SocketException exception)
+        {
+            logger.LogWarning(exception, "ESC/POS printer {PrinterId} is unreachable", printer.Id);
+            return new(false, "failed", "PRINTER_UNREACHABLE", PrinterId: printer.Id);
+        }
+        try
+        {
             await using var stream = client.GetStream();
             var written = 0;
             for (var copy = 0; copy < request.Copies; copy += 1)
@@ -52,22 +103,43 @@ public sealed class EscPosPrinterGateway(IOptions<HubOptions> options, ILogger<E
                 await stream.FlushAsync(timeout.Token);
                 written += payload.Length;
             }
-            return new(true, "accepted", null, written, _options.Id);
+            return new(true, "accepted", null, written, printer.Id);
         }
         catch (OperationCanceledException)
         {
-            return new(false, "failed", "PRINTER_TIMEOUT");
-        }
-        catch (SocketException exception)
-        {
-            logger.LogWarning(exception, "ESC/POS printer {PrinterId} is unreachable", _options.Id);
-            return new(false, "failed", "PRINTER_UNREACHABLE");
+            return new(false, "failed", "PRINTER_RESULT_UNKNOWN", PrinterId: printer.Id);
         }
         catch (IOException exception)
         {
-            logger.LogWarning(exception, "ESC/POS printer {PrinterId} failed while writing", _options.Id);
-            return new(false, "failed", "PRINTER_IO_ERROR");
+            logger.LogWarning(exception, "ESC/POS printer {PrinterId} failed while writing", printer.Id);
+            return new(false, "failed", "PRINTER_RESULT_UNKNOWN", PrinterId: printer.Id);
         }
+    }
+
+    private static async Task<PrinterStatus> ProbeAsync(
+        PrinterOptions printer,
+        CancellationToken cancellationToken)
+    {
+        if (!PrinterConfiguration.IsValid(printer))
+            return new(printer.Id, false, false, printer.Default, printer.PaperWidthMm, "PRINTER_NOT_CONFIGURED");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(printer.TimeoutSeconds, 1, 5)));
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(printer.Host, printer.Port, timeout.Token);
+            return new(printer.Id, true, true, printer.Default, printer.PaperWidthMm);
+        }
+        catch
+        {
+            return new(printer.Id, true, false, printer.Default, printer.PaperWidthMm, "PRINTER_UNREACHABLE");
+        }
+    }
+
+    private static bool Matches(IEnumerable<string> values, string candidate)
+    {
+        var routes = values.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+        return routes.Length == 0 || routes.Contains(candidate, StringComparer.OrdinalIgnoreCase);
     }
 }
 

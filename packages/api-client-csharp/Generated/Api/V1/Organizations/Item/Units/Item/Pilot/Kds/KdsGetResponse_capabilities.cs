@@ -30,10 +30,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
         public bool? Capacity { get; set; }
         /// <summary>The courseHold property</summary>
         public bool? CourseHold { get; set; }
+        /// <summary>The demandControl property</summary>
+        public bool? DemandControl { get; set; }
         /// <summary>The history property</summary>
         public bool? History { get; set; }
         /// <summary>The itemTransition property</summary>
         public bool? ItemTransition { get; set; }
+        /// <summary>The orderChanges property</summary>
+        public bool? OrderChanges { get; set; }
         /// <summary>The orderHandoff property</summary>
         public bool? OrderHandoff { get; set; }
         /// <summary>The orderPriority property</summary>
@@ -44,18 +48,28 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
         public bool? PartialReady { get; set; }
         /// <summary>The priority property</summary>
         public bool? Priority { get; set; }
+        /// <summary>The productionGrid property</summary>
+        public bool? ProductionGrid { get; set; }
         /// <summary>The recall property</summary>
         public bool? Recall { get; set; }
+        /// <summary>The recipes property</summary>
+        public bool? Recipes { get; set; }
         /// <summary>The recommendation property</summary>
         public bool? Recommendation { get; set; }
         /// <summary>The refire property</summary>
         public bool? Refire { get; set; }
         /// <summary>The reroute property</summary>
         public bool? Reroute { get; set; }
+        /// <summary>The runnerHandoff property</summary>
+        public bool? RunnerHandoff { get; set; }
+        /// <summary>The sequentialStages property</summary>
+        public bool? SequentialStages { get; set; }
         /// <summary>The terminalProfileManage property</summary>
         public bool? TerminalProfileManage { get; set; }
         /// <summary>The terminalProfileRead property</summary>
         public bool? TerminalProfileRead { get; set; }
+        /// <summary>The ticketClaim property</summary>
+        public bool? TicketClaim { get; set; }
         /// <summary>The ticketTransition property</summary>
         public bool? TicketTransition { get; set; }
         /// <summary>
@@ -91,19 +105,26 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
                 { "block", n => { Block = n.GetBoolValue(); } },
                 { "capacity", n => { Capacity = n.GetBoolValue(); } },
                 { "courseHold", n => { CourseHold = n.GetBoolValue(); } },
+                { "demandControl", n => { DemandControl = n.GetBoolValue(); } },
                 { "history", n => { History = n.GetBoolValue(); } },
                 { "itemTransition", n => { ItemTransition = n.GetBoolValue(); } },
+                { "orderChanges", n => { OrderChanges = n.GetBoolValue(); } },
                 { "orderHandoff", n => { OrderHandoff = n.GetBoolValue(); } },
                 { "orderPriority", n => { OrderPriority = n.GetBoolValue(); } },
                 { "orderPriorityOffline", n => { OrderPriorityOffline = n.GetBoolValue(); } },
                 { "partialReady", n => { PartialReady = n.GetBoolValue(); } },
                 { "priority", n => { Priority = n.GetBoolValue(); } },
+                { "productionGrid", n => { ProductionGrid = n.GetBoolValue(); } },
                 { "recall", n => { Recall = n.GetBoolValue(); } },
+                { "recipes", n => { Recipes = n.GetBoolValue(); } },
                 { "recommendation", n => { Recommendation = n.GetBoolValue(); } },
                 { "refire", n => { Refire = n.GetBoolValue(); } },
                 { "reroute", n => { Reroute = n.GetBoolValue(); } },
+                { "runnerHandoff", n => { RunnerHandoff = n.GetBoolValue(); } },
+                { "sequentialStages", n => { SequentialStages = n.GetBoolValue(); } },
                 { "terminalProfileManage", n => { TerminalProfileManage = n.GetBoolValue(); } },
                 { "terminalProfileRead", n => { TerminalProfileRead = n.GetBoolValue(); } },
+                { "ticketClaim", n => { TicketClaim = n.GetBoolValue(); } },
                 { "ticketTransition", n => { TicketTransition = n.GetBoolValue(); } },
             };
         }
@@ -122,19 +143,26 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
             writer.WriteBoolValue("block", Block);
             writer.WriteBoolValue("capacity", Capacity);
             writer.WriteBoolValue("courseHold", CourseHold);
+            writer.WriteBoolValue("demandControl", DemandControl);
             writer.WriteBoolValue("history", History);
             writer.WriteBoolValue("itemTransition", ItemTransition);
+            writer.WriteBoolValue("orderChanges", OrderChanges);
             writer.WriteBoolValue("orderHandoff", OrderHandoff);
             writer.WriteBoolValue("orderPriority", OrderPriority);
             writer.WriteBoolValue("orderPriorityOffline", OrderPriorityOffline);
             writer.WriteBoolValue("partialReady", PartialReady);
             writer.WriteBoolValue("priority", Priority);
+            writer.WriteBoolValue("productionGrid", ProductionGrid);
             writer.WriteBoolValue("recall", Recall);
+            writer.WriteBoolValue("recipes", Recipes);
             writer.WriteBoolValue("recommendation", Recommendation);
             writer.WriteBoolValue("refire", Refire);
             writer.WriteBoolValue("reroute", Reroute);
+            writer.WriteBoolValue("runnerHandoff", RunnerHandoff);
+            writer.WriteBoolValue("sequentialStages", SequentialStages);
             writer.WriteBoolValue("terminalProfileManage", TerminalProfileManage);
             writer.WriteBoolValue("terminalProfileRead", TerminalProfileRead);
+            writer.WriteBoolValue("ticketClaim", TicketClaim);
             writer.WriteBoolValue("ticketTransition", TicketTransition);
             writer.WriteAdditionalData(AdditionalData);
         }

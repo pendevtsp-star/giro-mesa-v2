@@ -20,6 +20,12 @@ namespace GiroMesa.ApiClient.Models
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_cashFlow? CashFlow { get; set; }
         /// <summary>The costs property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_costs? Costs { get; set; }
+        /// <summary>The forecast property</summary>
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_forecast? Forecast { get; set; }
+        /// <summary>The labor property</summary>
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_labor? Labor { get; set; }
+        /// <summary>The reconciliation property</summary>
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_reconciliation? Reconciliation { get; set; }
         /// <summary>The sales property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_sales? Sales { get; set; }
         /// <summary>
@@ -50,6 +56,9 @@ namespace GiroMesa.ApiClient.Models
                 { "budget", n => { Budget = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_budget>(); } },
                 { "cashFlow", n => { CashFlow = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_cashFlow>(); } },
                 { "costs", n => { Costs = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_costs>(); } },
+                { "forecast", n => { Forecast = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_forecast>(); } },
+                { "labor", n => { Labor = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_labor>(); } },
+                { "reconciliation", n => { Reconciliation = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_reconciliation>(); } },
                 { "sales", n => { Sales = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_sales>(); } },
             };
         }
@@ -63,6 +72,9 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_budget>("budget", Budget);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_cashFlow>("cashFlow", CashFlow);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_costs>("costs", Costs);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_forecast>("forecast", Forecast);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_labor>("labor", Labor);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_reconciliation>("reconciliation", Reconciliation);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage_sales>("sales", Sales);
             writer.WriteAdditionalData(AdditionalData);
         }

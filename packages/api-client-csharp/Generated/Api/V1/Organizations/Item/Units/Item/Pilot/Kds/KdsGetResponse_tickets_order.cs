@@ -50,6 +50,30 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
 #else
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_readyNotifiedAt ReadyNotifiedAt { get; set; }
 #endif
+        /// <summary>The runnerClaimedAt property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt? RunnerClaimedAt { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt RunnerClaimedAt { get; set; }
+#endif
+        /// <summary>The runnerIdentityId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId? RunnerIdentityId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId RunnerIdentityId { get; set; }
+#endif
+        /// <summary>The runnerPickedUpAt property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt? RunnerPickedUpAt { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt RunnerPickedUpAt { get; set; }
+#endif
         /// <summary>The status property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_status? Status { get; set; }
         /// <summary>
@@ -83,6 +107,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
                 { "priorityUpdatedAt", n => { PriorityUpdatedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedAt>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedAt.CreateFromDiscriminatorValue); } },
                 { "priorityUpdatedByIdentityId", n => { PriorityUpdatedByIdentityId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedByIdentityId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedByIdentityId.CreateFromDiscriminatorValue); } },
                 { "readyNotifiedAt", n => { ReadyNotifiedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_readyNotifiedAt>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_readyNotifiedAt.CreateFromDiscriminatorValue); } },
+                { "runnerClaimedAt", n => { RunnerClaimedAt = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt.CreateFromDiscriminatorValue); } },
+                { "runnerIdentityId", n => { RunnerIdentityId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId.CreateFromDiscriminatorValue); } },
+                { "runnerPickedUpAt", n => { RunnerPickedUpAt = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt.CreateFromDiscriminatorValue); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_status>(); } },
             };
         }
@@ -99,6 +126,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedAt>("priorityUpdatedAt", PriorityUpdatedAt);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_priorityUpdatedByIdentityId>("priorityUpdatedByIdentityId", PriorityUpdatedByIdentityId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_readyNotifiedAt>("readyNotifiedAt", ReadyNotifiedAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt>("runnerClaimedAt", RunnerClaimedAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId>("runnerIdentityId", RunnerIdentityId);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt>("runnerPickedUpAt", RunnerPickedUpAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_status>("status", Status);
             writer.WriteAdditionalData(AdditionalData);
         }
@@ -353,6 +383,192 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds
                 }
                 else {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_readyNotifiedAtMember1>(null, KdsGetResponseTicketsOrderReadyNotifiedAtMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="DateTimeOffset"/>, <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class KdsGetResponse_tickets_order_runnerClaimedAt : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="DateTimeOffset"/></summary>
+            public DateTimeOffset? DateTimeOffset { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1? KdsGetResponseTicketsOrderRunnerClaimedAtMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1 KdsGetResponseTicketsOrderRunnerClaimedAtMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerClaimedAt();
+                if(parseNode.GetDateTimeOffsetValue() is DateTimeOffset dateTimeOffsetValue)
+                {
+                    result.DateTimeOffset = dateTimeOffsetValue;
+                }
+                else {
+                    result.KdsGetResponseTicketsOrderRunnerClaimedAtMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(KdsGetResponseTicketsOrderRunnerClaimedAtMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(KdsGetResponseTicketsOrderRunnerClaimedAtMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(DateTimeOffset != null)
+                {
+                    writer.WriteDateTimeOffsetValue(null, DateTimeOffset);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerClaimedAtMember1>(null, KdsGetResponseTicketsOrderRunnerClaimedAtMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class KdsGetResponse_tickets_order_runnerIdentityId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1? KdsGetResponseTicketsOrderRunnerIdentityIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1 KdsGetResponseTicketsOrderRunnerIdentityIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerIdentityId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.KdsGetResponseTicketsOrderRunnerIdentityIdMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(KdsGetResponseTicketsOrderRunnerIdentityIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(KdsGetResponseTicketsOrderRunnerIdentityIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerIdentityIdMember1>(null, KdsGetResponseTicketsOrderRunnerIdentityIdMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="DateTimeOffset"/>, <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class KdsGetResponse_tickets_order_runnerPickedUpAt : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="DateTimeOffset"/></summary>
+            public DateTimeOffset? DateTimeOffset { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1? KdsGetResponseTicketsOrderRunnerPickedUpAtMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1 KdsGetResponseTicketsOrderRunnerPickedUpAtMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order.KdsGetResponse_tickets_order_runnerPickedUpAt();
+                if(parseNode.GetDateTimeOffsetValue() is DateTimeOffset dateTimeOffsetValue)
+                {
+                    result.DateTimeOffset = dateTimeOffsetValue;
+                }
+                else {
+                    result.KdsGetResponseTicketsOrderRunnerPickedUpAtMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(KdsGetResponseTicketsOrderRunnerPickedUpAtMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(KdsGetResponseTicketsOrderRunnerPickedUpAtMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(DateTimeOffset != null)
+                {
+                    writer.WriteDateTimeOffsetValue(null, DateTimeOffset);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.KdsGetResponse_tickets_order_runnerPickedUpAtMember1>(null, KdsGetResponseTicketsOrderRunnerPickedUpAtMember1);
                 }
             }
         }

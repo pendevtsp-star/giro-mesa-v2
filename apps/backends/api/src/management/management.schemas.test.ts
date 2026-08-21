@@ -228,12 +228,30 @@ describe("time tracking policy", () => {
     );
   });
 
-  it("accepts offline capture metadata and bounded correction decisions", () => {
+  it("requires offline capture metadata and a justification", () => {
     assert.equal(
       selfClockInSchema.safeParse({
         latitude: -19.9167,
         longitude: -43.9345,
         capturedAt: "2026-08-17T12:00:00.000Z",
+      }).success,
+      true,
+    );
+    assert.equal(
+      selfClockInSchema.safeParse({
+        latitude: -19.9167,
+        longitude: -43.9345,
+        offline: true,
+      }).success,
+      false,
+    );
+    assert.equal(
+      selfClockInSchema.safeParse({
+        latitude: -19.9167,
+        longitude: -43.9345,
+        capturedAt: "2026-08-17T12:00:00.000Z",
+        offline: true,
+        offlineJustification: "Internet indisponível na unidade.",
       }).success,
       true,
     );
@@ -247,6 +265,40 @@ describe("time tracking policy", () => {
       true,
     );
     assert.equal(timeCorrectionDecisionSchema.safeParse({ decision: "approve" }).success, true);
+  });
+
+  it("accepts multiple locations and rejects duplicated labels", () => {
+    const policy = {
+      mode: "all" as const,
+      geofenceEnabled: true,
+      locationLabel: "Unidade Centro",
+      latitude: -19.9167,
+      longitude: -43.9345,
+      radiusMeters: 100,
+      accuracyToleranceMeters: 50,
+      maxLocationAccuracyMeters: 80,
+      lowAccuracyPolicy: "flag" as const,
+      additionalLocations: [
+        {
+          label: "Unidade Shopping",
+          latitude: -19.92,
+          longitude: -43.93,
+          radiusMeters: 120,
+          accuracyToleranceMeters: 40,
+        },
+      ],
+      managerCanView: true,
+      financeCanView: false,
+      selectedPersonIds: [],
+    };
+    assert.equal(timeTrackingSettingsSchema.safeParse(policy).success, true);
+    assert.equal(
+      timeTrackingSettingsSchema.safeParse({
+        ...policy,
+        additionalLocations: [{ ...policy.additionalLocations[0], label: "unidade centro" }],
+      }).success,
+      false,
+    );
   });
 
   it("validates period closure reasons and ISO dates", () => {

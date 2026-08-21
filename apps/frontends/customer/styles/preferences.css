@@ -18,7 +18,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #fff0e7;
+  background: var(--gm-danger-soft);
   color: var(--orange);
   font-size: 24px;
   font-weight: 900;
@@ -44,7 +44,7 @@
 .preference-intro {
   max-width: 590px;
   margin: 0 0 24px;
-  color: var(--muted);
+  color: var(--legacy-muted);
 }
 .public-state-action,
 .preference-form > button {
@@ -53,7 +53,7 @@
   border: 0;
   border-radius: 11px;
   background: var(--orange);
-  color: #fff;
+  color: var(--gm-on-action);
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
@@ -72,7 +72,7 @@
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--gm-surface);
   box-shadow: 0 14px 36px rgba(30, 49, 41, 0.08);
 }
 .preference-card > h2 {
@@ -83,7 +83,7 @@
 }
 .preference-card > p {
   margin: 0;
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 13px;
 }
 .preference-form {
@@ -95,12 +95,12 @@
 .preference-form > input {
   min-width: 0;
   padding: 12px;
-  border: 1px solid #cbd2cd;
+  border: 1px solid var(--gm-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--gm-surface);
 }
 .preference-form > small {
-  color: var(--muted);
+  color: var(--legacy-muted);
   font-size: 10px;
 }
 .preference-form > button {
@@ -131,7 +131,7 @@
   border: 0;
   border-radius: 15px;
   background: var(--orange);
-  color: #fff;
+  color: var(--gm-on-action);
   box-shadow: 0 16px 36px rgba(165, 66, 29, 0.34);
   font-weight: 800;
   cursor: pointer;
@@ -166,12 +166,12 @@
   font-size: 12px;
 }
 .toast.success {
-  background: #e2f2e2;
-  color: #245e38;
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
 }
 .toast.warning {
-  background: #fff0e7;
-  color: #8c3e21;
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
 }
 .toast button {
   border: 0;

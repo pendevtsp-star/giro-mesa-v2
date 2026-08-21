@@ -18,9 +18,19 @@ export interface FiscalProfile {
 export interface FiscalDashboard {
   provider: {
     name: string;
-    status: "unknown" | "not_configured";
+    status:
+      | "platform_not_configured"
+      | "profile_required"
+      | "company_required"
+      | "credentials_missing"
+      | "ready"
+      | "error";
     environment: "homologation" | "production" | null;
     lastSyncAt: string | null;
+    nextAction: string;
+    companyId: string | null;
+    certificateValidUntil: string | null;
+    environments: { homologation: boolean; production: boolean };
   };
   summary: {
     authorizedCount: number;
@@ -102,7 +112,6 @@ export class InvalidFiscalPayloadError extends Error {
 export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
   const payload = record(value);
   const dashboard = record(payload.dashboard);
-  const profile = dashboard.profile === null ? null : record(dashboard.profile);
   const statuses = record(dashboard.documentsByStatus);
   const products = record(dashboard.products);
   const documents = parseDocuments(payload.documents);
@@ -113,11 +122,7 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
   const contingencyCount = optionalCount(statuses.contingency);
   const missingClassification = count(products.missingClassification);
   const openAccountantRequests = count(dashboard.openAccountantRequests);
-  const provider = profile
-    ? profile.provider === null
-      ? null
-      : oneOf(profile.provider, ["focus"])
-    : null;
+  const provider = parseProviderStatus(payload.provider);
   return {
     profile: payload.profile === null ? null : parseFiscalProfile(payload.profile),
     taxRevisions: collection(payload.taxRevisions).map((item) => ({
@@ -128,12 +133,7 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
       .filter((product) => product.active)
       .map((product) => ({ id: product.id, name: product.name })),
     dashboard: {
-      provider: {
-        name: provider === "focus" ? "Focus NFe" : "Provedor não configurado",
-        status: provider ? "unknown" : "not_configured",
-        environment: profile ? oneOf(profile.environment, ["homologation", "production"]) : null,
-        lastSyncAt: null,
-      },
+      provider,
       summary: {
         authorizedCount,
         rejectedCount,
@@ -188,6 +188,35 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
     },
     documents,
     periods: parsePeriods(payload.periods, documents),
+  };
+}
+
+function parseProviderStatus(value: unknown): FiscalDashboard["provider"] {
+  const provider = record(value);
+  const connection = provider.connection === null ? null : record(provider.connection);
+  const environments = connection ? record(connection.environments) : {};
+  return {
+    name: "Focus NFe",
+    status: oneOf(provider.status, [
+      "platform_not_configured",
+      "profile_required",
+      "company_required",
+      "credentials_missing",
+      "ready",
+      "error",
+    ]),
+    environment:
+      provider.environment === null
+        ? null
+        : oneOf(provider.environment, ["homologation", "production"]),
+    lastSyncAt: connection ? optionalText(connection.lastCheckedAt) : null,
+    nextAction: text(provider.nextAction),
+    companyId: connection ? optionalText(connection.companyId) : null,
+    certificateValidUntil: connection ? optionalText(connection.certificateValidUntil) : null,
+    environments: {
+      homologation: environments.homologation === true,
+      production: environments.production === true,
+    },
   };
 }
 
@@ -404,7 +433,19 @@ function oneOf<const T extends string>(value: unknown, options: readonly T[]): T
 export function fiscalTone(value: string): FiscalTone {
   if (["online", "authorized", "closed", "ready", "resolved"].includes(value)) return "success";
   if (["degraded", "processing", "reviewing", "generating", "info"].includes(value)) return "info";
-  if (["rejected", "offline", "failed", "critical"].includes(value)) return "danger";
-  if (["pending", "open", "contingency", "warning"].includes(value)) return "warning";
+  if (["rejected", "offline", "failed", "critical", "error"].includes(value)) return "danger";
+  if (
+    [
+      "pending",
+      "open",
+      "contingency",
+      "warning",
+      "platform_not_configured",
+      "profile_required",
+      "company_required",
+      "credentials_missing",
+    ].includes(value)
+  )
+    return "warning";
   return "neutral";
 }

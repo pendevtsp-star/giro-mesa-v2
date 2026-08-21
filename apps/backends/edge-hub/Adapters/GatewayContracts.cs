@@ -82,8 +82,17 @@ public sealed record PrintResult(
     string? PrinterId = null,
     bool Duplicate = false);
 
+public sealed record PrinterStatus(
+    string Id,
+    bool Configured,
+    bool Available,
+    bool IsDefault,
+    int PaperWidthMm,
+    string? ErrorCode = null);
+
 public interface IPrinterGateway
 {
     CapabilityState Capability { get; }
     Task<PrintResult> PrintAsync(PrintRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PrinterStatus>> GetStatusesAsync(CancellationToken cancellationToken = default);
 }

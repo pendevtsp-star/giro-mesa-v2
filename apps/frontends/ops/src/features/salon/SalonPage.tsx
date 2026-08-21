@@ -1,4 +1,16 @@
-import { Badge, Button, Card, EmptyState, Icon, Modal, StatusDot, Toast } from "@giromesa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  Input,
+  Label,
+  Modal,
+  NativeSelect,
+  StatusDot,
+  Toast,
+} from "@giromesa/ui";
 import { type FormEvent, useEffect, useState } from "react";
 import { api } from "../../api";
 import { pilotMutation, QueuedOperationalMutationError } from "../../operational-dispatch";
@@ -1451,7 +1463,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   {readyTables.map((readyTable) => {
                     const phase = servicePhaseForTable(readyTable.id);
                     return (
-                      <button
+                      <Button
                         className="priority-task priority-task--warning"
                         key={`ready-${readyTable.id}`}
                         onClick={() => selectTable(readyTable)}
@@ -1466,7 +1478,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </small>
                         </span>
                         <strong>Abrir mesa</strong>
-                      </button>
+                      </Button>
                     );
                   })}
                   {turnoverTables.map((turnoverTable) => (
@@ -1509,7 +1521,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       Math.ceil((new Date(transfer.expiresAt).getTime() - Date.now()) / 60_000),
                     );
                     return (
-                      <button
+                      <Button
                         className="priority-task priority-task--warning"
                         key={group?.id ?? transfer.id}
                         onClick={() => {
@@ -1531,7 +1543,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </small>
                         </span>
                         <strong>Abrir na planta</strong>
-                      </button>
+                      </Button>
                     );
                   })}
                   {activeCalls.map((call) => {
@@ -1611,7 +1623,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     <small>{roleConfig.description}</small>
                   </div>
                 </div>
-                <button
+                <Button
                   className="salon-cockpit-toggle"
                   onClick={() => setShowMetricsCockpit((curr) => !curr)}
                   type="button"
@@ -1620,22 +1632,22 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <span>
                     {showMetricsCockpit ? "Ocultar métricas do salão" : "Métricas em tempo real"}
                   </span>
-                </button>
+                </Button>
               </div>
             )}
 
             {canConfigure && showMetricsCockpit && (
               <div className="salon-metrics-cockpit">
-                <div className="salon-metric-card">
+                <Card className="salon-metric-card">
                   <div className="salon-metric-card__header">
                     <span>Faturamento em aberto</span>
                     <Icon name="cash" size={16} />
                   </div>
                   <strong>{formatMoney(totalActiveSalonCents)}</strong>
                   <small>{activeOpenTabs.length} comanda(s) ativas no salão</small>
-                </div>
+                </Card>
 
-                <div className="salon-metric-card">
+                <Card className="salon-metric-card">
                   <div className="salon-metric-card__header">
                     <span>Ocupação do salão</span>
                     <Icon name="salon" size={16} />
@@ -1655,18 +1667,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <small>
                     {occupiedSeats}/{totalSeats} lugares ocupados ({seatOccupancyRate}%)
                   </small>
-                </div>
+                </Card>
 
-                <div className="salon-metric-card">
+                <Card className="salon-metric-card">
                   <div className="salon-metric-card__header">
                     <span>Ticket médio / mesa</span>
                     <Icon name="catalog" size={16} />
                   </div>
                   <strong>{formatMoney(avgTicketPerTableCents)}</strong>
                   <small>Por mesa ocupada no turno</small>
-                </div>
+                </Card>
 
-                <div className="salon-metric-card salon-metric-card--alert">
+                <Card className="salon-metric-card salon-metric-card--alert">
                   <div className="salon-metric-card__header">
                     <span>Atenção imediata</span>
                     <Icon name="clock" size={16} />
@@ -1688,7 +1700,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       </span>
                     )}
                   </div>
-                </div>
+                </Card>
               </div>
             )}
 
@@ -1729,9 +1741,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   {advancedFilterCount > 0 && <b>{advancedFilterCount}</b>}
                 </summary>
                 <div className="salon-filter-menu__panel">
-                  <label className="salon-select">
+                  <Label className="salon-select">
                     <span>Ambiente</span>
-                    <select
+                    <NativeSelect
                       onChange={(event) => setRoomFilter(event.target.value)}
                       value={roomFilter}
                     >
@@ -1743,11 +1755,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             {item.name}
                           </option>
                         ))}
-                    </select>
-                  </label>
-                  <label className="salon-select">
+                    </NativeSelect>
+                  </Label>
+                  <Label className="salon-select">
                     <span>Praça do turno</span>
-                    <select
+                    <NativeSelect
                       onChange={(event) => setSectionFilter(event.target.value)}
                       value={sectionFilter}
                     >
@@ -1758,8 +1770,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           {section.name}
                         </option>
                       ))}
-                    </select>
-                  </label>
+                    </NativeSelect>
+                  </Label>
                   <div className="salon-filter-menu__actions">
                     <Button onClick={saveCurrentFilter} size="sm" variant="ghost">
                       Salvar visão
@@ -1784,7 +1796,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               </details>
               <fieldset className="salon-view-toggle">
                 <legend className="gm-sr-only">Visualização</legend>
-                <button
+                <Button
                   aria-pressed={view === "map"}
                   onClick={() => setView("map")}
                   type="button"
@@ -1792,8 +1804,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 >
                   <Icon name="grid" size={14} />
                   <span>Painel</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   aria-pressed={view === "floor"}
                   onClick={() => setView("floor")}
                   type="button"
@@ -1801,8 +1813,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 >
                   <Icon name="salon" size={14} />
                   <span>Planta</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   aria-pressed={view === "list"}
                   onClick={() => setView("list")}
                   type="button"
@@ -1810,7 +1822,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 >
                   <Icon name="list" size={14} />
                   <span>Lista</span>
-                </button>
+                </Button>
               </fieldset>
               <Button
                 aria-label="Atalhos de teclado"
@@ -1871,34 +1883,34 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </p>
                   <fieldset className="segmented floor-setup__scope">
                     <legend className="gm-sr-only">Tipo de configuração</legend>
-                    <button
+                    <Button
                       aria-pressed={setupSection === "space"}
                       onClick={() => setSetupSection("space")}
                       type="button"
                     >
                       Espaço físico
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       aria-pressed={setupSection === "shift"}
                       onClick={() => setSetupSection("shift")}
                       type="button"
                     >
                       Turno e praças
-                    </button>
+                    </Button>
                   </fieldset>
                   {setupSection === "space" ? (
                     <div className="quick-actions-grid floor-management__forms floor-management__forms--real">
                       <form className="action-form" onSubmit={(event) => void createRoom(event)}>
                         <h3>Novo ambiente físico</h3>
-                        <label>
+                        <Label>
                           Nome
-                          <input
+                          <Input
                             minLength={2}
                             onChange={(event) => setRoomName(event.target.value)}
                             required
                             value={roomName}
                           />
-                        </label>
+                        </Label>
                         <Button disabled={busy || roomName.trim().length < 2} type="submit">
                           Criar ambiente
                         </Button>
@@ -1910,25 +1922,25 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         <h3>Adicionar mesas</h3>
                         <fieldset className="table-create-mode">
                           <legend>Quantidade</legend>
-                          <button
+                          <Button
                             aria-pressed={tableMode === "single"}
                             onClick={() => setTableMode("single")}
                             type="button"
                           >
                             Uma mesa
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             aria-pressed={tableMode === "batch"}
                             onClick={() => setTableMode("batch")}
                             type="button"
                           >
                             Em sequência
-                          </button>
+                          </Button>
                         </fieldset>
                         {tableMode === "single" ? (
-                          <label className="action-form__wide">
+                          <Label className="action-form__wide">
                             Identificação
-                            <input
+                            <Input
                               maxLength={60}
                               minLength={1}
                               onChange={(event) => setTableLabel(event.target.value)}
@@ -1936,31 +1948,31 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               required
                               value={tableLabel}
                             />
-                          </label>
+                          </Label>
                         ) : (
                           <>
-                            <label className="action-form__wide">
+                            <Label className="action-form__wide">
                               Prefixo
-                              <input
+                              <Input
                                 maxLength={50}
                                 onChange={(event) => setTablePrefix(event.target.value)}
                                 required
                                 value={tablePrefix}
                               />
-                            </label>
-                            <label>
+                            </Label>
+                            <Label>
                               Iniciar em
-                              <input
+                              <Input
                                 min={1}
                                 onChange={(event) => setTableStart(Number(event.target.value))}
                                 required
                                 type="number"
                                 value={tableStart}
                               />
-                            </label>
-                            <label>
+                            </Label>
+                            <Label>
                               Quantidade
-                              <input
+                              <Input
                                 max={MAX_TABLE_BATCH}
                                 min={1}
                                 onChange={(event) => setTableQuantity(Number(event.target.value))}
@@ -1968,7 +1980,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 type="number"
                                 value={tableQuantity}
                               />
-                            </label>
+                            </Label>
                             <p aria-live="polite" className="table-batch-preview">
                               <strong>Prévia</strong>
                               <span>
@@ -1979,9 +1991,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             </p>
                           </>
                         )}
-                        <label>
+                        <Label>
                           Lugares por mesa
-                          <input
+                          <Input
                             max={100}
                             min={1}
                             onChange={(event) => setTableSeats(Number(event.target.value))}
@@ -1989,10 +2001,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             type="number"
                             value={tableSeats}
                           />
-                        </label>
-                        <label>
+                        </Label>
+                        <Label>
                           Ambiente
-                          <select
+                          <NativeSelect
                             onChange={(event) => setRoomId(event.target.value)}
                             required
                             value={roomId || data.rooms[0]?.id || ""}
@@ -2007,8 +2019,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   {item.name}
                                 </option>
                               ))}
-                          </select>
-                        </label>
+                          </NativeSelect>
+                        </Label>
                         <Button
                           disabled={busy || !tableNames.length || data.rooms.length === 0}
                           type="submit"
@@ -2026,9 +2038,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         onSubmit={(event) => void createServiceSection(event)}
                       >
                         <h3>Modelo reutilizável de praça</h3>
-                        <label>
+                        <Label>
                           Nome
-                          <input
+                          <Input
                             maxLength={120}
                             minLength={2}
                             onChange={(event) => setServiceSectionName(event.target.value)}
@@ -2036,19 +2048,20 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             required
                             value={serviceSectionName}
                           />
-                        </label>
-                        <label>
+                        </Label>
+                        <Label>
                           Cor
                           <input
+                            className="border-input bg-background"
                             aria-label="Cor da praça"
                             onChange={(event) => setServiceSectionColor(event.target.value)}
                             type="color"
                             value={serviceSectionColor}
                           />
-                        </label>
-                        <label>
+                        </Label>
+                        <Label>
                           Perfil de serviço
-                          <select
+                          <NativeSelect
                             onChange={(event) =>
                               setServiceSectionMode(event.target.value as ServiceMode)
                             }
@@ -2058,11 +2071,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             <option value="quick_service">Giro rápido</option>
                             <option value="bar">Bar e comandas</option>
                             <option value="hybrid">Híbrido</option>
-                          </select>
-                        </label>
-                        <label>
+                          </NativeSelect>
+                        </Label>
+                        <Label>
                           Responsável padrão
-                          <select
+                          <NativeSelect
                             onChange={(event) =>
                               setServiceSectionDefaultResponsibleId(event.target.value)
                             }
@@ -2074,8 +2087,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 {person.displayName}
                               </option>
                             ))}
-                          </select>
-                        </label>
+                          </NativeSelect>
+                        </Label>
                         <fieldset className="floor-setup__tables action-form__wide">
                           <legend>Mesas padrão</legend>
                           {data.tables
@@ -2085,8 +2098,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 !data.serviceSectionTables.some((row) => row.tableId === item.id),
                             )
                             .map((item) => (
-                              <label key={item.id}>
+                              <Label key={item.id}>
                                 <input
+                                  className="accent-primary"
                                   checked={serviceSectionTableIds.includes(item.id)}
                                   onChange={() =>
                                     setServiceSectionTableIds((current) =>
@@ -2101,7 +2115,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   {item.label} ·{" "}
                                   {data.rooms.find((room) => room.id === item.roomId)?.name}
                                 </span>
-                              </label>
+                              </Label>
                             ))}
                         </fieldset>
                         <Button
@@ -2130,9 +2144,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   ? "Bar e comandas"
                                   : "Híbrido"}
                           </p>
-                          <label>
+                          <Label>
                             Praça do turno
-                            <select
+                            <NativeSelect
                               onChange={(event) => {
                                 const nextId = event.target.value;
                                 setAssignmentSectionId(nextId);
@@ -2165,11 +2179,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   {section.name}
                                 </option>
                               ))}
-                            </select>
-                          </label>
-                          <label>
+                            </NativeSelect>
+                          </Label>
+                          <Label>
                             Titular
-                            <select
+                            <NativeSelect
                               onChange={(event) => setAssignmentPrimaryId(event.target.value)}
                               value={assignmentPrimaryId}
                             >
@@ -2179,15 +2193,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   {person.displayName}
                                 </option>
                               ))}
-                            </select>
-                          </label>
+                            </NativeSelect>
+                          </Label>
                           <fieldset className="floor-setup__tables action-form__wide">
                             <legend>Apoio</legend>
                             {data.staff
                               .filter((person) => person.identityId !== assignmentPrimaryId)
                               .map((person) => (
-                                <label key={person.identityId}>
+                                <Label key={person.identityId}>
                                   <input
+                                    className="accent-primary"
                                     checked={assignmentSupportIds.includes(person.identityId)}
                                     onChange={() =>
                                       setAssignmentSupportIds((current) =>
@@ -2199,7 +2214,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                     type="checkbox"
                                   />
                                   <span>{person.displayName}</span>
-                                </label>
+                                </Label>
                               ))}
                           </fieldset>
                           <fieldset className="floor-setup__tables action-form__wide">
@@ -2213,8 +2228,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                     row.shiftSectionId !== assignmentSectionId,
                                 );
                                 return (
-                                  <label key={item.id}>
+                                  <Label key={item.id}>
                                     <input
+                                      className="accent-primary"
                                       checked={assignmentTableIds.includes(item.id)}
                                       disabled={Boolean(otherSection)}
                                       onChange={() =>
@@ -2227,7 +2243,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                       type="checkbox"
                                     />
                                     <span>{item.label}</span>
-                                  </label>
+                                  </Label>
                                 );
                               })}
                           </fieldset>
@@ -2255,18 +2271,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       ) : (
                         <form className="action-form" onSubmit={(event) => void openShift(event)}>
                           <h3>Abrir turno</h3>
-                          <label>
+                          <Label>
                             Identificação opcional
-                            <input
+                            <Input
                               maxLength={120}
                               onChange={(event) => setShiftLabel(event.target.value)}
                               placeholder="Ex.: Jantar de sexta"
                               value={shiftLabel}
                             />
-                          </label>
-                          <label>
+                          </Label>
+                          <Label>
                             Perfil predominante
-                            <select
+                            <NativeSelect
                               onChange={(event) => setShiftMode(event.target.value as ServiceMode)}
                               value={shiftMode}
                             >
@@ -2274,16 +2290,17 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               <option value="quick_service">Giro rápido</option>
                               <option value="bar">Bar e comandas</option>
                               <option value="hybrid">Híbrido</option>
-                            </select>
-                          </label>
-                          <label className="action-form__check">
+                            </NativeSelect>
+                          </Label>
+                          <Label className="action-form__check">
                             <input
+                              className="accent-primary"
                               checked={copyPreviousAssignments}
                               onChange={(event) => setCopyPreviousAssignments(event.target.checked)}
                               type="checkbox"
                             />
                             <span>Reaproveitar a equipe do turno anterior</span>
-                          </label>
+                          </Label>
                           <p className="field-hint">
                             {data.serviceSections.length} modelo(s) de praça serão carregados
                             automaticamente.
@@ -2347,8 +2364,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 )}
                 <fieldset className="table-group-mode">
                   <legend>Como deseja operar o atendimento?</legend>
-                  <label aria-disabled={!data.activeShift}>
+                  <Label aria-disabled={!data.activeShift}>
                     <input
+                      className="accent-primary"
                       checked={joinAccountMode === "layout_only"}
                       disabled={!data.activeShift}
                       onChange={() => setJoinAccountMode("layout_only")}
@@ -2361,9 +2379,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         comandas, praças ou responsáveis.
                       </small>
                     </span>
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     <input
+                      className="accent-primary"
                       checked={joinAccountMode === "physical_only"}
                       onChange={() => setJoinAccountMode("physical_only")}
                       type="radio"
@@ -2374,9 +2393,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         Cria um grupo operacional; pedidos e pagamentos continuam em cada mesa.
                       </small>
                     </span>
-                  </label>
-                  <label>
+                  </Label>
+                  <Label>
                     <input
+                      className="accent-primary"
                       checked={joinAccountMode === "single_tab"}
                       onChange={() => setJoinAccountMode("single_tab")}
                       type="radio"
@@ -2385,11 +2405,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       <strong>Usar uma única comanda</strong>
                       <small>Pedidos, pessoas e valores passam para a comanda principal.</small>
                     </span>
-                  </label>
+                  </Label>
                 </fieldset>
-                <label className="compact-field">
+                <Label className="compact-field">
                   Mesa principal
-                  <select
+                  <NativeSelect
                     onChange={(event) => setJoinAnchorId(event.target.value)}
                     value={joinAnchorId}
                   >
@@ -2401,12 +2421,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </option>
                       ) : null;
                     })}
-                  </select>
-                </label>
+                  </NativeSelect>
+                </Label>
                 {joinAccountMode !== "layout_only" && (
-                  <label className="compact-field">
+                  <Label className="compact-field">
                     Responsável pelo grupo
-                    <select
+                    <NativeSelect
                       onChange={(event) => setJoinResponsibleIdentityId(event.target.value)}
                       value={joinResponsibleIdentityId}
                     >
@@ -2415,8 +2435,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           {person.displayName}
                         </option>
                       ))}
-                    </select>
-                  </label>
+                    </NativeSelect>
+                  </Label>
                 )}
                 {joinTabs.length > 1 && joinAccountMode === "single_tab" && (
                   <p className="field-hint">
@@ -2459,9 +2479,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     ? "As mesas permanecem nos ambientes físicos e cada uma volta à sua praça original ao final do prazo."
                     : "A mesa permanece no mesmo ambiente físico e volta automaticamente para a praça original ao final do prazo."}
                 </p>
-                <label>
+                <Label>
                   Praça temporária
-                  <select
+                  <NativeSelect
                     onChange={(event) => setTransferTargetSectionId(event.target.value)}
                     value={transferTargetSectionId}
                   >
@@ -2472,11 +2492,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           {section.name}
                         </option>
                       ))}
-                  </select>
-                </label>
-                <label>
+                  </NativeSelect>
+                </Label>
+                <Label>
                   Duração
-                  <select
+                  <NativeSelect
                     onChange={(event) => setTransferDurationMinutes(Number(event.target.value))}
                     value={transferDurationMinutes}
                   >
@@ -2486,20 +2506,21 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     <option value={120}>2 horas</option>
                     <option value={240}>4 horas</option>
                     <option value={720}>Até 12 horas</option>
-                  </select>
-                </label>
-                <label>
+                  </NativeSelect>
+                </Label>
+                <Label>
                   Motivo
-                  <input
+                  <Input
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setTransferReason(event.target.value)}
                     value={transferReason}
                   />
-                </label>
+                </Label>
                 {(tab || selectedGroupTabs.length > 0) && (
-                  <label className="action-form__check">
+                  <Label className="action-form__check">
                     <input
+                      className="accent-primary"
                       checked={transferOpenTab}
                       onChange={(event) => setTransferOpenTab(event.target.checked)}
                       type="checkbox"
@@ -2508,7 +2529,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       Passar também {selectedGroup ? "as comandas do grupo" : "a comanda atual"} ao
                       titular da nova praça
                     </span>
-                  </label>
+                  </Label>
                 )}
                 <div className="table-group-dialog__actions">
                   <Button onClick={() => setTransferDialogOpen(false)} variant="ghost">
@@ -2552,14 +2573,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         )?.displayName ?? "Responsável atual")
                       : "Sem responsável";
                     return (
-                      <label key={group.key}>
+                      <Label key={group.key}>
                         <span>
                           <strong>{currentName}</strong>
                           <small>
                             {group.count} comanda(s) · {formatMoney(group.totalCents)}
                           </small>
                         </span>
-                        <select
+                        <NativeSelect
                           aria-label={`Próximo responsável pelas comandas de ${currentName}`}
                           onChange={(event) =>
                             setHandoverAssignments((current) => ({
@@ -2575,20 +2596,20 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               Passar para {person.displayName}
                             </option>
                           ))}
-                        </select>
-                      </label>
+                        </NativeSelect>
+                      </Label>
                     );
                   })}
                 </fieldset>
-                <label>
+                <Label>
                   Registro da passagem
-                  <input
+                  <Input
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setHandoverReason(event.target.value)}
                     value={handoverReason}
                   />
-                </label>
+                </Label>
                 <p className="field-hint">
                   Pedidos, pagamentos e comandas não serão encerrados. A próxima equipe continua do
                   ponto exato em que o turno terminou.
@@ -2672,14 +2693,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         ["turnover", "Limpeza", counts.turnover],
                       ] as const
                     ).map(([id, label, count]) => (
-                      <button
+                      <Button
                         aria-pressed={filterStatus === id}
                         key={id}
                         onClick={() => setFilterStatus(id)}
                         type="button"
                       >
                         {label} <small>{count}</small>
-                      </button>
+                      </Button>
                     ))}
                   </fieldset>
                 </div>
@@ -2917,7 +2938,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       const isSelected = selectedTableId === item.id;
 
                       return (
-                        <button
+                        <Button
                           aria-pressed={isSelected}
                           className={`real-table real-table--${presentation.className} ${joinSelection.includes(item.id) ? "table-tile--joining" : ""} ${isSelected ? "selected" : ""}`}
                           key={item.id}
@@ -2982,7 +3003,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               )}
                             </div>
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
@@ -3215,7 +3236,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         <div className="group-workspace-bar__actions">
                           {selectedGroupTableIds.length > 1 && (
                             <>
-                              <select
+                              <NativeSelect
                                 aria-label="Mesa a retirar do grupo"
                                 onChange={(event) => setDetachTableId(event.target.value)}
                                 value={detachTableId}
@@ -3233,7 +3254,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                       </option>
                                     ) : null;
                                   })}
-                              </select>
+                              </NativeSelect>
                               <Button
                                 disabled={busy || !detachTableId}
                                 onClick={() => void detachFromGroup()}
@@ -3264,7 +3285,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             (candidate) => candidate.id === groupTab.tableId,
                           );
                           return (
-                            <button
+                            <Button
                               aria-pressed={tab?.id === groupTab.id}
                               key={groupTab.id}
                               onClick={() => setSelectedTabId(groupTab.id)}
@@ -3272,7 +3293,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             >
                               <span>{accountTable?.label ?? groupTab.label ?? "Comanda"}</span>
                               <strong>{formatMoney(groupTab.totalCents)}</strong>
-                            </button>
+                            </Button>
                           );
                         })}
                       </fieldset>
@@ -3336,16 +3357,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </span>
                         </div>
                         {!selectedUsesQuickFlow && (
-                          <label className="compact-field">
+                          <Label className="compact-field">
                             Pessoas
-                            <input
+                            <Input
                               min={1}
                               max={500}
                               onChange={(event) => setGuests(Number(event.target.value))}
                               type="number"
                               value={guests}
                             />
-                          </label>
+                          </Label>
                         )}
                         <Button
                           disabled={busy || (!selectedUsesQuickFlow && guests < 1)}

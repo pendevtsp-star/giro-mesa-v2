@@ -16,8 +16,18 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         public int? AccuracyToleranceMeters { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The additionalLocations property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_additionalLocations>? AdditionalLocations { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_additionalLocations> AdditionalLocations { get; set; }
+#endif
         /// <summary>The antiFraudEnabled property</summary>
         public bool? AntiFraudEnabled { get; set; }
+        /// <summary>The emailAlertsEnabled property</summary>
+        public bool? EmailAlertsEnabled { get; set; }
         /// <summary>The financeCanView property</summary>
         public bool? FinanceCanView { get; set; }
         /// <summary>The geofenceEnabled property</summary>
@@ -26,6 +36,22 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         public int? LateToleranceMinutes { get; set; }
         /// <summary>The latitude property</summary>
         public double? Latitude { get; set; }
+        /// <summary>The locationAddress property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? LocationAddress { get; set; }
+#nullable restore
+#else
+        public string LocationAddress { get; set; }
+#endif
+        /// <summary>The locationChangeReason property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? LocationChangeReason { get; set; }
+#nullable restore
+#else
+        public string LocationChangeReason { get; set; }
+#endif
         /// <summary>The locationLabel property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -34,14 +60,20 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
 #else
         public string LocationLabel { get; set; }
 #endif
+        /// <summary>The locationRetentionDays property</summary>
+        public int? LocationRetentionDays { get; set; }
         /// <summary>The longitude property</summary>
         public double? Longitude { get; set; }
         /// <summary>The longShiftAlertMinutes property</summary>
         public int? LongShiftAlertMinutes { get; set; }
+        /// <summary>The lowAccuracyPolicy property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_lowAccuracyPolicy? LowAccuracyPolicy { get; set; }
         /// <summary>The managerAlertOnAnomaly property</summary>
         public bool? ManagerAlertOnAnomaly { get; set; }
         /// <summary>The managerCanView property</summary>
         public bool? ManagerCanView { get; set; }
+        /// <summary>The maxLocationAccuracyMeters property</summary>
+        public int? MaxLocationAccuracyMeters { get; set; }
         /// <summary>The maxOvertimeMinutes property</summary>
         public int? MaxOvertimeMinutes { get; set; }
         /// <summary>The minimumBreakMinutes property</summary>
@@ -52,6 +84,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         public bool? NotificationsEnabled { get; set; }
         /// <summary>The offlineEnabled property</summary>
         public bool? OfflineEnabled { get; set; }
+        /// <summary>The offlineMaxDelayMinutes property</summary>
+        public int? OfflineMaxDelayMinutes { get; set; }
+        /// <summary>The offlineRequiresJustification property</summary>
+        public bool? OfflineRequiresJustification { get; set; }
         /// <summary>The radiusMeters property</summary>
         public int? RadiusMeters { get; set; }
         /// <summary>The reminderAfterShiftMinutes property</summary>
@@ -73,16 +109,22 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         {
             AdditionalData = new Dictionary<string, object>();
             AntiFraudEnabled = true;
+            EmailAlertsEnabled = false;
             FinanceCanView = false;
             GeofenceEnabled = true;
             LateToleranceMinutes = 15;
+            LocationRetentionDays = 365;
             LongShiftAlertMinutes = 720;
+            LowAccuracyPolicy = global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_lowAccuracyPolicy.Block;
             ManagerAlertOnAnomaly = true;
             ManagerCanView = false;
+            MaxLocationAccuracyMeters = 100;
             MaxOvertimeMinutes = 120;
             MinimumBreakMinutes = 0;
             NotificationsEnabled = true;
             OfflineEnabled = true;
+            OfflineMaxDelayMinutes = 120;
+            OfflineRequiresJustification = true;
             ReminderAfterShiftMinutes = 15;
             ReminderBeforeShiftMinutes = 15;
         }
@@ -105,21 +147,30 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "accuracyToleranceMeters", n => { AccuracyToleranceMeters = n.GetIntValue(); } },
+                { "additionalLocations", n => { AdditionalLocations = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_additionalLocations>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_additionalLocations.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "antiFraudEnabled", n => { AntiFraudEnabled = n.GetBoolValue(); } },
+                { "emailAlertsEnabled", n => { EmailAlertsEnabled = n.GetBoolValue(); } },
                 { "financeCanView", n => { FinanceCanView = n.GetBoolValue(); } },
                 { "geofenceEnabled", n => { GeofenceEnabled = n.GetBoolValue(); } },
                 { "lateToleranceMinutes", n => { LateToleranceMinutes = n.GetIntValue(); } },
                 { "latitude", n => { Latitude = n.GetDoubleValue(); } },
+                { "locationAddress", n => { LocationAddress = n.GetStringValue(); } },
+                { "locationChangeReason", n => { LocationChangeReason = n.GetStringValue(); } },
                 { "locationLabel", n => { LocationLabel = n.GetStringValue(); } },
+                { "locationRetentionDays", n => { LocationRetentionDays = n.GetIntValue(); } },
                 { "longShiftAlertMinutes", n => { LongShiftAlertMinutes = n.GetIntValue(); } },
                 { "longitude", n => { Longitude = n.GetDoubleValue(); } },
+                { "lowAccuracyPolicy", n => { LowAccuracyPolicy = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_lowAccuracyPolicy>(); } },
                 { "managerAlertOnAnomaly", n => { ManagerAlertOnAnomaly = n.GetBoolValue(); } },
                 { "managerCanView", n => { ManagerCanView = n.GetBoolValue(); } },
+                { "maxLocationAccuracyMeters", n => { MaxLocationAccuracyMeters = n.GetIntValue(); } },
                 { "maxOvertimeMinutes", n => { MaxOvertimeMinutes = n.GetIntValue(); } },
                 { "minimumBreakMinutes", n => { MinimumBreakMinutes = n.GetIntValue(); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_mode>(); } },
                 { "notificationsEnabled", n => { NotificationsEnabled = n.GetBoolValue(); } },
                 { "offlineEnabled", n => { OfflineEnabled = n.GetBoolValue(); } },
+                { "offlineMaxDelayMinutes", n => { OfflineMaxDelayMinutes = n.GetIntValue(); } },
+                { "offlineRequiresJustification", n => { OfflineRequiresJustification = n.GetBoolValue(); } },
                 { "radiusMeters", n => { RadiusMeters = n.GetIntValue(); } },
                 { "reminderAfterShiftMinutes", n => { ReminderAfterShiftMinutes = n.GetIntValue(); } },
                 { "reminderBeforeShiftMinutes", n => { ReminderBeforeShiftMinutes = n.GetIntValue(); } },
@@ -134,21 +185,30 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("accuracyToleranceMeters", AccuracyToleranceMeters);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_additionalLocations>("additionalLocations", AdditionalLocations);
             writer.WriteBoolValue("antiFraudEnabled", AntiFraudEnabled);
+            writer.WriteBoolValue("emailAlertsEnabled", EmailAlertsEnabled);
             writer.WriteBoolValue("financeCanView", FinanceCanView);
             writer.WriteBoolValue("geofenceEnabled", GeofenceEnabled);
             writer.WriteIntValue("lateToleranceMinutes", LateToleranceMinutes);
             writer.WriteDoubleValue("latitude", Latitude);
+            writer.WriteStringValue("locationAddress", LocationAddress);
+            writer.WriteStringValue("locationChangeReason", LocationChangeReason);
             writer.WriteStringValue("locationLabel", LocationLabel);
+            writer.WriteIntValue("locationRetentionDays", LocationRetentionDays);
             writer.WriteDoubleValue("longitude", Longitude);
             writer.WriteIntValue("longShiftAlertMinutes", LongShiftAlertMinutes);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_lowAccuracyPolicy>("lowAccuracyPolicy", LowAccuracyPolicy);
             writer.WriteBoolValue("managerAlertOnAnomaly", ManagerAlertOnAnomaly);
             writer.WriteBoolValue("managerCanView", ManagerCanView);
+            writer.WriteIntValue("maxLocationAccuracyMeters", MaxLocationAccuracyMeters);
             writer.WriteIntValue("maxOvertimeMinutes", MaxOvertimeMinutes);
             writer.WriteIntValue("minimumBreakMinutes", MinimumBreakMinutes);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings.SettingsPutRequestBody_mode>("mode", Mode);
             writer.WriteBoolValue("notificationsEnabled", NotificationsEnabled);
             writer.WriteBoolValue("offlineEnabled", OfflineEnabled);
+            writer.WriteIntValue("offlineMaxDelayMinutes", OfflineMaxDelayMinutes);
+            writer.WriteBoolValue("offlineRequiresJustification", OfflineRequiresJustification);
             writer.WriteIntValue("radiusMeters", RadiusMeters);
             writer.WriteIntValue("reminderAfterShiftMinutes", ReminderAfterShiftMinutes);
             writer.WriteIntValue("reminderBeforeShiftMinutes", ReminderBeforeShiftMinutes);

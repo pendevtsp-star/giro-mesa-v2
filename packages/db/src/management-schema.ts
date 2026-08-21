@@ -19,7 +19,12 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { posOrderItems, posOrders, posProducts } from "./operations-schema.js";
+import {
+  posOrderItems,
+  posOrders,
+  posProductionStations,
+  posProducts,
+} from "./operations-schema.js";
 import { identities, organizations, units } from "./schema.js";
 
 const timestamps = {
@@ -77,10 +82,18 @@ export const managementReportExportStatus = pgEnum("management_report_export_sta
   "ready",
   "failed",
 ]);
-export const managementReportExportFormat = pgEnum("management_report_export_format", ["csv"]);
+export const managementReportExportFormat = pgEnum("management_report_export_format", [
+  "csv",
+  "pdf",
+  "xlsx",
+]);
 export const managementTimeTrackingClosureStatus = pgEnum(
   "management_time_tracking_closure_status",
   ["closed", "reopened"],
+);
+export const managementTimeTrackingLowAccuracyPolicy = pgEnum(
+  "management_time_tracking_low_accuracy_policy",
+  ["block", "flag"],
 );
 export const managementReceivableStatus = pgEnum("management_receivable_status", [
   "open",
@@ -140,9 +153,24 @@ export const managementInventoryReviewStatus = pgEnum("management_inventory_revi
 ]);
 export const managementInventoryTransferStatus = pgEnum("management_inventory_transfer_status", [
   "in_transit",
+  "partially_received",
   "received",
+  "divergent",
   "canceled",
 ]);
+export const managementStockLocationKind = pgEnum("management_stock_location_kind", [
+  "warehouse",
+  "cooler",
+  "freezer",
+  "bar",
+  "kitchen",
+  "returnables",
+  "other",
+]);
+export const managementReturnableSupplierExchangeStatus = pgEnum(
+  "management_returnable_supplier_exchange_status",
+  ["in_transit", "received", "canceled"],
+);
 export const managementInventoryAssetStatus = pgEnum("management_inventory_asset_status", [
   "in_use",
   "maintenance",
@@ -211,6 +239,13 @@ export const managementStockLocations = pgTable(
     unitId: uuid("unit_id").notNull(),
     name: varchar("name", { length: 120 }).notNull(),
     code: varchar("code", { length: 40 }).notNull(),
+    barcode: varchar("barcode", { length: 80 }),
+    kind: managementStockLocationKind("kind").notNull().default("other"),
+    responsibleIdentityId: uuid("responsible_identity_id").references(() => identities.id),
+    requireDistinctTransferReceiver: boolean("require_distinct_transfer_receiver")
+      .notNull()
+      .default(false),
+    transferSlaMinutes: integer("transfer_sla_minutes").notNull().default(30),
     active: boolean("active").notNull().default(true),
     ...timestamps,
   },
@@ -225,11 +260,15 @@ export const managementStockLocations = pgTable(
       table.unitId,
       table.code,
     ),
+    uniqueIndex("management_stock_locations_barcode_unique")
+      .on(table.organizationId, table.unitId, table.barcode)
+      .where(sql`${table.barcode} is not null`),
     foreignKey({
       name: "management_stock_locations_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
+    check("management_stock_locations_sla_check", sql`${table.transferSlaMinutes} > 0`),
   ],
 );
 
@@ -310,6 +349,56 @@ export const managementInventoryItems = pgTable(
   ],
 );
 
+export const managementStockLocationItemSettings = pgTable(
+  "management_stock_location_item_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    inventoryItemId: uuid("inventory_item_id").notNull(),
+    minimumQuantity: numeric("minimum_quantity", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
+    targetQuantity: numeric("target_quantity", { precision: 16, scale: 3 }).notNull().default("0"),
+    transferUnitLabel: varchar("transfer_unit_label", { length: 40 }),
+    unitsPerTransferUnit: numeric("units_per_transfer_unit", { precision: 16, scale: 3 })
+      .notNull()
+      .default("1"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_stock_location_item_settings_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.locationId,
+      table.inventoryItemId,
+    ),
+    foreignKey({
+      name: "management_stock_location_item_settings_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_stock_location_item_settings_item_fk",
+      columns: [table.organizationId, table.unitId, table.inventoryItemId],
+      foreignColumns: [
+        managementInventoryItems.organizationId,
+        managementInventoryItems.unitId,
+        managementInventoryItems.id,
+      ],
+    }).onDelete("cascade"),
+    check(
+      "management_stock_location_item_settings_values_check",
+      sql`${table.minimumQuantity} >= 0 and ${table.targetQuantity} >= ${table.minimumQuantity} and ${table.unitsPerTransferUnit} > 0`,
+    ),
+  ],
+);
+
 export const managementProductReturnables = pgTable(
   "management_product_returnables",
   {
@@ -358,6 +447,56 @@ export const managementProductReturnables = pgTable(
     }).onDelete("restrict"),
     check("management_product_returnables_quantity_check", sql`${table.quantityPerUnit} > 0`),
     check("management_product_returnables_deposit_check", sql`${table.depositCents} >= 0`),
+  ],
+);
+
+export const managementInventoryIssueRoutes = pgTable(
+  "management_inventory_issue_routes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    productId: uuid("product_id").notNull(),
+    stationId: uuid("station_id"),
+    locationId: uuid("location_id").notNull(),
+    active: boolean("active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_inventory_issue_routes_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_issue_routes_default_unique")
+      .on(table.organizationId, table.unitId, table.productId)
+      .where(sql`${table.stationId} is null`),
+    uniqueIndex("management_inventory_issue_routes_station_unique")
+      .on(table.organizationId, table.unitId, table.productId, table.stationId)
+      .where(sql`${table.stationId} is not null`),
+    foreignKey({
+      name: "management_inventory_issue_routes_product_fk",
+      columns: [table.organizationId, table.productId],
+      foreignColumns: [posProducts.organizationId, posProducts.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_inventory_issue_routes_station_fk",
+      columns: [table.organizationId, table.unitId, table.stationId],
+      foreignColumns: [
+        posProductionStations.organizationId,
+        posProductionStations.unitId,
+        posProductionStations.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_inventory_issue_routes_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("restrict"),
   ],
 );
 
@@ -905,6 +1044,8 @@ export const managementInventoryTransfers = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
+    batchId: uuid("batch_id").notNull().defaultRandom(),
+    lineNumber: integer("line_number").notNull().default(1),
     inventoryItemId: uuid("inventory_item_id").notNull(),
     sourceLocationId: uuid("source_location_id").notNull(),
     destinationLocationId: uuid("destination_location_id").notNull(),
@@ -912,6 +1053,12 @@ export const managementInventoryTransfers = pgTable(
     destinationLotId: uuid("destination_lot_id"),
     eventId: uuid("event_id").notNull(),
     quantity: numeric("quantity", { precision: 16, scale: 3 }).notNull(),
+    quantityReceived: numeric("quantity_received", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
+    quantityDivergent: numeric("quantity_divergent", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
     reason: text("reason").notNull(),
     status: managementInventoryTransferStatus("status").notNull().default("in_transit"),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
@@ -922,6 +1069,9 @@ export const managementInventoryTransfers = pgTable(
     canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
     receivedAt: timestamp("received_at", { withTimezone: true }),
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '30 minutes'`),
     resolutionNote: text("resolution_note"),
     ...timestamps,
   },
@@ -935,6 +1085,12 @@ export const managementInventoryTransfers = pgTable(
       table.organizationId,
       table.unitId,
       table.idempotencyKey,
+    ),
+    unique("management_inventory_transfers_batch_line_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.batchId,
+      table.lineNumber,
     ),
     index("management_inventory_transfers_status_idx").on(
       table.organizationId,
@@ -996,14 +1152,81 @@ export const managementInventoryTransfers = pgTable(
         managementInventoryEvents.id,
       ],
     }).onDelete("restrict"),
-    check("management_inventory_transfers_quantity_check", sql`${table.quantity} > 0`),
+    check(
+      "management_inventory_transfers_quantity_check",
+      sql`${table.quantity} > 0 and ${table.quantityReceived} >= 0 and ${table.quantityDivergent} >= 0 and ${table.quantityReceived} + ${table.quantityDivergent} <= ${table.quantity}`,
+    ),
+    check("management_inventory_transfers_line_number_check", sql`${table.lineNumber} > 0`),
     check(
       "management_inventory_transfers_locations_check",
       sql`${table.sourceLocationId} <> ${table.destinationLocationId}`,
     ),
     check(
       "management_inventory_transfers_resolution_check",
-      sql`(${table.status} = 'in_transit' and ${table.receivedAt} is null and ${table.canceledAt} is null) or (${table.status} = 'received' and ${table.receivedAt} is not null and ${table.receivedByIdentityId} is not null and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and ${table.receivedAt} is null)`,
+      sql`(${table.status} in ('in_transit', 'partially_received') and ${table.canceledAt} is null) or (${table.status} in ('received', 'divergent') and ${table.receivedAt} is not null and ${table.receivedByIdentityId} is not null and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null)`,
+    ),
+  ],
+);
+
+export const managementInventoryTransferReceipts = pgTable(
+  "management_inventory_transfer_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    transferId: uuid("transfer_id").notNull(),
+    quantityReceived: numeric("quantity_received", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
+    quantityDivergent: numeric("quantity_divergent", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
+    divergenceReason: text("divergence_reason"),
+    evidenceMetadata: jsonb("evidence_metadata")
+      .$type<{ urls: string[] }>()
+      .notNull()
+      .default({ urls: [] }),
+    note: text("note").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    receivedByIdentityId: uuid("received_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_inventory_transfer_receipts_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_transfer_receipts_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_inventory_transfer_receipts_transfer_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.transferId,
+      table.receivedAt,
+    ),
+    foreignKey({
+      name: "management_inventory_transfer_receipts_transfer_fk",
+      columns: [table.organizationId, table.unitId, table.transferId],
+      foreignColumns: [
+        managementInventoryTransfers.organizationId,
+        managementInventoryTransfers.unitId,
+        managementInventoryTransfers.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_inventory_transfer_receipts_quantity_check",
+      sql`${table.quantityReceived} >= 0 and ${table.quantityDivergent} >= 0 and ${table.quantityReceived} + ${table.quantityDivergent} > 0`,
+    ),
+    check(
+      "management_inventory_transfer_receipts_divergence_check",
+      sql`${table.quantityDivergent} = 0 or length(trim(${table.divergenceReason})) >= 3`,
     ),
   ],
 );
@@ -1467,6 +1690,8 @@ export const managementInventoryClosings = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
+    locationId: uuid("location_id"),
+    shiftReference: varchar("shift_reference", { length: 80 }),
     period: date("period", { mode: "string" }).notNull(),
     totalValueCents: integer("total_value_cents").notNull(),
     totalReservedValueCents: integer("total_reserved_value_cents").notNull(),
@@ -1489,6 +1714,8 @@ export const managementInventoryClosings = pgTable(
       table.organizationId,
       table.unitId,
       table.period,
+      sql`coalesce(${table.locationId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      sql`coalesce(${table.shiftReference}, '')`,
     ),
     uniqueIndex("management_inventory_closings_idempotency_unique").on(
       table.organizationId,
@@ -1499,6 +1726,15 @@ export const managementInventoryClosings = pgTable(
       name: "management_inventory_closings_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_inventory_closings_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
     }).onDelete("restrict"),
     check(
       "management_inventory_closings_values_check",
@@ -1708,6 +1944,81 @@ export const managementReturnableIncidents = pgTable(
     check(
       "management_returnable_incidents_review_check",
       sql`(${table.status} = 'pending' and ${table.approverIdentityId} is null and ${table.reviewedAt} is null) or (${table.status} in ('approved', 'rejected') and ${table.approverIdentityId} is not null and ${table.reviewedAt} is not null)`,
+    ),
+  ],
+);
+
+export const managementReturnableSupplierExchanges = pgTable(
+  "management_returnable_supplier_exchanges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    containerInventoryItemId: uuid("container_inventory_item_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    supplierId: uuid("supplier_id").notNull(),
+    quantity: numeric("quantity", { precision: 16, scale: 3 }).notNull(),
+    status: managementReturnableSupplierExchangeStatus("status").notNull().default("in_transit"),
+    note: text("note").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    sentByIdentityId: uuid("sent_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    receivedByIdentityId: uuid("received_by_identity_id").references(() => identities.id),
+    canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_returnable_supplier_exchanges_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_returnable_supplier_exchanges_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_returnable_supplier_exchanges_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.sentAt,
+    ),
+    foreignKey({
+      name: "management_returnable_supplier_exchanges_container_fk",
+      columns: [table.organizationId, table.unitId, table.containerInventoryItemId],
+      foreignColumns: [
+        managementInventoryItems.organizationId,
+        managementInventoryItems.unitId,
+        managementInventoryItems.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_supplier_exchanges_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_supplier_exchanges_supplier_fk",
+      columns: [table.organizationId, table.unitId, table.supplierId],
+      foreignColumns: [
+        managementSuppliers.organizationId,
+        managementSuppliers.unitId,
+        managementSuppliers.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_returnable_supplier_exchanges_quantity_check", sql`${table.quantity} > 0`),
+    check(
+      "management_returnable_supplier_exchanges_status_check",
+      sql`(${table.status} = 'in_transit' and ${table.receivedAt} is null and ${table.canceledAt} is null) or (${table.status} = 'received' and ${table.receivedAt} is not null and ${table.receivedByIdentityId} is not null and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and ${table.receivedAt} is null)`,
     ),
   ],
 );
@@ -2742,16 +3053,39 @@ export const managementTimeTrackingSettings = pgTable(
     mode: managementTimeTrackingMode("mode").notNull().default("off"),
     geofenceEnabled: boolean("geofence_enabled").notNull().default(true),
     locationLabel: varchar("location_label", { length: 160 }),
+    locationAddress: varchar("location_address", { length: 300 }),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     radiusMeters: integer("radius_meters").notNull().default(100),
     accuracyToleranceMeters: integer("accuracy_tolerance_meters").notNull().default(50),
+    maxLocationAccuracyMeters: integer("max_location_accuracy_meters").notNull().default(100),
+    lowAccuracyPolicy: managementTimeTrackingLowAccuracyPolicy("low_accuracy_policy")
+      .notNull()
+      .default("block"),
+    additionalLocations: jsonb("additional_locations")
+      .$type<
+        Array<{
+          id: string;
+          label: string;
+          address?: string;
+          latitude: number;
+          longitude: number;
+          radiusMeters: number;
+          accuracyToleranceMeters: number;
+        }>
+      >()
+      .notNull()
+      .default([]),
     managerCanView: boolean("manager_can_view").notNull().default(false),
     financeCanView: boolean("finance_can_view").notNull().default(false),
     antiFraudEnabled: boolean("anti_fraud_enabled").notNull().default(true),
     offlineEnabled: boolean("offline_enabled").notNull().default(true),
+    offlineMaxDelayMinutes: integer("offline_max_delay_minutes").notNull().default(120),
+    offlineRequiresJustification: boolean("offline_requires_justification").notNull().default(true),
     notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
+    emailAlertsEnabled: boolean("email_alerts_enabled").notNull().default(false),
     managerAlertOnAnomaly: boolean("manager_alert_on_anomaly").notNull().default(true),
+    locationRetentionDays: integer("location_retention_days").notNull().default(365),
     lateToleranceMinutes: integer("late_tolerance_minutes").notNull().default(15),
     minimumBreakMinutes: integer("minimum_break_minutes").notNull().default(0),
     maxOvertimeMinutes: integer("max_overtime_minutes").notNull().default(120),
@@ -2777,11 +3111,11 @@ export const managementTimeTrackingSettings = pgTable(
     ),
     check(
       "management_time_tracking_settings_radius_check",
-      sql`${table.radiusMeters} between 25 and 5000 and ${table.accuracyToleranceMeters} between 0 and 500`,
+      sql`${table.radiusMeters} between 25 and 5000 and ${table.accuracyToleranceMeters} between 0 and 500 and ${table.maxLocationAccuracyMeters} between 5 and 2000`,
     ),
     check(
       "management_time_tracking_settings_rules_check",
-      sql`${table.lateToleranceMinutes} between 0 and 120 and ${table.minimumBreakMinutes} between 0 and 1440 and ${table.maxOvertimeMinutes} between 0 and 720 and ${table.longShiftAlertMinutes} between 60 and 1440 and ${table.reminderBeforeShiftMinutes} between 0 and 240 and ${table.reminderAfterShiftMinutes} between 0 and 240`,
+      sql`${table.lateToleranceMinutes} between 0 and 120 and ${table.minimumBreakMinutes} between 0 and 1440 and ${table.maxOvertimeMinutes} between 0 and 720 and ${table.longShiftAlertMinutes} between 60 and 1440 and ${table.reminderBeforeShiftMinutes} between 0 and 240 and ${table.reminderAfterShiftMinutes} between 0 and 240 and ${table.offlineMaxDelayMinutes} between 5 and 2880 and ${table.locationRetentionDays} between 30 and 1825`,
     ),
   ],
 );
@@ -2871,16 +3205,22 @@ export const managementTimeEntries = pgTable(
     clockInAccuracyMeters: integer("clock_in_accuracy_meters"),
     clockInServerAt: timestamp("clock_in_server_at", { withTimezone: true }),
     clockInDeviceId: varchar("clock_in_device_id", { length: 160 }),
+    clockInSessionId: varchar("clock_in_session_id", { length: 160 }),
     clockInIpAddress: varchar("clock_in_ip_address", { length: 64 }),
     clockInUserAgent: varchar("clock_in_user_agent", { length: 512 }),
+    clockInGeofenceLabel: varchar("clock_in_geofence_label", { length: 160 }),
+    clockInOfflineJustification: varchar("clock_in_offline_justification", { length: 1_000 }),
     clockInFlags: jsonb("clock_in_flags").$type<string[]>().notNull().default([]),
     clockOutLatitude: doublePrecision("clock_out_latitude"),
     clockOutLongitude: doublePrecision("clock_out_longitude"),
     clockOutAccuracyMeters: integer("clock_out_accuracy_meters"),
     clockOutServerAt: timestamp("clock_out_server_at", { withTimezone: true }),
     clockOutDeviceId: varchar("clock_out_device_id", { length: 160 }),
+    clockOutSessionId: varchar("clock_out_session_id", { length: 160 }),
     clockOutIpAddress: varchar("clock_out_ip_address", { length: 64 }),
     clockOutUserAgent: varchar("clock_out_user_agent", { length: 512 }),
+    clockOutGeofenceLabel: varchar("clock_out_geofence_label", { length: 160 }),
+    clockOutOfflineJustification: varchar("clock_out_offline_justification", { length: 1_000 }),
     clockOutFlags: jsonb("clock_out_flags").$type<string[]>().notNull().default([]),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     recordedByIdentityId: uuid("recorded_by_identity_id")
@@ -2933,16 +3273,22 @@ export const managementTimeEntryBreaks = pgTable(
     startAccuracyMeters: integer("start_accuracy_meters"),
     startServerAt: timestamp("start_server_at", { withTimezone: true }),
     startDeviceId: varchar("start_device_id", { length: 160 }),
+    startSessionId: varchar("start_session_id", { length: 160 }),
     startIpAddress: varchar("start_ip_address", { length: 64 }),
     startUserAgent: varchar("start_user_agent", { length: 512 }),
+    startGeofenceLabel: varchar("start_geofence_label", { length: 160 }),
+    startOfflineJustification: varchar("start_offline_justification", { length: 1_000 }),
     startFlags: jsonb("start_flags").$type<string[]>().notNull().default([]),
     endLatitude: doublePrecision("end_latitude"),
     endLongitude: doublePrecision("end_longitude"),
     endAccuracyMeters: integer("end_accuracy_meters"),
     endServerAt: timestamp("end_server_at", { withTimezone: true }),
     endDeviceId: varchar("end_device_id", { length: 160 }),
+    endSessionId: varchar("end_session_id", { length: 160 }),
     endIpAddress: varchar("end_ip_address", { length: 64 }),
     endUserAgent: varchar("end_user_agent", { length: 512 }),
+    endGeofenceLabel: varchar("end_geofence_label", { length: 160 }),
+    endOfflineJustification: varchar("end_offline_justification", { length: 1_000 }),
     endFlags: jsonb("end_flags").$type<string[]>().notNull().default([]),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     recordedByIdentityId: uuid("recorded_by_identity_id")
@@ -3365,6 +3711,7 @@ export const managementReportSchedules = pgTable(
     range: managementReportRange("range").notNull(),
     comparisonMode: varchar("comparison_mode", { length: 32 }).notNull().default("previous_period"),
     family: varchar("family", { length: 32 }).notNull().default("overview"),
+    format: managementReportExportFormat("format").notNull().default("csv"),
     delivery: managementReportDelivery("delivery").notNull(),
     recipientIdentityId: uuid("recipient_identity_id").references(() => identities.id, {
       onDelete: "set null",
@@ -3403,7 +3750,7 @@ export const managementReportSchedules = pgTable(
     ),
     check(
       "management_report_schedules_family_check",
-      sql`${table.family} in ('overview', 'sales', 'exceptions', 'inventory', 'purchasing', 'operations', 'profitability', 'multiunit', 'quality')`,
+      sql`${table.family} in ('overview', 'sales', 'exceptions', 'inventory', 'purchasing', 'operations', 'profitability', 'multiunit', 'quality', 'labor', 'reconciliation', 'forecast')`,
     ),
     check(
       "management_report_schedules_delivery_check",
@@ -3423,6 +3770,11 @@ export const managementReportExports = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     query: jsonb("query").$type<Record<string, unknown>>().notNull(),
     content: text("content"),
+    contentEncoding: varchar("content_encoding", { length: 12 })
+      .$type<"utf8" | "base64">()
+      .notNull()
+      .default("utf8"),
+    mimeType: varchar("mime_type", { length: 120 }).notNull().default("text/csv; charset=utf-8"),
     status: managementReportExportStatus("status").notNull(),
     format: managementReportExportFormat("format").notNull().default("csv"),
     sha256: varchar("sha256", { length: 64 }),
@@ -3461,6 +3813,10 @@ export const managementReportExports = pgTable(
       ],
     }).onDelete("restrict"),
     check("management_report_exports_row_count_check", sql`${table.rowCount} >= 0`),
+    check(
+      "management_report_exports_encoding_check",
+      sql`${table.contentEncoding} in ('utf8','base64')`,
+    ),
     check(
       "management_report_exports_completion_check",
       sql`(${table.status} = 'ready' and ${table.content} is not null and ${table.sha256} is not null and ${table.completedAt} is not null and ${table.errorCode} is null) or (${table.status} = 'failed' and ${table.content} is null and ${table.sha256} is null and ${table.completedAt} is not null and ${table.errorCode} is not null)`,

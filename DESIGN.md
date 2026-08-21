@@ -1,6 +1,6 @@
-# GiroMesa V2 — sistema visual de produção
+# GiroMesa V2 — sistema visual shadcn/ui de produção
 
-O Cardápio operacional é a referência visual canônica. A implementação compartilhada vive em `packages/ui`; CSS específico de domínio pode permanecer junto da feature, mas não deve redefinir primitivos globais.
+O Cardápio operacional é a referência visual canônica. A implementação compartilhada segue shadcn/ui com Tailwind CSS v4 e vive em `packages/ui`; CSS específico de domínio pode permanecer junto da feature, mas não deve redefinir primitivos globais.
 
 ## Princípios
 
@@ -15,11 +15,15 @@ O Cardápio operacional é a referência visual canônica. A implementação com
 - Tokens: `packages/ui/src/tokens/*.css`.
 - Temas: `packages/ui/src/themes/{light,dark}.css`.
 - Componentes: `packages/ui/src/components`.
+- Configuração do gerador shadcn: `packages/ui/components.json` e o `components.json` de cada frontend.
+- Utilitários de composição: `packages/ui/src/lib/utils.ts` (`cn`).
 - Padrões extraídos do Cardápio: `packages/ui/src/patterns.css`.
 - Consumo global: `@giromesa/ui/styles.css`.
 - Regras específicas do catálogo: `apps/frontends/ops/src/features/catalog/catalog.css`.
 
 Novas cores, espaçamentos, raios, sombras e botões reutilizáveis entram primeiro em `packages/ui`. Não duplique um padrão existente dentro de uma página.
+
+Os tokens públicos shadcn (`--background`, `--foreground`, `--primary`, `--muted`, `--accent`, `--destructive`, `--border`, `--input` e `--ring`) são a camada semântica. Os aliases `--gm-*` permanecem durante a migração para compatibilidade com as features existentes.
 
 ## Cores e superfícies
 
@@ -33,7 +37,7 @@ Novas cores, espaçamentos, raios, sombras e botões reutilizáveis entram prime
 ## Tipografia
 
 - Interface: `--gm-font` (Inter/system sans).
-- Títulos editoriais e títulos fortes de modal: `--gm-display` (Georgia/serif).
+- Títulos e títulos fortes de modal: `--gm-display`, alinhado à pilha sans-serif da interface shadcn.
 - Escala: `--gm-font-xs`, `sm`, `base`, `md`, `lg`, `xl`, `2xl`.
 - Corpo operacional padrão: `0.82rem–0.88rem`; metadados/pills: `0.68rem–0.76rem`; título de card: aproximadamente `1.05rem`.
 - Pesos 600–800 comunicam ação/status. Evite negrito em todos os textos.

@@ -32,12 +32,31 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public double? Longitude { get; set; }
         /// <summary>The mockLocationDetected property</summary>
         public bool? MockLocationDetected { get; set; }
+        /// <summary>The offline property</summary>
+        public bool? Offline { get; set; }
+        /// <summary>The offlineJustification property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? OfflineJustification { get; set; }
+#nullable restore
+#else
+        public string OfflineJustification { get; set; }
+#endif
+        /// <summary>The sessionId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? SessionId { get; set; }
+#nullable restore
+#else
+        public string SessionId { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Self.Breaks.Item.Complete.CompletePostRequestBody"/> and sets the default values.
         /// </summary>
         public CompletePostRequestBody()
         {
             AdditionalData = new Dictionary<string, object>();
+            Offline = false;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -63,6 +82,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
                 { "latitude", n => { Latitude = n.GetDoubleValue(); } },
                 { "longitude", n => { Longitude = n.GetDoubleValue(); } },
                 { "mockLocationDetected", n => { MockLocationDetected = n.GetBoolValue(); } },
+                { "offline", n => { Offline = n.GetBoolValue(); } },
+                { "offlineJustification", n => { OfflineJustification = n.GetStringValue(); } },
+                { "sessionId", n => { SessionId = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -78,6 +100,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
             writer.WriteDoubleValue("latitude", Latitude);
             writer.WriteDoubleValue("longitude", Longitude);
             writer.WriteBoolValue("mockLocationDetected", MockLocationDetected);
+            writer.WriteBoolValue("offline", Offline);
+            writer.WriteStringValue("offlineJustification", OfflineJustification);
+            writer.WriteStringValue("sessionId", SessionId);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

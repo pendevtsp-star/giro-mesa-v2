@@ -14,16 +14,22 @@ namespace GiroMesa.ApiClient.Models
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The backfillCosts property</summary>
+        public bool? BackfillCosts { get; set; }
         /// <summary>The drillDown property</summary>
         public bool? DrillDown { get; set; }
         /// <summary>The emailDeliveryConfigured property</summary>
         public bool? EmailDeliveryConfigured { get; set; }
         /// <summary>The export property</summary>
         public bool? Export { get; set; }
+        /// <summary>The manageAlerts property</summary>
+        public bool? ManageAlerts { get; set; }
         /// <summary>The manageBudget property</summary>
         public bool? ManageBudget { get; set; }
         /// <summary>The manageSchedules property</summary>
         public bool? ManageSchedules { get; set; }
+        /// <summary>The manageViews property</summary>
+        public bool? ManageViews { get; set; }
         /// <summary>The viewCosts property</summary>
         public bool? ViewCosts { get; set; }
         /// <summary>
@@ -51,11 +57,14 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "backfillCosts", n => { BackfillCosts = n.GetBoolValue(); } },
                 { "drillDown", n => { DrillDown = n.GetBoolValue(); } },
                 { "emailDeliveryConfigured", n => { EmailDeliveryConfigured = n.GetBoolValue(); } },
                 { "export", n => { Export = n.GetBoolValue(); } },
+                { "manageAlerts", n => { ManageAlerts = n.GetBoolValue(); } },
                 { "manageBudget", n => { ManageBudget = n.GetBoolValue(); } },
                 { "manageSchedules", n => { ManageSchedules = n.GetBoolValue(); } },
+                { "manageViews", n => { ManageViews = n.GetBoolValue(); } },
                 { "viewCosts", n => { ViewCosts = n.GetBoolValue(); } },
             };
         }
@@ -66,11 +75,14 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteBoolValue("backfillCosts", BackfillCosts);
             writer.WriteBoolValue("drillDown", DrillDown);
             writer.WriteBoolValue("emailDeliveryConfigured", EmailDeliveryConfigured);
             writer.WriteBoolValue("export", Export);
+            writer.WriteBoolValue("manageAlerts", ManageAlerts);
             writer.WriteBoolValue("manageBudget", ManageBudget);
             writer.WriteBoolValue("manageSchedules", ManageSchedules);
+            writer.WriteBoolValue("manageViews", ManageViews);
             writer.WriteBoolValue("viewCosts", ViewCosts);
             writer.WriteAdditionalData(AdditionalData);
         }

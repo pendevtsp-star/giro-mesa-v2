@@ -1,14 +1,14 @@
 :root {
   --ink: var(--gm-ink);
-  --ink-2: #26362e;
+  --ink-2: var(--gm-muted);
   --cream: var(--gm-surface-soft);
   --paper: var(--gm-surface);
   --forest: var(--gm-brand-strong);
   --forest-2: var(--gm-shell);
-  --lime: #c6f34d;
+  --lime: var(--gm-brand-soft);
   --orange: var(--gm-accent);
   --line: var(--gm-border);
-  --muted: var(--gm-muted);
+  --legacy-muted: var(--gm-muted);
   --shadow: var(--gm-shadow-xl);
   --radius: var(--gm-radius-lg);
 }
@@ -61,8 +61,8 @@ summary:focus-visible {
   left: 16px;
   z-index: 200;
   padding: 12px 18px;
-  background: #fff;
-  color: #111;
+  background: var(--gm-surface);
+  color: var(--gm-ink);
   border-radius: 10px;
 }
 .skip-link:focus {
@@ -72,8 +72,8 @@ summary:focus-visible {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 253, 247, 0.9);
-  border-bottom: 1px solid rgba(23, 34, 29, 0.08);
+  background: color-mix(in srgb, var(--gm-paper) 90%, transparent);
+  border-bottom: 1px solid var(--gm-border);
   backdrop-filter: blur(18px);
 }
 .header-inner {
@@ -142,12 +142,12 @@ summary:focus-visible {
   transform: translateY(-2px);
 }
 .button-primary {
-  background: var(--orange);
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(166, 60, 19, 0.25);
+  background: var(--gm-action);
+  color: var(--gm-on-action);
+  box-shadow: var(--gm-shadow-sm);
 }
 .button-primary:hover {
-  background: #842d0b;
+  background: var(--gm-action-hover);
 }
 .button-ghost {
   background: transparent;
@@ -171,7 +171,7 @@ summary:focus-visible {
 }
 .button-dark {
   background: var(--forest-2);
-  color: #fff;
+  color: var(--gm-on-action);
   border-color: rgba(255, 255, 255, 0.2);
 }
 .eyebrow {

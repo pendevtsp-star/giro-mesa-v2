@@ -1,4 +1,5 @@
-import { Badge, Button, Card } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, Input, NativeSelect } from "@giromesa/ui";
 import type { KdsAllDayItem, KdsData } from "../../operations.shared";
 import type { RealtimeStatus } from "../../realtime";
 import { type KdsAvailabilityChange, KdsAvailabilityPanel } from "./KdsAvailabilityPanel";
@@ -157,7 +158,7 @@ export function KdsSettingsPage({
           <div className="gm-form-grid kds-settings-terminal-controls">
             <label className="gm-form-field" htmlFor="kds-terminal-label">
               <span>Nome deste terminal</span>
-              <input
+              <Input
                 className="gm-form-control"
                 id="kds-terminal-label"
                 maxLength={80}
@@ -169,25 +170,25 @@ export function KdsSettingsPage({
             <fieldset>
               <legend>Área ao abrir</legend>
               <div className="segmented">
-                <button
+                <Button
                   aria-pressed={viewMode === "station"}
                   onClick={() => onViewModeChange("station")}
                   type="button"
                 >
                   Praça
-                </button>
-                <button
+                </Button>
+                <Button
                   aria-pressed={viewMode === "pass"}
                   onClick={() => onViewModeChange("pass")}
                   type="button"
                 >
                   Passe / expedição
-                </button>
+                </Button>
               </div>
             </fieldset>
             <label className="gm-form-field" htmlFor="kds-settings-station">
               <span>Praça deste terminal</span>
-              <select
+              <NativeSelect
                 className="gm-form-control"
                 data-kds-station
                 disabled={stationLocked || viewMode === "pass"}
@@ -201,7 +202,7 @@ export function KdsSettingsPage({
                     {station.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               <small>Seleção local deste navegador; não altera o roteamento dos produtos.</small>
             </label>
             <div className="kds-settings-lock">
@@ -421,20 +422,20 @@ export function KdsSettingsPage({
             <fieldset>
               <legend>Densidade dos tickets</legend>
               <div className="segmented">
-                <button
+                <Button
                   aria-pressed={density === "compact"}
                   onClick={() => onDensityChange("compact")}
                   type="button"
                 >
                   Compacta
-                </button>
-                <button
+                </Button>
+                <Button
                   aria-pressed={density === "comfortable"}
                   onClick={() => onDensityChange("comfortable")}
                   type="button"
                 >
                   Confortável
-                </button>
+                </Button>
               </div>
             </fieldset>
 

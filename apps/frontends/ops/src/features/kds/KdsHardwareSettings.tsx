@@ -1,4 +1,5 @@
-import { Badge, Button, Card } from "@giromesa/ui";
+// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
+import { Badge, Button, Card, Input } from "@giromesa/ui";
 import { useState } from "react";
 import {
   DEFAULT_KDS_BUMP_BAR_MAP,
@@ -69,7 +70,7 @@ export function KdsHardwareSettings({
         <legend>Impressora térmica</legend>
         <label className="gm-form-field">
           <span>Identificador no Edge</span>
-          <input
+          <Input
             className="gm-form-control"
             maxLength={80}
             onChange={(event) =>
@@ -80,7 +81,7 @@ export function KdsHardwareSettings({
         </label>
         <label className="gm-form-field">
           <span>Vias</span>
-          <input
+          <Input
             className="gm-form-control"
             max={3}
             min={1}
@@ -107,7 +108,7 @@ export function KdsHardwareSettings({
         {Object.entries(bumpMap).map(([action, key]) => (
           <label key={action}>
             <span>{ACTION_LABEL[action as KdsBumpAction]}</span>
-            <input
+            <Input
               aria-label={`Tecla para ${ACTION_LABEL[action as KdsBumpAction]}`}
               onKeyDown={(event) => {
                 event.preventDefault();

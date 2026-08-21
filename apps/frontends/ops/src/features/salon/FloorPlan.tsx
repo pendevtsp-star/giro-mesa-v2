@@ -1005,6 +1005,7 @@ export function FloorPlan({
               ).map(([layer, label, description]) => (
                 <label key={layer}>
                   <input
+                    className="accent-primary"
                     checked={layers[layer]}
                     disabled={editing && layer !== "operation"}
                     onChange={(event) =>
@@ -1288,7 +1289,7 @@ export function FloorPlan({
             })}
         </svg>
         <div className={`floor-plan-minimap ${minimapOpen ? "" : "floor-plan-minimap--closed"}`}>
-          <button
+          <Button
             aria-keyshortcuts="+ - 0 Home ArrowLeft ArrowRight ArrowUp ArrowDown"
             aria-label="Navegar planta com teclado"
             onKeyDown={handlePlanKeyDown}
@@ -1296,14 +1297,14 @@ export function FloorPlan({
             type="button"
           >
             Teclado
-          </button>
-          <button
+          </Button>
+          <Button
             aria-expanded={minimapOpen}
             onClick={() => setMinimapOpen((current) => !current)}
             type="button"
           >
             {minimapOpen ? "Ocultar mapa" : "Minimapa"}
-          </button>
+          </Button>
           {minimapOpen && (
             <svg
               aria-label="Minimapa da planta"

@@ -26,6 +26,7 @@ Worker ────────────> outbox do banco + provedores extern
 | Delivery | `apps/frontends/ops/src/features/delivery/DeliveryPage.tsx` | `src/growth.shared.tsx`, `src/realtime.ts`, API `growth/`, `packages/db/src/growth-schema.ts` |
 | Estoque e compras | `apps/frontends/ops/src/features/inventory/InventoryPage.tsx`, `features/purchases/PurchasesPage.tsx` | `InventoryWorkspace.tsx`, `InventoryModals.tsx`, `management.shared.tsx`, API `management/`, worker `inventory.ts` e `packages/db/src/management-schema.ts` |
 | Pessoas | `apps/frontends/ops/src/features/people/PeoplePage.tsx`, `TimeClockBanner.tsx` | `management.shared.tsx`, `api.ts`, API `management/management.{controller,service,schemas,rules}.ts`, `packages/db/src/management-schema.ts` e `tests/e2e-real/people-production.spec.ts` |
+| Fechamento da equipe | `apps/frontends/ops/src/features/waiter-settlements/WaiterSettlementsPage.tsx` | `waiter-settlements.ts`, `api.ts`, API `management/management-settlements.*` e `packages/db/src/settlement-schema.ts` |
 | Relatórios | `apps/frontends/ops/src/features/reports/ReportsPage.tsx` | `management.shared.tsx`, API `management/management-report.*`, worker `reports.ts` e `packages/db/src/{management,operations}-schema.ts` |
 | Fiscal e Contador | `apps/frontends/ops/src/features/fiscal/FiscalPages.tsx` | `features/fiscal/fiscal.ts`, API `fiscal/`, `packages/db/src/fiscal-schema.ts` e ciclo fiscal do Edge Hub |
 | Publicação/QR do Cardápio | `apps/backends/api/src/public-menu/`, `pilot-catalog.service.ts` | `apps/frontends/customer/components/menu-experience.tsx`, tokens de mesa e mídia pública |
@@ -50,6 +51,7 @@ Worker ────────────> outbox do banco + provedores extern
 | Alterar Delivery | feature `delivery`, `growth.shared.tsx`, `realtime.ts`, API `growth`, schema `growth` | regras + integração PostgreSQL + teste E2E real em 375 px |
 | Alterar Estoque/compras | features `inventory` e `purchases`, `management.shared.tsx`, API `management`, worker `inventory.ts`, schema `management` | regras + integração PostgreSQL + typechecks API/worker/Ops + mobile 390 px |
 | Alterar Pessoas/ponto/comissões | feature `people`, `management.shared.tsx`, API `management`, schema `management` | regras de autorização/dinheiro + migration limpa/reaplicada + integração PostgreSQL + E2E real light/dark em 375 px |
+| Alterar fechamento da equipe | feature `waiter-settlements`, `api.ts`, API `management-settlements`, schema `settlement` | regras financeiras/RBAC + migration limpa/reaplicada + integração PostgreSQL + typechecks API/Ops + E2E real em 375 px |
 | Alterar preço/pagamento | contracts, domain, db, serviço API proprietário | unitário + integração + idempotência/audit |
 | Alterar Relatórios | feature `reports`, `management.shared.tsx`, API `management/management-report.*`, worker `reports.ts`, schemas `management`/`operations` | regras financeiras/RBAC + migration PostgreSQL + typechecks API/worker/Ops + E2E real em 375 px |
 | Alterar Fiscal/Contador | feature `fiscal`, API `fiscal`, schema fiscal e eventos `fiscal.*` do Edge Hub | unitários de regras + migration + typechecks API/Ops + testes .NET quando houver SDK |

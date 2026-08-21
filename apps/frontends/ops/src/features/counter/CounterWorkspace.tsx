@@ -1,4 +1,14 @@
-import { Badge, Button, Card, Modal, Toast } from "@giromesa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Label,
+  Modal,
+  NativeSelect,
+  Textarea,
+  Toast,
+} from "@giromesa/ui";
 import { useEffect, useRef, useState } from "react";
 import { api, type PosPrintJob, type PrintDocumentType, type PrintJobStatus } from "../../api";
 import { sendShellPrintJob, shellPrintingAvailable } from "../../bridge";
@@ -17,6 +27,7 @@ import {
 } from "../../operations.shared";
 import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
+import { currentTerminalPrinterId } from "../shell/terminal-profile";
 import { promisedAtToIso, splitPromisedAt } from "./promisedAt";
 import "./counter.css";
 
@@ -411,7 +422,11 @@ export function TabWorkspace({
         scope.organizationId,
         scope.unitId,
         tabId,
-        { documentType: printDocuments[mode].documentType, copies: 1 },
+        {
+          documentType: printDocuments[mode].documentType,
+          copies: 1,
+          printerId: currentTerminalPrinterId(scope.unitId),
+        },
         id,
       );
       updateLocalPrint(id, { serverId: created.printJob.id, server: created.printJob });
@@ -492,6 +507,13 @@ export function TabWorkspace({
       updateLocalPrint(job.id, { status: "failed" });
       setFeedback(error instanceof Error ? error.message : "Não foi possível imprimir.");
     }
+  }
+
+  function openCustomerDisplay() {
+    const target = new URL(window.location.href);
+    target.hash = `/counter?display=${encodeURIComponent(tabId)}`;
+    const display = window.open(target, "_blank", "popup,width=1280,height=800");
+    if (!display) setFeedback("O navegador bloqueou o visor. Libere pop-ups para este sistema.");
   }
 
   useEffect(() => {
@@ -994,21 +1016,21 @@ export function TabWorkspace({
                   aria-label="Áreas do atendimento"
                   className="workspace-tabs workspace-tabs--primary"
                 >
-                  <button
+                  <Button
                     aria-current={view === "order" ? "page" : undefined}
                     onClick={() => setView("order")}
                     type="button"
                   >
                     Pedido <Badge tone="neutral">{activeItems.length}</Badge>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     aria-current={view === "account" ? "page" : undefined}
                     onClick={() => setView("account")}
                     type="button"
                   >
                     Conta
                     {billCall && <span className="workspace-tabs__alert" />}
-                  </button>
+                  </Button>
                   <details
                     className="workspace-tabs__more"
                     data-active={view === "table" || view === "activity"}
@@ -1018,7 +1040,7 @@ export function TabWorkspace({
                       <span aria-hidden="true">⌄</span>
                     </summary>
                     <div className="workspace-tabs__menu">
-                      <button
+                      <Button
                         aria-current={view === "table" ? "page" : undefined}
                         onClick={(event) => {
                           setView("table");
@@ -1030,8 +1052,8 @@ export function TabWorkspace({
                           <strong>Detalhes</strong>
                           <small>Cliente, responsável e organização da mesa</small>
                         </span>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         aria-current={view === "activity" ? "page" : undefined}
                         onClick={(event) => {
                           setView("activity");
@@ -1043,7 +1065,19 @@ export function TabWorkspace({
                           <strong>Histórico</strong>
                           <small>{data.events.length} registro(s) auditáveis</small>
                         </span>
-                      </button>
+                      </Button>
+                      <Button
+                        onClick={(event) => {
+                          openCustomerDisplay();
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                        type="button"
+                      >
+                        <span>
+                          <strong>Visor do cliente</strong>
+                          <small>Abrir esta conta em uma segunda tela</small>
+                        </span>
+                      </Button>
                     </div>
                   </details>
                 </nav>
@@ -1137,9 +1171,9 @@ export function TabWorkspace({
                         );
                       }}
                     >
-                      <label>
+                      <Label>
                         Tipo
-                        <select
+                        <NativeSelect
                           onChange={(event) =>
                             setFulfillmentType(event.target.value as typeof fulfillmentType)
                           }
@@ -1148,76 +1182,77 @@ export function TabWorkspace({
                           <option value="dine_in">Consumo no local</option>
                           <option value="pickup">Retirada</option>
                           <option value="delivery">Delivery</option>
-                        </select>
-                      </label>
-                      <label>
+                        </NativeSelect>
+                      </Label>
+                      <Label>
                         Cliente
-                        <input
+                        <Input
                           onChange={(event) => setCustomerName(event.target.value)}
                           placeholder={displayLabel}
                           value={customerName}
                         />
-                      </label>
-                      <label>
+                      </Label>
+                      <Label>
                         Telefone
-                        <input
+                        <Input
                           inputMode="tel"
                           onChange={(event) => setCustomerPhone(event.target.value)}
                           value={customerPhone}
                         />
-                      </label>
-                      <label className="inline-form__wide">
+                      </Label>
+                      <Label className="inline-form__wide">
                         <input
+                          className="accent-primary"
                           checked={readyNotificationConsent}
                           disabled={!customerPhone.trim()}
                           onChange={(event) => setReadyNotificationConsent(event.target.checked)}
                           type="checkbox"
                         />
                         Cliente autorizou receber o aviso de pedido pronto
-                      </label>
-                      <label className="inline-form__wide">
+                      </Label>
+                      <Label className="inline-form__wide">
                         Observações importantes
-                        <textarea
+                        <Textarea
                           maxLength={500}
                           onChange={(event) => setServiceNotes(event.target.value)}
                           rows={2}
                           value={serviceNotes}
                         />
-                      </label>
+                      </Label>
                       <fieldset className="promised-at-field">
                         <legend>Prometido para</legend>
-                        <label>
+                        <Label>
                           <span>Data</span>
-                          <input
+                          <Input
                             onChange={(event) => setPromisedDate(event.target.value)}
                             type="date"
                             value={promisedDate}
                           />
-                        </label>
-                        <label>
+                        </Label>
+                        <Label>
                           <span>Hora</span>
-                          <input
+                          <Input
                             lang="pt-BR"
                             onChange={(event) => setPromisedTime(event.target.value)}
                             type="time"
                             value={promisedTime}
                           />
-                        </label>
+                        </Label>
                       </fieldset>
                       {fulfillmentType === "delivery" && (
-                        <label className="inline-form__wide">
+                        <Label className="inline-form__wide">
                           Endereço de entrega
-                          <input
+                          <Input
                             onChange={(event) => setDeliveryAddress(event.target.value)}
                             required
                             value={deliveryAddress}
                           />
-                        </label>
+                        </Label>
                       )}
                       {floor && (
-                        <label>
+                        <Label>
                           Responsável
-                          <select
+                          <NativeSelect
                             onChange={(event) => setResponsibleIdentityId(event.target.value)}
                             value={responsibleIdentityId}
                           >
@@ -1227,8 +1262,8 @@ export function TabWorkspace({
                                 {person.displayName}
                               </option>
                             ))}
-                          </select>
-                        </label>
+                          </NativeSelect>
+                        </Label>
                       )}
                       <Button disabled={busy} size="sm" type="submit" variant="secondary">
                         Salvar dados
@@ -1292,12 +1327,12 @@ export function TabWorkspace({
                         </div>
                         <div className="quick-order-strip__items">
                           {lastOrder.length > 0 && (
-                            <button onClick={repeatLastOrder} type="button">
+                            <Button onClick={repeatLastOrder} type="button">
                               ↻ Repetir último
-                            </button>
+                            </Button>
                           )}
                           {quickProducts.map((item) => (
-                            <button
+                            <Button
                               key={item.id}
                               onClick={() =>
                                 item.modifierGroupIds.length ? setProductId(item.id) : addItem(item)
@@ -1306,14 +1341,14 @@ export function TabWorkspace({
                             >
                               {favoriteProductIds.includes(item.id) ? "★ " : ""}
                               {item.name}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </section>
                     )}
-                    <label className="search-field real-product-search">
+                    <Label className="search-field real-product-search">
                       <span aria-hidden="true">⌕</span>
-                      <input
+                      <Input
                         ref={productSearchRef}
                         onChange={(event) => setProductSearch(event.target.value)}
                         onKeyDown={(event) => {
@@ -1328,24 +1363,24 @@ export function TabWorkspace({
                         value={productSearch}
                       />
                       <kbd>/</kbd>
-                    </label>
+                    </Label>
                     <div className="segmented segmented--scroll real-category-filter">
-                      <button
+                      <Button
                         aria-pressed={categoryId === "all"}
                         onClick={() => setCategoryId("all")}
                         type="button"
                       >
                         Todos
-                      </button>
+                      </Button>
                       {menu.categories.map((category) => (
-                        <button
+                        <Button
                           aria-pressed={categoryId === category.id}
                           key={category.id}
                           onClick={() => setCategoryId(category.id)}
                           type="button"
                         >
                           {category.name}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                     <div className="real-product-picker">
@@ -1356,7 +1391,7 @@ export function TabWorkspace({
                           }`}
                           key={item.id}
                         >
-                          <button
+                          <Button
                             aria-label={`Adicionar ${item.name}`}
                             disabled={!item.available || item.priceCents === null}
                             onClick={(event) => {
@@ -1399,8 +1434,8 @@ export function TabWorkspace({
                                 ? "Sem preço"
                                 : formatMoney(item.priceCents)}
                             </strong>
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             aria-label={
                               favoriteProductIds.includes(item.id)
                                 ? `Remover ${item.name} dos favoritos`
@@ -1417,7 +1452,7 @@ export function TabWorkspace({
                             type="button"
                           >
                             {favoriteProductIds.includes(item.id) ? "★" : "☆"}
-                          </button>
+                          </Button>
                         </article>
                       ))}
                     </div>
@@ -1482,8 +1517,9 @@ export function TabWorkspace({
                               {menu.options
                                 .filter((option) => option.groupId === group.id && option.active)
                                 .map((option) => (
-                                  <label key={option.id}>
+                                  <Label key={option.id}>
                                     <input
+                                      className="accent-primary"
                                       checked={options.includes(option.id)}
                                       onChange={(event) =>
                                         setOptions((current) =>
@@ -1498,38 +1534,38 @@ export function TabWorkspace({
                                     {option.priceDeltaCents > 0 && (
                                       <small>+ {formatMoney(option.priceDeltaCents)}</small>
                                     )}
-                                  </label>
+                                  </Label>
                                 ))}
                             </fieldset>
                           ))}
                           <div className="product-customization">
                             <fieldset className="quantity-stepper product-customization__quantity">
                               <legend className="gm-sr-only">Quantidade</legend>
-                              <button
+                              <Button
                                 aria-label="Diminuir quantidade"
                                 disabled={quantity <= 1}
                                 onClick={() => setQuantity((current) => Math.max(1, current - 1))}
                                 type="button"
                               >
                                 −
-                              </button>
+                              </Button>
                               <strong>{quantity}</strong>
-                              <button
+                              <Button
                                 aria-label="Aumentar quantidade"
                                 onClick={() => setQuantity((current) => current + 1)}
                                 type="button"
                               >
                                 +
-                              </button>
+                              </Button>
                             </fieldset>
-                            <label className="product-customization__notes">
+                            <Label className="product-customization__notes">
                               Observação para a produção
-                              <input
+                              <Input
                                 onChange={(event) => setNotes(event.target.value)}
                                 placeholder="Ex.: sem cebola"
                                 value={notes}
                               />
-                            </label>
+                            </Label>
                             <QuickOrderChips
                               onSelectChip={(chip) =>
                                 setNotes((current) =>
@@ -1543,9 +1579,9 @@ export function TabWorkspace({
                                 <small>{fullService ? "Serviço completo" : "Opcional"}</small>
                               </summary>
                               <div className="gm-form-grid product-advanced-options__fields">
-                                <label className="gm-form-field">
+                                <Label className="gm-form-field">
                                   <span>Pessoa/assento</span>
-                                  <input
+                                  <Input
                                     className="gm-form-control"
                                     min={0}
                                     onChange={(event) => setSeatNumber(Number(event.target.value))}
@@ -1553,10 +1589,10 @@ export function TabWorkspace({
                                     type="number"
                                     value={seatNumber}
                                   />
-                                </label>
-                                <label className="gm-form-field">
+                                </Label>
+                                <Label className="gm-form-field">
                                   <span>Etapa</span>
-                                  <select
+                                  <NativeSelect
                                     className="gm-form-control"
                                     onChange={(event) =>
                                       setCourse(
@@ -1569,17 +1605,17 @@ export function TabWorkspace({
                                     <option value="starter">Entrada</option>
                                     <option value="main">Principal</option>
                                     <option value="dessert">Sobremesa</option>
-                                  </select>
-                                </label>
-                                <label className="gm-form-field product-advanced-options__restriction">
+                                  </NativeSelect>
+                                </Label>
+                                <Label className="gm-form-field product-advanced-options__restriction">
                                   <span>Alergia/restrição</span>
-                                  <input
+                                  <Input
                                     className="gm-form-control"
                                     onChange={(event) => setAllergyNote(event.target.value)}
                                     placeholder="Destacar para a produção"
                                     value={allergyNote}
                                   />
-                                </label>
+                                </Label>
                               </div>
                             </details>
                             <div className="product-configurator__actions">
@@ -1615,7 +1651,7 @@ export function TabWorkspace({
                       data-expanded={draftExpanded}
                     >
                       {cart.length > 0 && (
-                        <button
+                        <Button
                           aria-expanded={draftExpanded}
                           className="cart-preview__mobile-toggle"
                           onClick={() => setDraftExpanded((current) => !current)}
@@ -1626,7 +1662,7 @@ export function TabWorkspace({
                             <small>{cartQuantity} item(ns)</small>
                           </span>
                           <strong>{formatMoney(cartTotalCents)}</strong>
-                        </button>
+                        </Button>
                       )}
                       <header className="cart-preview__heading">
                         <span>
@@ -1634,7 +1670,7 @@ export function TabWorkspace({
                           <small>Preservado neste dispositivo até o envio.</small>
                         </span>
                         {lastRemovedItem && (
-                          <button
+                          <Button
                             onClick={() => {
                               setCart((current) => [...current, lastRemovedItem]);
                               setLastRemovedItem(null);
@@ -1642,7 +1678,7 @@ export function TabWorkspace({
                             type="button"
                           >
                             Desfazer remoção
-                          </button>
+                          </Button>
                         )}
                       </header>
                       {cart.length === 0 && (
@@ -1666,7 +1702,7 @@ export function TabWorkspace({
                           </span>
                           <span className="cart-preview__actions">
                             <span className="quantity-stepper quantity-stepper--compact">
-                              <button
+                              <Button
                                 aria-label={`Diminuir ${item.name}`}
                                 onClick={() =>
                                   item.quantity === 1
@@ -1682,9 +1718,9 @@ export function TabWorkspace({
                                 type="button"
                               >
                                 −
-                              </button>
+                              </Button>
                               <strong>{item.quantity}</strong>
-                              <button
+                              <Button
                                 aria-label={`Aumentar ${item.name}`}
                                 onClick={() =>
                                   setCart((current) =>
@@ -1698,9 +1734,9 @@ export function TabWorkspace({
                                 type="button"
                               >
                                 +
-                              </button>
+                              </Button>
                             </span>
-                            <button
+                            <Button
                               onClick={() => {
                                 setProductId(item.productId);
                                 setQuantity(item.quantity);
@@ -1716,14 +1752,14 @@ export function TabWorkspace({
                               type="button"
                             >
                               Observação
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               aria-label={`Remover ${item.name}`}
                               onClick={() => removeDraftItem(item)}
                               type="button"
                             >
                               Remover
-                            </button>
+                            </Button>
                           </span>
                         </div>
                       ))}
@@ -1882,9 +1918,9 @@ export function TabWorkspace({
                             <strong>{job.label}</strong>
                             <small>{printStatusLabel(job)}</small>
                             {job.status !== "preparing" && (
-                              <button onClick={() => void reprintDocument(job)} type="button">
+                              <Button onClick={() => void reprintDocument(job)} type="button">
                                 {printActionLabel(job.status)}
-                              </button>
+                              </Button>
                             )}
                           </span>
                         ))}
@@ -1934,7 +1970,7 @@ export function TabWorkspace({
                             </span>
                             <strong>{formatMoney(item.netCents)}</strong>
                             {tabOpen && (
-                              <button
+                              <Button
                                 aria-expanded={itemActionId === item.id}
                                 aria-label={`Ações para ${item.productName}`}
                                 onClick={() => {
@@ -1946,7 +1982,7 @@ export function TabWorkspace({
                                 type="button"
                               >
                                 Mais
-                              </button>
+                              </Button>
                             )}
                           </div>
                           {itemActionId === item.id && (
@@ -1957,43 +1993,43 @@ export function TabWorkspace({
                               <div className="approval-form__heading">
                                 <span>Ajustar item</span>
                                 <strong>{item.productName}</strong>
-                                <button onClick={() => setItemActionId("")} type="button">
+                                <Button onClick={() => setItemActionId("")} type="button">
                                   Fechar
-                                </button>
+                                </Button>
                               </div>
                               <p>
                                 {canApproveAdjustments
                                   ? "Autorize com seu código gerencial ou encaminhe para outro responsável."
                                   : "Envie a solicitação; o gerente aprova no próprio dispositivo com o código dele."}
                               </p>
-                              <label>
+                              <Label>
                                 Motivo
-                                <input
+                                <Input
                                   list={`adjustment-reasons-${tabId}`}
                                   minLength={3}
                                   onChange={(event) => setApprovalReason(event.target.value)}
                                   value={approvalReason}
                                 />
-                              </label>
+                              </Label>
                               <datalist id={`adjustment-reasons-${tabId}`}>
                                 {adjustmentReasons.map((reason) => (
                                   <option key={reason} value={reason} />
                                 ))}
                               </datalist>
-                              <label>
+                              <Label>
                                 Desconto em reais
-                                <input
+                                <Input
                                   min={0}
                                   onChange={(event) => setDiscountReais(Number(event.target.value))}
                                   step="0.01"
                                   type="number"
                                   value={discountReais}
                                 />
-                              </label>
+                              </Label>
                               {canApproveAdjustments && (
-                                <label>
+                                <Label>
                                   Seu código gerencial
-                                  <input
+                                  <Input
                                     autoComplete="one-time-code"
                                     inputMode="numeric"
                                     maxLength={8}
@@ -2004,7 +2040,7 @@ export function TabWorkspace({
                                     type="password"
                                     value={approvalPin}
                                   />
-                                </label>
+                                </Label>
                               )}
                               <div className="dialog-actions">
                                 {!canApproveAdjustments && (
@@ -2261,7 +2297,7 @@ export function TabWorkspace({
                           }}
                         >
                           <h3>Transferir mesa</h3>
-                          <select
+                          <NativeSelect
                             onChange={(event) => setTransferTableId(event.target.value)}
                             value={transferTableId}
                           >
@@ -2271,7 +2307,7 @@ export function TabWorkspace({
                                 {table.label}
                               </option>
                             ))}
-                          </select>
+                          </NativeSelect>
                           <Button disabled={busy || !transferTableId} size="sm" type="submit">
                             Transferir
                           </Button>
@@ -2309,7 +2345,7 @@ export function TabWorkspace({
                           }}
                         >
                           <h3>Transferir item</h3>
-                          <select
+                          <NativeSelect
                             onChange={(event) => setMoveItemId(event.target.value)}
                             value={moveItemId}
                           >
@@ -2321,8 +2357,8 @@ export function TabWorkspace({
                                   {item.quantity}× {item.productName}
                                 </option>
                               ))}
-                          </select>
-                          <select
+                          </NativeSelect>
+                          <NativeSelect
                             onChange={(event) => setMoveTargetTabId(event.target.value)}
                             value={moveTargetTabId}
                           >
@@ -2332,7 +2368,7 @@ export function TabWorkspace({
                                 {targetLabel(target)}
                               </option>
                             ))}
-                          </select>
+                          </NativeSelect>
                           <Button
                             disabled={busy || !moveItemId || !moveTargetTabId}
                             size="sm"
@@ -2394,19 +2430,19 @@ export function TabWorkspace({
                             Pago {formatMoney(paidCents)} · falta {formatMoney(remainingCents)}
                           </p>
                           <div className="segmented">
-                            <button
+                            <Button
                               onClick={() => setPaymentReais(remainingCents / 400)}
                               type="button"
                             >
                               25%
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => setPaymentReais(remainingCents / 200)}
                               type="button"
                             >
                               50%
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() =>
                                 setPaymentReais(
                                   remainingCents / Math.max(1, data.tab.guestCount) / 100,
@@ -2415,25 +2451,25 @@ export function TabWorkspace({
                               type="button"
                             >
                               1 pessoa
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => setPaymentReais(remainingCents / 100)}
                               type="button"
                             >
                               Restante
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => {
                                 setPaymentReais(0);
                               }}
                               type="button"
                             >
                               Valor livre
-                            </button>
+                            </Button>
                           </div>
-                          <label>
+                          <Label>
                             Forma de pagamento
-                            <select
+                            <NativeSelect
                               onChange={(event) =>
                                 setPaymentMethod(event.target.value as typeof paymentMethod)
                               }
@@ -2444,11 +2480,11 @@ export function TabWorkspace({
                               <option value="credit_card">Crédito</option>
                               <option value="debit_card">Débito</option>
                               <option value="other">Outro</option>
-                            </select>
-                          </label>
-                          <label>
+                            </NativeSelect>
+                          </Label>
+                          <Label>
                             Valor a receber
-                            <input
+                            <Input
                               min={0.01}
                               onChange={(event) => setPaymentReais(Number(event.target.value))}
                               ref={paymentAmountRef}
@@ -2456,11 +2492,11 @@ export function TabWorkspace({
                               type="number"
                               value={paymentReais}
                             />
-                          </label>
+                          </Label>
                           {paymentMethod === "cash" && (
-                            <label className="cash-change-field">
+                            <Label className="cash-change-field">
                               Valor recebido
-                              <input
+                              <Input
                                 min={paymentReais}
                                 onChange={(event) =>
                                   setCashReceivedReais(Number(event.target.value))
@@ -2475,9 +2511,9 @@ export function TabWorkspace({
                                   Math.round(Math.max(0, cashReceivedReais - paymentReais) * 100),
                                 )}
                               </strong>
-                            </label>
+                            </Label>
                           )}
-                          <input
+                          <Input
                             onChange={(event) => setPaymentReference(event.target.value)}
                             placeholder="Referência opcional"
                             value={paymentReference}
@@ -2520,7 +2556,7 @@ export function TabWorkspace({
                           }}
                         >
                           <h3>Unificar comandas</h3>
-                          <select
+                          <NativeSelect
                             onChange={(event) => setMergeTabId(event.target.value)}
                             value={mergeTabId}
                           >
@@ -2530,7 +2566,7 @@ export function TabWorkspace({
                                 {targetLabel(tab)}
                               </option>
                             ))}
-                          </select>
+                          </NativeSelect>
                           <Button disabled={busy || !mergeTabId} size="sm" type="submit">
                             Unificar aqui
                           </Button>
@@ -2572,7 +2608,7 @@ export function TabWorkspace({
                           }}
                         >
                           <h3>Separar item</h3>
-                          <select
+                          <NativeSelect
                             onChange={(event) => setSplitItemId(event.target.value)}
                             value={splitItemId}
                           >
@@ -2582,8 +2618,8 @@ export function TabWorkspace({
                                 {item.quantity}× {item.productName}
                               </option>
                             ))}
-                          </select>
-                          <input
+                          </NativeSelect>
+                          <Input
                             min={1}
                             onChange={(event) => setSplitQuantity(Number(event.target.value))}
                             type="number"
@@ -2619,9 +2655,9 @@ export function TabWorkspace({
                           hidden={view !== "account" || !canAdjustCharges}
                         >
                           <h3>Serviço</h3>
-                          <label>
+                          <Label>
                             Percentual
-                            <input
+                            <Input
                               max={100}
                               min={0}
                               onChange={(event) => setServicePercent(Number(event.target.value))}
@@ -2629,7 +2665,7 @@ export function TabWorkspace({
                               type="number"
                               value={servicePercent}
                             />
-                          </label>
+                          </Label>
                           <Button disabled={busy} size="sm" type="submit">
                             Aplicar
                           </Button>
@@ -2660,16 +2696,16 @@ export function TabWorkspace({
                           hidden={view !== "account" || !canAdjustCharges}
                         >
                           <h3>Gorjeta</h3>
-                          <label>
+                          <Label>
                             Valor em reais
-                            <input
+                            <Input
                               min={0}
                               onChange={(event) => setTipReais(Number(event.target.value))}
                               step="0.01"
                               type="number"
                               value={tipReais}
                             />
-                          </label>
+                          </Label>
                           <Button disabled={busy} size="sm" type="submit">
                             Aplicar
                           </Button>
@@ -2770,18 +2806,18 @@ export function TabWorkspace({
                       <strong>Reabrir atendimento encerrado</strong>
                       <small>Pagamentos e histórico permanecem registrados.</small>
                     </div>
-                    <label>
+                    <Label>
                       Motivo
-                      <input
+                      <Input
                         list={`adjustment-reasons-${tabId}`}
                         minLength={3}
                         onChange={(event) => setReopenReason(event.target.value)}
                         value={reopenReason}
                       />
-                    </label>
-                    <label>
+                    </Label>
+                    <Label>
                       Seu código gerencial
-                      <input
+                      <Input
                         autoComplete="one-time-code"
                         inputMode="numeric"
                         maxLength={8}
@@ -2790,7 +2826,7 @@ export function TabWorkspace({
                         type="password"
                         value={reopenPin}
                       />
-                    </label>
+                    </Label>
                     <Button
                       disabled={busy || reopenPin.length < 4 || reopenReason.trim().length < 3}
                       size="sm"

@@ -18,6 +18,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_comparisonMode? ComparisonMode { get; set; }
         /// <summary>The family property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_family? Family { get; set; }
+        /// <summary>The format property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_format? Format { get; set; }
         /// <summary>The from property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -42,6 +44,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
             AdditionalData = new Dictionary<string, object>();
             ComparisonMode = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_comparisonMode.Previous_period;
             Family = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_family.Overview;
+            Format = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_format.Csv;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -63,6 +66,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
             {
                 { "comparisonMode", n => { ComparisonMode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_comparisonMode>(); } },
                 { "family", n => { Family = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_family>(); } },
+                { "format", n => { Format = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_format>(); } },
                 { "from", n => { From = n.GetStringValue(); } },
                 { "to", n => { To = n.GetStringValue(); } },
             };
@@ -76,6 +80,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_comparisonMode>("comparisonMode", ComparisonMode);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_family>("family", Family);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsPostRequestBody_format>("format", Format);
             writer.WriteStringValue("from", From);
             writer.WriteStringValue("to", To);
             writer.WriteAdditionalData(AdditionalData);

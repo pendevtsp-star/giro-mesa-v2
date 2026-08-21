@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import "./Icon.css";
 
 export type IconName =
   | "dashboard"
@@ -278,6 +277,7 @@ export function Icon({
     <svg
       aria-hidden="true"
       className={`gm-icon ${className}`}
+      data-slot="icon"
       fill="none"
       height={size}
       viewBox="0 0 24 24"

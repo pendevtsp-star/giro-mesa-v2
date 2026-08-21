@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Handoff;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Priority;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Runner;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -25,6 +26,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orde
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Priority.PriorityRequestBuilder Priority
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Priority.PriorityRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The runner property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Runner.RunnerRequestBuilder Runner
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.Runner.RunnerRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Orders.Item.WithOrderItemRequestBuilder"/> and sets the default values.

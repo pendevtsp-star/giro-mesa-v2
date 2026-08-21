@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Assignments;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Closures;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.LocationAnomalies;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Report;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Settings;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -27,6 +28,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Closures.ClosuresRequestBuilder Closures
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Closures.ClosuresRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The locationAnomalies property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.LocationAnomalies.LocationAnomaliesRequestBuilder LocationAnomalies
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.LocationAnomalies.LocationAnomaliesRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The report property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.TimeTracking.Report.ReportRequestBuilder Report

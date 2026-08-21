@@ -67,6 +67,93 @@ export function reportBudgetCoverage(
     : ("partial" as const);
 }
 
+export function buildReportForecast(input: {
+  dailySeries: readonly {
+    revenueCents: number;
+    previousRevenueCents: number | null;
+  }[];
+  cashFlow: { inflowsCents: number; outflowsCents: number };
+  inventory: readonly {
+    key: string;
+    label: string;
+    consumedQuantity: number;
+    currentQuantity: number;
+  }[];
+  horizonDays?: number;
+}) {
+  const horizonDays = Math.min(Math.max(input.horizonDays ?? 7, 1), 90);
+  const sampleDays = input.dailySeries.length;
+  const average = sampleDays
+    ? input.dailySeries.reduce((sum, row) => sum + row.revenueCents, 0) / sampleDays
+    : 0;
+  const variance = sampleDays
+    ? input.dailySeries.reduce((sum, row) => sum + (row.revenueCents - average) ** 2, 0) /
+      sampleDays
+    : 0;
+  const deviation = Math.sqrt(variance);
+  const comparable = input.dailySeries.filter(
+    (row) => row.previousRevenueCents !== null && row.previousRevenueCents > 0,
+  );
+  const errorPercent = comparable.length
+    ? Number(
+        (
+          (comparable.reduce(
+            (sum, row) =>
+              sum +
+              Math.abs(row.revenueCents - (row.previousRevenueCents as number)) /
+                (row.previousRevenueCents as number),
+            0,
+          ) /
+            comparable.length) *
+          100
+        ).toFixed(1),
+      )
+    : null;
+  const confidence =
+    sampleDays >= 28 && errorPercent !== null && errorPercent <= 20
+      ? ("high" as const)
+      : sampleDays >= 14 && (errorPercent === null || errorPercent <= 40)
+        ? ("medium" as const)
+        : ("low" as const);
+  const total = Math.round(average * horizonDays);
+  const interval = Math.round(1.28 * deviation * Math.sqrt(horizonDays));
+  const dailyInflows = sampleDays ? input.cashFlow.inflowsCents / sampleDays : 0;
+  const dailyOutflows = sampleDays ? input.cashFlow.outflowsCents / sampleDays : 0;
+  return {
+    method: "historical_daily_average_v1" as const,
+    horizonDays,
+    sampleDays,
+    confidence,
+    errorPercent,
+    revenue: {
+      dailyAverageCents: Math.round(average),
+      forecastCents: total,
+      lowerBoundCents: Math.max(0, total - interval),
+      upperBoundCents: total + interval,
+    },
+    cash: {
+      inflowsCents: Math.round(dailyInflows * horizonDays),
+      outflowsCents: Math.round(dailyOutflows * horizonDays),
+      netCents: Math.round((dailyInflows - dailyOutflows) * horizonDays),
+    },
+    purchases: input.inventory
+      .map((item) => {
+        const dailyDemand = sampleDays > 0 ? item.consumedQuantity / sampleDays : 0;
+        return {
+          key: item.key,
+          label: item.label,
+          suggestedQuantity: Number(
+            Math.max(0, dailyDemand * horizonDays - item.currentQuantity).toFixed(3),
+          ),
+          dailyDemand: Number(dailyDemand.toFixed(3)),
+        };
+      })
+      .filter((item) => item.suggestedQuantity > 0)
+      .sort((left, right) => right.suggestedQuantity - left.suggestedQuantity)
+      .slice(0, 20),
+  };
+}
+
 function zonedParts(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,

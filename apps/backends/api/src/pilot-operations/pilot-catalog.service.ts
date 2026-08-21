@@ -732,6 +732,7 @@ export class PilotCatalogService {
             unitId,
             productId: product.id,
             stationId,
+            stage: input.stationRouting?.find((route) => route.stationId === stationId)?.stage ?? 1,
           })),
         );
         await tx.insert(auditEvents).values({
@@ -944,6 +945,16 @@ export class PilotCatalogService {
     const stockDate = await this.unitBusinessDate(organizationId, unitId);
     await this.database.db.transaction(async (tx) => {
       await this.lockAndAssertStations(tx, organizationId, unitId, input.stationIds);
+      const existingRoutes = await tx
+        .select({ stationId: posProductStations.stationId, stage: posProductStations.stage })
+        .from(posProductStations)
+        .where(
+          and(
+            eq(posProductStations.organizationId, organizationId),
+            eq(posProductStations.unitId, unitId),
+            eq(posProductStations.productId, productId),
+          ),
+        );
       await tx
         .insert(posProductPrices)
         .values({
@@ -1002,6 +1013,10 @@ export class PilotCatalogService {
           unitId,
           productId,
           stationId,
+          stage:
+            input.stationRouting?.find((route) => route.stationId === stationId)?.stage ??
+            existingRoutes.find((route) => route.stationId === stationId)?.stage ??
+            1,
         })),
       );
       await tx.insert(auditEvents).values({
@@ -1046,6 +1061,16 @@ export class PilotCatalogService {
         .where(and(eq(posProducts.organizationId, organizationId), eq(posProducts.id, productId)))
         .limit(1);
       if (!existing) throw new NotFoundException({ code: "PRODUCT_NOT_FOUND" });
+      const existingRoutes = await tx
+        .select({ stationId: posProductStations.stationId, stage: posProductStations.stage })
+        .from(posProductStations)
+        .where(
+          and(
+            eq(posProductStations.organizationId, organizationId),
+            eq(posProductStations.unitId, unitId),
+            eq(posProductStations.productId, productId),
+          ),
+        );
       await tx
         .update(posProducts)
         .set({
@@ -1132,6 +1157,10 @@ export class PilotCatalogService {
           unitId,
           productId,
           stationId,
+          stage:
+            input.stationRouting?.find((route) => route.stationId === stationId)?.stage ??
+            existingRoutes.find((route) => route.stationId === stationId)?.stage ??
+            1,
         })),
       );
       await tx

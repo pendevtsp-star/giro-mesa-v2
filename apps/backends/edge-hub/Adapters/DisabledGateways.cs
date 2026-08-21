@@ -38,4 +38,7 @@ public sealed class DisabledPrinterGateway : IPrinterGateway
 
     public Task<PrintResult> PrintAsync(PrintRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PrintResult(false, "unavailable", "PRINTER_NOT_CONFIGURED"));
+
+    public Task<IReadOnlyList<PrinterStatus>> GetStatusesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PrinterStatus>>([]);
 }
