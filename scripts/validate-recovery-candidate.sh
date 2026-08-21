@@ -178,7 +178,7 @@ import json, pathlib, sys
 entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
 if not entries or entries[-1].get("tag") != "0045_strong_pride": raise SystemExit("RECOVERY_CANDIDATE_JOURNAL_INVALID")
 for entry in entries:
-    if entry.get("idx", -1) >= 26: print(f'{entry["tag"]}\t{entry["when"]}')
+    if entry.get("when", 0) > 1786493658116: print(f'{entry["tag"]}\t{entry["when"]}')
 PY
   )
   binding="$(docker port "$container" 5432/tcp | head -n 1)"
