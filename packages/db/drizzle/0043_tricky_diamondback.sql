@@ -510,7 +510,7 @@ CREATE INDEX "doseclub_reconciliation_findings_status_idx" ON "doseclub_reconcil
 CREATE UNIQUE INDEX "doseclub_reconciliation_runs_scheduled_day_unique" ON "doseclub_reconciliation_runs" USING btree ("organization_id","unit_id","run_date") WHERE "doseclub_reconciliation_runs"."trigger" = 'scheduled';--> statement-breakpoint
 CREATE UNIQUE INDEX "doseclub_reconciliation_runs_idempotency_unique" ON "doseclub_reconciliation_runs" USING btree ("organization_id","unit_id","idempotency_key") WHERE "doseclub_reconciliation_runs"."idempotency_key" is not null;--> statement-breakpoint
 CREATE INDEX "doseclub_reconciliation_runs_claim_idx" ON "doseclub_reconciliation_runs" USING btree ("status","lease_until","created_at");--> statement-breakpoint
-CREATE INDEX "doseclub_states_updated_idx" ON "doseclub_states" USING btree ("organization_id","unit_id","updated_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx" ON "doseclub_states" USING btree ("organization_id","unit_id","updated_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "command_inbox_scope_idempotency_unique" ON "command_inbox" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
 CREATE INDEX "command_inbox_aggregate_sequence_idx" ON "command_inbox" USING btree ("organization_id","unit_id","aggregate_type","aggregate_id","occupancy_epoch","aggregate_sequence");--> statement-breakpoint
 CREATE INDEX "command_inbox_received_idx" ON "command_inbox" USING btree ("organization_id","unit_id","received_at");--> statement-breakpoint
