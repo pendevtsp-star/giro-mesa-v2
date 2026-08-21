@@ -8,6 +8,8 @@ const workflowPath = join(root, ".github", "workflows", "validate-recovery.yml")
 const publishPath = join(root, ".github", "workflows", "publish-images.yml");
 const validatorPath = join(root, "scripts", "validate-recovery-candidate.sh");
 const recoveryMatrixPath = join(root, "deploy", "vps", "recovery-compatibility.json");
+const entrypointPath = join(root, "deploy", "vps", "deploy-entrypoint.sh");
+const provenancePath = join(root, "deploy", "vps", "verify-image-provenance.sh");
 const migration43Path = join(root, "packages", "db", "drizzle", "0043_tricky_diamondback.sql");
 
 test("manual recovery validation is non-privileged and bound to the default branch", () => {
@@ -89,11 +91,18 @@ test("privileged recovery authorization binds the versioned evidence file", () =
     "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
-  const evidence = readFileSync(
+  const evidence = JSON.parse(readFileSync(
     join(root, "docs", "evidence", "recovery", "5421ce-validation.json"),
     "utf8",
-  );
-  assert.equal(JSON.parse(evidence).targetMigration, "0045_strong_pride");
+  ));
+  assert.equal(evidence.targetMigration, "0045_strong_pride");
+  assert.deepEqual(evidence.schemaLevels, [45]);
+  assert.equal(evidence.runtime.schemaLevel, 45);
+  for (const scriptPath of [entrypointPath, provenancePath]) {
+    const script = readFileSync(scriptPath, "utf8");
+    assert.match(script, /evidence\.get\("schemaLevels"\) == \[45\]/);
+    assert.match(script, /"schemaLevel":45/);
+  }
   assert.match(publish, /docs\/evidence\/recovery\//);
   assert.match(publish, /recovery evidence hash mismatch/);
 });
