@@ -161,9 +161,9 @@ export GIROMESA_SITE_IMAGE=${recovery_image_values[2]} GIROMESA_CUSTOMER_IMAGE=$
 export GIROMESA_OPS_IMAGE=${recovery_image_values[4]}
 recovery_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$recovery_release/deploy/vps/compose.pilot.yaml" -f "$recovery_release/deploy/vps/compose.images.yaml" -f "$recovery_release/deploy/vps/compose.observability.yaml")
 "${recovery_compose[@]}" config --quiet
-GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$recovery_release/deploy/vps/verify-image-provenance.sh"
+GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
 "${recovery_compose[@]}" pull
-"$recovery_release/deploy/vps/verify-image-provenance.sh"
+"$provenance_script"
 export GIROMESA_RELEASE_ARTIFACT_SHA=$artifact_sha GIROMESA_IMAGE_ATTESTATION_FILE=$attestation
 export GIROMESA_RELEASE_DIRECTORY=$release_dir
 export GIROMESA_EXPECTED_PROVENANCE_ROLE=target
