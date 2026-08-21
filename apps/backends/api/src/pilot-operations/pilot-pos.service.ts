@@ -179,7 +179,7 @@ export class PilotPosService {
     allowed: readonly SystemRole[],
   ) {
     await this.requireAccess(identityId, organizationId, unitId);
-    const rows = await this.scope.requireOrganizationRole(identityId, organizationId, allowed);
+    const rows = await this.scope.requireOrganizationRole(identityId, organizationId, SYSTEM_ROLES);
     if (
       !rows.some(
         (row) =>
