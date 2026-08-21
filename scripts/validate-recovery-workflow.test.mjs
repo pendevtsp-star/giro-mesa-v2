@@ -112,4 +112,7 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   }
   assert.match(publish, /docs\/evidence\/recovery\//);
   assert.match(publish, /recovery evidence hash mismatch/);
+  assert.match(publish, /exactly one recovery artifact and evidence are allowed/);
+  assert.match(publish, /duplicate recovery source transition/);
+  assert.doesNotMatch(publish, /len\(transitions\)!=1/);
 });

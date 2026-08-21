@@ -232,9 +232,12 @@ jobs:
           if not transitions:
               output.write_text("enabled=false\nrecovery_sha=0000000000000000000000000000000000000000\n",encoding="utf-8")
               raise SystemExit(0)
-          if len(transitions)!=1: raise SystemExit("exactly one recovery authorization is allowed")
           item=transitions[0]; artifact=item.get("recoveryArtifact","")
           if not re.fullmatch(r"git:[0-9a-f]{40}",artifact): raise SystemExit("invalid recovery artifact")
+          authorization={(entry.get("recoveryArtifact"),entry.get("recoveryMigration"),entry.get("appliedAfter"),json.dumps(entry.get("evidence",{}),sort_keys=True)) for entry in transitions}
+          if len(authorization)!=1: raise SystemExit("exactly one recovery artifact and evidence are allowed")
+          origins={(entry.get("appliedBefore"),str(entry.get("appliedBeforeWhen"))) for entry in transitions}
+          if len(origins)!=len(transitions): raise SystemExit("duplicate recovery source transition")
           recovery_sha=artifact.removeprefix("git:")
           evidence=item.get("evidence",{}); relative=evidence.get("path","")
           if not re.fullmatch(r"docs/evidence/recovery/[A-Za-z0-9_.-]+\.json",relative): raise SystemExit("invalid evidence path")
