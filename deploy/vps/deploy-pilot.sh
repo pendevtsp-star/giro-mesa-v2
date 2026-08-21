@@ -99,7 +99,7 @@ PY
 python3 - "$recovery_matrix" "$source_migration_id" "$target_migration_id" "$recovery_migration_id" "$recovery_sha" <<'PY'
 import json, re, sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
-valid=value.get("schemaVersion")==1 and value.get("targetMigration")=="0042_shallow_lenny_balinger" and any(
+valid=value.get("schemaVersion")==1 and value.get("targetMigration")=="0045_strong_pride" and any(
     item.get("appliedBefore")==sys.argv[2]
     and str(item.get("appliedBeforeWhen"))=="1786493658116"
     and item.get("appliedAfter")==sys.argv[3]

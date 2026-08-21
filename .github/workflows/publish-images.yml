@@ -242,7 +242,7 @@ jobs:
           if actual!=evidence.get("sha256"): raise SystemExit("recovery evidence hash mismatch")
           value=json.loads(path.read_text(encoding="utf-8"))
           legacy={"sourceArtifact":"git:4d408037c3fbcb67e2ad57f8ad47b6300a10ec77","sourceMigration":"0026_doseclub_integration","sourceAppliedAt":"1786493658116","postgresMajors":[16,17],"result":"passed"}
-          if value.get("recoveryArtifact")!=artifact or value.get("postgresMajors")!=[16,17] or value.get("targetMigration")!="0042_shallow_lenny_balinger" or value.get("testedUpgrade") is not True or value.get("legacyUpgrade")!=legacy: raise SystemExit("recovery evidence incomplete")
+          if value.get("recoveryArtifact")!=artifact or value.get("postgresMajors")!=[16,17] or value.get("targetMigration")!="0045_strong_pride" or value.get("testedUpgrade") is not True or value.get("legacyUpgrade")!=legacy: raise SystemExit("recovery evidence incomplete")
           subprocess.run(["git","cat-file","-e",f"{recovery_sha}^{{commit}}"],check=True)
           output.write_text(f"enabled=true\nrecovery_sha={recovery_sha}\n",encoding="utf-8")
           PY

@@ -370,16 +370,16 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /system\.worker_probe/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0042_shallow_lenny_balinger");
+  assert.equal(matrix.requiredAppliedMigration, "0045_strong_pride");
   assert.deepEqual(matrix.transitions, [
     {
-      appliedMigration: "0042_shallow_lenny_balinger",
-      targetReleaseMigration: "0042_shallow_lenny_balinger",
-      targetArtifact: "git:179dcd2901e012ccda7be987828db1b72bb87942",
+      appliedMigration: "0045_strong_pride",
+      targetReleaseMigration: "0045_strong_pride",
+      targetArtifact: "git:5421cefb866576183119b265fcaa9f042745e591",
       evidence: {
-        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32295634301",
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
         testReportDigest:
-          "sha256:596dd8a09e3656a1899596c55378c0f6331aaea62e476e382e4dfe0175c745d0",
+          "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
       },
     },
   ]);
@@ -411,21 +411,21 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0042_shallow_lenny_balinger");
+  assert.equal(recovery.targetMigration, "0045_strong_pride");
   assert.deepEqual(recovery.transitions, [
     {
       appliedBefore: "0026_doseclub_integration",
       appliedBeforeWhen: "1786493658116",
-      appliedAfter: "0042_shallow_lenny_balinger",
-      recoveryMigration: "0042_shallow_lenny_balinger",
-      recoveryArtifact: "git:179dcd2901e012ccda7be987828db1b72bb87942",
+      appliedAfter: "0045_strong_pride",
+      recoveryMigration: "0045_strong_pride",
+      recoveryArtifact: "git:5421cefb866576183119b265fcaa9f042745e591",
       testedUpgrade: true,
       evidence: {
-        path: "docs/evidence/recovery/179dcd-validation.json",
-        sha256: "sha256:596dd8a09e3656a1899596c55378c0f6331aaea62e476e382e4dfe0175c745d0",
-        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32295634301",
+        path: "docs/evidence/recovery/5421ce-validation.json",
+        sha256: "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
+        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
         testReportDigest:
-          "sha256:596dd8a09e3656a1899596c55378c0f6331aaea62e476e382e4dfe0175c745d0",
+          "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
       },
     },
   ]);

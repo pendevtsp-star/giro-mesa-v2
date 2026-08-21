@@ -32,20 +32,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:179dcd2901e012ccda7be987828db1b72bb87942",
+    "artifact": "git:5421cefb866576183119b265fcaa9f042745e591",
     "migration": {
-      "id": "0042_shallow_lenny_balinger",
+      "id": "0045_strong_pride",
       "status": "verified",
-      "evidence": "git:179dcd2901e012ccda7be987828db1b72bb87942"
+      "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:179dcd2901e012ccda7be987828db1b72bb87942"
+        "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:179dcd2901e012ccda7be987828db1b72bb87942"
+        "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
       }
     }
   },

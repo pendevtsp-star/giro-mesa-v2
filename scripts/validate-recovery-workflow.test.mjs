@@ -70,30 +70,30 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0042_shallow_lenny_balinger");
+  assert.equal(matrix.targetMigration, "0045_strong_pride");
   assert.equal(matrix.transitions.length, 1);
   const [transition] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
   assert.equal(transition.recoveryMigration, matrix.targetMigration);
-  assert.equal(transition.recoveryArtifact, "git:179dcd2901e012ccda7be987828db1b72bb87942");
+  assert.equal(transition.recoveryArtifact, "git:5421cefb866576183119b265fcaa9f042745e591");
   assert.equal(transition.testedUpgrade, true);
-  assert.equal(transition.evidence.path, "docs/evidence/recovery/179dcd-validation.json");
+  assert.equal(transition.evidence.path, "docs/evidence/recovery/5421ce-validation.json");
   assert.equal(
     transition.evidence.sha256,
-    "sha256:596dd8a09e3656a1899596c55378c0f6331aaea62e476e382e4dfe0175c745d0",
+    "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
   );
   assert.equal(
     transition.evidence.workflowRun,
-    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32295634301",
+    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   const evidence = readFileSync(
-    join(root, "docs", "evidence", "recovery", "179dcd-validation.json"),
+    join(root, "docs", "evidence", "recovery", "5421ce-validation.json"),
     "utf8",
   );
-  assert.equal(JSON.parse(evidence).targetMigration, "0042_shallow_lenny_balinger");
+  assert.equal(JSON.parse(evidence).targetMigration, "0045_strong_pride");
   assert.match(publish, /docs\/evidence\/recovery\//);
   assert.match(publish, /recovery evidence hash mismatch/);
 });
