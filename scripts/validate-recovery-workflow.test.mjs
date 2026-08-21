@@ -46,8 +46,8 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /"doseClubReconciliation":\s*"legacy-source-upgraded"/);
   assert.match(script, /run_legacy_upgrade_matrix 16/);
   assert.match(script, /run_legacy_upgrade_matrix 17/);
-  assert.match(script, /0026_nifty_bullseye\.sql/);
-  assert.match(script, /1786935404301/);
+  assert.match(script, /entry\.get\("idx", -1\) >= 26/);
+  assert.match(script, /psql -1/);
   assert.match(script, /"runtime":\s*\{[\s\S]*"apiHealth":\s*"passed"/);
   assert.match(script, /"apiHealthByLevel"/);
   assert.match(script, /system\.worker_probe/);
