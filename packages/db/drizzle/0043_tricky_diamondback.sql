@@ -1,5 +1,13 @@
-CREATE TYPE "public"."command_inbox_status" AS ENUM('applied', 'quarantined', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."command_quarantine_status" AS ENUM('pending', 'recovered');--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'public'::regnamespace AND typname = 'command_inbox_status') THEN
+		CREATE TYPE "public"."command_inbox_status" AS ENUM('applied', 'quarantined', 'rejected');
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'public'::regnamespace AND typname = 'command_quarantine_status') THEN
+		CREATE TYPE "public"."command_quarantine_status" AS ENUM('pending', 'recovered');
+	END IF;
+END $$;--> statement-breakpoint
 CREATE TYPE "public"."management_returnable_supplier_exchange_status" AS ENUM('in_transit', 'received', 'canceled');--> statement-breakpoint
 CREATE TYPE "public"."management_stock_location_kind" AS ENUM('warehouse', 'cooler', 'freezer', 'bar', 'kitchen', 'returnables', 'other');--> statement-breakpoint
 CREATE TYPE "public"."management_report_alert_status" AS ENUM('open', 'claimed', 'resolved', 'dismissed');--> statement-breakpoint
@@ -129,7 +137,7 @@ CREATE TABLE IF NOT EXISTS "doseclub_states" (
 );
 --> statement-breakpoint
 ALTER TABLE "doseclub_states" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "aggregate_sequence_states" (
+CREATE TABLE IF NOT EXISTS "aggregate_sequence_states" (
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
 	"aggregate_type" varchar(80) NOT NULL,
@@ -145,7 +153,7 @@ CREATE TABLE "aggregate_sequence_states" (
 );
 --> statement-breakpoint
 ALTER TABLE "aggregate_sequence_states" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "command_inbox" (
+CREATE TABLE IF NOT EXISTS "command_inbox" (
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
 	"command_id" uuid NOT NULL,
@@ -174,7 +182,7 @@ CREATE TABLE "command_inbox" (
 );
 --> statement-breakpoint
 ALTER TABLE "command_inbox" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "command_quarantine" (
+CREATE TABLE IF NOT EXISTS "command_quarantine" (
 	"organization_id" uuid NOT NULL,
 	"unit_id" uuid NOT NULL,
 	"command_id" uuid NOT NULL,
@@ -464,10 +472,26 @@ DO $$ BEGIN
 		ALTER TABLE "doseclub_states" ADD CONSTRAINT "doseclub_states_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
 	END IF;
 END $$;--> statement-breakpoint
-ALTER TABLE "aggregate_sequence_states" ADD CONSTRAINT "aggregate_sequence_states_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "command_quarantine" ADD CONSTRAINT "command_quarantine_inbox_fk" FOREIGN KEY ("organization_id","unit_id","command_id") REFERENCES "public"."command_inbox"("organization_id","unit_id","command_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.aggregate_sequence_states'::regclass AND conname = 'aggregate_sequence_states_organization_unit_fk') THEN
+		ALTER TABLE "aggregate_sequence_states" ADD CONSTRAINT "aggregate_sequence_states_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.command_inbox'::regclass AND conname = 'command_inbox_organization_id_organizations_id_fk') THEN
+		ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.command_inbox'::regclass AND conname = 'command_inbox_organization_unit_fk') THEN
+		ALTER TABLE "command_inbox" ADD CONSTRAINT "command_inbox_organization_unit_fk" FOREIGN KEY ("organization_id","unit_id") REFERENCES "public"."units"("organization_id","id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.command_quarantine'::regclass AND conname = 'command_quarantine_inbox_fk') THEN
+		ALTER TABLE "command_quarantine" ADD CONSTRAINT "command_quarantine_inbox_fk" FOREIGN KEY ("organization_id","unit_id","command_id") REFERENCES "public"."command_inbox"("organization_id","unit_id","command_id") ON DELETE cascade ON UPDATE no action;
+	END IF;
+END $$;--> statement-breakpoint
 ALTER TABLE "management_inventory_issue_routes" ADD CONSTRAINT "management_inventory_issue_routes_product_fk" FOREIGN KEY ("organization_id","product_id") REFERENCES "public"."pos_products"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "management_inventory_issue_routes" ADD CONSTRAINT "management_inventory_issue_routes_station_fk" FOREIGN KEY ("organization_id","unit_id","station_id") REFERENCES "public"."pos_production_stations"("organization_id","unit_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "management_inventory_issue_routes" ADD CONSTRAINT "management_inventory_issue_routes_location_fk" FOREIGN KEY ("organization_id","unit_id","location_id") REFERENCES "public"."management_stock_locations"("organization_id","unit_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -511,10 +535,10 @@ CREATE UNIQUE INDEX "doseclub_reconciliation_runs_scheduled_day_unique" ON "dose
 CREATE UNIQUE INDEX "doseclub_reconciliation_runs_idempotency_unique" ON "doseclub_reconciliation_runs" USING btree ("organization_id","unit_id","idempotency_key") WHERE "doseclub_reconciliation_runs"."idempotency_key" is not null;--> statement-breakpoint
 CREATE INDEX "doseclub_reconciliation_runs_claim_idx" ON "doseclub_reconciliation_runs" USING btree ("status","lease_until","created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx" ON "doseclub_states" USING btree ("organization_id","unit_id","updated_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "command_inbox_scope_idempotency_unique" ON "command_inbox" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
-CREATE INDEX "command_inbox_aggregate_sequence_idx" ON "command_inbox" USING btree ("organization_id","unit_id","aggregate_type","aggregate_id","occupancy_epoch","aggregate_sequence");--> statement-breakpoint
-CREATE INDEX "command_inbox_received_idx" ON "command_inbox" USING btree ("organization_id","unit_id","received_at");--> statement-breakpoint
-CREATE INDEX "command_quarantine_pending_idx" ON "command_quarantine" USING btree ("organization_id","unit_id","status","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "command_inbox_scope_idempotency_unique" ON "command_inbox" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "command_inbox_aggregate_sequence_idx" ON "command_inbox" USING btree ("organization_id","unit_id","aggregate_type","aggregate_id","occupancy_epoch","aggregate_sequence");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "command_inbox_received_idx" ON "command_inbox" USING btree ("organization_id","unit_id","received_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "command_quarantine_pending_idx" ON "command_quarantine" USING btree ("organization_id","unit_id","status","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "management_inventory_issue_routes_default_unique" ON "management_inventory_issue_routes" USING btree ("organization_id","unit_id","product_id") WHERE "management_inventory_issue_routes"."station_id" is null;--> statement-breakpoint
 CREATE UNIQUE INDEX "management_inventory_issue_routes_station_unique" ON "management_inventory_issue_routes" USING btree ("organization_id","unit_id","product_id","station_id") WHERE "management_inventory_issue_routes"."station_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "management_inventory_transfer_receipts_idempotency_unique" ON "management_inventory_transfer_receipts" USING btree ("organization_id","unit_id","idempotency_key");--> statement-breakpoint

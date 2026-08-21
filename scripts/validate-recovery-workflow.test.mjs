@@ -8,6 +8,7 @@ const workflowPath = join(root, ".github", "workflows", "validate-recovery.yml")
 const publishPath = join(root, ".github", "workflows", "publish-images.yml");
 const validatorPath = join(root, "scripts", "validate-recovery-candidate.sh");
 const recoveryMatrixPath = join(root, "deploy", "vps", "recovery-compatibility.json");
+const migration43Path = join(root, "packages", "db", "drizzle", "0043_tricky_diamondback.sql");
 
 test("manual recovery validation is non-privileged and bound to the default branch", () => {
   const workflow = readFileSync(workflowPath, "utf8");
@@ -56,6 +57,14 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /recovery-validation\.json/);
   assert.match(script, /recovery-validation\.json\.sha256/);
   assert.match(script, /json\.dumps\(value, sort_keys=True, separators=\(",", ":"\)\)/);
+});
+
+test("schema 0043 adopts the historical event and DoseClub objects", () => {
+  const migration = readFileSync(migration43Path, "utf8");
+  assert.match(migration, /typname = 'command_inbox_status'/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS "command_inbox"/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS "doseclub_operations"/);
+  assert.match(migration, /CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx"/);
 });
 
 test("privileged recovery authorization binds the versioned evidence file", () => {
