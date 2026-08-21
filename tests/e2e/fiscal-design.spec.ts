@@ -108,7 +108,7 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
 
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("http://localhost:3102/#/fiscal");
+    await page.goto("http://127.0.0.1:3112/#/fiscal");
     await expect(page.getByRole("heading", { name: "Ativação fiscal" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Empresa emitente" })).toBeVisible();
     expect(

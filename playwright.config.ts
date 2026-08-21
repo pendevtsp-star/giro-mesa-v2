@@ -32,5 +32,14 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
+    {
+      command: "pnpm --filter @giromesa/ops exec vite --host 127.0.0.1 --port 3112",
+      env: {
+        VITE_API_URL: "http://127.0.0.1:3112",
+      },
+      url: "http://127.0.0.1:3112",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
   ],
 });
