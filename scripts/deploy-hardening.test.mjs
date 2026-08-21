@@ -454,7 +454,11 @@ test("deployment and rollback compose contracts always include observability and
   assert.match(deploy, /compose\.observability\.yaml/);
   assert.match(deploy, /compose\.images\.yaml/);
   assert.match(deploy, /verify-image-provenance\.sh/);
-  assert.doesNotMatch(deploy, /recovery_release\/deploy\/vps\/verify-image-provenance\.sh/);
+  assert.doesNotMatch(
+    deploy,
+    /GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "\$recovery_release\/deploy\/vps\/verify-image-provenance\.sh"/,
+  );
+  assert.doesNotMatch(deploy, /\n"\$recovery_release\/deploy\/vps\/verify-image-provenance\.sh"\n/);
   assert.match(rollback, /compose\.images\.yaml/);
   assert.match(images, /postgres@sha256:[0-9a-f]{64}/);
   for (const variable of ["API", "WORKER", "SITE", "CUSTOMER", "OPS"]) {
