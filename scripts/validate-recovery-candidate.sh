@@ -141,7 +141,7 @@ run_database_matrix 16 "$postgres16"
 run_database_matrix 17 "$postgres17"
 
 run_legacy_upgrade_matrix() {
-  local major="$1" image="$2" binding port container tag when file hash latest
+  local major="$1" image="$2" binding port container tag when file hash latest reconciliation_file reconciliation_hash
   container="gm-recovery-legacy-${major}-${suffix}"
   containers+=("$container")
   docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 "$image" >/dev/null
@@ -165,6 +165,11 @@ if not entries or entries[-1].get("tag") != "0026_doseclub_integration": raise S
 for entry in entries: print(f'{entry["tag"]}\t{entry["when"]}')
 PY
   )
+  reconciliation_file="$candidate_directory/packages/db/drizzle/0026_nifty_bullseye.sql"
+  reconciliation_hash="$(sha256sum "$reconciliation_file" | cut -d ' ' -f 1)"
+  docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$reconciliation_file" >/dev/null
+  docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+    -c "INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES ('$reconciliation_hash', 1786935404301)" >/dev/null
   binding="$(docker port "$container" 5432/tcp | head -n 1)"
   port="${binding##*:}"
   (cd -- "$candidate_directory" && DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:${port}/postgres" pnpm db:migrate)
