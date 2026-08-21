@@ -15,6 +15,20 @@
         "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
         "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
       }
+    },
+    {
+      "appliedBefore": "0042_shallow_lenny_balinger",
+      "appliedBeforeWhen": "1787029862431",
+      "appliedAfter": "0045_strong_pride",
+      "recoveryMigration": "0045_strong_pride",
+      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "testedUpgrade": true,
+      "evidence": {
+        "path": "docs/evidence/recovery/5421ce-validation.json",
+        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
+        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+      }
     }
   ]
 }

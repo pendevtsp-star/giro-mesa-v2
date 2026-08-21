@@ -96,15 +96,15 @@ if not entries or not isinstance(entries[-1].get("tag"), str): raise SystemExit(
 print(entries[-1]["tag"], end="")
 PY
 )
-python3 - "$recovery_matrix" "$source_migration_id" "$target_migration_id" "$recovery_migration_id" "$recovery_sha" <<'PY'
+python3 - "$recovery_matrix" "$source_migration_id" "$applied_migration_at" "$target_migration_id" "$recovery_migration_id" "$recovery_sha" <<'PY'
 import json, re, sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 valid=value.get("schemaVersion")==1 and value.get("targetMigration")=="0045_strong_pride" and any(
     item.get("appliedBefore")==sys.argv[2]
-    and str(item.get("appliedBeforeWhen"))=="1786493658116"
-    and item.get("appliedAfter")==sys.argv[3]
-    and item.get("recoveryMigration")==sys.argv[4]
-    and item.get("recoveryArtifact")==f"git:{sys.argv[5]}"
+    and str(item.get("appliedBeforeWhen"))==sys.argv[3]
+    and item.get("appliedAfter")==sys.argv[4]
+    and item.get("recoveryMigration")==sys.argv[5]
+    and item.get("recoveryArtifact")==f"git:{sys.argv[6]}"
     and item.get("testedUpgrade") is True
     and isinstance(item.get("evidence"),dict)
     and re.fullmatch(r"https://github\.com/pendevtsp-star/giro-mesa-v2/actions/runs/[0-9]+",item["evidence"].get("workflowRun",""))

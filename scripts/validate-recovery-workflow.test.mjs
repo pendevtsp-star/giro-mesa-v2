@@ -73,8 +73,8 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
   assert.equal(matrix.targetMigration, "0045_strong_pride");
-  assert.equal(matrix.transitions.length, 1);
-  const [transition] = matrix.transitions;
+  assert.equal(matrix.transitions.length, 2);
+  const [transition, currentProductionTransition] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
@@ -91,6 +91,13 @@ test("privileged recovery authorization binds the versioned evidence file", () =
     "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
+  assert.equal(currentProductionTransition.appliedBefore, "0042_shallow_lenny_balinger");
+  assert.equal(currentProductionTransition.appliedBeforeWhen, "1787029862431");
+  assert.equal(currentProductionTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(currentProductionTransition.recoveryMigration, matrix.targetMigration);
+  assert.equal(currentProductionTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(currentProductionTransition.testedUpgrade, true);
+  assert.deepEqual(currentProductionTransition.evidence, transition.evidence);
   const evidence = JSON.parse(readFileSync(
     join(root, "docs", "evidence", "recovery", "5421ce-validation.json"),
     "utf8",
