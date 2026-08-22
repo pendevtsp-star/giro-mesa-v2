@@ -657,6 +657,9 @@ test("private repository publishes keyless Sigstore signatures for every image d
     "scripts/fiscal-production-smoke.sql",
   ]) {
     assert.equal(workflow.split(fiscalReleaseFile).length - 1, 1);
+    assert.ok(
+      workflow.indexOf(fiscalReleaseFile) < workflow.indexOf("\n  recovery-manifest:"),
+    );
     assert.match(provenance, new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
     assert.match(readFileSync(trustedEntrypoint, "utf8"), new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
   }
