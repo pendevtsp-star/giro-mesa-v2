@@ -20,6 +20,8 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
   await page.route(/\/v1\//, async (route) => {
     const path = new URL(route.request().url()).pathname;
     const json = (body: unknown) => route.fulfill({ status: 200, json: body });
+    if (path.endsWith("/auth/terminal-session"))
+      return route.fulfill({ status: 401, json: { message: "Terminal ausente" } });
     if (path.endsWith("/auth/me")) {
       return json({
         identity: { id: identityId, email: "gestao@giromesa.test", displayName: "Gestão" },

@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test("login operacional mantém campos legíveis e associados", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A própria jornada cobre desktop e mobile.");
+  await page.route(/\/v1\/auth\/terminal-session$/, (route) =>
+    route.fulfill({ status: 401, json: { message: "Terminal ausente" } }),
+  );
   await page.route(/\/v1\/auth\/me$/, (route) =>
     route.fulfill({ status: 401, json: { message: "Sessão ausente" } }),
   );
