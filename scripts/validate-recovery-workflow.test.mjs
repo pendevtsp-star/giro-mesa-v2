@@ -42,7 +42,7 @@ test("shared validator proves the full database and runtime compatibility matrix
   const script = readFileSync(validatorPath, "utf8");
   assert.match(script, /postgres16/);
   assert.match(script, /postgres17/);
-  assert.match(script, /for level in 45/);
+  assert.match(script, /for level in 45 53/);
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
   assert.match(script, /APP=api/);
   assert.match(script, /APP=worker/);
@@ -72,13 +72,14 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0045_strong_pride");
-  assert.equal(matrix.transitions.length, 2);
-  const [transition, currentProductionTransition] = matrix.transitions;
+  assert.equal(matrix.targetMigration, "0053_petite_trauma");
+  assert.equal(matrix.transitions.length, 3);
+  const [transition, previousProductionTransition, currentProductionTransition] =
+    matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
-  assert.equal(transition.recoveryMigration, matrix.targetMigration);
+  assert.equal(transition.recoveryMigration, "0045_strong_pride");
   assert.equal(transition.recoveryArtifact, "git:5421cefb866576183119b265fcaa9f042745e591");
   assert.equal(transition.testedUpgrade, true);
   assert.equal(transition.evidence.path, "docs/evidence/recovery/5421ce-validation.json");
@@ -91,24 +92,30 @@ test("privileged recovery authorization binds the versioned evidence file", () =
     "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
-  assert.equal(currentProductionTransition.appliedBefore, "0042_shallow_lenny_balinger");
-  assert.equal(currentProductionTransition.appliedBeforeWhen, "1787029862431");
+  assert.equal(previousProductionTransition.appliedBefore, "0042_shallow_lenny_balinger");
+  assert.equal(previousProductionTransition.appliedBeforeWhen, "1787029862431");
+  assert.equal(previousProductionTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(previousProductionTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousProductionTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(previousProductionTransition.testedUpgrade, true);
+  assert.deepEqual(previousProductionTransition.evidence, transition.evidence);
+  assert.equal(currentProductionTransition.appliedBefore, "0045_strong_pride");
+  assert.equal(currentProductionTransition.appliedBeforeWhen, "1787256690924");
   assert.equal(currentProductionTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(currentProductionTransition.recoveryMigration, matrix.targetMigration);
+  assert.equal(currentProductionTransition.recoveryMigration, "0045_strong_pride");
   assert.equal(currentProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(currentProductionTransition.testedUpgrade, true);
   assert.deepEqual(currentProductionTransition.evidence, transition.evidence);
-  const evidence = JSON.parse(readFileSync(
-    join(root, "docs", "evidence", "recovery", "5421ce-validation.json"),
-    "utf8",
-  ));
+  const evidence = JSON.parse(
+    readFileSync(join(root, "docs", "evidence", "recovery", "5421ce-validation.json"), "utf8"),
+  );
   assert.equal(evidence.targetMigration, "0045_strong_pride");
   assert.deepEqual(evidence.schemaLevels, [45]);
   assert.equal(evidence.runtime.schemaLevel, 45);
   for (const scriptPath of [entrypointPath, provenancePath]) {
     const script = readFileSync(scriptPath, "utf8");
-    assert.match(script, /evidence\.get\("schemaLevels"\) == \[45\]/);
-    assert.match(script, /"schemaLevel":45/);
+    assert.match(script, /evidence\.get\("schemaLevels"\) == \[45, 53\]/);
+    assert.match(script, /"schemaLevel":53/);
   }
   assert.match(publish, /docs\/evidence\/recovery\//);
   assert.match(publish, /recovery evidence hash mismatch/);

@@ -63,8 +63,9 @@ postgres16="${postgres_images[0]%$'\r'}"
 postgres17="${postgres_images[1]%$'\r'}"
 
 required_migration="$candidate_directory/packages/db/drizzle/0045_strong_pride.sql"
+required_target_migration="$trust_root/packages/db/drizzle/0053_petite_trauma.sql"
 required_matrix_test="$candidate_directory/packages/db/src/schema.test.ts"
-[[ -f "$required_migration" && -f "$required_matrix_test" ]] || {
+[[ -f "$required_migration" && -f "$required_target_migration" && -f "$required_matrix_test" ]] || {
   printf 'RECOVERY_0045_PROOF_MISSING\n' >&2
   exit 65
 }
@@ -244,7 +245,8 @@ PY
 chmod 600 "$runtime_environment"
 
 apply_schema_level() {
-  local database="$1" level="$2" file prefix number
+  local database="$1" level="$2" migration_root="$candidate_directory" file prefix number
+  if ((level > 45)); then migration_root="$trust_root"; fi
   docker exec "$runtime_postgres" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c "CREATE DATABASE \"${database}\"" >/dev/null
   while IFS= read -r file; do
@@ -253,7 +255,7 @@ apply_schema_level() {
     if ((number <= level)); then
       docker exec -i "$runtime_postgres" psql -U postgres -d "$database" -v ON_ERROR_STOP=1 < "$file" >/dev/null
     fi
-  done < <(find "$candidate_directory/packages/db/drizzle" -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' -print | sort)
+  done < <(find "$migration_root/packages/db/drizzle" -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' -print | sort)
 }
 
 write_runtime_environment() {
@@ -269,7 +271,7 @@ PY
   mv -f -- "$temporary" "$runtime_environment"
 }
 
-for level in 45; do
+for level in 45 53; do
   database="recovery_level_${level}"
   api="gm-recovery-api-${level}-${suffix}"
   worker="gm-recovery-worker-${level}-${suffix}"
@@ -277,19 +279,17 @@ for level in 45; do
   apply_schema_level "$database" "$level"
   write_runtime_environment "$database"
 
-  if ((level == 45)); then
-    docker run -d --name "$api" --network "$network" --env-file "$runtime_environment" \
-      -e HOST=0.0.0.0 -e PORT=3200 "$api_image" >/dev/null
-    ready=false
-    for _ in $(seq 1 60); do
-      if docker exec "$api" node -e "fetch('http://127.0.0.1:3200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
-        ready=true
-        break
-      fi
-      sleep 2
-    done
-    [[ "$ready" == true ]] || { docker logs "$api" >&2; printf 'RECOVERY_API_NOT_READY:%s\n' "$level" >&2; exit 1; }
-  fi
+  docker run -d --name "$api" --network "$network" --env-file "$runtime_environment" \
+    -e HOST=0.0.0.0 -e PORT=3200 "$api_image" >/dev/null
+  ready=false
+  for _ in $(seq 1 60); do
+    if docker exec "$api" node -e "fetch('http://127.0.0.1:3200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+      ready=true
+      break
+    fi
+    sleep 2
+  done
+  [[ "$ready" == true ]] || { docker logs "$api" >&2; printf 'RECOVERY_API_NOT_READY:%s\n' "$level" >&2; exit 1; }
   docker run -d --name "$worker" --network "$network" --env-file "$runtime_environment" \
     "$worker_image" >/dev/null
   before="$(docker inspect --format '{{.RestartCount}}' "$worker")"
@@ -313,7 +313,7 @@ for level in 45; do
   done
   [[ "$processed" == true ]] || { printf 'RECOVERY_WORKER_OUTBOX_PROBE_FAILED:%s\n' "$level" >&2; exit 1; }
   docker rm -f "$worker" >/dev/null
-  if ((level == 45)); then docker rm -f "$api" >/dev/null; fi
+  docker rm -f "$api" >/dev/null
 done
 
 mkdir -p -- "$output_directory"
@@ -323,14 +323,14 @@ import hashlib, json, os, pathlib, sys, tempfile
 directory=pathlib.Path(sys.argv[1])
 recovery_sha=sys.argv[2]
 doseclub_present=sys.argv[3]=="true"
-levels=[45]
+levels=[45,53]
 value={
     "schemaVersion":1,
     "role":"recovery",
     "recoveryArtifact":"git:"+recovery_sha,
     "postgresMajors":[16,17],
     "schemaLevels":levels,
-    "targetMigration":"0045_strong_pride",
+    "targetMigration":"0053_petite_trauma",
     "testedUpgrade":True,
     "doseClubReconciliation":"legacy-source-upgraded",
     "legacyUpgrade":{
@@ -342,7 +342,7 @@ value={
     },
     "runtime":{
         "postgresMajor":17,
-        "schemaLevel":45,
+        "schemaLevel":53,
         "apiHealth":"passed",
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
@@ -350,8 +350,8 @@ value={
     "runtimeMatrix":{
         "postgresMajor":17,
         "schemaLevels":levels,
-        "apiHealthByLevel":{"45":"passed"},
-        "workerByLevel":{"45":"passed"},
+        "apiHealthByLevel":{"45":"passed","53":"passed"},
+        "workerByLevel":{"45":"passed","53":"passed"},
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
         "doseClub":{"present":doseclub_present,"probe":"passed" if doseclub_present else "not-present"},

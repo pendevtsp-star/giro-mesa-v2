@@ -538,39 +538,26 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0045_strong_pride");
-  assert.deepEqual(recovery.transitions, [
-    {
-      appliedBefore: "0026_doseclub_integration",
-      appliedBeforeWhen: "1786493658116",
-      appliedAfter: "0045_strong_pride",
-      recoveryMigration: "0045_strong_pride",
-      recoveryArtifact: "git:5421cefb866576183119b265fcaa9f042745e591",
-      testedUpgrade: true,
-      evidence: {
-        path: "docs/evidence/recovery/5421ce-validation.json",
-        sha256: "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        testReportDigest:
-          "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-      },
-    },
-    {
-      appliedBefore: "0042_shallow_lenny_balinger",
-      appliedBeforeWhen: "1787029862431",
-      appliedAfter: "0045_strong_pride",
-      recoveryMigration: "0045_strong_pride",
-      recoveryArtifact: "git:5421cefb866576183119b265fcaa9f042745e591",
-      testedUpgrade: true,
-      evidence: {
-        path: "docs/evidence/recovery/5421ce-validation.json",
-        sha256: "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        testReportDigest:
-          "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-      },
-    },
-  ]);
+  assert.equal(recovery.targetMigration, "0053_petite_trauma");
+  assert.deepEqual(
+    recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
+      appliedBefore,
+      appliedBeforeWhen,
+    })),
+    [
+      { appliedBefore: "0026_doseclub_integration", appliedBeforeWhen: "1786493658116" },
+      { appliedBefore: "0042_shallow_lenny_balinger", appliedBeforeWhen: "1787029862431" },
+      { appliedBefore: "0045_strong_pride", appliedBeforeWhen: "1787256690924" },
+    ],
+  );
+  for (const transition of recovery.transitions) {
+    assert.equal(transition.appliedAfter, recovery.targetMigration);
+    assert.equal(transition.recoveryMigration, "0045_strong_pride");
+    assert.equal(transition.recoveryArtifact, "git:5421cefb866576183119b265fcaa9f042745e591");
+    assert.equal(transition.testedUpgrade, true);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/32503278065$/);
+    assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
+  }
 });
 
 test("deployment and rollback compose contracts always include observability and digest images", () => {

@@ -199,13 +199,13 @@ evidence_valid = (
     and evidence.get("role") == "recovery"
     and evidence.get("recoveryArtifact") == "git:" + recovery_sha
     and evidence.get("postgresMajors") == [16, 17]
-    and evidence.get("schemaLevels") == [45]
-    and evidence.get("targetMigration") == "0045_strong_pride"
+    and evidence.get("schemaLevels") == [45, 53]
+    and evidence.get("targetMigration") == "0053_petite_trauma"
     and evidence.get("testedUpgrade") is True
     and evidence.get("doseClubReconciliation") == "legacy-source-upgraded"
     and evidence.get("legacyUpgrade") == {"sourceArtifact":"git:4d408037c3fbcb67e2ad57f8ad47b6300a10ec77","sourceMigration":"0026_doseclub_integration","sourceAppliedAt":"1786493658116","postgresMajors":[16,17],"result":"passed"}
     and evidence.get("result") == "passed"
-    and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":45,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
+    and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":53,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
 )
 if not (validate_files(target_manifest, target_root, "target") and validate_files(recovery_manifest, recovery_root, "recovery") and evidence_valid):
     raise SystemExit("TRUST_RELEASE_FILES_INVALID")
