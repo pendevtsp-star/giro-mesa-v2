@@ -159,6 +159,12 @@ export function RealDashboard({
         const activity = overview.activity.filter(
           (item) => !item.route || canAccess(profile, item.route),
         );
+        const unavailableSources = new Set(overview.unavailableSources);
+        const freshSources = overview.sources.filter(({ status }) => status === "fresh").length;
+        const canOpenOperationalShift =
+          overview.activeShift === null &&
+          ["owner", "manager"].includes(overview.profileId) &&
+          canAccess(profile, "salon");
         return (
           <div className="dashboard-overview">
             <section aria-label="Contexto da visão geral" className="dashboard-context">
@@ -173,43 +179,91 @@ export function RealDashboard({
                       : "Visão gerencial da unidade"}
                 </span>
               </div>
-              <time dateTime={overview.generatedAt}>
-                Atualizado às {time(overview.generatedAt)}
-              </time>
+              <div className="dashboard-context__actions">
+                {canOpenOperationalShift && (
+                  <a
+                    className="gm-button gm-button--primary gm-button--sm"
+                    href={routeHref("salon")}
+                  >
+                    Abrir operação
+                  </a>
+                )}
+                <time dateTime={overview.generatedAt}>
+                  Atualizado às {time(overview.generatedAt)}
+                </time>
+              </div>
             </section>
 
             <p aria-live="polite" className="dashboard-live-update" role="status">
               {alertDigest}
             </p>
 
-            {(overview.unavailableSources.length > 0 || actionError) && (
-              <Card className="dashboard-partial" role="alert">
+            {actionError && (
+              <Card
+                className="dashboard-partial flex-row flex-wrap items-center gap-3 p-3"
+                role="alert"
+              >
                 <div>
+                  <strong>Ação não concluída</strong>
+                  <span>{actionError}</span>
+                </div>
+              </Card>
+            )}
+
+            {(overview.unavailableSources.length > 0 || remote.stale || remote.updating) && (
+              <Card
+                className={`dashboard-partial flex-row flex-wrap items-center gap-3 p-3 ${remote.updating && overview.unavailableSources.length === 0 ? "dashboard-partial--updating" : ""}`}
+                role={overview.unavailableSources.length > 0 || remote.stale ? "alert" : "status"}
+              >
+                <div className="dashboard-partial__summary">
                   <strong>
-                    {actionError ? "Ação não concluída" : "Dados parcialmente atualizados"}
+                    {remote.updating && overview.unavailableSources.length === 0
+                      ? "Atualizando dados"
+                      : remote.stale
+                        ? "Dados desatualizados"
+                        : `${overview.unavailableSources.length} ${overview.unavailableSources.length === 1 ? "fonte indisponível" : "fontes indisponíveis"}`}
                   </strong>
                   <span>
-                    {actionError ??
-                      "As demais fontes continuam disponíveis. Tente novamente somente a fonte necessária."}
+                    {remote.updating && overview.unavailableSources.length === 0
+                      ? "A última resposta válida permanece visível durante a consulta."
+                      : remote.stale
+                        ? "Não foi possível confirmar uma nova atualização. Os dados abaixo são da última resposta válida."
+                        : `Dados parcialmente atualizados. ${freshSources} de ${overview.sources.length} fontes responderam às ${time(overview.generatedAt)}.`}
                   </span>
                 </div>
-                {!actionError && (
-                  <div className="dashboard-source-retries">
-                    {overview.unavailableSources.map((source) => (
-                      <Button
-                        disabled={busyAction === `source:${source}`}
-                        key={source}
-                        onClick={() => void retrySource(source as OverviewSourceId)}
-                        type="button"
-                        variant="secondary"
-                      >
-                        {busyAction === `source:${source}`
-                          ? "Consultando…"
-                          : `Tentar ${sourceLabel(source)}`}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                <div className="dashboard-partial__actions">
+                  <Button
+                    aria-busy={remote.updating}
+                    disabled={remote.updating || busyAction !== null}
+                    onClick={remote.retry}
+                    size="sm"
+                    type="button"
+                    variant="secondary"
+                  >
+                    {remote.updating ? "Atualizando…" : "Atualizar dados"}
+                  </Button>
+                  {overview.unavailableSources.length > 0 && (
+                    <details className="dashboard-source-details">
+                      <summary>Ver detalhes</summary>
+                      <div className="dashboard-source-retries">
+                        {overview.unavailableSources.map((source) => (
+                          <Button
+                            disabled={busyAction === `source:${source}` || remote.updating}
+                            key={source}
+                            onClick={() => void retrySource(source as OverviewSourceId)}
+                            size="sm"
+                            type="button"
+                            variant="secondary"
+                          >
+                            {busyAction === `source:${source}`
+                              ? "Consultando…"
+                              : `Tentar ${sourceLabel(source)}`}
+                          </Button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
               </Card>
             )}
 
@@ -255,30 +309,40 @@ export function RealDashboard({
                         )}
                       </a>
                       <div className="dashboard-priority__controls">
-                        <a href={routeHref(item.route)}>{item.actionLabel} →</a>
-                        <Button
-                          disabled={busyAction !== null || item.assignedTo?.isMe}
-                          onClick={() => void actOnPriority(item, "claim")}
-                          type="button"
-                          variant="secondary"
-                        >
-                          Assumir
-                        </Button>
-                        <Button
-                          disabled={busyAction !== null}
-                          onClick={() => void actOnPriority(item, "snooze")}
-                          type="button"
-                          variant="ghost"
-                        >
-                          Adiar 15 min
-                        </Button>
-                        <Button
-                          disabled={busyAction !== null}
-                          onClick={() => void actOnPriority(item, "resolve")}
-                          type="button"
-                        >
-                          Marcar tratada
-                        </Button>
+                        <a className="dashboard-priority__action" href={routeHref(item.route)}>
+                          {item.actionLabel} →
+                        </a>
+                        <details className="dashboard-priority__more">
+                          <summary>Mais ações</summary>
+                          <div>
+                            <Button
+                              disabled={busyAction !== null || item.assignedTo?.isMe}
+                              onClick={() => void actOnPriority(item, "claim")}
+                              size="sm"
+                              type="button"
+                              variant="secondary"
+                            >
+                              Assumir
+                            </Button>
+                            <Button
+                              disabled={busyAction !== null}
+                              onClick={() => void actOnPriority(item, "snooze")}
+                              size="sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              Adiar 15 min
+                            </Button>
+                            <Button
+                              disabled={busyAction !== null}
+                              onClick={() => void actOnPriority(item, "resolve")}
+                              size="sm"
+                              type="button"
+                            >
+                              Marcar tratada
+                            </Button>
+                          </div>
+                        </details>
                       </div>
                     </article>
                   ))}
@@ -287,7 +351,7 @@ export function RealDashboard({
                 <EmptyState
                   description={
                     overview.unavailableSources.length
-                      ? "Parte das fontes não respondeu. Atualize a fonte antes de concluir que não há pendências."
+                      ? "Parte das fontes não respondeu. Atualize os dados antes de concluir que não há pendências."
                       : "Nenhuma exceção exige ação neste momento."
                   }
                   icon={overview.unavailableSources.length ? "!" : "✓"}
@@ -302,35 +366,45 @@ export function RealDashboard({
 
             {metrics.length ? (
               <section aria-label="Indicadores principais" className="dashboard-metrics">
-                {metrics.map((metric) => (
-                  <a
-                    className={`dashboard-metric dashboard-metric--${metric.tone}`}
-                    href={routeHref(metric.route)}
-                    key={metric.id}
-                  >
-                    <Card>
-                      <span className="dashboard-metric__label">{metric.label}</span>
-                      <strong>{metric.value}</strong>
-                      <small>{metric.detail}</small>
-                      {(metric.comparison || metric.goal) && (
-                        <span className="dashboard-metric__context">
-                          {metric.comparison && (
-                            <Badge tone={metric.comparison.tone}>
-                              {metric.comparison.value} · {metric.comparison.label}
-                            </Badge>
-                          )}
-                          {metric.goal && (
-                            <Badge tone={metric.goal.tone}>{metric.goal.label}</Badge>
-                          )}
+                {metrics.map((metric) => {
+                  const sourceUnavailable = unavailableSources.has(metric.source);
+                  return (
+                    <a
+                      className={`dashboard-metric dashboard-metric--${metric.tone}`}
+                      href={routeHref(metric.route)}
+                      key={metric.id}
+                    >
+                      <Card
+                        className={`grid ${sourceUnavailable ? "dashboard-metric__unavailable" : ""}`}
+                      >
+                        <span className="dashboard-metric__label">{metric.label}</span>
+                        <strong>{metric.value}</strong>
+                        <small>{metric.detail}</small>
+                        {sourceUnavailable && (
+                          <Badge tone="warning">
+                            Fonte {sourceLabel(metric.source)} indisponível
+                          </Badge>
+                        )}
+                        {(metric.comparison || metric.goal) && !sourceUnavailable && (
+                          <span className="dashboard-metric__context">
+                            {metric.comparison && (
+                              <Badge tone={metric.comparison.tone}>
+                                {metric.comparison.value} · {metric.comparison.label}
+                              </Badge>
+                            )}
+                            {metric.goal && (
+                              <Badge tone={metric.goal.tone}>{metric.goal.label}</Badge>
+                            )}
+                          </span>
+                        )}
+                        <span aria-hidden="true" className="dashboard-metric__arrow">
+                          →
                         </span>
-                      )}
-                      <span aria-hidden="true" className="dashboard-metric__arrow">
-                        →
-                      </span>
-                      <VisuallyHidden>Abrir {metric.label}</VisuallyHidden>
-                    </Card>
-                  </a>
-                ))}
+                        <VisuallyHidden>Abrir {metric.label}</VisuallyHidden>
+                      </Card>
+                    </a>
+                  );
+                })}
               </section>
             ) : (
               <Card>
@@ -472,17 +546,14 @@ export function RealDashboard({
                         />
                         {sourceLabel(source.id)}
                       </span>
-                      <time dateTime={source.checkedAt}>{time(source.checkedAt)}</time>
-                      {source.status === "unavailable" && (
-                        <Button
-                          disabled={busyAction === `source:${source.id}`}
-                          onClick={() => void retrySource(source.id)}
-                          type="button"
-                          variant="secondary"
-                        >
-                          Tentar novamente
-                        </Button>
-                      )}
+                      <time dateTime={source.checkedAt}>
+                        {source.status === "fresh"
+                          ? time(source.checkedAt)
+                          : `Tentativa ${time(source.checkedAt)}`}
+                      </time>
+                      <Badge tone={source.status === "fresh" ? "success" : "warning"}>
+                        {source.status === "fresh" ? "Atualizada" : "Indisponível"}
+                      </Badge>
                     </div>
                   ))}
                 </div>

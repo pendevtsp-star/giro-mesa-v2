@@ -24,6 +24,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShi
 #endif
         /// <summary>The countedCents property</summary>
         public int? CountedCents { get; set; }
+        /// <summary>The tenderCounts property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody_tenderCounts>? TenderCounts { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody_tenderCounts> TenderCounts { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody"/> and sets the default values.
         /// </summary>
@@ -51,6 +59,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShi
             {
                 { "closeReason", n => { CloseReason = n.GetStringValue(); } },
                 { "countedCents", n => { CountedCents = n.GetIntValue(); } },
+                { "tenderCounts", n => { TenderCounts = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody_tenderCounts>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody_tenderCounts.CreateFromDiscriminatorValue)?.AsList(); } },
             };
         }
         /// <summary>
@@ -62,6 +71,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShi
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("closeReason", CloseReason);
             writer.WriteIntValue("countedCents", CountedCents);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Close.ClosePostRequestBody_tenderCounts>("tenderCounts", TenderCounts);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

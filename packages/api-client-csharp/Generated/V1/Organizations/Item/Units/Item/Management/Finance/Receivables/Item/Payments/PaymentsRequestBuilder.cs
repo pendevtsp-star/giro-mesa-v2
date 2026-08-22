@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.Item.Payments
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\management\finance\receivables\{receivableId}\payments
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\management\finance\receivables\{receivableId}\payments
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class PaymentsRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PaymentsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}/payments", pathParameters)
+        public PaymentsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/finance/receivables/{receivableId}/payments", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PaymentsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}/payments", rawUrl)
+        public PaymentsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/finance/receivables/{receivableId}/payments", rawUrl)
         {
         }
         /// <param name="body">The request body</param>

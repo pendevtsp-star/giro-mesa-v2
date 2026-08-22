@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Overview.Visit
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\management\overview\visit
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\management\overview\visit
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class VisitRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Overvie
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public VisitRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/overview/visit", pathParameters)
+        public VisitRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/overview/visit", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Overvie
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public VisitRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/overview/visit", rawUrl)
+        public VisitRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/overview/visit", rawUrl)
         {
         }
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>

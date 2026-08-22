@@ -98,6 +98,55 @@ public sealed class HubStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PersistsFiscalIntentAndRecoversAnExpiredLeaseAcrossRestart()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var organizationId = Guid.NewGuid().ToString();
+        var unitId = Guid.NewGuid().ToString();
+        var actorId = Guid.NewGuid().ToString();
+        var request = new FiscalRequest(
+            "order-2026-lease",
+            actorId,
+            Guid.NewGuid().ToString(),
+            2590,
+            "{\"sensitive\":true}");
+        var payload = JsonSerializer.Serialize(request);
+
+        var created = await store.CreateOrGetFiscalOperationAsync(
+            organizationId, unitId, actorId, Guid.NewGuid().ToString(),
+            "issue", request.IdempotencyKey, payload, now);
+        var replay = await store.CreateOrGetFiscalOperationAsync(
+            organizationId, unitId, actorId, Guid.NewGuid().ToString(),
+            "issue", request.IdempotencyKey, payload, now);
+
+        Assert.True(created.Inserted);
+        Assert.False(replay.Inserted);
+        Assert.Equal(created.Operation.Id, replay.Operation.Id);
+        var claimed = Assert.IsType<StoredFiscalOperation>(
+            await store.ClaimFiscalOperationAsync(created.Operation.Id, now, TimeSpan.FromSeconds(30), 5));
+        Assert.Null(await store.ClaimFiscalOperationAsync(
+            created.Operation.Id, now, TimeSpan.FromSeconds(30), 5));
+        Assert.Equal(1, claimed.AttemptCount);
+
+        await Assert.ThrowsAsync<OperationalConflictException>(() =>
+            store.CreateOrGetFiscalOperationAsync(
+                organizationId, unitId, actorId, Guid.NewGuid().ToString(),
+                "issue", request.IdempotencyKey,
+                JsonSerializer.Serialize(request with { TotalInCents = 9999 }), now));
+
+        SqliteConnection.ClearAllPools();
+        var restarted = CreateStore();
+        await restarted.InitializeAsync();
+        var reclaimed = Assert.IsType<StoredFiscalOperation>(
+            await restarted.ClaimFiscalOperationAsync(
+                created.Operation.Id, now.AddSeconds(31), TimeSpan.FromSeconds(30), 5));
+        Assert.Equal(2, reclaimed.AttemptCount);
+        Assert.NotEqual(claimed.LeaseToken, reclaimed.LeaseToken);
+    }
+
+    [Fact]
     public void BuildsACanonicalTerminalFiscalReconciliationEvent()
     {
         var snapshot = SnapshotWithKdsOrder("order-1");

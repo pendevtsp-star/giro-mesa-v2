@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  type BusinessHours,
+  businessHoursSchema,
   contactRequestSchema,
+  copyUnitSettingsSchema,
   createOrganizationSchema,
   deliveryAddressSchema,
   deliveryCourierAssignmentSchema,
@@ -16,10 +19,72 @@ import {
   publicOrderSchema,
   registerRequestSchema,
   registerSchema,
+  timezoneSchema,
   trialApplicationRequestSchema,
 } from "./index.js";
 
 describe("public contracts", () => {
+  it("validates structured establishment hours and IANA timezones", () => {
+    const weekly: BusinessHours["weekly"] = Array.from({ length: 7 }, (_, index) => ({
+      weekday: index + 1,
+      mode: "closed" as const,
+    }));
+    weekly[0] = {
+      weekday: 1,
+      mode: "periods",
+      periods: [
+        { start: "11:00", end: "15:00", endsNextDay: false },
+        { start: "18:00", end: "01:00", endsNextDay: true },
+      ],
+    };
+    assert.equal(businessHoursSchema.safeParse({ weekly, exceptions: [] }).success, true);
+    assert.equal(timezoneSchema.safeParse("America/Sao_Paulo").success, true);
+    assert.equal(timezoneSchema.safeParse("Mars/Olympus_Mons").success, false);
+    assert.equal(
+      businessHoursSchema.safeParse({
+        weekly: weekly.map((day, index) => (index === 1 ? { ...day, weekday: 1 } : day)),
+        exceptions: [],
+      }).success,
+      false,
+    );
+  });
+
+  it("rejects overlapping hours, duplicate exceptions and copy targets", () => {
+    const weekly: BusinessHours["weekly"] = Array.from({ length: 7 }, (_, index) => ({
+      weekday: index + 1,
+      mode: "closed" as const,
+    }));
+    weekly[0] = {
+      weekday: 1,
+      mode: "periods",
+      periods: [{ start: "22:00", end: "02:00", endsNextDay: true }],
+    };
+    weekly[1] = {
+      weekday: 2,
+      mode: "periods",
+      periods: [{ start: "01:00", end: "03:00", endsNextDay: false }],
+    };
+    assert.equal(businessHoursSchema.safeParse({ weekly, exceptions: [] }).success, false);
+    assert.equal(
+      businessHoursSchema.safeParse({
+        weekly: Array.from({ length: 7 }, (_, index) => ({
+          weekday: index + 1,
+          mode: "closed",
+        })),
+        exceptions: [
+          { date: "2026-12-25", mode: "closed" },
+          { date: "2026-12-25", mode: "open24h" },
+        ],
+      }).success,
+      false,
+    );
+    const unitId = crypto.randomUUID();
+    assert.equal(
+      copyUnitSettingsSchema.safeParse({ targetUnitIds: [unitId, unitId] }).success,
+      false,
+    );
+  });
+
   it("normalizes identity email and rejects weak passwords", () => {
     const result = registerSchema.parse({
       email: " Owner@Example.COM ",

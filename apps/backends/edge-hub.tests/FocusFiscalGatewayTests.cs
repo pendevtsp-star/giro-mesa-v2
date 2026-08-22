@@ -219,8 +219,13 @@ public sealed class FocusFiscalGatewayTests
     [Fact]
     public async Task InvalidatesANumberRangeOnlyAfterProviderAuthorization()
     {
-        var handler = new RecordingHandler((request, _) =>
+        var handler = new RecordingHandler((request, call) =>
         {
+            if (call == 1)
+            {
+                Assert.Equal(HttpMethod.Get, request.Method);
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
             Assert.Equal(HttpMethod.Post, request.Method);
             Assert.EndsWith("/v2/nfce/inutilizacao", request.RequestUri?.ToString());
             var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -245,6 +250,7 @@ public sealed class FocusFiscalGatewayTests
         Assert.True(result.Success);
         Assert.Equal("invalidated", result.Status);
         Assert.Equal("135260000000001", result.DocumentReference);
+        Assert.Equal(2, handler.CallCount);
     }
 
     [Fact]
@@ -252,14 +258,6 @@ public sealed class FocusFiscalGatewayTests
     {
         var handler = new RecordingHandler((request, call) =>
         {
-            if (call == 1)
-            {
-                Assert.Equal(HttpMethod.Post, request.Method);
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("{\"status\":\"erro_autorizacao\"}")
-                };
-            }
             Assert.Equal(HttpMethod.Get, request.Method);
             Assert.Contains("cnpj=12345678000199", request.RequestUri?.Query);
             Assert.Contains("numero_inicial=40", request.RequestUri?.Query);
@@ -280,7 +278,7 @@ public sealed class FocusFiscalGatewayTests
 
         Assert.True(result.Success);
         Assert.Equal("135260000000002", result.DocumentReference);
-        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(1, handler.CallCount);
     }
 
     [Fact]

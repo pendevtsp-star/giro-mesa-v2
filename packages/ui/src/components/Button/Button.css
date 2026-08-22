@@ -1,4 +1,4 @@
-.gm-button:not(.gm-pill) {
+.gm-button:where(:not(.gm-pill)) {
   align-items: center;
   border: 1px solid transparent;
   border-radius: var(--gm-radius-xs);

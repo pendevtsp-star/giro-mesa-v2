@@ -130,6 +130,12 @@ importers:
 
   apps/frontends/customer:
     dependencies:
+      '@giromesa/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@giromesa/domain':
+        specifier: workspace:*
+        version: link:../../../packages/domain
       '@giromesa/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
@@ -167,6 +173,9 @@ importers:
       '@giromesa/contracts':
         specifier: workspace:*
         version: link:../../../packages/contracts
+      '@giromesa/domain':
+        specifier: workspace:*
+        version: link:../../../packages/domain
       '@giromesa/ui':
         specifier: workspace:*
         version: link:../../../packages/ui

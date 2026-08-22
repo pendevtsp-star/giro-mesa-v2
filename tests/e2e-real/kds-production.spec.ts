@@ -623,8 +623,9 @@ async function expectNoHorizontalOverflow(page: Page) {
   );
 }
 
-test("KDS mantém submenu, rotas e última área operacional", async ({ page }) => {
+test("KDS mantém submenu, rotas e última área operacional", async ({ page }, testInfo) => {
   await mockKdsApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await enterKds(page);
 
   await expect(page).toHaveURL(/#\/kds\/station$/);
@@ -645,6 +646,32 @@ test("KDS mantém submenu, rotas e última área operacional", async ({ page }) 
   await expect(page.getByRole("heading", { level: 2, name: "Aparência" })).toBeVisible();
   await expect(page.getByText("Somente este terminal").first()).toBeVisible();
   await expect(page.getByText("Configuração da unidade").first()).toBeVisible();
+  await expect(page.getByLabel("Identificador no Edge")).toHaveAttribute("placeholder", "Padrão");
+  await expect(page.getByLabel("Tecla para Ação anterior")).toHaveValue("← Esquerda");
+  await expect(page.getByLabel("Tecla para Próxima ação")).toHaveValue("→ Direita");
+
+  const settingsGrid = page.locator(".kds-settings__grid");
+  await expect(settingsGrid).toHaveCSS("column-count", "2");
+  const bumpMappings = page.locator(".kds-bump-map label");
+  const firstDesktopMapping = await bumpMappings.nth(0).boundingBox();
+  const secondDesktopMapping = await bumpMappings.nth(1).boundingBox();
+  expect(Math.abs((firstDesktopMapping?.y ?? 0) - (secondDesktopMapping?.y ?? 0))).toBeLessThan(3);
+
+  const desktopScreenshot = testInfo.outputPath("kds-configuracoes-1440.png");
+  await page.screenshot({ path: desktopScreenshot, fullPage: true });
+  await testInfo.attach("kds-configuracoes-1440", {
+    contentType: "image/png",
+    path: desktopScreenshot,
+  });
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(settingsGrid).toHaveCSS("column-count", "1");
+  const firstMobileMapping = await bumpMappings.nth(0).boundingBox();
+  const secondMobileMapping = await bumpMappings.nth(1).boundingBox();
+  expect(secondMobileMapping?.y ?? 0).toBeGreaterThan(
+    (firstMobileMapping?.y ?? 0) + (firstMobileMapping?.height ?? 0),
+  );
+  await expectNoHorizontalOverflow(page);
 
   await page.getByRole("link", { name: "Produção KDS", exact: true }).click();
   await expect(page).toHaveURL(/#\/kds\/pass$/);
@@ -855,6 +882,13 @@ test("KDS mantém acessibilidade, dark mode e ausência de overflow nos pontos c
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: /Abrir menu do perfil/ }).click();
+  const profileMenu = page.getByRole("region", { name: "Menu do perfil" });
+  const popoverBackdrop = page.getByRole("button", { name: "Fechar menu aberto" });
+  await expect(profileMenu).toBeVisible();
+  await expect(popoverBackdrop).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await popoverBackdrop.hover({ position: { x: 24, y: 180 } });
+  await expect(popoverBackdrop).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(profileMenu).toBeVisible();
   await page.getByRole("button", { name: /Tema escuro/ }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expectNoHorizontalOverflow(page);

@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Models
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The isDefault property</summary>
+        public bool? IsDefault { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -30,6 +32,8 @@ namespace GiroMesa.ApiClient.Models
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportViewQuery Query { get; set; }
 #endif
+        /// <summary>The sortOrder property</summary>
+        public int? SortOrder { get; set; }
         /// <summary>The version property</summary>
         public int? Version { get; set; }
         /// <summary>The visibility property</summary>
@@ -59,8 +63,10 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "isDefault", n => { IsDefault = n.GetBoolValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "query", n => { Query = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportViewQuery>(global::GiroMesa.ApiClient.Models.ManagementReportViewQuery.CreateFromDiscriminatorValue); } },
+                { "sortOrder", n => { SortOrder = n.GetIntValue(); } },
                 { "version", n => { Version = n.GetIntValue(); } },
                 { "visibility", n => { Visibility = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportViewInput_visibility>(); } },
             };
@@ -72,8 +78,10 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteBoolValue("isDefault", IsDefault);
             writer.WriteStringValue("name", Name);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportViewQuery>("query", Query);
+            writer.WriteIntValue("sortOrder", SortOrder);
             writer.WriteIntValue("version", Version);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportViewInput_visibility>("visibility", Visibility);
             writer.WriteAdditionalData(AdditionalData);

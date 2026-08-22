@@ -101,6 +101,7 @@ session_secret=$(openssl rand -hex 48)
 qr_table_token_secret=$(openssl rand -hex 48)
 mfa_key=$(openssl rand -base64 32)
 outbox_key=$(openssl rand -base64 32)
+fiscal_credentials_key=$(openssl rand -base64 32)
 internal_key=$(openssl rand -hex 32)
 webhook_key=$(openssl rand -base64 32)
 command_fingerprint_key=$(openssl rand -base64 32)
@@ -125,6 +126,9 @@ write_key OPS_APP_URL https://app.giromesa.com.br
 write_key API_URL https://api.giromesa.com.br
 write_key NEXT_PUBLIC_API_URL https://api.giromesa.com.br
 write_key NEXT_PUBLIC_OPS_URL https://app.giromesa.com.br
+write_key NEXT_PUBLIC_REDE_STORE_URL ""
+write_key NEXT_PUBLIC_PAYGO_STORE_URL ""
+write_key NEXT_PUBLIC_STONE_STORE_URL ""
 write_key NEXT_PUBLIC_GOOGLE_AUTH_ENABLED true
 write_key NEXT_PUBLIC_WHATSAPP_NUMBER "$whatsapp_number"
 write_key NEXT_PUBLIC_CUSTOMER_API_URL https://api.giromesa.com.br
@@ -139,9 +143,14 @@ write_key QR_TABLE_TOKEN_SECRET "$qr_table_token_secret"
 write_key MEDIA_ROOT /app/data/media
 write_key MFA_ENCRYPTION_KEY "$mfa_key"
 write_key OUTBOX_ENCRYPTION_KEY "$outbox_key"
+write_key FISCAL_RELEASE_ENV homologation
+write_key FOCUS_NFE_PRIMARY_TOKEN ""
+write_key FISCAL_CREDENTIALS_ENCRYPTION_KEY "$fiscal_credentials_key"
+write_key FOCUS_NFE_TIMEOUT_MS 15000
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"
 if [[ -n "$platform_admin_grants" ]]; then write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"; fi
 write_key INTERNAL_API_KEY "$internal_key"
+write_key SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS 300
 write_key COOKIE_DOMAIN .giromesa.com.br
 write_key GOOGLE_OAUTH_CLIENT_ID "$google_client_id"
 write_key GOOGLE_OAUTH_CLIENT_SECRET "$google_client_secret"

@@ -247,19 +247,101 @@ export function settlement(totalCents: number, settledCents: number, deltaCents:
 
 export function cashConference(input: {
   openingCents: number;
-  suppliesCents: number;
-  withdrawalsCents: number;
-  cashReceiptsCents: number;
+  drawerInCents: number;
+  drawerOutCents: number;
   countedCents: number;
 }) {
   assertCents(input.openingCents, "openingCents", true);
-  assertCents(input.suppliesCents, "suppliesCents", true);
-  assertCents(input.withdrawalsCents, "withdrawalsCents", true);
-  assertCents(input.cashReceiptsCents, "cashReceiptsCents", true);
+  assertCents(input.drawerInCents, "drawerInCents", true);
+  assertCents(input.drawerOutCents, "drawerOutCents", true);
   assertCents(input.countedCents, "countedCents", true);
-  const expectedCents =
-    input.openingCents + input.suppliesCents - input.withdrawalsCents + input.cashReceiptsCents;
+  const expectedCents = input.openingCents + input.drawerInCents - input.drawerOutCents;
   return { expectedCents, differenceCents: input.countedCents - expectedCents };
+}
+
+export function assertCashDrawerDebit(expectedCents: number, debitCents: number) {
+  assertCents(expectedCents, "expectedCents", true);
+  assertCents(debitCents, "amountCents");
+  if (debitCents > expectedCents)
+    throw new ConflictException({
+      code: "CASH_DRAWER_INSUFFICIENT",
+      message: "O valor excede o saldo físico esperado no caixa.",
+    });
+}
+
+export function cashTransferLockOrder(fromCashShiftId: string, toCashShiftId: string) {
+  if (fromCashShiftId === toCashShiftId)
+    throw new ConflictException({
+      code: "CASH_TRANSFER_SAME_REGISTER",
+      message: "Origem e destino devem ser caixas diferentes.",
+    });
+  return [fromCashShiftId, toCashShiftId].sort() as [string, string];
+}
+
+export type CashTenderMethod =
+  | "cash"
+  | "pix"
+  | "credit_card"
+  | "debit_card"
+  | "bank_transfer"
+  | "other";
+
+export function cashTenderConference(
+  expectedByMethod: ReadonlyMap<CashTenderMethod, number>,
+  observations: readonly {
+    method: CashTenderMethod;
+    observedCents: number;
+    source: "manual" | "smartpos";
+  }[],
+) {
+  const observedByMethod = new Map(observations.map((count) => [count.method, count]));
+  const requiredMethods = new Set<CashTenderMethod>(["cash"]);
+  for (const [method, expectedCents] of expectedByMethod) {
+    assertCents(expectedCents, "expectedCents", true);
+    if (expectedCents > 0) requiredMethods.add(method);
+  }
+  const missing = [...requiredMethods].filter((method) => !observedByMethod.has(method));
+  if (missing.length > 0)
+    throw new BadRequestException({
+      code: "CASH_TENDER_COUNTS_INCOMPLETE",
+      message: "Informe a conferência de todas as formas de pagamento esperadas.",
+      details: { missingMethods: missing },
+    });
+
+  return observations
+    .map((observation) => {
+      assertCents(observation.observedCents, "observedCents", true);
+      const expectedCents = expectedByMethod.get(observation.method) ?? 0;
+      return {
+        method: observation.method,
+        expectedCents,
+        observedCents: observation.observedCents,
+        differenceCents: observation.observedCents - expectedCents,
+        source: observation.source,
+      };
+    })
+    .sort((left, right) => left.method.localeCompare(right.method));
+}
+
+export function cashDifferenceSeverity(
+  tenderBreakdown: readonly { differenceCents: number }[],
+  criticalThresholdCents: number,
+) {
+  assertCents(criticalThresholdCents, "criticalThresholdCents", true);
+  const greatestDifference = tenderBreakdown.reduce(
+    (greatest, tender) => Math.max(greatest, Math.abs(tender.differenceCents)),
+    0,
+  );
+  if (greatestDifference === 0) return "none" as const;
+  return greatestDifference >= criticalThresholdCents
+    ? ("critical" as const)
+    : ("warning" as const);
+}
+
+export function requiresCashApproval(role: string, amountCents: number, thresholdCents: number) {
+  assertCents(amountCents, "amountCents");
+  assertCents(thresholdCents, "movementApprovalThresholdCents", true);
+  return role === "cashier" && amountCents > thresholdCents;
 }
 
 export function profitabilityCoverage(
@@ -448,4 +530,44 @@ export function purchaseReceiptPlan(
     };
   });
   return { updates, totalCents: updates.reduce((sum, update) => sum + update.totalCents, 0) };
+}
+
+export type PersonAccessRole =
+  | "owner"
+  | "manager"
+  | "waiter"
+  | "cashier"
+  | "receptionist"
+  | "busser"
+  | "kds"
+  | "delivery"
+  | "inventory"
+  | "finance"
+  | "accountant";
+
+const MANAGER_GRANTABLE_PERSON_ROLES: readonly PersonAccessRole[] = [
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+];
+
+export function canGrantPersonAccessRole(
+  actorRole: "owner" | "manager",
+  targetRole: PersonAccessRole,
+) {
+  if (targetRole === "owner") return false;
+  return actorRole === "owner" || MANAGER_GRANTABLE_PERSON_ROLES.includes(targetRole);
+}
+
+export function personAccessPublicStatus(
+  status: "pending" | "active" | "suspended" | "canceled" | "terminated",
+  expiresAt: Date | null,
+  now = new Date(),
+): "none" | "pending" | "expired" | "active" | "suspended" {
+  if (status === "active" || status === "suspended") return status;
+  if (status !== "pending") return "none";
+  return expiresAt && expiresAt <= now ? "expired" : "pending";
 }

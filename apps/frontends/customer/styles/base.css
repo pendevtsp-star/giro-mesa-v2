@@ -78,18 +78,25 @@ textarea:focus-visible {
   color: var(--gm-on-action);
   background:
     radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.26), transparent 32%), var(--green);
+  border-bottom: 4px solid var(--restaurant-brand, var(--gm-accent));
 }
 .restaurant-mark {
   width: 58px;
   height: 58px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  border: 2px solid var(--restaurant-accent, rgba(255, 255, 255, 0.32));
   border-radius: 50% 50% 42% 42%;
   color: #ffe0a4;
   font:
     italic 31px Georgia,
     serif;
+}
+.restaurant-mark img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 .restaurant-header p,
 .restaurant-header h1,
@@ -111,6 +118,27 @@ textarea:focus-visible {
 .restaurant-header span {
   color: #d9e2de;
   font-size: 12px;
+}
+.restaurant-header .business-status,
+.restaurant-header .business-hours {
+  display: block;
+  width: fit-content;
+  margin-top: 5px;
+  font-size: 11px;
+}
+.restaurant-header .business-status {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.restaurant-header .business-status.open {
+  color: #d6ffe7;
+}
+.restaurant-header .business-status.closed {
+  color: #ffe3db;
+}
+.restaurant-header .business-hours {
+  color: #d9e2de;
 }
 .icon-button {
   width: 38px;

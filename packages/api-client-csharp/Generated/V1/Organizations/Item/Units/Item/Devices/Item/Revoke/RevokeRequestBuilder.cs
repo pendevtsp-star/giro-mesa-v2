@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.Item.Revoke
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\devices\{deviceId}\revoke
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\devices\{deviceId}\revoke
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class RevokeRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.Item.Revok
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public RevokeRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/devices/{deviceId}/revoke", pathParameters)
+        public RevokeRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/devices/{deviceId}/revoke", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.Item.Revok
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public RevokeRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/devices/{deviceId}/revoke", rawUrl)
+        public RevokeRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/devices/{deviceId}/revoke", rawUrl)
         {
         }
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>

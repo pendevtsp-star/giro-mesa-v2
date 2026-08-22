@@ -236,6 +236,10 @@ async function mockProductionApi(
       });
       return;
     }
+    if (route.request().method() === "GET" && path === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_INVALID" } });
+      return;
+    }
     const payload =
       path === "/v1/auth/me"
         ? {
@@ -386,6 +390,17 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(page.getByText("Onde você vai trabalhar?")).toHaveCount(0);
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole("button", { name: "Abrir menu", exact: true })).toBeHidden();
+  await page.getByTitle("Ir para módulo (Ctrl+K)").click();
+  const commandDialog = page.getByRole("dialog", { name: "Ir para módulo" });
+  await expect(commandDialog).toBeVisible();
+  await expect(commandDialog.locator(".command-palette__result").first()).toHaveCSS(
+    "display",
+    "grid",
+  );
+  await expect(commandDialog.getByRole("searchbox")).toHaveCSS("border-top-width", "0px");
+  await expect(commandDialog).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await commandDialog.getByRole("button", { name: "Fechar" }).click();
   await page.getByRole("button", { name: "Recolher menu lateral" }).click();
   await expect(page.locator(".sidebar")).toHaveClass(/sidebar--collapsed/);
   await expect
@@ -532,6 +547,31 @@ test("Recepção real mantém estados vazios compactos e orientados à próxima 
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Recepção e espera" })).toBeVisible();
+  const arrivalBar = page.locator(".arrival-bar");
+  const arrivalSearch = arrivalBar.locator(".gm-search-field");
+  const arrivalDate = page.getByLabel("Agenda do dia");
+  const newReservation = arrivalBar.getByRole("button", { name: "Nova reserva" });
+  await expect(arrivalBar).toHaveCSS("display", "grid");
+  await expect(page.getByRole("searchbox", { name: "Buscar chegada" })).toBeVisible();
+  const desktopSearch = await arrivalSearch.boundingBox();
+  const desktopDate = await arrivalDate.boundingBox();
+  const desktopAction = await newReservation.boundingBox();
+  expect(Math.abs((desktopSearch?.y ?? 0) - (desktopDate?.y ?? 0))).toBeLessThan(3);
+  expect(
+    Math.abs(
+      (desktopDate?.y ?? 0) +
+        (desktopDate?.height ?? 0) -
+        ((desktopAction?.y ?? 0) + (desktopAction?.height ?? 0)),
+    ),
+  ).toBeLessThan(3);
+
+  await page.setViewportSize({ width: 768, height: 900 });
+  const tabletSearch = await arrivalSearch.boundingBox();
+  const tabletDate = await arrivalDate.boundingBox();
+  expect(tabletDate?.y ?? 0).toBeGreaterThan((tabletSearch?.y ?? 0) + (tabletSearch?.height ?? 0));
+  await expectNoHorizontalOverflow(page);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
   const cards = page.locator(".reservations-card");
   await expect(cards).toHaveCount(2);
   for (const card of await cards.all()) {
@@ -557,7 +597,9 @@ test("Recepção real mantém estados vazios compactos e orientados à próxima 
   await expectWcagAa(page);
 });
 
-test("Balcão recebe, imprime pré-conta sem mesa e não pisca a confirmação", async ({ page }) => {
+test("Balcão cobra no SmartPOS, imprime pré-conta e não duplica cartão manual", async ({
+  page,
+}) => {
   const pickupTab = {
     ...tab,
     id: "pickup-1",
@@ -573,20 +615,127 @@ test("Balcão recebe, imprime pré-conta sem mesa e não pisca a confirmação",
     totalCents: 9_300,
   };
   await page.addInitScript(() => {
+    const smartPosWindow = window as Window & { smartPosStartArgs?: unknown[] };
     window.HybridWebView = {
-      SendRawMessage: () => undefined,
-      InvokeDotNet: async (method: string) =>
-        method === "SendPrintJobAsync"
-          ? {
-              Success: true,
-              Status: "accepted",
-              PrinterId: "caixa",
-              Duplicate: false,
-            }
-          : null,
+      SendRawMessage: () => {
+        window.dispatchEvent(
+          new CustomEvent("HybridWebViewMessageReceived", {
+            detail: {
+              message: JSON.stringify({
+                type: "shell.context",
+                payload: {
+                  DeviceId: "00000000-0000-4000-8000-000000000111",
+                  DeviceName: "SmartPOS teste",
+                  Platform: "android",
+                },
+              }),
+            },
+          }),
+        );
+      },
+      InvokeDotNet: async (method: string, args?: unknown[]) => {
+        if (method === "SendPrintJobAsync") {
+          return {
+            Success: true,
+            Status: "accepted",
+            PrinterId: "caixa",
+            Duplicate: false,
+          };
+        }
+        if (method === "StartPaymentAsync") {
+          smartPosWindow.smartPosStartArgs = args;
+          return {
+            Success: true,
+            Launched: true,
+            Status: "processing",
+            AttemptId: "attempt-1",
+            ProviderReference: null,
+            ErrorCode: null,
+            RequiresReconciliation: false,
+          };
+        }
+        if (method === "GetPaymentCapabilitiesAsync") {
+          return {
+            Available: true,
+            Configured: true,
+            Homologated: true,
+            Provider: "rede",
+            Environment: "production",
+            Methods: ["credit_card", "debit_card", "pix"],
+            CanStart: true,
+            CanRecover: true,
+            CanCancel: true,
+            PendingAttemptId: null,
+            ErrorCode: null,
+          };
+        }
+        return { Success: false, ErrorCode: "TEST_NATIVE_CACHE_UNAVAILABLE" };
+      },
     };
   });
   await mockProductionApi(page);
+  const paymentAttempt = {
+    id: "attempt-1",
+    tabId: "pickup-1",
+    installationId: "00000000-0000-4000-8000-000000000111",
+    provider: "rede",
+    method: "debit_card",
+    amountCents: 9_300,
+    installments: 1,
+    status: "processing",
+    providerReference: null,
+    failureCode: null,
+    failureMessage: null,
+    expiresAt: "2026-08-21T17:10:00.000Z",
+    processingAt: "2026-08-21T17:00:01.000Z",
+    resolvedAt: null,
+    createdAt: "2026-08-21T17:00:00.000Z",
+    updatedAt: "2026-08-21T17:00:01.000Z",
+  };
+  let paymentRequest: { body: unknown; headers: Record<string, string> } | null = null;
+  await page.route("**/pilot/**payment-**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/payment-capabilities")) {
+      await route.fulfill({
+        json: {
+          installationId: paymentAttempt.installationId,
+          available: true,
+          status: "homologated",
+          provider: "rede",
+          methods: ["credit_card", "debit_card", "pix"],
+          maxInstallments: 12,
+          supports: { cancel: true, recover: true, reversal: true },
+          reason: null,
+        },
+      });
+      return;
+    }
+    if (route.request().method() === "POST" && url.pathname.endsWith("/payment-attempts")) {
+      paymentRequest = {
+        body: route.request().postDataJSON(),
+        headers: route.request().headers(),
+      };
+      await route.fulfill({
+        status: 201,
+        json: {
+          attempt: paymentAttempt,
+          action: { type: "start", attemptId: paymentAttempt.id, provider: "rede" },
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        attempt: {
+          ...paymentAttempt,
+          status: "approved",
+          providerReference: "rede-test-1",
+          resolvedAt: "2026-08-21T17:00:03.000Z",
+          updatedAt: "2026-08-21T17:00:03.000Z",
+        },
+      },
+    });
+  });
   await page.route("**/pilot/tabs**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (route.request().method() !== "GET") {
@@ -636,9 +785,40 @@ test("Balcão recebe, imprime pré-conta sem mesa e não pisca a confirmação",
   await expectNoHorizontalOverflow(page);
   await cartToggle.click();
   await page.getByRole("button", { name: "Receber", exact: true }).click();
-  const amount = page.getByLabel("Valor a receber");
-  await expect(amount).toBeFocused();
-  await expect(amount).toHaveValue("93");
+  const paymentDialog = page.getByRole("dialog", { name: "Cobrar na maquininha" });
+  await expect(paymentDialog).toBeVisible();
+  await expect(paymentDialog.getByLabel("Valor a cobrar")).toHaveValue("93");
+  await expect(paymentDialog.getByRole("button", { name: "Débito" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  for (const width of [360, 480]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expectNoHorizontalOverflow(page);
+    const chargeHeight = await paymentDialog
+      .getByRole("button", { name: /Cobrar R\$/ })
+      .evaluate((element) => element.getBoundingClientRect().height);
+    expect(chargeHeight).toBeGreaterThan(47.9);
+  }
+  await expectWcagAa(page);
+  await paymentDialog.getByRole("button", { name: /Cobrar R\$/ }).click();
+  await expect(paymentDialog.getByText("Pagamento aprovado", { exact: true })).toBeVisible();
+  expect(paymentRequest).not.toBeNull();
+  expect(paymentRequest?.body).toEqual({
+    method: "debit_card",
+    amountCents: 9_300,
+    installments: 1,
+    installationId: paymentAttempt.installationId,
+  });
+  expect(paymentRequest?.headers["idempotency-key"]).toBeTruthy();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { smartPosStartArgs?: unknown[] }).smartPosStartArgs),
+    )
+    .toEqual(["attempt-1"]);
+  await paymentDialog.getByRole("button", { name: "Voltar à conta" }).click();
+  const manualMethods = page.getByLabel("Forma de pagamento");
+  await expect(manualMethods.locator("option")).toHaveText(["Dinheiro", "Outro não eletrônico"]);
 
   const printAccount = page.getByRole("button", { name: "Imprimir pré-conta", exact: true });
   await expect(printAccount).toBeEnabled();
@@ -646,6 +826,147 @@ test("Balcão recebe, imprime pré-conta sem mesa e não pisca a confirmação",
   await expect(page.getByText("Entregue à impressora", { exact: true })).toBeVisible();
   await expect(page.getByText(/Não fecha a comanda e não registra pagamento/)).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test("Gestão SmartPOS pareia terminal e mostra saúde fail-closed em tela estreita", async ({
+  page,
+}) => {
+  const installationId = "00000000-0000-4000-8000-000000000111";
+  const certificationId = "00000000-0000-4000-8000-000000000222";
+  let pairingBody: unknown = null;
+  await page.addInitScript(() => localStorage.setItem("giromesa-theme", "dark"));
+  await mockProductionApi(page);
+  await page.route("**/pilot/installations/*/payment-capabilities", (route) =>
+    route.fulfill({
+      json: {
+        installationId: new URL(route.request().url()).pathname.split("/").at(-2),
+        available: false,
+        status: "disabled",
+        provider: null,
+        methods: [],
+        maxInstallments: 1,
+        supports: { cancel: false, recover: false, reversal: false },
+        reason: "PAYMENT_DEVICE_NOT_ENROLLED",
+      },
+    }),
+  );
+  await page.route("**/pilot/payment-devices/pairing-codes", async (route) => {
+    pairingBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      json: {
+        pairingId: "pairing-1",
+        code: "AB12CD34",
+        qrPayload: "giromesa:payment-pairing:pairing-1",
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+    });
+  });
+  await page.route("**/pilot/payment-devices", (route) =>
+    route.fulfill({
+      json: {
+        devices: [
+          {
+            installationId,
+            label: "POS Balcão 01",
+            enrolledAt: "2026-08-21T17:00:00.000Z",
+            revokedAt: null,
+            lastSeenAt: "2026-08-21T17:03:00.000Z",
+            reportedDiagnostics: {
+              manufacturer: "Stone",
+              model: "Sunmi P2",
+              androidVersion: "11",
+              firmwareVersion: "1.4.2",
+              appVersion: "0.2.3",
+              packageName: "com.giromesa.ops",
+              signingCertificateSha256: "a".repeat(64),
+            },
+            capabilities: {
+              installationId,
+              available: false,
+              status: "suspended",
+              provider: "stone",
+              methods: ["credit_card", "debit_card", "pix"],
+              maxInstallments: 12,
+              supports: { cancel: true, recover: true, reversal: false },
+              reason: "CERTIFICATION_SUSPENDED",
+              certificationId,
+              diagnosticsMatch: true,
+              killSwitch: { enabled: true, reason: "Bloqueio preventivo do suporte" },
+            },
+            certification: {
+              id: certificationId,
+              provider: "stone",
+              status: "suspended",
+              killSwitchEnabled: true,
+              killSwitchReason: "Bloqueio preventivo do suporte",
+            },
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/pilot/payment-operations/health", (route) =>
+    route.fulfill({
+      json: {
+        generatedAt: "2026-08-21T17:05:00.000Z",
+        summary: {
+          unknownAttempts: 1,
+          staleProcessingAttempts: 0,
+          offlineDevices: 1,
+          reconciliationDivergences: 2,
+        },
+        incidents: [
+          {
+            kind: "unknown_attempt",
+            severity: "critical",
+            entityId: "attempt-1",
+            label: "Comanda 18 sem resultado",
+            occurredAt: "2026-08-21T16:55:00.000Z",
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/pilot/payment-reconciliation**", (route) =>
+    route.fulfill({
+      json: {
+        entries: [],
+        summary: { grossCents: 10_000, feeCents: 200, netCents: 9_800, divergences: 2 },
+      },
+    }),
+  );
+  await page.route("**/pilot/payment-homologation-runs", (route) =>
+    route.fulfill({ json: { runs: [] } }),
+  );
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/device";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.setViewportSize({ width: 360, height: 640 });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "SmartPOS e dispositivos" }),
+  ).toBeVisible();
+  await expect(page.getByText("Comanda 18 sem resultado")).toBeVisible();
+  await expect(page.getByText("Bloqueio preventivo do suporte")).toBeVisible();
+  await expect(page.getByRole("button", { name: /kill switch/i })).toHaveCount(0);
+  await page.getByLabel("Nome operacional do terminal").fill("POS Caixa 02");
+  await page.getByRole("button", { name: "Gerar pareamento" }).click();
+  await expect(page.getByText("AB12CD34", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: /QR Code temporário/ })).toBeVisible();
+  expect(pairingBody).toEqual({ label: "POS Caixa 02", expiresInSeconds: 300 });
+
+  for (const viewport of [
+    { width: 360, height: 640 },
+    { width: 480, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectNoHorizontalOverflow(page);
+  }
+  await expectWcagAa(page);
 });
 
 test("Recepção senta em mesa compatível e abre a comanda na mesma requisição", async ({ page }) => {
@@ -696,9 +1017,7 @@ test("Recepção senta em mesa compatível e abre a comanda na mesma requisiçã
   ]);
 });
 
-test("Cardápio real mantém a interface completa e as integrações reais", async ({
-  page,
-}) => {
+test("Cardápio real mantém a interface completa e as integrações reais", async ({ page }) => {
   const requests: Array<{ body: unknown; headers: Record<string, string> }> = [];
   const priceUpdates: unknown[] = [];
   await mockProductionApi(
@@ -715,10 +1034,21 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
   await expect(page.getByRole("heading", { name: "Gerenciar Cardápio" })).toBeVisible();
-  for (const unsupportedAction of [
+  await expect(page.locator(".catalog-management-header")).toHaveCSS("flex-direction", "column");
+  await expect(page.locator(".catalog-management-header__actions")).toHaveCSS(
+    "justify-content",
+    "flex-start",
+  );
+  for (const primaryAction of [
     "Matriz BCG",
     "Ver como Cliente & QR",
     "Opcionais & Modificadores",
+  ]) {
+    await expect(page.getByText(primaryAction, { exact: false }).first()).toBeVisible();
+  }
+  await expect(page.getByText("Importar CSV", { exact: false }).first()).toBeHidden();
+  await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
+  for (const secondaryAction of [
     "Importar CSV",
     "Planilha CSV",
     "Identidade & Branding",
@@ -727,7 +1057,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     "Reajuste em Lote",
     "Placas QR de Mesas",
   ]) {
-    await expect(page.getByText(unsupportedAction, { exact: false }).first()).toBeVisible();
+    await expect(page.getByText(secondaryAction, { exact: false }).first()).toBeVisible();
   }
   for (const availableButton of [
     "Matriz BCG",

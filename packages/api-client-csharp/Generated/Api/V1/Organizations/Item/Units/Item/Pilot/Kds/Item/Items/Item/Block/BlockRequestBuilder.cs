@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Items.Item.Block
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\pilot\kds\{ticketId}\items\{orderItemId}\block
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\pilot\kds\{ticketId}\items\{orderItemId}\block
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class BlockRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public BlockRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/block", pathParameters)
+        public BlockRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot/kds/{ticketId}/items/{orderItemId}/block", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public BlockRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/items/{orderItemId}/block", rawUrl)
+        public BlockRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot/kds/{ticketId}/items/{orderItemId}/block", rawUrl)
         {
         }
         /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Items.Item.Block.BlockPostResponse"/></returns>

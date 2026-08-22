@@ -4,10 +4,12 @@ import {
   Button,
   Card,
   EmptyState,
+  FormField,
   Icon,
   Input,
   Modal,
   NativeSelect,
+  SearchField,
   Textarea,
 } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -355,24 +357,24 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
           {reservations.refreshing || waitlist.refreshing ? "Atualizando…" : "Atualizar"}
         </Button>
       </div>
-      <Card className="arrival-bar">
-        <label className="search-field">
-          <Icon name="search" size={18} />
-          <Input
+      <Card className="arrival-bar grid">
+        <FormField htmlFor="arrival-search" label="Buscar chegada">
+          <SearchField
+            aria-label="Buscar chegada"
+            id="arrival-search"
             onChange={(event) => setArrivalQuery(event.target.value)}
-            placeholder="Buscar chegada por nome ou telefone"
-            type="search"
+            placeholder="Nome ou telefone"
             value={arrivalQuery}
           />
-        </label>
-        <label>
-          Agenda do dia
+        </FormField>
+        <FormField htmlFor="arrival-date" label="Agenda do dia">
           <Input
+            id="arrival-date"
             onChange={(event) => setAgendaDate(event.target.value)}
             type="date"
             value={agendaDate}
           />
-        </label>
+        </FormField>
         <div className="arrival-bar__actions">
           <Button onClick={() => openComposer("reservation")} size="sm" variant="secondary">
             Nova reserva

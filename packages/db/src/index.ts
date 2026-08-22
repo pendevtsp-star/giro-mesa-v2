@@ -8,6 +8,7 @@ import * as reportSchema from "./report-schema.js";
 import * as baseSchema from "./schema.js";
 import * as settlementSchema from "./settlement-schema.js";
 
+export * from "./fiscal-artifacts.js";
 export * from "./fiscal-schema.js";
 export * from "./growth-schema.js";
 export * from "./management-schema.js";

@@ -154,6 +154,9 @@ public sealed class FocusFiscalGateway(
 
         return await ExecuteAsync(async timeoutToken =>
         {
+            var existing = await ConsultInvalidationCoreAsync(request, configuration, timeoutToken);
+            if (existing is not null) return existing;
+
             using var message = AuthorizedRequest(
                 HttpMethod.Post,
                 new Uri(BaseAddress(configuration), "v2/nfce/inutilizacao"),
@@ -178,8 +181,7 @@ public sealed class FocusFiscalGateway(
                 response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.UnprocessableEntity))
                 return result;
 
-            var existing = await ConsultInvalidationCoreAsync(request, configuration, timeoutToken);
-            return existing ?? result;
+            return await ConsultInvalidationCoreAsync(request, configuration, timeoutToken) ?? result;
         }, cancellationToken, request.IdempotencyKey);
     }
 

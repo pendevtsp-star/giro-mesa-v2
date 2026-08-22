@@ -10,7 +10,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Losses.Item
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\management\waiter-settlements\losses\{lossId}
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\management\waiter-settlements\losses\{lossId}
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class WithLossItemRequestBuilder : BaseRequestBuilder
@@ -25,7 +25,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithLossItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/losses/{lossId}", pathParameters)
+        public WithLossItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/waiter-settlements/losses/{lossId}", pathParameters)
         {
         }
         /// <summary>
@@ -33,7 +33,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithLossItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/losses/{lossId}", rawUrl)
+        public WithLossItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/waiter-settlements/losses/{lossId}", rawUrl)
         {
         }
     }

@@ -77,7 +77,7 @@ export function CatalogFilters({
 
         <div className="catalog-filters__controls">
           <fieldset className="catalog-view-switcher">
-            <legend className="catalog-visually-hidden">Visualização</legend>
+            <legend className="gm-sr-only">Visualização</legend>
             {VIEW_MODES.map((mode) => (
               <Button
                 aria-label={mode.label}

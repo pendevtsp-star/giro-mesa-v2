@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settlements.Item.Export
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\management\waiter-settlements\settlements\{settlementId}\export
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\management\waiter-settlements\settlements\{settlementId}\export
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class ExportRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ExportRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/export", pathParameters)
+        public ExportRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/waiter-settlements/settlements/{settlementId}/export", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ExportRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements/settlements/{settlementId}/export", rawUrl)
+        public ExportRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/waiter-settlements/settlements/{settlementId}/export", rawUrl)
         {
         }
         /// <returns>A <see cref="Stream"/></returns>

@@ -31,6 +31,7 @@ export type Permission =
   | "reservations.manage"
   | "growth.manage"
   | "multiunit.view"
+  | "settings.manage"
   | "platform.manage"
   | "alerts.view";
 
@@ -53,7 +54,9 @@ export type RouteId =
   | "reservations"
   | "crm"
   | "multiunit"
+  | "settings"
   | "platform"
+  | "device"
   | "alerts";
 
 export interface Profile {
@@ -77,6 +80,11 @@ export interface Unit {
   name: string;
   city?: string;
   timezone: string;
+  branding?: {
+    displayName?: string;
+    logoUrl?: string | null;
+    primaryColor?: string;
+  };
 }
 
 export type TableStatus =

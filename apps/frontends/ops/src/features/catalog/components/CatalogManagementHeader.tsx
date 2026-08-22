@@ -13,7 +13,7 @@ type CatalogManagementHeaderProps = {
   onExportCsv: () => void;
   onImportCsv: (event: ChangeEvent<HTMLInputElement>) => void;
   onLanguageChange: (language: CatalogLanguage) => void;
-  onOpenBranding: () => void;
+  brandingHref: string;
   onOpenBulkAdjustment: () => void;
   onOpenCustomerPreview: () => void;
   onOpenLabels: () => void;
@@ -33,6 +33,8 @@ type HeaderAction = {
   onClick: () => void;
   title: string;
 };
+
+type HeaderLink = Omit<HeaderAction, "onClick"> & { href: string };
 
 const LANGUAGE_OPTIONS: Array<{ label: string; title: string; value: CatalogLanguage }> = [
   { label: "🇧🇷 PT", title: "Cardápio em Português", value: "pt" },
@@ -57,6 +59,7 @@ function HeaderActionButton({ disabled, icon, label, onClick, title }: HeaderAct
 }
 
 export function CatalogManagementHeader({
+  brandingHref,
   categoryCount,
   comboCount,
   groupCount,
@@ -65,7 +68,6 @@ export function CatalogManagementHeader({
   onExportCsv,
   onImportCsv,
   onLanguageChange,
-  onOpenBranding,
   onOpenBulkAdjustment,
   onOpenCustomerPreview,
   onOpenLabels,
@@ -118,7 +120,7 @@ export function CatalogManagementHeader({
 
   const actions = headerActions;
 
-  const secondaryActions: HeaderAction[] = [
+  const secondaryActions: Array<HeaderAction | HeaderLink> = [
     {
       icon: "upload",
       label: "Planilha CSV",
@@ -128,7 +130,7 @@ export function CatalogManagementHeader({
     {
       icon: "settings",
       label: "Identidade & Branding",
-      onClick: onOpenBranding,
+      href: brandingHref,
       title: "Personalizar nome, cores, slogan e avisos do estabelecimento",
     },
     {
@@ -161,57 +163,73 @@ export function CatalogManagementHeader({
       </div>
 
       <fieldset className="gm-toolbar gm-toolbar--scroll catalog-management-header__actions">
-        <legend className="catalog-visually-hidden">Ações do cardápio</legend>
+        <legend className="gm-sr-only">Ações do cardápio</legend>
         {actions.map((action) => (
           <HeaderActionButton key={action.label} {...action} />
         ))}
 
-        <label
-          className="gm-button gm-button--secondary gm-button--sm catalog-management-header__import"
-          title="Importar Cardápio atualizado via CSV"
-        >
-          <Icon name="upload" size={14} />
-          <span>Importar CSV</span>
-          <input
-            accept=".csv"
-            className="catalog-visually-hidden"
-            onChange={onImportCsv}
-            type="file"
-          />
-        </label>
-
-        <fieldset className="catalog-language-switcher">
-          <legend className="catalog-visually-hidden">Idioma do cardápio</legend>
-          <span className="catalog-language-switcher__label">Idioma:</span>
-          {LANGUAGE_OPTIONS.map((option) => (
-            <Button
-              aria-pressed={language === option.value}
-              className="catalog-language-switcher__option"
-              data-active={language === option.value}
-              key={option.value}
-              onClick={() => onLanguageChange(option.value)}
-              title={option.title}
-              type="button"
+        <details className="catalog-management-header__more">
+          <summary>
+            <Icon name="settings" size={14} />
+            <span>Mais ações</span>
+            <small>{secondaryActions.length + 3}</small>
+          </summary>
+          <div className="gm-toolbar catalog-management-header__more-actions">
+            <label
+              className="gm-button gm-button--secondary gm-button--sm catalog-management-header__import"
+              title="Importar Cardápio atualizado via CSV"
             >
-              {option.label}
+              <Icon name="upload" size={14} />
+              <span>Importar CSV</span>
+              <input accept=".csv" className="gm-sr-only" onChange={onImportCsv} type="file" />
+            </label>
+
+            <fieldset className="catalog-language-switcher">
+              <legend className="gm-sr-only">Idioma do cardápio</legend>
+              <span className="catalog-language-switcher__label">Idioma:</span>
+              {LANGUAGE_OPTIONS.map((option) => (
+                <Button
+                  aria-pressed={language === option.value}
+                  className="catalog-language-switcher__option"
+                  data-active={language === option.value}
+                  key={option.value}
+                  onClick={() => onLanguageChange(option.value)}
+                  title={option.title}
+                  type="button"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </fieldset>
+
+            <Button
+              className="catalog-management-header__action catalog-management-header__action--accent"
+              onClick={onOpenQrGenerator}
+              size="sm"
+              title="Gerar e imprimir placas de QR Code numeradas para mesas e balcões"
+              variant="secondary"
+            >
+              <Icon name="catalog" size={14} />
+              <span>Placas QR de Mesas</span>
             </Button>
-          ))}
-        </fieldset>
 
-        <Button
-          className="catalog-management-header__action catalog-management-header__action--accent"
-          onClick={onOpenQrGenerator}
-          size="sm"
-          title="Gerar e imprimir placas de QR Code numeradas para mesas e balcões"
-          variant="secondary"
-        >
-          <Icon name="catalog" size={14} />
-          <span>Placas QR de Mesas</span>
-        </Button>
-
-        {secondaryActions.map((action) => (
-          <HeaderActionButton key={action.label} {...action} />
-        ))}
+            {secondaryActions.map((action) =>
+              "href" in action ? (
+                <a
+                  className="gm-button gm-button--secondary gm-button--sm catalog-management-header__action"
+                  href={action.href}
+                  key={action.label}
+                  title={action.title}
+                >
+                  <Icon name={action.icon} size={14} />
+                  <span>{action.label}</span>
+                </a>
+              ) : (
+                <HeaderActionButton key={action.label} {...action} />
+              ),
+            )}
+          </div>
+        </details>
       </fieldset>
     </header>
   );

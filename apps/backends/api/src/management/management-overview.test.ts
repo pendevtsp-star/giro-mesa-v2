@@ -179,4 +179,53 @@ describe("management overview role matrix", () => {
     });
     assert.deepEqual(result.priorities, []);
   });
+
+  it("keeps operational metric slots and independent sources when operations are unavailable", () => {
+    const withoutOperations = { ...snapshot, operations: undefined };
+
+    for (const profile of ["manager", "waiter", "kitchen"] as const) {
+      const result = shapeManagementOverview(profile, generatedAt, withoutOperations, [
+        "operations",
+      ]);
+      assert.equal(result.metrics.length, 4);
+      assert.ok(
+        result.metrics.every(
+          ({ value, detail, source }) =>
+            value === "—" &&
+            detail === "Dados temporariamente indisponíveis" &&
+            source === "operations",
+        ),
+      );
+    }
+
+    const owner = shapeManagementOverview("owner", generatedAt, withoutOperations, ["operations"]);
+    assert.equal(owner.metrics.length, 4);
+    assert.deepEqual(
+      owner.metrics.map(({ id, source, value }) => ({ id, source, value })),
+      [
+        { id: "pending-approvals", source: "operations", value: "—" },
+        { id: "sales", source: "operations", value: "—" },
+        { id: "gross-margin", source: "finance", value: "R$\u00a070,00" },
+        { id: "projected-balance", source: "finance", value: "R$\u00a040,00" },
+      ],
+    );
+
+    const cashier = shapeManagementOverview("cashier", generatedAt, withoutOperations, [
+      "operations",
+    ]);
+    assert.equal(cashier.metrics.length, 4);
+    assert.equal(cashier.metrics.find(({ id }) => id === "cash-status")?.value, "Aberto");
+    assert.equal(cashier.metrics.find(({ id }) => id === "cash-status")?.source, "cash");
+    assert.equal(cashier.metrics.find(({ id }) => id === "cash-difference")?.value, "R$\u00a02,00");
+    assert.ok(
+      cashier.metrics
+        .filter(({ id }) => id === "received" || id === "tabs-to-receive")
+        .every(
+          ({ value, detail, source }) =>
+            value === "—" &&
+            detail === "Dados temporariamente indisponíveis" &&
+            source === "operations",
+        ),
+    );
+  });
 });

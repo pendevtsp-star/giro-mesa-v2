@@ -117,6 +117,7 @@ public sealed class EscPosPrinterGatewayTests
     {
         var payload = JsonDocument.Parse("""
             {
+              "establishmentName":"Casa Giro Centro",
               "generatedAt":"2026-08-18T12:30:00-03:00",
               "tab":{"label":"Mesa 12","customerName":"Joao"},
               "totals":{"subtotalCents":2900,"discountCents":0,"serviceChargeCents":290,"tipCents":0,"totalCents":3190,"paidCents":1000,"remainingCents":2190},
@@ -127,6 +128,7 @@ public sealed class EscPosPrinterGatewayTests
 
         var receipt = ThermalReceiptFormatter.Format("partial_statement", payload, 32);
 
+        Assert.Contains("CASA GIRO CENTRO", receipt);
         Assert.Contains("PRE-CONTA", receipt);
         Assert.Contains("Mesa 12", receipt);
         Assert.Contains("R$ 31,90", receipt);

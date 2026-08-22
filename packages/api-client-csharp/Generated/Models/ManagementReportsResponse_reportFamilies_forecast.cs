@@ -14,6 +14,16 @@ namespace GiroMesa.ApiClient.Models
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The available property</summary>
+        public bool? Available { get; set; }
+        /// <summary>The calendarSignals property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_calendarSignals>? CalendarSignals { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_calendarSignals> CalendarSignals { get; set; }
+#endif
         /// <summary>The cash property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -30,6 +40,8 @@ namespace GiroMesa.ApiClient.Models
         public int? HorizonDays { get; set; }
         /// <summary>The method property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_method? Method { get; set; }
+        /// <summary>The minimumSampleDays property</summary>
+        public int? MinimumSampleDays { get; set; }
         /// <summary>The purchases property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -73,11 +85,14 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "available", n => { Available = n.GetBoolValue(); } },
+                { "calendarSignals", n => { CalendarSignals = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_calendarSignals>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_calendarSignals.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "cash", n => { Cash = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_cash>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_cash.CreateFromDiscriminatorValue); } },
                 { "confidence", n => { Confidence = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_confidence>(); } },
                 { "errorPercent", n => { ErrorPercent = n.GetDoubleValue(); } },
                 { "horizonDays", n => { HorizonDays = n.GetIntValue(); } },
                 { "method", n => { Method = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_method>(); } },
+                { "minimumSampleDays", n => { MinimumSampleDays = n.GetIntValue(); } },
                 { "purchases", n => { Purchases = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_purchases>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_purchases.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "revenue", n => { Revenue = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_revenue>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_revenue.CreateFromDiscriminatorValue); } },
                 { "sampleDays", n => { SampleDays = n.GetIntValue(); } },
@@ -90,11 +105,14 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteBoolValue("available", Available);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_calendarSignals>("calendarSignals", CalendarSignals);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_cash>("cash", Cash);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_confidence>("confidence", Confidence);
             writer.WriteDoubleValue("errorPercent", ErrorPercent);
             writer.WriteIntValue("horizonDays", HorizonDays);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_method>("method", Method);
+            writer.WriteIntValue("minimumSampleDays", MinimumSampleDays);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_purchases>("purchases", Purchases);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_forecast_revenue>("revenue", Revenue);
             writer.WriteIntValue("sampleDays", SampleDays);

@@ -10,7 +10,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Transfers.Item
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\management\inventory\transfers\{transferId}
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\management\inventory\transfers\{transferId}
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class WithTransferItemRequestBuilder : BaseRequestBuilder
@@ -25,7 +25,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithTransferItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/{transferId}", pathParameters)
+        public WithTransferItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/inventory/transfers/{transferId}", pathParameters)
         {
         }
         /// <summary>
@@ -33,7 +33,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithTransferItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/management/inventory/transfers/{transferId}", rawUrl)
+        public WithTransferItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/inventory/transfers/{transferId}", rawUrl)
         {
         }
     }

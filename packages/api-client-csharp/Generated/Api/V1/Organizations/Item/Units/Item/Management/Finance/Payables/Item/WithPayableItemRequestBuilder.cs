@@ -10,7 +10,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\management\finance\payables\{payableId}
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\management\finance\payables\{payableId}
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class WithPayableItemRequestBuilder : BaseRequestBuilder
@@ -25,7 +25,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithPayableItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}", pathParameters)
+        public WithPayableItemRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/finance/payables/{payableId}", pathParameters)
         {
         }
         /// <summary>
@@ -33,7 +33,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public WithPayableItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}", rawUrl)
+        public WithPayableItemRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/finance/payables/{payableId}", rawUrl)
         {
         }
     }

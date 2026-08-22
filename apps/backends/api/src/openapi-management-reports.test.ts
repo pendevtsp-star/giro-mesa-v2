@@ -45,6 +45,35 @@ describe("management reports OpenAPI contract", () => {
             default: "previous_period",
           },
         },
+        {
+          name: "family",
+          in: "query",
+          required: false,
+          schema: {
+            type: "string",
+            enum: [
+              "overview",
+              "sales",
+              "exceptions",
+              "inventory",
+              "purchasing",
+              "operations",
+              "profitability",
+              "multiunit",
+              "quality",
+              "labor",
+              "reconciliation",
+              "forecast",
+            ],
+            default: "overview",
+          },
+        },
+        {
+          name: "minimumComparableOperatingDays",
+          in: "query",
+          required: false,
+          schema: { type: "integer", minimum: 1, maximum: 31, default: 7 },
+        },
       ]);
       assert.deepEqual(operation?.responses["200"], {
         description: "Relatório gerencial do período e comparação anterior equivalente.",

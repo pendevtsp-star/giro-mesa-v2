@@ -12,7 +12,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Combos
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\pilot\catalog\combos
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\pilot\catalog\combos
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class CombosRequestBuilder : BaseRequestBuilder
@@ -34,7 +34,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Comb
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public CombosRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos", pathParameters)
+        public CombosRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot/catalog/combos", pathParameters)
         {
         }
         /// <summary>
@@ -42,7 +42,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.Comb
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public CombosRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/combos", rawUrl)
+        public CombosRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot/catalog/combos", rawUrl)
         {
         }
         /// <param name="body">The request body</param>

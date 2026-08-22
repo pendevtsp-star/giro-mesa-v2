@@ -20,6 +20,7 @@ import {
   posKdsTickets,
   posOperationalShifts,
   posOrders,
+  posPaymentReversals,
   posProductionStations,
   posServiceCalls,
   posTabEvents,
@@ -598,6 +599,9 @@ export class ManagementOverviewService {
     const scope = and(eq(posTabs.organizationId, organizationId), eq(posTabs.unitId, unitId));
     const periodDuration = Math.max(60 * 60_000, now.getTime() - periodStart.getTime());
     const previousStart = new Date(periodStart.getTime() - periodDuration);
+    const periodStartIso = periodStart.toISOString();
+    const previousStartIso = previousStart.toISOString();
+    const nowIso = now.toISOString();
     const [
       tabsRows,
       tableRows,
@@ -605,6 +609,7 @@ export class ManagementOverviewService {
       kdsRows,
       readyRows,
       paymentRows,
+      paymentReversalRows,
       peopleRows,
       approvalEvents,
       stationRows,
@@ -612,11 +617,11 @@ export class ManagementOverviewService {
       this.database.db
         .select({
           salesCents:
-            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${periodStart}), 0)`.mapWith(
+            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${periodStartIso}::timestamptz), 0)`.mapWith(
               Number,
             ),
           closedTabs:
-            sql<number>`count(*) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${periodStart})`.mapWith(
+            sql<number>`count(*) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${periodStartIso}::timestamptz)`.mapWith(
               Number,
             ),
           openTabs: sql<number>`count(*) filter (where ${posTabs.status} = 'open')`.mapWith(Number),
@@ -629,11 +634,11 @@ export class ManagementOverviewService {
               Number,
             ),
           previousSalesCents:
-            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${previousStart} and ${posTabs.closedAt} < ${periodStart}), 0)`.mapWith(
+            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${previousStartIso}::timestamptz and ${posTabs.closedAt} < ${periodStartIso}::timestamptz), 0)`.mapWith(
               Number,
             ),
           previousClosedTabs:
-            sql<number>`count(*) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${previousStart} and ${posTabs.closedAt} < ${periodStart})`.mapWith(
+            sql<number>`count(*) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${previousStartIso}::timestamptz and ${posTabs.closedAt} < ${periodStartIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -691,7 +696,7 @@ export class ManagementOverviewService {
             Number,
           ),
           delayed:
-            sql<number>`count(*) filter (where ${posKdsTickets.status} in ('pending', 'preparing') and coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + (${kdsDelayMinutes} * interval '1 minute')) < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${posKdsTickets.status} in ('pending', 'preparing') and coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + (${kdsDelayMinutes} * interval '1 minute')) < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -715,11 +720,11 @@ export class ManagementOverviewService {
       this.database.db
         .select({
           receivedCents:
-            sql<number>`coalesce(sum(${posTabPayments.amountCents}) filter (where ${posTabPayments.createdAt} >= ${periodStart}), 0)`.mapWith(
+            sql<number>`coalesce(sum(${posTabPayments.amountCents}) filter (where ${posTabPayments.createdAt} >= ${periodStartIso}::timestamptz), 0)`.mapWith(
               Number,
             ),
           previousReceivedCents:
-            sql<number>`coalesce(sum(${posTabPayments.amountCents}) filter (where ${posTabPayments.createdAt} >= ${previousStart} and ${posTabPayments.createdAt} < ${periodStart}), 0)`.mapWith(
+            sql<number>`coalesce(sum(${posTabPayments.amountCents}) filter (where ${posTabPayments.createdAt} >= ${previousStartIso}::timestamptz and ${posTabPayments.createdAt} < ${periodStartIso}::timestamptz), 0)`.mapWith(
               Number,
             ),
         })
@@ -729,6 +734,26 @@ export class ManagementOverviewService {
             eq(posTabPayments.organizationId, organizationId),
             eq(posTabPayments.unitId, unitId),
             gte(posTabPayments.createdAt, previousStart),
+          ),
+        ),
+      this.database.db
+        .select({
+          reversedCents:
+            sql<number>`coalesce(sum(${posPaymentReversals.amountCents}) filter (where ${posPaymentReversals.resolvedAt} >= ${periodStartIso}::timestamptz), 0)`.mapWith(
+              Number,
+            ),
+          previousReversedCents:
+            sql<number>`coalesce(sum(${posPaymentReversals.amountCents}) filter (where ${posPaymentReversals.resolvedAt} >= ${previousStartIso}::timestamptz and ${posPaymentReversals.resolvedAt} < ${periodStartIso}::timestamptz), 0)`.mapWith(
+              Number,
+            ),
+        })
+        .from(posPaymentReversals)
+        .where(
+          and(
+            eq(posPaymentReversals.organizationId, organizationId),
+            eq(posPaymentReversals.unitId, unitId),
+            eq(posPaymentReversals.status, "approved"),
+            gte(posPaymentReversals.resolvedAt, previousStart),
           ),
         ),
       this.database.db
@@ -794,7 +819,8 @@ export class ManagementOverviewService {
       openTabs: tabs?.openTabs ?? 0,
       myOpenTabs: tabs?.myOpenTabs ?? 0,
       openValueCents: tabs?.openValueCents ?? 0,
-      receivedCents: paymentRows[0]?.receivedCents ?? 0,
+      receivedCents:
+        (paymentRows[0]?.receivedCents ?? 0) - (paymentReversalRows[0]?.reversedCents ?? 0),
       tables: tables?.tables ?? 0,
       occupiedTables: tables?.occupiedTables ?? 0,
       turnoverTables: tables?.turnoverTables ?? 0,
@@ -814,7 +840,9 @@ export class ManagementOverviewService {
       ).length,
       previousSalesCents: tabs?.previousSalesCents ?? 0,
       previousClosedTabs: tabs?.previousClosedTabs ?? 0,
-      previousReceivedCents: paymentRows[0]?.previousReceivedCents ?? 0,
+      previousReceivedCents:
+        (paymentRows[0]?.previousReceivedCents ?? 0) -
+        (paymentReversalRows[0]?.previousReversedCents ?? 0),
       busiestStationLabel: stationRows[0]?.label ?? null,
       busiestStationQueue: stationRows[0]?.count ?? 0,
     };

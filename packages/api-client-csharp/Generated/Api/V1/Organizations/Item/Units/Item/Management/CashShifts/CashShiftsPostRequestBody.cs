@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Cas
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The cashRegisterId property</summary>
+        public Guid? CashRegisterId { get; set; }
         /// <summary>The openingCents property</summary>
         public int? OpeningCents { get; set; }
         /// <summary>
@@ -41,6 +43,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Cas
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "cashRegisterId", n => { CashRegisterId = n.GetGuidValue(); } },
                 { "openingCents", n => { OpeningCents = n.GetIntValue(); } },
             };
         }
@@ -51,6 +54,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Cas
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteGuidValue("cashRegisterId", CashRegisterId);
             writer.WriteIntValue("openingCents", OpeningCents);
             writer.WriteAdditionalData(AdditionalData);
         }

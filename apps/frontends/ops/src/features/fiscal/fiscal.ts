@@ -17,7 +17,6 @@ export interface FiscalProfile {
 
 export interface FiscalDashboard {
   provider: {
-    name: string;
     status:
       | "platform_not_configured"
       | "profile_required"
@@ -28,7 +27,7 @@ export interface FiscalDashboard {
     environment: "homologation" | "production" | null;
     lastSyncAt: string | null;
     nextAction: string;
-    companyId: string | null;
+    registered: boolean;
     certificateValidUntil: string | null;
     environments: { homologation: boolean; production: boolean };
   };
@@ -57,6 +56,37 @@ export interface FiscalDocument {
   totalCents: number;
   issuedAt: string;
   accessKey: string | null;
+}
+
+export interface FiscalDocumentDetail extends FiscalDocument {
+  tabId: string | null;
+  orderId: string | null;
+  taxCents: number;
+  authorizedAt: string | null;
+  canceledAt: string | null;
+  items: Array<{
+    id: string;
+    lineNumber: number;
+    description: string;
+    quantityMilli: number;
+    unitPriceCents: number;
+    totalCents: number;
+    taxCents: number;
+  }>;
+  events: Array<{
+    id: string;
+    type: string;
+    status: string | null;
+    code: string | null;
+    message: string | null;
+    occurredAt: string;
+  }>;
+  artifacts: Array<{
+    kind: "authorization_xml" | "cancellation_xml" | "danfe_pdf";
+    sha256: string;
+    bytes: number;
+    contentType: string;
+  }>;
 }
 
 export interface FiscalPeriod {
@@ -90,10 +120,21 @@ export interface AccountantRequest {
 export interface FiscalWorkspace {
   profile: FiscalProfile | null;
   taxRevisions: Array<{ productId: string; status: "draft" | "active" | "revoked" }>;
-  products: Array<{ id: string; name: string }>;
+  products: Array<{ id: string; name: string; categoryId: string; categoryName: string }>;
   dashboard: FiscalDashboard;
   documents: FiscalDocument[];
   periods: FiscalPeriod[];
+  numberInvalidations: Array<{
+    id: string;
+    series: string;
+    initialNumber: number;
+    finalNumber: number;
+    justification: string;
+    status: "processing" | "invalidated" | "rejected";
+    errorMessage: string | null;
+    processedAt: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface AccountantWorkspace {
@@ -116,6 +157,7 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
   const products = record(dashboard.products);
   const documents = parseDocuments(payload.documents);
   const catalog = parsePilotCatalog(payload.catalog);
+  const categories = new Map(catalog.categories.map((category) => [category.id, category.name]));
   const authorizedCount = optionalCount(statuses.authorized);
   const rejectedCount = optionalCount(statuses.rejected);
   const pendingCount = count(dashboard.pendingDocuments);
@@ -131,7 +173,12 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
     })),
     products: catalog.products
       .filter((product) => product.active)
-      .map((product) => ({ id: product.id, name: product.name })),
+      .map((product) => ({
+        id: product.id,
+        name: product.name,
+        categoryId: product.categoryId,
+        categoryName: categories.get(product.categoryId) ?? "Sem categoria",
+      })),
     dashboard: {
       provider,
       summary: {
@@ -188,7 +235,78 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
     },
     documents,
     periods: parsePeriods(payload.periods, documents),
+    numberInvalidations: (payload.numberInvalidations === undefined
+      ? []
+      : collection(payload.numberInvalidations)
+    ).map((item) => ({
+      id: text(item.id),
+      series: text(item.series),
+      initialNumber: count(item.initialNumber),
+      finalNumber: count(item.finalNumber),
+      justification: text(item.justification),
+      status: oneOf(item.status, ["processing", "invalidated", "rejected"]),
+      errorMessage: optionalText(item.errorMessage),
+      processedAt: optionalText(item.processedAt),
+      createdAt: text(item.createdAt),
+    })),
   };
+}
+
+export function parseFiscalDocumentDetail(value: unknown): FiscalDocumentDetail {
+  const item = record(value);
+  const [document] = parseDocuments([item]);
+  if (!document) throw new InvalidFiscalPayloadError();
+  return {
+    ...document,
+    tabId: optionalText(item.tabId),
+    orderId: optionalText(item.orderId),
+    taxCents: count(item.taxCents),
+    authorizedAt: optionalText(item.authorizedAt),
+    canceledAt: optionalText(item.canceledAt),
+    items: collection(item.items).map((row) => ({
+      id: text(row.id),
+      lineNumber: count(row.lineNumber),
+      description: text(row.description),
+      quantityMilli: count(row.quantityMilli),
+      unitPriceCents: count(row.unitPriceCents),
+      totalCents: count(row.totalCents),
+      taxCents: count(row.taxCents),
+    })),
+    events: collection(item.events).map((row) => ({
+      id: text(row.id),
+      type: text(row.type),
+      status: optionalText(row.status),
+      code: optionalText(row.code),
+      message: optionalText(row.message),
+      occurredAt: text(row.occurredAt),
+    })),
+    artifacts: (item.artifacts === undefined ? [] : collection(item.artifacts)).map((row) => ({
+      kind: oneOf(row.kind, ["authorization_xml", "cancellation_xml", "danfe_pdf"]),
+      sha256: text(row.sha256),
+      bytes: count(row.bytes),
+      contentType: text(row.contentType),
+    })),
+  };
+}
+
+export function fiscalRejectionGuidance(code: string | null, message: string | null): string {
+  const reason = `${code ?? ""} ${message ?? ""}`.toLocaleLowerCase("pt-BR");
+  if (/inscri[cç][aã]o|cadastro|ie\b/.test(reason)) {
+    return "Revise a inscrição estadual e o cadastro fiscal da empresa.";
+  }
+  if (/ncm|cest|cfop|classifica[cç][aã]o/.test(reason)) {
+    return "Revise a classificação fiscal dos produtos desta nota.";
+  }
+  if (/certificado|csc/.test(reason)) {
+    return "Atualize o certificado A1 ou o CSC antes de tentar novamente.";
+  }
+  if (/duplic|j[aá] existe/.test(reason)) {
+    return "A nota pode já ter sido enviada. Atualize a situação antes de tentar novamente.";
+  }
+  if (/timeout|tempo limite|processando/.test(reason)) {
+    return "A autorização ainda pode estar em andamento. Aguarde e atualize a situação.";
+  }
+  return "Revise os dados da nota e, depois da correção, atualize a situação.";
 }
 
 function parseProviderStatus(value: unknown): FiscalDashboard["provider"] {
@@ -196,7 +314,6 @@ function parseProviderStatus(value: unknown): FiscalDashboard["provider"] {
   const connection = provider.connection === null ? null : record(provider.connection);
   const environments = connection ? record(connection.environments) : {};
   return {
-    name: "Focus NFe",
     status: oneOf(provider.status, [
       "platform_not_configured",
       "profile_required",
@@ -211,7 +328,7 @@ function parseProviderStatus(value: unknown): FiscalDashboard["provider"] {
         : oneOf(provider.environment, ["homologation", "production"]),
     lastSyncAt: connection ? optionalText(connection.lastCheckedAt) : null,
     nextAction: text(provider.nextAction),
-    companyId: connection ? optionalText(connection.companyId) : null,
+    registered: connection?.registered === true,
     certificateValidUntil: connection ? optionalText(connection.certificateValidUntil) : null,
     environments: {
       homologation: environments.homologation === true,
@@ -341,18 +458,12 @@ function parseAccountingPackage(value: unknown): AccountingPackage | null {
   const packageCompetence = payload.competence ?? record(payload.period).competence;
   const accountingPackage = record(payload.accountingPackage);
   const packagePayload = record(accountingPackage.payload);
-  const serialized = JSON.stringify(packagePayload);
   return {
     competence: competenceDate(packageCompetence),
     status: oneOf(payload.status ?? accountingPackage.status, ["pending", "ready", "failed"]),
     generatedAt: optionalText(accountingPackage.generatedAt),
     payload: packagePayload,
-    files: [
-      {
-        name: `pacote-contabil-${competenceDate(packageCompetence)}.json`,
-        sizeBytes: new TextEncoder().encode(serialized).byteLength,
-      },
-    ],
+    files: [{ name: `pacote-contabil-${competenceDate(packageCompetence)}.zip`, sizeBytes: 0 }],
   };
 }
 

@@ -11,7 +11,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.CashShifts.Item.Movements
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\management\cash-shifts\{cashShiftId}\movements
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\management\cash-shifts\{cashShiftId}\movements
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class MovementsRequestBuilder : BaseRequestBuilder
@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Cas
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public MovementsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/movements", pathParameters)
+        public MovementsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/cash-shifts/{cashShiftId}/movements", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Cas
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public MovementsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/movements", rawUrl)
+        public MovementsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/cash-shifts/{cashShiftId}/movements", rawUrl)
         {
         }
         /// <param name="body">The request body</param>

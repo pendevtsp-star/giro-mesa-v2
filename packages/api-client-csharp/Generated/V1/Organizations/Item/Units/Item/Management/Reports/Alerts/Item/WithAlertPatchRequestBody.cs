@@ -16,6 +16,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The assignedToIdentityId property</summary>
         public Guid? AssignedToIdentityId { get; set; }
+        /// <summary>The comment property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Comment { get; set; }
+#nullable restore
+#else
+        public string Comment { get; set; }
+#endif
         /// <summary>The dueAt property</summary>
         public DateTimeOffset? DueAt { get; set; }
         /// <summary>The status property</summary>
@@ -48,6 +56,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "assignedToIdentityId", n => { AssignedToIdentityId = n.GetGuidValue(); } },
+                { "comment", n => { Comment = n.GetStringValue(); } },
                 { "dueAt", n => { DueAt = n.GetDateTimeOffsetValue(); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports.Alerts.Item.WithAlertPatchRequestBody_status>(); } },
                 { "version", n => { Version = n.GetIntValue(); } },
@@ -61,6 +70,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteGuidValue("assignedToIdentityId", AssignedToIdentityId);
+            writer.WriteStringValue("comment", Comment);
             writer.WriteDateTimeOffsetValue("dueAt", DueAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Reports.Alerts.Item.WithAlertPatchRequestBody_status>("status", Status);
             writer.WriteIntValue("version", Version);

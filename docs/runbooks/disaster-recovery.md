@@ -13,6 +13,8 @@ Este runbook comprova somente o que foi ensaiado. Build verde, disponibilidade H
 
 O manifesto usa HMAC-SHA-256 com chave de ao menos 32 bytes fornecida exclusivamente por `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64`. Ela deve vir do cofre, ter versão, rotação e cópia de recuperação separada; nunca é gravada no backup.
 
+Os artefatos fiscais não estão integralmente no banco: XMLs, DANFEs, comprovantes de inutilização e pacotes contábeis ZIP ficam sob `MEDIA_ROOT/fiscal`, enquanto caminhos, tamanhos e hashes ficam no PostgreSQL. Por isso banco e volume formam uma única unidade de recuperação. `GIROMESA_OBJECT_DIRECTORY` deve ser o `Mountpoint` canônico do volume `giromesa-v2-pilot_media_data`; um diretório apenas existente, mas diferente do mount usado pelos containers, é recusado pelo pré-deploy.
+
 ## Backup
 
 1. Confirme um diretório dedicado fora do host primário.
@@ -27,8 +29,8 @@ O manifesto usa HMAC-SHA-256 com chave de ao menos 32 bytes fornecida exclusivam
 2. Prepare diretórios de destino vazios para objetos e configuração e um arquivo SQL de smoke funcional, versionado junto da release.
 3. Na VPS Linux, execute `scripts/restore-drill.sh` com o artefato esperado e `--smoke-sql-file`; o script registra o SHA-256 desse smoke na evidência. O PowerShell `scripts/restore-drill.ps1` permanece equivalente para ensaios Windows.
 4. O script valida HMAC, hashes, caminhos e destinos vazios antes de tocar no banco; depois restaura banco, objetos e configuração criptografada.
-5. O smoke funcional roda por último, com `ON_ERROR_STOP`; ele deve validar migrations, RLS negativo e invariantes de ledger aplicáveis à release.
-6. Confirme a leitura dos objetos e que a configuração restaurada continua criptografada.
+5. O smoke funcional roda por último, com `ON_ERROR_STOP`; ele deve validar migrations, RLS negativo e invariantes de ledger aplicáveis à release. Para o módulo fiscal, inclua `scripts/fiscal-production-smoke.sql` para exigir tabelas, índices, colunas de storage e FKs da migration 0050.
+6. Confirme a leitura dos objetos e que a configuração restaurada continua criptografada. Depois de iniciar API e worker, execute `bash scripts/check-fiscal-storage.sh shared "$GIROMESA_OBJECT_DIRECTORY" "$(docker compose -p giromesa-v2-pilot ps -q api)" "$(docker compose -p giromesa-v2-pilot ps -q worker)"`; o resultado esperado é `FISCAL_STORAGE_READY` e o probe é removido automaticamente.
 7. Registre `restore-evidence.json`, duração, artefato, migration, hashes e aprovadores; destrua o ambiente descartável.
 
 Falha de assinatura/hash, versão divergente, RTO acima de 30 minutos ou teste funcional incompleto invalida o ensaio. Não repare o backup durante uma restauração real; escolha uma geração íntegra anterior e registre a perda efetiva.
@@ -37,7 +39,7 @@ O teste Docker Linux é opt-in para não iniciar containers por acidente: `DISAS
 
 ## Pré-deploy e rollback da aplicação
 
-`deploy/vps/deploy-pilot.sh` executa `ensure-runtime-env.sh`, valida ferramentas, deriva o SHA imutável, confere a migration alvo do journal e vincula o backup à migration que está realmente aplicada no banco de origem. Só depois conclui `backup-production.sh` e inicia migrations. Falta de chave HMAC, grants administrativos revisados, correspondência no journal ou manifesto aborta o deploy. Objetos e configuração já criptografada podem ser incluídos por `GIROMESA_OBJECT_DIRECTORY` e `GIROMESA_ENCRYPTED_CONFIG_ARCHIVE`; nenhum snapshot novo do `.env` em claro é permitido.
+Antes de vincular o release, o operador executa `ensure-runtime-env.sh`. `deploy/vps/deploy-pilot.sh` valida ferramentas, deriva o SHA imutável, confere a migration alvo do journal e vincula o backup à migration que está realmente aplicada no banco de origem. O script também valida o gate fiscal assinado, prova que o backup aponta para o volume efetivamente montado na API, aplica o smoke da migration 0050 e, ao final, comprova o compartilhamento do volume entre API e worker. Só depois conclui a promoção. Falta de chave HMAC, grants administrativos revisados, correspondência no journal, manifesto fiscal ou cobertura real dos objetos aborta o deploy. Nenhum snapshot novo do `.env` em claro é permitido.
 
 `deploy/vps/rollback-app.sh` troca somente a release da aplicação por SHA completo já instalado. Ele exige que operador declare migrations atual e alvo iguais, registra `rollback-app.json`, executa smoke e nunca chama restauração do banco. Schema divergente bloqueia esse rollback e exige plano de recuperação específico revisado.
 

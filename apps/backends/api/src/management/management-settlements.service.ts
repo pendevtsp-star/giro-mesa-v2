@@ -14,6 +14,8 @@ import {
   managementWaiterSettlements,
   outboxEvents,
   posOperationalShifts,
+  posPaymentAttempts,
+  posPaymentReversals,
   posTabPayments,
   posTabs,
 } from "@giromesa/db";
@@ -403,6 +405,17 @@ export class ManagementSettlementsService {
       with payments as (
         select tab_id, coalesce(sum(amount_cents),0)::int paid_cents
           from pos_tab_payments where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid group by tab_id
+      ), reversals as (
+        select payments.tab_id, coalesce(sum(reversals.amount_cents),0)::int reversed_cents
+          from pos_payment_reversals reversals
+          join pos_tab_payments payments
+            on payments.organization_id=reversals.organization_id
+           and payments.unit_id=reversals.unit_id
+           and payments.id=reversals.payment_id
+         where reversals.organization_id=${organizationId}::uuid
+           and reversals.unit_id=${unitId}::uuid
+           and reversals.status='approved'
+         group by payments.tab_id
       ), losses as (
         select tab_id, coalesce(sum(amount_cents),0)::int loss_cents
           from management_operational_losses
@@ -411,17 +424,52 @@ export class ManagementSettlementsService {
       )
       select tabs.id as "tabId", coalesce(tabs.label, tabs.display_number::text, tabs.id::text) as label,
              responsible.display_name as "responsibleName", tabs.total_cents as "totalCents",
-             greatest(tabs.total_cents-coalesce(payments.paid_cents,0)-coalesce(losses.loss_cents,0),0)::int as "remainingCents"
+             greatest(tabs.total_cents-greatest(coalesce(payments.paid_cents,0)-coalesce(reversals.reversed_cents,0),0)-coalesce(losses.loss_cents,0),0)::int as "remainingCents"
         from pos_tabs tabs
         left join payments on payments.tab_id=tabs.id
+        left join reversals on reversals.tab_id=tabs.id
         left join losses on losses.tab_id=tabs.id
         left join identities responsible on responsible.id=tabs.responsible_identity_id
        where tabs.organization_id=${organizationId}::uuid and tabs.unit_id=${unitId}::uuid and tabs.status='open'
          and (${normalized}='' or coalesce(tabs.label,'') ilike ${`%${normalized}%`} or coalesce(tabs.display_number::text,'') ilike ${`%${normalized}%`} or coalesce(responsible.display_name,'') ilike ${`%${normalized}%`})
-         and tabs.total_cents > coalesce(payments.paid_cents,0)+coalesce(losses.loss_cents,0)
+         and tabs.total_cents > greatest(coalesce(payments.paid_cents,0)-coalesce(reversals.reversed_cents,0),0)+coalesce(losses.loss_cents,0)
        order by tabs.updated_at desc limit 30
     `);
     return { candidates };
+  }
+
+  private async effectivePaidCents(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    const [row] = await tx
+      .select({
+        paidCents: sql<number>`greatest(
+          coalesce(sum(${posTabPayments.amountCents}), 0) -
+          coalesce(sum(${posPaymentReversals.amountCents}) filter (where ${posPaymentReversals.status} = 'approved'), 0),
+          0
+        )::int`.mapWith(Number),
+      })
+      .from(posTabPayments)
+      .leftJoin(
+        posPaymentReversals,
+        and(
+          eq(posPaymentReversals.organizationId, posTabPayments.organizationId),
+          eq(posPaymentReversals.unitId, posTabPayments.unitId),
+          eq(posPaymentReversals.paymentId, posTabPayments.id),
+          eq(posPaymentReversals.status, "approved"),
+        ),
+      )
+      .where(
+        and(
+          eq(posTabPayments.organizationId, organizationId),
+          eq(posTabPayments.unitId, unitId),
+          eq(posTabPayments.tabId, tabId),
+        ),
+      );
+    return cents(row?.paidCents);
   }
 
   async updateSettings(
@@ -558,6 +606,9 @@ export class ManagementSettlementsService {
       input,
       async (tx) => {
         await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${input.tabId}`}))`,
+        );
+        await tx.execute(
           sql`select id from pos_tabs where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.tabId}::uuid for update`,
         );
         const [tab] = await tx
@@ -572,16 +623,7 @@ export class ManagementSettlementsService {
           )
           .limit(1);
         if (!tab) throw new NotFoundException({ code: "TAB_NOT_FOUND" });
-        const [payment] = await tx
-          .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}),0)::int` })
-          .from(posTabPayments)
-          .where(
-            and(
-              eq(posTabPayments.organizationId, organizationId),
-              eq(posTabPayments.unitId, unitId),
-              eq(posTabPayments.tabId, input.tabId),
-            ),
-          );
+        const paidCents = await this.effectivePaidCents(tx, organizationId, unitId, input.tabId);
         const [loss] = await tx
           .select({
             lossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}) filter (where ${managementOperationalLosses.status}='approved' and ${managementOperationalLosses.type}='unpaid_tab'),0)::int`,
@@ -594,9 +636,21 @@ export class ManagementSettlementsService {
               eq(managementOperationalLosses.tabId, input.tabId),
             ),
           );
+        const [reservation] = await tx
+          .select({
+            reservedCents: sql<number>`coalesce(sum(${posPaymentAttempts.amountCents}) filter (where ${posPaymentAttempts.status} in ('processing', 'unknown') or (${posPaymentAttempts.status} = 'created' and ${posPaymentAttempts.expiresAt} > now())), 0)::int`,
+          })
+          .from(posPaymentAttempts)
+          .where(
+            and(
+              eq(posPaymentAttempts.organizationId, organizationId),
+              eq(posPaymentAttempts.unitId, unitId),
+              eq(posPaymentAttempts.tabId, input.tabId),
+            ),
+          );
         const remainingCents = Math.max(
           0,
-          tab.totalCents - cents(payment?.paidCents) - cents(loss?.lossCents),
+          tab.totalCents - paidCents - cents(loss?.lossCents) - cents(reservation?.reservedCents),
         );
         if (input.type === "unpaid_tab" && tab.status !== "open")
           throw new ConflictException({ code: "LOSS_REQUIRES_OPEN_TAB" });
@@ -656,6 +710,26 @@ export class ManagementSettlementsService {
       "settlement.operational-loss.decision",
       { lossId, ...input },
       async (tx) => {
+        const [lossHint] = await tx
+          .select({
+            tabId: managementOperationalLosses.tabId,
+            type: managementOperationalLosses.type,
+          })
+          .from(managementOperationalLosses)
+          .where(
+            and(
+              eq(managementOperationalLosses.organizationId, organizationId),
+              eq(managementOperationalLosses.unitId, unitId),
+              eq(managementOperationalLosses.id, lossId),
+            ),
+          )
+          .limit(1);
+        if (!lossHint) throw new NotFoundException({ code: "OPERATIONAL_LOSS_NOT_FOUND" });
+        if (lossHint.type === "unpaid_tab") {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${lossHint.tabId}`}))`,
+          );
+        }
         await tx.execute(
           sql`select id from management_operational_losses where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${lossId}::uuid for update`,
         );
@@ -692,16 +766,7 @@ export class ManagementSettlementsService {
               ),
             )
             .limit(1);
-          const [payment] = await tx
-            .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}),0)::int` })
-            .from(posTabPayments)
-            .where(
-              and(
-                eq(posTabPayments.organizationId, organizationId),
-                eq(posTabPayments.unitId, unitId),
-                eq(posTabPayments.tabId, loss.tabId),
-              ),
-            );
+          const paidCents = await this.effectivePaidCents(tx, organizationId, unitId, loss.tabId);
           const [approved] = await tx
             .select({
               lossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}) filter (where ${managementOperationalLosses.status}='approved' and ${managementOperationalLosses.type}='unpaid_tab'),0)::int`,
@@ -714,13 +779,65 @@ export class ManagementSettlementsService {
                 eq(managementOperationalLosses.tabId, loss.tabId),
               ),
             );
+          const [reservation] = await tx
+            .select({
+              reservedCents: sql<number>`coalesce(sum(${posPaymentAttempts.amountCents}) filter (where ${posPaymentAttempts.status} in ('processing', 'unknown') or (${posPaymentAttempts.status} = 'created' and ${posPaymentAttempts.expiresAt} > now())), 0)::int`,
+            })
+            .from(posPaymentAttempts)
+            .where(
+              and(
+                eq(posPaymentAttempts.organizationId, organizationId),
+                eq(posPaymentAttempts.unitId, unitId),
+                eq(posPaymentAttempts.tabId, loss.tabId),
+              ),
+            );
           const remaining =
-            (tab?.totalCents ?? 0) - cents(payment?.paidCents) - cents(approved?.lossCents);
+            (tab?.totalCents ?? 0) -
+            paidCents -
+            cents(approved?.lossCents) -
+            cents(reservation?.reservedCents);
           if (tab?.status !== "open" || loss.amountCents > remaining)
             throw new ConflictException({
               code: "OPERATIONAL_LOSS_EXCEEDS_REMAINING",
               remainingCents: Math.max(0, remaining),
             });
+        }
+        if (input.action === "reverse" && loss.type === "unpaid_tab") {
+          const [[tab], paidCents, [approved]] = await Promise.all([
+            tx
+              .select({ totalCents: posTabs.totalCents, status: posTabs.status })
+              .from(posTabs)
+              .where(
+                and(
+                  eq(posTabs.organizationId, organizationId),
+                  eq(posTabs.unitId, unitId),
+                  eq(posTabs.id, loss.tabId),
+                ),
+              )
+              .limit(1),
+            this.effectivePaidCents(tx, organizationId, unitId, loss.tabId),
+            tx
+              .select({
+                lossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}) filter (where ${managementOperationalLosses.status}='approved' and ${managementOperationalLosses.type}='unpaid_tab'),0)::int`,
+              })
+              .from(managementOperationalLosses)
+              .where(
+                and(
+                  eq(managementOperationalLosses.organizationId, organizationId),
+                  eq(managementOperationalLosses.unitId, unitId),
+                  eq(managementOperationalLosses.tabId, loss.tabId),
+                ),
+              ),
+          ]);
+          if (!tab) throw new NotFoundException({ code: "TAB_NOT_FOUND" });
+          const coverageAfterReversal = paidCents + cents(approved?.lossCents) - loss.amountCents;
+          if (tab.status !== "open" && coverageAfterReversal < tab.totalCents) {
+            throw new ConflictException({
+              code: "OPERATIONAL_LOSS_REVERSE_WOULD_UNCOVER_CLOSED_TAB",
+              coverageAfterReversalCents: Math.max(0, coverageAfterReversal),
+              totalCents: tab.totalCents,
+            });
+          }
         }
         const now = new Date();
         const nextStatus =
@@ -797,12 +914,27 @@ export class ManagementSettlementsService {
       : sql``;
     const eligibility =
       configuration.eligibleTabs === "fully_paid"
-        ? sql`and coalesce(payments.paid_cents,0) >= tabs.total_cents`
+        ? sql`and greatest(coalesce(payments.paid_cents,0)-coalesce(reversals.reversed_cents,0),0) >= tabs.total_cents`
         : sql``;
     const orderRows = await tx.execute<AggregationOrderRow>(sql`
       with payments as (
         select organization_id, unit_id, tab_id, coalesce(sum(amount_cents),0)::int paid_cents
           from pos_tab_payments where organization_id=${organizationId}::uuid group by organization_id,unit_id,tab_id
+      ), reversals as (
+        select reversals.organization_id, reversals.unit_id, payments.tab_id,
+               coalesce(sum(reversals.amount_cents),0)::int reversed_cents
+          from pos_payment_reversals reversals
+          join pos_tab_payments payments
+            on payments.organization_id=reversals.organization_id
+           and payments.unit_id=reversals.unit_id
+           and payments.id=reversals.payment_id
+          join units source_unit
+            on source_unit.organization_id=reversals.organization_id
+           and source_unit.id=reversals.unit_id
+         where reversals.organization_id=${organizationId}::uuid
+           and reversals.status='approved'
+           and timezone(source_unit.timezone,reversals.resolved_at)::date between ${period.from}::date and ${period.to}::date
+         group by reversals.organization_id,reversals.unit_id,payments.tab_id
       ), losses as (
         select organization_id, unit_id, tab_id,
                coalesce(sum(amount_cents),0)::int loss_cents,
@@ -817,19 +949,21 @@ export class ManagementSettlementsService {
              coalesce(sum(items.discount_cents) filter (where items.status <> 'canceled'),0)::int as "discountCents",
              coalesce(sum(items.gross_cents) filter (where items.status = 'canceled'),0)::int as "canceledCents",
              tabs.service_charge_cents as "tabServiceChargeCents", tabs.tip_cents as "tabTipCents",
-             tabs.total_cents as "tabTotalCents", coalesce(payments.paid_cents,0)::int as "paidCents",
+             tabs.total_cents as "tabTotalCents",
+             greatest(coalesce(payments.paid_cents,0)-coalesce(reversals.reversed_cents,0),0)::int as "paidCents",
              coalesce(losses.loss_cents,0)::int as "operationalLossCents", coalesce(losses.refund_cents,0)::int as "refundCents"
         from pos_tabs tabs
         join units source_unit on source_unit.organization_id=tabs.organization_id and source_unit.id=tabs.unit_id
         left join pos_orders orders on orders.organization_id=tabs.organization_id and orders.unit_id=tabs.unit_id and orders.tab_id=tabs.id
         left join pos_order_items items on items.organization_id=orders.organization_id and items.unit_id=orders.unit_id and items.order_id=orders.id
         left join payments on payments.organization_id=tabs.organization_id and payments.unit_id=tabs.unit_id and payments.tab_id=tabs.id
+        left join reversals on reversals.organization_id=tabs.organization_id and reversals.unit_id=tabs.unit_id and reversals.tab_id=tabs.id
         left join losses on losses.organization_id=tabs.organization_id and losses.unit_id=tabs.unit_id and losses.tab_id=tabs.id
        where tabs.organization_id=${organizationId}::uuid and tabs.status='closed'
          and timezone(source_unit.timezone,tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
          ${unitFilter} ${shiftFilter} ${eligibility}
        group by tabs.id,tabs.unit_id,tabs.responsible_identity_id,orders.id,orders.created_by_identity_id,
-                tabs.service_charge_cents,tabs.tip_cents,tabs.total_cents,payments.paid_cents,losses.loss_cents,losses.refund_cents
+                tabs.service_charge_cents,tabs.tip_cents,tabs.total_cents,payments.paid_cents,reversals.reversed_cents,losses.loss_cents,losses.refund_cents
        order by tabs.id,orders.id
     `);
     const byTab = new Map<string, AggregationOrderRow[]>();

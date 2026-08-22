@@ -41,6 +41,11 @@ export const reportFamilySchema = z.enum([
   "forecast",
 ]);
 
+export const reportQuerySchema = reportPeriodSchema.extend({
+  family: reportFamilySchema.default("overview"),
+  minimumComparableOperatingDays: z.coerce.number().int().min(1).max(31).default(7),
+});
+
 export const reportDrillDownQuerySchema = reportPeriodSchema
   .extend({
     dimension: z.enum([
@@ -129,6 +134,8 @@ const reportViewBaseSchema = z.object({
   name: z.string().trim().min(2).max(120),
   visibility: z.enum(["private", "unit", "organization"]).default("private"),
   query: reportPeriodSchema.extend({ family: reportFamilySchema.default("overview") }),
+  isDefault: z.boolean().optional(),
+  sortOrder: z.number().int().min(-10_000).max(10_000).optional(),
 });
 export const reportViewCreateSchema = reportViewBaseSchema;
 export const reportViewUpdateSchema = reportViewBaseSchema.extend({ version });
@@ -144,6 +151,7 @@ export const reportAlertActionSchema = z.object({
   status: z.enum(["open", "claimed", "resolved", "dismissed"]),
   assignedToIdentityId: id.nullable().optional(),
   dueAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  comment: z.string().trim().min(1).max(1_000).optional(),
   version,
 });
 
@@ -151,7 +159,21 @@ export const reportCostBackfillSchema = reportPeriodSchema.extend({
   allowEstimated: z.literal(true),
 });
 
+export const reportCostPreviewSchema = reportPeriodSchema;
+
+export const reportReconciliationClosureSchema = reportPeriodSchema.extend({
+  status: z.enum(["open", "closed"]),
+  checklist: z.object({
+    payments: z.boolean(),
+    fiscal: z.boolean(),
+    external: z.boolean(),
+  }),
+  note: z.string().trim().min(2).max(1_000),
+  evidence: z.array(z.url().max(2_048)).max(10).default([]),
+});
+
 export type ReportMetric = z.infer<typeof reportMetricSchema>;
+export type ReportQueryInput = z.infer<typeof reportQuerySchema>;
 export type ReportDrillDownQuery = z.infer<typeof reportDrillDownQuerySchema>;
 export type ReportBudgetInput = z.infer<typeof reportBudgetInputSchema>;
 export type ReportExportInput = z.infer<typeof reportExportInputSchema>;
@@ -166,3 +188,5 @@ export type ReportAlertListQuery = z.infer<typeof reportAlertListQuerySchema>;
 export type ReportAlertEvaluateInput = z.infer<typeof reportAlertEvaluateSchema>;
 export type ReportAlertActionInput = z.infer<typeof reportAlertActionSchema>;
 export type ReportCostBackfillInput = z.infer<typeof reportCostBackfillSchema>;
+export type ReportCostPreviewInput = z.infer<typeof reportCostPreviewSchema>;
+export type ReportReconciliationClosureInput = z.infer<typeof reportReconciliationClosureSchema>;

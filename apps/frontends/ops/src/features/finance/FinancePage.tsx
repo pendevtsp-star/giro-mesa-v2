@@ -7,6 +7,7 @@ import {
   dateLabel,
   type ManagementScope,
   operationalKey,
+  parseCash,
   parseFinance,
   RemoteGate,
   useRemote,
@@ -15,6 +16,7 @@ import { formatMoney } from "../../rules";
 
 export function RealFinancePage({ scope }: { scope: ManagementScope }) {
   const remote = useRemote(scope, api.management.finance, parseFinance);
+  const cashRemote = useRemote(scope, api.management.cashShifts, parseCash);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [competenceDate, setCompetenceDate] = useState("");
@@ -30,8 +32,9 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
     "payable",
   );
   const [settlementAmount, setSettlementAmount] = useState("");
-  const [settlementMethod, setSettlementMethod] = useState("");
+  const [settlementMethod, setSettlementMethod] = useState("pix");
   const [settlementReference, setSettlementReference] = useState("");
+  const [settlementCashRegisterId, setSettlementCashRegisterId] = useState("");
   async function createPayable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const amountCents = currencyToCents(amount);
@@ -98,6 +101,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
       amountCents,
       method: settlementMethod.trim(),
       reference: settlementReference.trim() || undefined,
+      cashRegisterId: settlementCashRegisterId || undefined,
     };
     try {
       if (settlementDirection === "payable") {
@@ -130,6 +134,10 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
   return (
     <RemoteGate remote={remote}>
       {(data) => {
+        const openCashRegisters =
+          cashRemote.state.status === "ready"
+            ? cashRemote.state.data.registers.filter((cashRegister) => cashRegister.openShiftId)
+            : [];
         const payable = data.entries
           .filter((entry) => entry.direction === "payable")
           .reduce((sum, entry) => sum + Math.max(0, entry.amountCents - entry.settledCents), 0);
@@ -288,14 +296,40 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                   </label>
                   <label>
                     Método
-                    <Input
-                      minLength={2}
+                    <NativeSelect
                       onChange={(event) => setSettlementMethod(event.target.value)}
-                      placeholder="Pix, dinheiro, cartão"
                       required
                       value={settlementMethod}
-                    />
+                    >
+                      <option value="pix">Pix</option>
+                      <option value="cash">Dinheiro</option>
+                      <option value="credit_card">Cartão de crédito</option>
+                      <option value="debit_card">Cartão de débito</option>
+                      <option value="bank_transfer">Transferência bancária</option>
+                      <option value="other">Outro</option>
+                    </NativeSelect>
                   </label>
+                  {openCashRegisters.length > 0 && (
+                    <label>
+                      Gaveta de conciliação
+                      <NativeSelect
+                        onChange={(event) => setSettlementCashRegisterId(event.target.value)}
+                        required={openCashRegisters.length > 1}
+                        value={settlementCashRegisterId}
+                      >
+                        <option value="">
+                          {openCashRegisters.length === 1
+                            ? `Automática · ${openCashRegisters[0]?.name}`
+                            : "Selecione a gaveta"}
+                        </option>
+                        {openCashRegisters.map((cashRegister) => (
+                          <option key={cashRegister.id} value={cashRegister.id}>
+                            {cashRegister.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </label>
+                  )}
                   <label className="action-form__wide">
                     Referência
                     <Input
@@ -303,10 +337,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                       value={settlementReference}
                     />
                   </label>
-                  <Button
-                    disabled={submitting || !settlementId || settlementMethod.trim().length < 2}
-                    type="submit"
-                  >
+                  <Button disabled={submitting || !settlementId} type="submit">
                     Confirmar liquidação
                   </Button>
                 </form>

@@ -11,6 +11,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   time,
   timestamp,
@@ -24,8 +25,17 @@ import {
   posOrders,
   posProductionStations,
   posProducts,
+  posTerminalProfiles,
 } from "./operations-schema.js";
-import { identities, organizations, units } from "./schema.js";
+import {
+  identities,
+  membershipInvitations,
+  memberships,
+  organizations,
+  roleBindings,
+  roleName,
+  units,
+} from "./schema.js";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -2775,13 +2785,125 @@ export const managementReceivableLines = pgTable(
   ],
 );
 
+export const managementCashSettings = pgTable(
+  "management_cash_settings",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    movementApprovalThresholdCents: integer("movement_approval_threshold_cents")
+      .notNull()
+      .default(50_000),
+    discrepancyCriticalThresholdCents: integer("discrepancy_critical_threshold_cents")
+      .notNull()
+      .default(1_000),
+    maxShiftMinutes: integer("max_shift_minutes").notNull().default(720),
+    updatedByIdentityId: uuid("updated_by_identity_id").references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_cash_settings_unit_unique").on(table.organizationId, table.unitId),
+    foreignKey({
+      name: "management_cash_settings_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "management_cash_settings_movement_threshold_check",
+      sql`${table.movementApprovalThresholdCents} >= 0`,
+    ),
+    check(
+      "management_cash_settings_discrepancy_threshold_check",
+      sql`${table.discrepancyCriticalThresholdCents} >= 0`,
+    ),
+    check("management_cash_settings_max_shift_check", sql`${table.maxShiftMinutes} > 0`),
+  ],
+);
+
+export const managementCashRegisters = pgTable(
+  "management_cash_registers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_cash_registers_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_cash_registers_name_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.name,
+    ),
+    foreignKey({
+      name: "management_cash_registers_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const managementCashRegisterTerminals = pgTable(
+  "management_cash_register_terminals",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    cashRegisterId: uuid("cash_register_id").notNull(),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_cash_register_terminals_terminal_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.installationId,
+    ),
+    index("management_cash_register_terminals_register_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.cashRegisterId,
+    ),
+    foreignKey({
+      name: "management_cash_register_terminals_terminal_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        posTerminalProfiles.organizationId,
+        posTerminalProfiles.unitId,
+        posTerminalProfiles.installationId,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_cash_register_terminals_register_fk",
+      columns: [table.organizationId, table.unitId, table.cashRegisterId],
+      foreignColumns: [
+        managementCashRegisters.organizationId,
+        managementCashRegisters.unitId,
+        managementCashRegisters.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const managementCashShifts = pgTable(
   "management_cash_shifts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
+    cashRegisterId: uuid("cash_register_id").notNull(),
     operatorIdentityId: uuid("operator_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    currentResponsibleIdentityId: uuid("current_responsible_identity_id")
       .notNull()
       .references(() => identities.id),
     status: managementCashShiftStatus("status").notNull().default("open"),
@@ -2791,9 +2913,14 @@ export const managementCashShifts = pgTable(
     differenceCents: integer("difference_cents"),
     openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedByIdentityId: uuid("closed_by_identity_id").references(() => identities.id),
     closeReason: text("close_reason"),
+    reviewedByIdentityId: uuid("reviewed_by_identity_id").references(() => identities.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
     openIdempotencyKey: varchar("open_idempotency_key", { length: 160 }).notNull(),
     closeIdempotencyKey: varchar("close_idempotency_key", { length: 160 }),
+    reviewIdempotencyKey: varchar("review_idempotency_key", { length: 160 }),
     version: integer("version").notNull().default(1),
     ...timestamps,
   },
@@ -2813,15 +2940,316 @@ export const managementCashShifts = pgTable(
       table.unitId,
       table.closeIdempotencyKey,
     ),
+    uniqueIndex("management_cash_shifts_review_idempotency_unique")
+      .on(table.organizationId, table.unitId, table.reviewIdempotencyKey)
+      .where(sql`${table.reviewIdempotencyKey} is not null`),
     uniqueIndex("management_cash_shifts_one_open_unique")
-      .on(table.organizationId, table.unitId)
+      .on(table.organizationId, table.unitId, table.cashRegisterId)
       .where(sql`${table.status} = 'open'`),
     foreignKey({
       name: "management_cash_shifts_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
+    foreignKey({
+      name: "management_cash_shifts_register_fk",
+      columns: [table.organizationId, table.unitId, table.cashRegisterId],
+      foreignColumns: [
+        managementCashRegisters.organizationId,
+        managementCashRegisters.unitId,
+        managementCashRegisters.id,
+      ],
+    }).onDelete("restrict"),
     check("management_cash_shifts_opening_check", sql`${table.openingCents} >= 0`),
+  ],
+);
+
+export const managementCashShiftResponsibilities = pgTable(
+  "management_cash_shift_responsibilities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    cashShiftId: uuid("cash_shift_id").notNull(),
+    fromIdentityId: uuid("from_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    toIdentityId: uuid("to_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    transferredByIdentityId: uuid("transferred_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    reason: text("reason").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("management_cash_shift_responsibilities_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_cash_shift_responsibilities_shift_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.cashShiftId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_cash_shift_responsibilities_shift_fk",
+      columns: [table.organizationId, table.unitId, table.cashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_cash_shift_responsibilities_distinct_check",
+      sql`${table.fromIdentityId} <> ${table.toIdentityId}`,
+    ),
+  ],
+);
+
+export const managementCashShiftTenderCounts = pgTable(
+  "management_cash_shift_tender_counts",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    cashShiftId: uuid("cash_shift_id").notNull(),
+    method: varchar("method", { length: 32 }).notNull(),
+    expectedCents: integer("expected_cents").notNull(),
+    observedCents: integer("observed_cents").notNull(),
+    differenceCents: integer("difference_cents").notNull(),
+    source: varchar("source", { length: 16 }).$type<"manual" | "smartpos">().notNull(),
+    recordedByIdentityId: uuid("recorded_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_cash_shift_tender_counts_method_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.cashShiftId,
+      table.method,
+    ),
+    foreignKey({
+      name: "management_cash_shift_tender_counts_shift_fk",
+      columns: [table.organizationId, table.unitId, table.cashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_cash_shift_tender_counts_expected_check", sql`${table.expectedCents} >= 0`),
+    check("management_cash_shift_tender_counts_observed_check", sql`${table.observedCents} >= 0`),
+    check(
+      "management_cash_shift_tender_counts_difference_check",
+      sql`${table.differenceCents} = ${table.observedCents} - ${table.expectedCents}`,
+    ),
+    check(
+      "management_cash_shift_tender_counts_source_check",
+      sql`${table.source} in ('manual','smartpos')`,
+    ),
+  ],
+);
+
+export const managementCashEntries = pgTable(
+  "management_cash_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    cashShiftId: uuid("cash_shift_id").notNull(),
+    direction: varchar("direction", { length: 3 }).$type<"in" | "out">().notNull(),
+    entryType: varchar("entry_type", { length: 32 })
+      .$type<
+        | "pos_payment"
+        | "receivable_payment"
+        | "payable_payment"
+        | "supply"
+        | "withdrawal"
+        | "refund"
+        | "reversal"
+        | "transfer_in"
+        | "transfer_out"
+      >()
+      .notNull(),
+    paymentMethod: varchar("payment_method", { length: 32 }),
+    affectsDrawer: boolean("affects_drawer").notNull().default(true),
+    amountCents: integer("amount_cents").notNull(),
+    sourceType: varchar("source_type", { length: 40 }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    description: text("description"),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("management_cash_entries_source_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sourceType,
+      table.sourceId,
+    ),
+    index("management_cash_entries_shift_occurred_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.cashShiftId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_cash_entries_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_entries_shift_fk",
+      columns: [table.organizationId, table.unitId, table.cashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_cash_entries_direction_check", sql`${table.direction} in ('in','out')`),
+    check(
+      "management_cash_entries_type_check",
+      sql`${table.entryType} in ('pos_payment','receivable_payment','payable_payment','supply','withdrawal','refund','reversal','transfer_in','transfer_out')`,
+    ),
+    check("management_cash_entries_amount_check", sql`${table.amountCents} > 0`),
+  ],
+);
+
+export const managementCashAdjustments = pgTable(
+  "management_cash_adjustments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    cashRegisterId: uuid("cash_register_id"),
+    originalCashShiftId: uuid("original_cash_shift_id"),
+    direction: varchar("direction", { length: 3 }).$type<"in" | "out">().notNull(),
+    entryType: varchar("entry_type", { length: 16 }).$type<"reversal" | "refund">().notNull(),
+    paymentMethod: varchar("payment_method", { length: 32 }),
+    affectsDrawer: boolean("affects_drawer").notNull().default(true),
+    amountCents: integer("amount_cents").notNull(),
+    sourceType: varchar("source_type", { length: 40 }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    description: text("description"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("management_cash_adjustments_source_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sourceType,
+      table.sourceId,
+    ),
+    index("management_cash_adjustments_occurred_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_cash_adjustments_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_adjustments_register_fk",
+      columns: [table.organizationId, table.unitId, table.cashRegisterId],
+      foreignColumns: [
+        managementCashRegisters.organizationId,
+        managementCashRegisters.unitId,
+        managementCashRegisters.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_adjustments_shift_fk",
+      columns: [table.organizationId, table.unitId, table.originalCashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_cash_adjustments_direction_check", sql`${table.direction} in ('in','out')`),
+    check(
+      "management_cash_adjustments_type_check",
+      sql`${table.entryType} in ('reversal','refund')`,
+    ),
+    check("management_cash_adjustments_amount_check", sql`${table.amountCents} > 0`),
+  ],
+);
+
+export const managementCashTransfers = pgTable(
+  "management_cash_transfers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    fromCashShiftId: uuid("from_cash_shift_id").notNull(),
+    toCashShiftId: uuid("to_cash_shift_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    reason: text("reason").notNull(),
+    transferredByIdentityId: uuid("transferred_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_cash_transfers_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_cash_transfers_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_cash_transfers_occurred_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_cash_transfers_from_shift_fk",
+      columns: [table.organizationId, table.unitId, table.fromCashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_transfers_to_shift_fk",
+      columns: [table.organizationId, table.unitId, table.toCashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_cash_transfers_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_cash_transfers_distinct_shifts_check",
+      sql`${table.fromCashShiftId} <> ${table.toCashShiftId}`,
+    ),
   ],
 );
 
@@ -2843,6 +3271,11 @@ export const managementCashMovements = pgTable(
     ...timestamps,
   },
   (table) => [
+    unique("management_cash_movements_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
     uniqueIndex("management_cash_movements_idempotency_unique").on(
       table.organizationId,
       table.unitId,
@@ -2859,6 +3292,104 @@ export const managementCashMovements = pgTable(
     }).onDelete("restrict"),
     check("management_cash_movements_type_check", sql`${table.type} in ('supply','withdrawal')`),
     check("management_cash_movements_amount_check", sql`${table.amountCents} > 0`),
+  ],
+);
+
+export const managementCashApprovalRequests = pgTable(
+  "management_cash_approval_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    kind: varchar("kind", { length: 16 }).$type<"supply" | "withdrawal" | "transfer">().notNull(),
+    cashShiftId: uuid("cash_shift_id").notNull(),
+    targetCashShiftId: uuid("target_cash_shift_id"),
+    amountCents: integer("amount_cents").notNull(),
+    reason: text("reason").notNull(),
+    requestedByIdentityId: uuid("requested_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    status: varchar("status", { length: 16 })
+      .$type<"pending" | "approved" | "rejected">()
+      .notNull()
+      .default("pending"),
+    decidedByIdentityId: uuid("decided_by_identity_id").references(() => identities.id),
+    decisionNote: text("decision_note"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    executedMovementId: uuid("executed_movement_id"),
+    executedTransferId: uuid("executed_transfer_id"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("management_cash_approval_requests_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_cash_approval_requests_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "management_cash_approval_requests_shift_fk",
+      columns: [table.organizationId, table.unitId, table.cashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_approval_requests_target_shift_fk",
+      columns: [table.organizationId, table.unitId, table.targetCashShiftId],
+      foreignColumns: [
+        managementCashShifts.organizationId,
+        managementCashShifts.unitId,
+        managementCashShifts.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_approval_requests_movement_fk",
+      columns: [table.organizationId, table.unitId, table.executedMovementId],
+      foreignColumns: [
+        managementCashMovements.organizationId,
+        managementCashMovements.unitId,
+        managementCashMovements.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_cash_approval_requests_transfer_fk",
+      columns: [table.organizationId, table.unitId, table.executedTransferId],
+      foreignColumns: [
+        managementCashTransfers.organizationId,
+        managementCashTransfers.unitId,
+        managementCashTransfers.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_cash_approval_requests_kind_check",
+      sql`${table.kind} in ('supply','withdrawal','transfer')`,
+    ),
+    check(
+      "management_cash_approval_requests_status_check",
+      sql`${table.status} in ('pending','approved','rejected')`,
+    ),
+    check("management_cash_approval_requests_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_cash_approval_requests_target_check",
+      sql`(${table.kind} = 'transfer' and ${table.targetCashShiftId} is not null and ${table.targetCashShiftId} <> ${table.cashShiftId}) or (${table.kind} in ('supply','withdrawal') and ${table.targetCashShiftId} is null)`,
+    ),
+    check(
+      "management_cash_approval_requests_decision_check",
+      sql`(${table.status} = 'pending' and ${table.decidedByIdentityId} is null and ${table.decidedAt} is null and ${table.decisionNote} is null) or (${table.status} = 'approved' and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null) or (${table.status} = 'rejected' and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null and nullif(btrim(${table.decisionNote}), '') is not null)`,
+    ),
+    check(
+      "management_cash_approval_requests_execution_check",
+      sql`(${table.executedMovementId} is null or (${table.status} = 'approved' and ${table.kind} in ('supply','withdrawal'))) and (${table.executedTransferId} is null or (${table.status} = 'approved' and ${table.kind} = 'transfer')) and not (${table.executedMovementId} is not null and ${table.executedTransferId} is not null)`,
+    ),
   ],
 );
 
@@ -3040,6 +3571,63 @@ export const managementPeople = pgTable(
     check(
       "management_people_inactive_reason_check",
       sql`${table.active} or (${table.statusChangedAt} is not null and ${table.statusChangedByIdentityId} is not null and nullif(btrim(${table.statusChangeReason}), '') is not null)`,
+    ),
+  ],
+);
+
+export const managementPersonAccess = pgTable(
+  "management_person_access",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => managementPeople.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    email: varchar("email", { length: 254 }).notNull(),
+    role: roleName("role").notNull(),
+    status: varchar("status", { length: 20 })
+      .$type<"pending" | "active" | "suspended" | "canceled" | "terminated">()
+      .notNull()
+      .default("pending"),
+    invitationId: uuid("invitation_id").references(() => membershipInvitations.id, {
+      onDelete: "set null",
+    }),
+    membershipId: uuid("membership_id").references(() => memberships.id, {
+      onDelete: "set null",
+    }),
+    roleBindingId: uuid("role_binding_id").references(() => roleBindings.id, {
+      onDelete: "set null",
+    }),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+    statusChangedByIdentityId: uuid("status_changed_by_identity_id").references(
+      () => identities.id,
+    ),
+    statusChangeReason: varchar("status_change_reason", { length: 1_000 }),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({
+      name: "management_person_access_person_unit_pk",
+      columns: [table.personId, table.unitId],
+    }),
+    uniqueIndex("management_person_access_invitation_unique").on(table.invitationId),
+    uniqueIndex("management_person_access_role_binding_unique").on(table.roleBindingId),
+    uniqueIndex("management_person_access_membership_unit_unique")
+      .on(table.organizationId, table.unitId, table.membershipId)
+      .where(sql`${table.membershipId} is not null`),
+    index("management_person_access_scope_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+    ),
+    foreignKey({
+      name: "management_person_access_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "management_person_access_status_check",
+      sql`${table.status} in ('pending','active','suspended','canceled','terminated')`,
     ),
   ],
 );

@@ -1,13 +1,24 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   auditEvents,
+  authSessions,
+  buildReportArtifact,
   type Database,
   identities,
   legalEntities,
   managementAccountsPayable,
   managementAccountsReceivable,
+  managementCashAdjustments,
+  managementCashApprovalRequests,
+  managementCashEntries,
   managementCashMovements,
+  managementCashRegisters,
+  managementCashRegisterTerminals,
+  managementCashSettings,
+  managementCashShiftResponsibilities,
   managementCashShifts,
+  managementCashShiftTenderCounts,
+  managementCashTransfers,
   managementCommissionRules,
   managementCommissions,
   managementIdempotency,
@@ -35,6 +46,7 @@ import {
   managementOverviewPriorityStates,
   managementPayablePayments,
   managementPeople,
+  managementPersonAccess,
   managementProductionBatches,
   managementProductionBatchInputs,
   managementProductReturnables,
@@ -64,25 +76,32 @@ import {
   managementTimeTrackingAssignments,
   managementTimeTrackingClosures,
   managementTimeTrackingSettings,
+  membershipInvitations,
   memberships,
   organizations,
   outboxEvents,
   posCatalogCategories,
   posOrderItems,
   posOrders,
+  posPaymentDeviceDiagnostics,
+  posPaymentReversals,
   posProductionStations,
   posProducts,
   posTabPayments,
   posTabs,
+  posTerminalProfiles,
   roleBindings,
+  terminalSessions,
   units,
 } from "@giromesa/db";
+import { encryptionKey, encryptSecret } from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   and,
@@ -94,6 +113,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   lt,
   lte,
@@ -101,6 +121,8 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { AuthService } from "../auth/auth.service.js";
+import { TerminalSessionService } from "../auth/terminal-session.service.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
@@ -116,15 +138,21 @@ import {
   supplierPerformance,
 } from "./management.inventory-rules.js";
 import {
+  assertCashDrawerDebit,
   assertCommissionCents,
   purchaseReconciliation as calculatePurchaseReconciliation,
-  cashConference,
+  canGrantPersonAccessRole,
+  cashDifferenceSeverity,
+  cashTenderConference,
+  cashTransferLockOrder,
   commissionAmountFromBasisPoints,
   inventoryChange,
   managementReplay,
   managementRequestHash,
   milliToQuantity,
   normalizeBusinessDocument,
+  type PersonAccessRole,
+  personAccessPublicStatus,
   profitabilityCoverage,
   purchaseLineReconciliation,
   purchaseReceiptPlan,
@@ -132,10 +160,21 @@ import {
   quantityToMilli,
   reportPercentageChange,
   reportPeriodContext,
+  requiresCashApproval,
   settlement,
 } from "./management.rules.js";
 import type {
+  CashApprovalDecisionInput,
   CashMovementInput,
+  CashRegisterCreateInput,
+  CashRegisterUpdateInput,
+  CashSettingsInput,
+  CashShiftExportQuery,
+  CashShiftHandoverInput,
+  CashShiftHistoryQuery,
+  CashShiftReviewInput,
+  CashTerminalUpdateInput,
+  CashTransferInput,
   ClockOutInput,
   CloseCashShiftInput,
   CommissionInput,
@@ -170,8 +209,13 @@ import type {
   PeopleAssignmentBatchInput,
   PeopleExportInput,
   PeopleListQuery,
+  PersonAccessInviteInput,
+  PersonAccessReactivateInput,
+  PersonAccessRoleUpdateInput,
   PersonInput,
   PersonStatusInput,
+  PersonUnitAccessInput,
+  PersonUnitAccessRemovalInput,
   PersonUpdateInput,
   ProductionBatchCancellationInput,
   ProductionBatchCompletionInput,
@@ -218,6 +262,7 @@ import type {
   TimeTrackingSettingsInput,
 } from "./management.schemas.js";
 import { inventoryEventSchema } from "./management.schemas.js";
+import { reportNextCursor, reportPageOffset } from "./management-report.rules.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
@@ -225,17 +270,59 @@ type ManagementRole = "owner" | "manager" | "inventory" | "finance" | "cashier";
 
 const INVENTORY_ROLES = ["owner", "manager", "inventory"] as const;
 const FINANCE_ROLES = ["owner", "manager", "finance"] as const;
-const CASH_ROLES = ["owner", "manager", "finance", "cashier"] as const;
+const CASH_READ_ROLES = ["owner", "manager", "finance", "cashier"] as const;
+const CASH_OPERATE_ROLES = ["owner", "manager", "cashier"] as const;
+const CASH_REVIEW_ROLES = ["owner", "manager"] as const;
+const DEFAULT_CASH_SETTINGS = {
+  movementApprovalThresholdCents: 50_000,
+  discrepancyCriticalThresholdCents: 1_000,
+  maxShiftMinutes: 720,
+} as const;
+const CASH_PAYMENT_METHODS = [
+  "cash",
+  "pix",
+  "credit_card",
+  "debit_card",
+  "bank_transfer",
+  "other",
+] as const;
 const PEOPLE_ROLES = ["owner", "manager"] as const;
+const SENSITIVE_PERSON_ACCESS_ROLES = new Set<PersonAccessRole>([
+  "manager",
+  "finance",
+  "accountant",
+]);
 const TIME_TRACKING_READ_ROLES = ["owner", "manager", "finance"] as const;
+const PERSON_ACCESS_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+const personAccessInvitationHash = (token: string) =>
+  createHash("sha256").update(token).digest("hex");
 const CHANNEL_LABELS = { dine_in: "Salão", pickup: "Retirada", delivery: "Delivery" } as const;
 const PAYMENT_LABELS = {
   cash: "Dinheiro",
   credit_card: "Cartão de crédito",
   debit_card: "Cartão de débito",
   pix: "Pix",
+  bank_transfer: "Transferência bancária",
   other: "Outro",
 } as const;
+
+type PersonAccessRead = typeof managementPersonAccess.$inferSelect & {
+  invitationExpiresAt: Date | null;
+};
+
+function personAccessView(access: PersonAccessRead | undefined) {
+  if (!access) return { status: "none" as const };
+  const status = personAccessPublicStatus(access.status, access.invitationExpiresAt);
+  if (status === "none") return { status };
+  return {
+    status,
+    email: access.email,
+    role: access.role,
+    invitationId: access.invitationId ?? undefined,
+    expiresAt: access.invitationExpiresAt?.toISOString(),
+    membershipId: access.membershipId ?? undefined,
+  };
+}
 
 type ReportDailyChannelSale = {
   date: string;
@@ -1017,6 +1104,8 @@ export class ManagementService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    private readonly auth?: AuthService,
+    private readonly terminals?: TerminalSessionService,
   ) {}
 
   private async requireRole(
@@ -1037,6 +1126,718 @@ export class ManagementService {
       });
     }
     return role;
+  }
+
+  private assertPersonAccessGrant(actorRole: ManagementRole, targetRole: PersonAccessRole) {
+    if (
+      (actorRole !== "owner" && actorRole !== "manager") ||
+      !canGrantPersonAccessRole(actorRole, targetRole)
+    ) {
+      throw new ForbiddenException({
+        code: "PERSON_ACCESS_ROLE_DENIED",
+        message: "Você não pode liberar este perfil de acesso.",
+      });
+    }
+  }
+
+  private async requireSensitiveAccessStepUp(
+    identityId: string,
+    role: PersonAccessRole,
+    proof?: { currentPassword?: string; mfaCode?: string },
+  ) {
+    if (!SENSITIVE_PERSON_ACCESS_ROLES.has(role)) return;
+    if (!this.auth) throw new ServiceUnavailableException({ code: "ACCESS_STEP_UP_UNAVAILABLE" });
+    await this.auth.verifyStepUp(identityId, proof);
+  }
+
+  private async personAccessRows(
+    source: Transaction | Database,
+    organizationId: string,
+    unitId: string,
+    personIds: string[],
+  ): Promise<PersonAccessRead[]> {
+    if (personIds.length === 0) return [];
+    const rows = await source
+      .select({
+        access: managementPersonAccess,
+        invitationExpiresAt: membershipInvitations.expiresAt,
+      })
+      .from(managementPersonAccess)
+      .leftJoin(
+        membershipInvitations,
+        eq(membershipInvitations.id, managementPersonAccess.invitationId),
+      )
+      .where(
+        and(
+          eq(managementPersonAccess.organizationId, organizationId),
+          eq(managementPersonAccess.unitId, unitId),
+          inArray(managementPersonAccess.personId, personIds),
+        ),
+      );
+    return rows.map((row) => ({
+      ...row.access,
+      invitationExpiresAt: row.invitationExpiresAt,
+    }));
+  }
+
+  private async personOffboardingFacts(
+    source: Transaction | Database,
+    organizationId: string,
+    personId: string,
+    identityId: string | null,
+  ) {
+    const now = new Date();
+    const accesses = await source
+      .select({ membershipId: managementPersonAccess.membershipId })
+      .from(managementPersonAccess)
+      .where(
+        and(
+          eq(managementPersonAccess.organizationId, organizationId),
+          eq(managementPersonAccess.personId, personId),
+          inArray(managementPersonAccess.status, ["active", "suspended", "pending"]),
+        ),
+      );
+    const membershipIds = accesses
+      .map((access) => access.membershipId)
+      .filter((id): id is string => Boolean(id));
+    const [openTime, futureSchedules, unsettledCommissions, openCash, activeTerminals] =
+      await Promise.all([
+        source
+          .select({ count: sql<number>`count(*)::int` })
+          .from(managementTimeEntries)
+          .where(
+            and(
+              eq(managementTimeEntries.organizationId, organizationId),
+              eq(managementTimeEntries.personId, personId),
+              isNull(managementTimeEntries.clockedOutAt),
+            ),
+          ),
+        source
+          .select({ count: sql<number>`count(*)::int` })
+          .from(managementSchedules)
+          .where(
+            and(
+              eq(managementSchedules.organizationId, organizationId),
+              eq(managementSchedules.personId, personId),
+              gt(managementSchedules.endsAt, now),
+              isNull(managementSchedules.canceledAt),
+            ),
+          ),
+        source
+          .select({ count: sql<number>`count(*)::int` })
+          .from(managementCommissions)
+          .where(
+            and(
+              eq(managementCommissions.organizationId, organizationId),
+              eq(managementCommissions.personId, personId),
+              inArray(managementCommissions.status, ["pending", "approved"]),
+            ),
+          ),
+        identityId
+          ? source
+              .select({ count: sql<number>`count(*)::int` })
+              .from(managementCashShifts)
+              .where(
+                and(
+                  eq(managementCashShifts.organizationId, organizationId),
+                  eq(managementCashShifts.status, "open"),
+                  or(
+                    eq(managementCashShifts.operatorIdentityId, identityId),
+                    eq(managementCashShifts.currentResponsibleIdentityId, identityId),
+                  ),
+                ),
+              )
+          : Promise.resolve([{ count: 0 }]),
+        membershipIds.length
+          ? source
+              .select({ count: sql<number>`count(*)::int` })
+              .from(terminalSessions)
+              .where(
+                and(
+                  inArray(terminalSessions.activeActorMembershipId, membershipIds),
+                  isNull(terminalSessions.revokedAt),
+                  gt(terminalSessions.expiresAt, now),
+                ),
+              )
+          : Promise.resolve([{ count: 0 }]),
+      ]);
+    const counts = {
+      openTimeEntries: openTime[0]?.count ?? 0,
+      futureSchedules: futureSchedules[0]?.count ?? 0,
+      unsettledCommissions: unsettledCommissions[0]?.count ?? 0,
+      openCashShifts: openCash[0]?.count ?? 0,
+      activeTerminals: activeTerminals[0]?.count ?? 0,
+      accessAssignments: accesses.length,
+    };
+    return {
+      canProceed: counts.openTimeEntries === 0 && counts.openCashShifts === 0,
+      counts,
+      checks: [
+        {
+          code: "OPEN_TIME_ENTRY",
+          label: "Turnos de ponto em andamento",
+          count: counts.openTimeEntries,
+          severity: "blocker" as const,
+        },
+        {
+          code: "OPEN_CASH_SHIFT",
+          label: "Caixas sob responsabilidade",
+          count: counts.openCashShifts,
+          severity: "blocker" as const,
+        },
+        {
+          code: "FUTURE_SCHEDULE",
+          label: "Escalas futuras preservadas",
+          count: counts.futureSchedules,
+          severity: "warning" as const,
+        },
+        {
+          code: "UNSETTLED_COMMISSION",
+          label: "Comissões ainda não liquidadas",
+          count: counts.unsettledCommissions,
+          severity: "warning" as const,
+        },
+        {
+          code: "ACTIVE_TERMINAL",
+          label: "Terminais que serão bloqueados",
+          count: counts.activeTerminals,
+          severity: "info" as const,
+        },
+      ],
+    };
+  }
+
+  private async createPersonAccessInvitation(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonAccessInviteInput,
+    replace: boolean,
+  ) {
+    if (process.env.EMAIL_PROVIDER_ENABLED !== "true") {
+      throw new ServiceUnavailableException({
+        code: "EMAIL_PROVIDER_DISABLED",
+        message: "Convites por e-mail ainda não foram configurados neste ambiente.",
+      });
+    }
+    const [person] = await tx
+      .select({ id: managementPeople.id, active: managementPeople.active })
+      .from(managementPeople)
+      .where(
+        and(
+          eq(managementPeople.organizationId, organizationId),
+          eq(managementPeople.unitId, unitId),
+          eq(managementPeople.id, personId),
+        ),
+      )
+      .limit(1);
+    if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+    if (!person.active) throw new ConflictException({ code: "PERSON_INACTIVE" });
+
+    const [current] = await tx
+      .select()
+      .from(managementPersonAccess)
+      .where(
+        and(
+          eq(managementPersonAccess.organizationId, organizationId),
+          eq(managementPersonAccess.unitId, unitId),
+          eq(managementPersonAccess.personId, personId),
+        ),
+      )
+      .limit(1);
+    if (current?.membershipId && ["active", "suspended"].includes(current.status)) {
+      throw new ConflictException({ code: "PERSON_ACCESS_ALREADY_LINKED" });
+    }
+    if (current?.status === "pending" && !replace) {
+      throw new ConflictException({ code: "PERSON_ACCESS_INVITATION_PENDING" });
+    }
+    if (current?.invitationId) {
+      await tx
+        .update(membershipInvitations)
+        .set({ acceptedAt: new Date() })
+        .where(
+          and(
+            eq(membershipInvitations.id, current.invitationId),
+            isNull(membershipInvitations.acceptedAt),
+          ),
+        );
+    }
+
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + PERSON_ACCESS_INVITATION_TTL_MS);
+    const [invitation] = await tx
+      .insert(membershipInvitations)
+      .values({
+        organizationId,
+        unitId,
+        email: input.email,
+        role: input.role,
+        tokenHash: personAccessInvitationHash(token),
+        invitedByIdentityId: actorIdentityId,
+        expiresAt,
+      })
+      .returning({ id: membershipInvitations.id });
+    if (!invitation) throw new Error("Person access invitation was not created");
+
+    const changedAt = new Date();
+    const accessValues = {
+      email: input.email,
+      role: input.role,
+      status: "pending" as const,
+      invitationId: invitation.id,
+      membershipId: null,
+      roleBindingId: null,
+      statusChangedAt: changedAt,
+      statusChangedByIdentityId: actorIdentityId,
+      statusChangeReason: replace ? "Convite reenviado." : "Convite enviado.",
+      updatedAt: changedAt,
+    };
+    const [access] = current
+      ? await tx
+          .update(managementPersonAccess)
+          .set(accessValues)
+          .where(
+            and(
+              eq(managementPersonAccess.organizationId, organizationId),
+              eq(managementPersonAccess.unitId, unitId),
+              eq(managementPersonAccess.personId, personId),
+            ),
+          )
+          .returning()
+      : await tx
+          .insert(managementPersonAccess)
+          .values({ personId, organizationId, unitId, ...accessValues })
+          .returning();
+    if (!access) throw new Error("Person access was not created");
+
+    const encryption = encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
+    await tx.insert(outboxEvents).values({
+      topic: "membership.invited",
+      aggregateType: "membership_invitation",
+      aggregateId: invitation.id,
+      payload: {
+        email: input.email,
+        invitationTokenEnvelope: encryptSecret(
+          token,
+          encryption,
+          `membership-invitation:${invitation.id}`,
+        ),
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+    await this.record(
+      tx,
+      actorIdentityId,
+      organizationId,
+      unitId,
+      replace ? "management.person.access.resent" : "management.person.access.invited",
+      "person_access",
+      personId,
+      { invitationId: invitation.id, email: input.email, role: input.role },
+    );
+    return personAccessView({ ...access, invitationExpiresAt: expiresAt });
+  }
+
+  private async lockedPersonAccess(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+  ) {
+    await tx.execute(
+      sql`select person_id from management_person_access where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and person_id=${personId}::uuid for update`,
+    );
+    const [access] = await tx
+      .select()
+      .from(managementPersonAccess)
+      .where(
+        and(
+          eq(managementPersonAccess.organizationId, organizationId),
+          eq(managementPersonAccess.unitId, unitId),
+          eq(managementPersonAccess.personId, personId),
+        ),
+      )
+      .limit(1);
+    if (!access) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
+    return access;
+  }
+
+  private async ensurePersonRoleBinding(
+    tx: Transaction,
+    membershipId: string,
+    unitId: string,
+    role: PersonAccessRole,
+  ) {
+    const [created] = await tx
+      .insert(roleBindings)
+      .values({ membershipId, unitId, role })
+      .onConflictDoNothing()
+      .returning({ id: roleBindings.id });
+    if (created) return created.id;
+    const [existing] = await tx
+      .select({ id: roleBindings.id })
+      .from(roleBindings)
+      .where(
+        and(
+          eq(roleBindings.membershipId, membershipId),
+          eq(roleBindings.unitId, unitId),
+          eq(roleBindings.role, role),
+        ),
+      )
+      .limit(1);
+    if (!existing) throw new Error("Person role binding was not created");
+    return existing.id;
+  }
+
+  private async revokeIdentitySessions(tx: Transaction, identityId: string | null) {
+    if (!identityId) return;
+    await tx
+      .update(authSessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(authSessions.identityId, identityId), isNull(authSessions.revokedAt)));
+  }
+
+  private async disableMembershipWithoutRoles(tx: Transaction, membershipId: string | null) {
+    if (!membershipId) return;
+    const [remaining] = await tx
+      .select({ id: roleBindings.id })
+      .from(roleBindings)
+      .where(eq(roleBindings.membershipId, membershipId))
+      .limit(1);
+    if (!remaining) {
+      await tx
+        .update(memberships)
+        .set({ status: "disabled", updatedAt: new Date() })
+        .where(eq(memberships.id, membershipId));
+    }
+  }
+
+  private async lockCashShiftById(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+  ) {
+    await tx.execute(
+      sql`select id from management_cash_shifts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${cashShiftId}::uuid for update`,
+    );
+    const [shift] = await tx
+      .select()
+      .from(managementCashShifts)
+      .where(
+        and(
+          eq(managementCashShifts.organizationId, organizationId),
+          eq(managementCashShifts.unitId, unitId),
+          eq(managementCashShifts.id, cashShiftId),
+        ),
+      )
+      .limit(1);
+    if (!shift)
+      throw new NotFoundException({
+        code: "CASH_SHIFT_NOT_FOUND",
+        message: "Caixa não encontrado nesta unidade.",
+      });
+    if (shift.status !== "open")
+      throw new ConflictException({
+        code: "CASH_SHIFT_CLOSED",
+        message: "O caixa informado não está aberto.",
+      });
+    return shift;
+  }
+
+  private async requireActiveCashRegister(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    cashRegisterId: string,
+  ) {
+    await tx.execute(
+      sql`select id from management_cash_registers where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${cashRegisterId}::uuid for update`,
+    );
+    const [register] = await tx
+      .select()
+      .from(managementCashRegisters)
+      .where(
+        and(
+          eq(managementCashRegisters.organizationId, organizationId),
+          eq(managementCashRegisters.unitId, unitId),
+          eq(managementCashRegisters.id, cashRegisterId),
+        ),
+      )
+      .limit(1);
+    if (!register)
+      throw new NotFoundException({
+        code: "CASH_REGISTER_NOT_FOUND",
+        message: "Gaveta não encontrada nesta unidade.",
+      });
+    if (!register.active)
+      throw new ConflictException({
+        code: "CASH_REGISTER_INACTIVE",
+        message: "A gaveta selecionada está inativa.",
+      });
+    return register;
+  }
+
+  private async lockOpenCashShift(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    selector: { cashShiftId?: string; cashRegisterId?: string } = {},
+  ) {
+    if (selector.cashShiftId) {
+      const shift = await this.lockCashShiftById(tx, organizationId, unitId, selector.cashShiftId);
+      if (selector.cashRegisterId && selector.cashRegisterId !== shift.cashRegisterId)
+        throw new ConflictException({
+          code: "CASH_SHIFT_MISMATCH",
+          message: "O turno informado não pertence à gaveta selecionada.",
+        });
+      return shift;
+    }
+
+    if (selector.cashRegisterId) {
+      await this.requireActiveCashRegister(tx, organizationId, unitId, selector.cashRegisterId);
+      await tx.execute(
+        sql`select id from management_cash_shifts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and cash_register_id=${selector.cashRegisterId}::uuid and status='open' for update`,
+      );
+      const [shift] = await tx
+        .select()
+        .from(managementCashShifts)
+        .where(
+          and(
+            eq(managementCashShifts.organizationId, organizationId),
+            eq(managementCashShifts.unitId, unitId),
+            eq(managementCashShifts.cashRegisterId, selector.cashRegisterId),
+            eq(managementCashShifts.status, "open"),
+          ),
+        )
+        .limit(1);
+      return shift ?? null;
+    }
+
+    await tx.execute(
+      sql`select id from management_cash_shifts where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and status='open' order by id for update`,
+    );
+    const openShifts = await tx
+      .select()
+      .from(managementCashShifts)
+      .where(
+        and(
+          eq(managementCashShifts.organizationId, organizationId),
+          eq(managementCashShifts.unitId, unitId),
+          eq(managementCashShifts.status, "open"),
+        ),
+      )
+      .orderBy(managementCashShifts.id)
+      .limit(2);
+    if (openShifts.length > 1)
+      throw new ConflictException({
+        code: "CASH_REGISTER_REQUIRED",
+        message: "Selecione a gaveta para registrar este pagamento.",
+      });
+    return openShifts[0] ?? null;
+  }
+
+  private async cashDrawerTotals(
+    tx: Transaction | Database,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+  ) {
+    const [totals] = await tx
+      .select({
+        drawerInCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'in' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+        drawerOutCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'out' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+      })
+      .from(managementCashEntries)
+      .where(
+        and(
+          eq(managementCashEntries.organizationId, organizationId),
+          eq(managementCashEntries.unitId, unitId),
+          eq(managementCashEntries.cashShiftId, cashShiftId),
+        ),
+      );
+    return {
+      drawerInCents: Number(totals?.drawerInCents ?? 0),
+      drawerOutCents: Number(totals?.drawerOutCents ?? 0),
+    };
+  }
+
+  private async cashSettings(
+    source: Transaction | Database,
+    organizationId: string,
+    unitId: string,
+  ) {
+    const [settings] = await source
+      .select({
+        movementApprovalThresholdCents: managementCashSettings.movementApprovalThresholdCents,
+        discrepancyCriticalThresholdCents: managementCashSettings.discrepancyCriticalThresholdCents,
+        maxShiftMinutes: managementCashSettings.maxShiftMinutes,
+      })
+      .from(managementCashSettings)
+      .where(
+        and(
+          eq(managementCashSettings.organizationId, organizationId),
+          eq(managementCashSettings.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    return settings ?? DEFAULT_CASH_SETTINGS;
+  }
+
+  private async executeCashMovement(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+    idempotencyKey: string,
+    input: CashMovementInput,
+  ) {
+    const shift = await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId);
+    if (input.type === "withdrawal") {
+      const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, shift.id);
+      assertCashDrawerDebit(
+        shift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
+        input.amountCents,
+      );
+    }
+    const movementId = randomUUID();
+    const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
+    await tx.insert(managementCashMovements).values({
+      id: movementId,
+      organizationId,
+      unitId,
+      cashShiftId,
+      ...input,
+      idempotencyKey,
+      actorIdentityId,
+      occurredAt,
+    });
+    await tx.insert(managementCashEntries).values({
+      organizationId,
+      unitId,
+      cashShiftId,
+      direction: input.type === "supply" ? "in" : "out",
+      entryType: input.type,
+      paymentMethod: null,
+      affectsDrawer: true,
+      amountCents: input.amountCents,
+      sourceType: "cash_movement",
+      sourceId: movementId,
+      description: input.reason,
+      actorIdentityId,
+      occurredAt,
+    });
+    await this.record(
+      tx,
+      actorIdentityId,
+      organizationId,
+      unitId,
+      `management.cash.${input.type}`,
+      "cash_shift",
+      cashShiftId,
+      { movementId, amountCents: input.amountCents, reason: input.reason },
+    );
+    return { movementId, cashShiftId, type: input.type, amountCents: input.amountCents };
+  }
+
+  private async executeCashTransfer(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: CashTransferInput,
+  ) {
+    const lockOrder = cashTransferLockOrder(input.fromCashShiftId, input.toCashShiftId);
+    const lockedShifts = [];
+    for (const cashShiftId of lockOrder)
+      lockedShifts.push(await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId));
+    const fromShift = lockedShifts.find((shift) => shift.id === input.fromCashShiftId);
+    const toShift = lockedShifts.find((shift) => shift.id === input.toCashShiftId);
+    if (!fromShift || !toShift)
+      throw new ConflictException({ code: "CASH_TRANSFER_SHIFT_LOCK_FAILED" });
+    if (fromShift.cashRegisterId === toShift.cashRegisterId)
+      throw new ConflictException({
+        code: "CASH_TRANSFER_SAME_REGISTER",
+        message: "Origem e destino devem ser gavetas diferentes.",
+      });
+    const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, fromShift.id);
+    assertCashDrawerDebit(
+      fromShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
+      input.amountCents,
+    );
+
+    const transferId = randomUUID();
+    const occurredAt = new Date();
+    await tx.insert(managementCashTransfers).values({
+      id: transferId,
+      organizationId,
+      unitId,
+      fromCashShiftId: fromShift.id,
+      toCashShiftId: toShift.id,
+      amountCents: input.amountCents,
+      reason: input.reason,
+      transferredByIdentityId: actorIdentityId,
+      occurredAt,
+      idempotencyKey,
+    });
+    await tx.insert(managementCashEntries).values([
+      {
+        organizationId,
+        unitId,
+        cashShiftId: fromShift.id,
+        direction: "out",
+        entryType: "transfer_out",
+        paymentMethod: null,
+        affectsDrawer: true,
+        amountCents: input.amountCents,
+        sourceType: "cash_transfer_out",
+        sourceId: transferId,
+        description: input.reason,
+        actorIdentityId,
+        occurredAt,
+      },
+      {
+        organizationId,
+        unitId,
+        cashShiftId: toShift.id,
+        direction: "in",
+        entryType: "transfer_in",
+        paymentMethod: null,
+        affectsDrawer: true,
+        amountCents: input.amountCents,
+        sourceType: "cash_transfer_in",
+        sourceId: transferId,
+        description: input.reason,
+        actorIdentityId,
+        occurredAt,
+      },
+    ]);
+    await this.record(
+      tx,
+      actorIdentityId,
+      organizationId,
+      unitId,
+      "management.cash.transferred",
+      "cash_transfer",
+      transferId,
+      {
+        fromCashShiftId: fromShift.id,
+        toCashShiftId: toShift.id,
+        amountCents: input.amountCents,
+        reason: input.reason,
+      },
+    );
+    return {
+      transferId,
+      fromCashShiftId: fromShift.id,
+      toCashShiftId: toShift.id,
+      amountCents: input.amountCents,
+      occurredAt: occurredAt.toISOString(),
+    };
   }
 
   async updateOverviewPriority(
@@ -10192,6 +10993,8 @@ export class ManagementService {
     input: FinancialPaymentInput,
   ) {
     await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    if (input.method === "cash")
+      await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
@@ -10224,8 +11027,24 @@ export class ManagementService {
             code: "PAYABLE_NOT_OPEN",
             message: "A conta não aceita pagamentos.",
           });
+        const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
+          cashRegisterId: input.cashRegisterId,
+        });
+        if (input.method === "cash" && !cashShift)
+          throw new BadRequestException({
+            code: "CASH_SHIFT_REQUIRED",
+            message: "Pagamentos em dinheiro exigem um caixa aberto.",
+          });
+        if (cashShift && input.method === "cash") {
+          const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, cashShift.id);
+          assertCashDrawerDebit(
+            cashShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
+            input.amountCents,
+          );
+        }
         const next = settlement(payable.amountCents, payable.paidCents, input.amountCents);
         const paymentId = randomUUID();
+        const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
         await tx.insert(managementPayablePayments).values({
           id: paymentId,
           organizationId,
@@ -10236,8 +11055,24 @@ export class ManagementService {
           reference: input.reference,
           idempotencyKey,
           paidByIdentityId: identityId,
-          paidAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
+          paidAt: occurredAt,
         });
+        if (cashShift)
+          await tx.insert(managementCashEntries).values({
+            organizationId,
+            unitId,
+            cashShiftId: cashShift.id,
+            direction: "out",
+            entryType: "payable_payment",
+            paymentMethod: input.method,
+            affectsDrawer: input.method === "cash",
+            amountCents: input.amountCents,
+            sourceType: "payable_payment",
+            sourceId: paymentId,
+            description: payable.description,
+            actorIdentityId: identityId,
+            occurredAt,
+          });
         const status = next.status === "settled" ? "paid" : "partially_paid";
         await tx
           .update(managementAccountsPayable)
@@ -10256,7 +11091,13 @@ export class ManagementService {
           "management.payable.paid",
           "payable",
           payable.id,
-          { paymentId, amountCents: input.amountCents, status },
+          {
+            paymentId,
+            amountCents: input.amountCents,
+            method: input.method,
+            cashShiftId: cashShift?.id ?? null,
+            status,
+          },
         );
         return { payableId, paymentId, paidCents: next.settledCents, status };
       },
@@ -10336,12 +11177,9 @@ export class ManagementService {
     idempotencyKey: string,
     input: ReceivablePaymentInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, CASH_ROLES);
-    if (input.method.toLowerCase() === "cash" && !input.cashShiftId)
-      throw new BadRequestException({
-        code: "CASH_SHIFT_REQUIRED",
-        message: "Recebimentos em dinheiro exigem um caixa aberto.",
-      });
+    await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    if (input.method === "cash")
+      await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
@@ -10374,48 +11212,51 @@ export class ManagementService {
             code: "RECEIVABLE_NOT_OPEN",
             message: "A conta não aceita recebimentos.",
           });
-        if (input.cashShiftId) {
-          const [shift] = await tx
-            .select({ id: managementCashShifts.id, status: managementCashShifts.status })
-            .from(managementCashShifts)
-            .where(
-              and(
-                eq(managementCashShifts.organizationId, organizationId),
-                eq(managementCashShifts.unitId, unitId),
-                eq(managementCashShifts.id, input.cashShiftId),
-              ),
-            )
-            .limit(1);
-          if (!shift)
-            throw new NotFoundException({
-              code: "CASH_SHIFT_NOT_FOUND",
-              message: "Caixa não encontrado nesta unidade.",
-            });
-          if (shift.status !== "open")
-            throw new ConflictException({
-              code: "CASH_SHIFT_CLOSED",
-              message: "O caixa informado não está aberto.",
-            });
-        }
+        const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
+          cashShiftId: input.cashShiftId,
+          cashRegisterId: input.cashRegisterId,
+        });
+        if (input.method === "cash" && !cashShift)
+          throw new BadRequestException({
+            code: "CASH_SHIFT_REQUIRED",
+            message: "Recebimentos em dinheiro exigem um caixa aberto.",
+          });
         const next = settlement(
           receivable.amountCents,
           receivable.receivedCents,
           input.amountCents,
         );
         const paymentId = randomUUID();
+        const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
         await tx.insert(managementReceivablePayments).values({
           id: paymentId,
           organizationId,
           unitId,
           receivableId,
-          cashShiftId: input.cashShiftId,
+          cashShiftId: cashShift?.id,
           amountCents: input.amountCents,
-          method: input.method.toLowerCase(),
+          method: input.method,
           reference: input.reference,
           idempotencyKey,
           receivedByIdentityId: identityId,
-          receivedAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
+          receivedAt: occurredAt,
         });
+        if (cashShift)
+          await tx.insert(managementCashEntries).values({
+            organizationId,
+            unitId,
+            cashShiftId: cashShift.id,
+            direction: "in",
+            entryType: "receivable_payment",
+            paymentMethod: input.method,
+            affectsDrawer: input.method === "cash",
+            amountCents: input.amountCents,
+            sourceType: "receivable_payment",
+            sourceId: paymentId,
+            description: receivable.description,
+            actorIdentityId: identityId,
+            occurredAt,
+          });
         const status = next.status === "settled" ? "received" : "partially_received";
         await tx
           .update(managementAccountsReceivable)
@@ -10434,7 +11275,13 @@ export class ManagementService {
           "management.receivable.received",
           "receivable",
           receivable.id,
-          { paymentId, amountCents: input.amountCents, status },
+          {
+            paymentId,
+            amountCents: input.amountCents,
+            method: input.method,
+            cashShiftId: cashShift?.id ?? null,
+            status,
+          },
         );
         return { receivableId, paymentId, receivedCents: next.settledCents, status };
       },
@@ -10526,6 +11373,169 @@ export class ManagementService {
     };
   }
 
+  async createCashRegister(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: CashRegisterCreateInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-register-create",
+      input,
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`cash-register:${organizationId}:${unitId}:${input.name.toLocaleLowerCase("pt-BR")}`}))`,
+        );
+        const [duplicate] = await tx
+          .select({ id: managementCashRegisters.id })
+          .from(managementCashRegisters)
+          .where(
+            and(
+              eq(managementCashRegisters.organizationId, organizationId),
+              eq(managementCashRegisters.unitId, unitId),
+              sql`lower(${managementCashRegisters.name}) = lower(${input.name})`,
+            ),
+          )
+          .limit(1);
+        if (duplicate)
+          throw new ConflictException({
+            code: "CASH_REGISTER_NAME_ALREADY_EXISTS",
+            message: "Já existe uma gaveta com este nome.",
+          });
+        const id = randomUUID();
+        await tx.insert(managementCashRegisters).values({
+          id,
+          organizationId,
+          unitId,
+          name: input.name,
+          createdByIdentityId: identityId,
+        });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-register.created",
+          "cash_register",
+          id,
+          { name: input.name },
+        );
+        return { id, name: input.name, active: true };
+      },
+    );
+  }
+
+  async updateCashRegister(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    cashRegisterId: string,
+    idempotencyKey: string,
+    input: CashRegisterUpdateInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-register-update",
+      { cashRegisterId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_cash_registers where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${cashRegisterId}::uuid for update`,
+        );
+        const [register] = await tx
+          .select()
+          .from(managementCashRegisters)
+          .where(
+            and(
+              eq(managementCashRegisters.organizationId, organizationId),
+              eq(managementCashRegisters.unitId, unitId),
+              eq(managementCashRegisters.id, cashRegisterId),
+            ),
+          )
+          .limit(1);
+        if (!register)
+          throw new NotFoundException({
+            code: "CASH_REGISTER_NOT_FOUND",
+            message: "Gaveta não encontrada nesta unidade.",
+          });
+        if (
+          input.name &&
+          input.name.toLocaleLowerCase("pt-BR") !== register.name.toLocaleLowerCase("pt-BR")
+        ) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`cash-register:${organizationId}:${unitId}:${input.name.toLocaleLowerCase("pt-BR")}`}))`,
+          );
+          const [duplicate] = await tx
+            .select({ id: managementCashRegisters.id })
+            .from(managementCashRegisters)
+            .where(
+              and(
+                eq(managementCashRegisters.organizationId, organizationId),
+                eq(managementCashRegisters.unitId, unitId),
+                ne(managementCashRegisters.id, cashRegisterId),
+                sql`lower(${managementCashRegisters.name}) = lower(${input.name})`,
+              ),
+            )
+            .limit(1);
+          if (duplicate)
+            throw new ConflictException({
+              code: "CASH_REGISTER_NAME_ALREADY_EXISTS",
+              message: "Já existe uma gaveta com este nome.",
+            });
+        }
+        if (input.active === false) {
+          const [openShift] = await tx
+            .select({ id: managementCashShifts.id })
+            .from(managementCashShifts)
+            .where(
+              and(
+                eq(managementCashShifts.organizationId, organizationId),
+                eq(managementCashShifts.unitId, unitId),
+                eq(managementCashShifts.cashRegisterId, cashRegisterId),
+                eq(managementCashShifts.status, "open"),
+              ),
+            )
+            .limit(1);
+          if (openShift)
+            throw new ConflictException({
+              code: "CASH_REGISTER_HAS_OPEN_SHIFT",
+              message: "Feche o turno antes de desativar esta gaveta.",
+            });
+        }
+        const [updated] = await tx
+          .update(managementCashRegisters)
+          .set({ ...input, updatedAt: new Date() })
+          .where(eq(managementCashRegisters.id, register.id))
+          .returning({
+            id: managementCashRegisters.id,
+            name: managementCashRegisters.name,
+            active: managementCashRegisters.active,
+          });
+        if (!updated) throw new ConflictException({ code: "CASH_REGISTER_UPDATE_FAILED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-register.updated",
+          "cash_register",
+          register.id,
+          { previous: { name: register.name, active: register.active }, current: updated },
+        );
+        return updated;
+      },
+    );
+  }
+
   async openCashShift(
     identityId: string,
     organizationId: string,
@@ -10533,7 +11543,7 @@ export class ManagementService {
     idempotencyKey: string,
     input: OpenCashShiftInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, CASH_ROLES);
+    await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
@@ -10542,8 +11552,42 @@ export class ManagementService {
       "cash-shift-open",
       input,
       async (tx) => {
+        let register: typeof managementCashRegisters.$inferSelect;
+        if (input.cashRegisterId) {
+          register = await this.requireActiveCashRegister(
+            tx,
+            organizationId,
+            unitId,
+            input.cashRegisterId,
+          );
+        } else {
+          const registers = await tx
+            .select()
+            .from(managementCashRegisters)
+            .where(
+              and(
+                eq(managementCashRegisters.organizationId, organizationId),
+                eq(managementCashRegisters.unitId, unitId),
+                eq(managementCashRegisters.active, true),
+              ),
+            )
+            .orderBy(managementCashRegisters.id)
+            .limit(2);
+          const selectedRegister = registers[0];
+          if (registers.length !== 1 || !selectedRegister)
+            throw new ConflictException({
+              code: "CASH_REGISTER_REQUIRED",
+              message: "Selecione a gaveta para abrir o caixa.",
+            });
+          register = await this.requireActiveCashRegister(
+            tx,
+            organizationId,
+            unitId,
+            selectedRegister.id,
+          );
+        }
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtext(${`cash-shift:${organizationId}:${unitId}`}))`,
+          sql`select pg_advisory_xact_lock(hashtext(${`cash-shift:${organizationId}:${unitId}:${register.id}`}))`,
         );
         const [open] = await tx
           .select({ id: managementCashShifts.id })
@@ -10552,6 +11596,7 @@ export class ManagementService {
             and(
               eq(managementCashShifts.organizationId, organizationId),
               eq(managementCashShifts.unitId, unitId),
+              eq(managementCashShifts.cashRegisterId, register.id),
               eq(managementCashShifts.status, "open"),
             ),
           )
@@ -10559,14 +11604,16 @@ export class ManagementService {
         if (open)
           throw new ConflictException({
             code: "CASH_SHIFT_ALREADY_OPEN",
-            message: "A unidade já possui um caixa aberto.",
+            message: "A gaveta já possui um caixa aberto.",
           });
         const id = randomUUID();
         await tx.insert(managementCashShifts).values({
           id,
           organizationId,
           unitId,
+          cashRegisterId: register.id,
           operatorIdentityId: identityId,
+          currentResponsibleIdentityId: identityId,
           openingCents: input.openingCents,
           openIdempotencyKey: idempotencyKey,
         });
@@ -10578,9 +11625,15 @@ export class ManagementService {
           "management.cash-shift.opened",
           "cash_shift",
           id,
-          { openingCents: input.openingCents },
+          { cashRegisterId: register.id, openingCents: input.openingCents },
         );
-        return { cashShiftId: id, status: "open", openingCents: input.openingCents };
+        return {
+          cashShiftId: id,
+          cashRegisterId: register.id,
+          cashRegisterName: register.name,
+          status: "open",
+          openingCents: input.openingCents,
+        };
       },
     );
   }
@@ -10593,7 +11646,7 @@ export class ManagementService {
     idempotencyKey: string,
     input: CashMovementInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, CASH_ROLES);
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
@@ -10602,49 +11655,125 @@ export class ManagementService {
       "cash-movement",
       { cashShiftId, ...input },
       async (tx) => {
-        const [shift] = await tx
-          .select({ id: managementCashShifts.id, status: managementCashShifts.status })
-          .from(managementCashShifts)
-          .where(
-            and(
-              eq(managementCashShifts.organizationId, organizationId),
-              eq(managementCashShifts.unitId, unitId),
-              eq(managementCashShifts.id, cashShiftId),
-            ),
-          )
-          .limit(1);
-        if (!shift)
-          throw new NotFoundException({
-            code: "CASH_SHIFT_NOT_FOUND",
-            message: "Caixa não encontrado nesta unidade.",
-          });
-        if (shift.status !== "open")
-          throw new ConflictException({
-            code: "CASH_SHIFT_CLOSED",
-            message: "O caixa não está aberto.",
-          });
-        const id = randomUUID();
-        await tx.insert(managementCashMovements).values({
-          id,
-          organizationId,
-          unitId,
-          cashShiftId,
-          ...input,
-          idempotencyKey,
-          actorIdentityId: identityId,
-          occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
-        });
-        await this.record(
+        const settings = await this.cashSettings(tx, organizationId, unitId);
+        if (
+          requiresCashApproval(role, input.amountCents, settings.movementApprovalThresholdCents)
+        ) {
+          await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId);
+          const approvalId = randomUUID();
+          const [approval] = await tx
+            .insert(managementCashApprovalRequests)
+            .values({
+              id: approvalId,
+              organizationId,
+              unitId,
+              kind: input.type,
+              cashShiftId,
+              amountCents: input.amountCents,
+              reason: input.reason,
+              requestedByIdentityId: identityId,
+              idempotencyKey,
+            })
+            .returning({ requestedAt: managementCashApprovalRequests.createdAt });
+          await this.record(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            "management.cash-approval.requested",
+            "cash_approval",
+            approvalId,
+            { kind: input.type, cashShiftId, amountCents: input.amountCents },
+          );
+          return {
+            approvalId,
+            status: "pending",
+            kind: input.type,
+            cashShiftId,
+            amountCents: input.amountCents,
+            requestedAt: approval?.requestedAt.toISOString(),
+          };
+        }
+        return this.executeCashMovement(
           tx,
           identityId,
           organizationId,
           unitId,
-          `management.cash.${input.type}`,
-          "cash_shift",
           cashShiftId,
-          { movementId: id, amountCents: input.amountCents, reason: input.reason },
+          idempotencyKey,
+          input,
         );
-        return { movementId: id, cashShiftId, type: input.type, amountCents: input.amountCents };
+      },
+    );
+  }
+
+  async transferCash(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: CashTransferInput,
+  ) {
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-transfer",
+      input,
+      async (tx) => {
+        const settings = await this.cashSettings(tx, organizationId, unitId);
+        if (
+          requiresCashApproval(role, input.amountCents, settings.movementApprovalThresholdCents)
+        ) {
+          const lockOrder = cashTransferLockOrder(input.fromCashShiftId, input.toCashShiftId);
+          for (const cashShiftId of lockOrder)
+            await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId);
+          const approvalId = randomUUID();
+          const [approval] = await tx
+            .insert(managementCashApprovalRequests)
+            .values({
+              id: approvalId,
+              organizationId,
+              unitId,
+              kind: "transfer",
+              cashShiftId: input.fromCashShiftId,
+              targetCashShiftId: input.toCashShiftId,
+              amountCents: input.amountCents,
+              reason: input.reason,
+              requestedByIdentityId: identityId,
+              idempotencyKey,
+            })
+            .returning({ requestedAt: managementCashApprovalRequests.createdAt });
+          await this.record(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            "management.cash-approval.requested",
+            "cash_approval",
+            approvalId,
+            { kind: "transfer", ...input },
+          );
+          return {
+            approvalId,
+            status: "pending",
+            kind: "transfer",
+            fromCashShiftId: input.fromCashShiftId,
+            toCashShiftId: input.toCashShiftId,
+            amountCents: input.amountCents,
+            requestedAt: approval?.requestedAt.toISOString(),
+          };
+        }
+        return this.executeCashTransfer(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          idempotencyKey,
+          input,
+        );
       },
     );
   }
@@ -10657,13 +11786,155 @@ export class ManagementService {
     idempotencyKey: string,
     input: CloseCashShiftInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, CASH_ROLES);
+    await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
     return this.idempotent(
       identityId,
       organizationId,
       unitId,
       idempotencyKey,
       "cash-shift-close",
+      { cashShiftId, ...input },
+      async (tx) => {
+        const shift = await this.lockOpenCashShift(tx, organizationId, unitId, { cashShiftId });
+        if (!shift) throw new ConflictException({ code: "CASH_SHIFT_CLOSED" });
+        const entries = await tx
+          .select({
+            direction: managementCashEntries.direction,
+            paymentMethod: managementCashEntries.paymentMethod,
+            affectsDrawer: managementCashEntries.affectsDrawer,
+            amountCents: managementCashEntries.amountCents,
+          })
+          .from(managementCashEntries)
+          .where(
+            and(
+              eq(managementCashEntries.organizationId, organizationId),
+              eq(managementCashEntries.unitId, unitId),
+              eq(managementCashEntries.cashShiftId, cashShiftId),
+            ),
+          );
+        const drawerInCents = entries
+          .filter((entry) => entry.affectsDrawer && entry.direction === "in")
+          .reduce((sum, entry) => sum + entry.amountCents, 0);
+        const drawerOutCents = entries
+          .filter((entry) => entry.affectsDrawer && entry.direction === "out")
+          .reduce((sum, entry) => sum + entry.amountCents, 0);
+        const expectedByMethod = new Map<(typeof CASH_PAYMENT_METHODS)[number], number>([
+          ["cash", shift.openingCents + drawerInCents - drawerOutCents],
+        ]);
+        for (const entry of entries) {
+          if (
+            !entry.paymentMethod ||
+            entry.paymentMethod === "cash" ||
+            entry.direction !== "in" ||
+            !CASH_PAYMENT_METHODS.includes(
+              entry.paymentMethod as (typeof CASH_PAYMENT_METHODS)[number],
+            )
+          )
+            continue;
+          const method = entry.paymentMethod as (typeof CASH_PAYMENT_METHODS)[number];
+          expectedByMethod.set(method, (expectedByMethod.get(method) ?? 0) + entry.amountCents);
+        }
+        const observations =
+          input.tenderCounts ??
+          (input.countedCents === undefined
+            ? []
+            : [
+                {
+                  method: "cash" as const,
+                  observedCents: input.countedCents,
+                  source: "manual" as const,
+                },
+              ]);
+        const tenderBreakdown = cashTenderConference(expectedByMethod, observations);
+        const cashTender = tenderBreakdown.find((tender) => tender.method === "cash");
+        if (!cashTender) throw new BadRequestException({ code: "CASH_TENDER_COUNT_REQUIRED" });
+        const expectedCents = cashTender.expectedCents;
+        const countedCents = cashTender.observedCents;
+        const differenceCents = cashTender.differenceCents;
+        const reviewRequired = tenderBreakdown.some((tender) => tender.differenceCents !== 0);
+        const settings = await this.cashSettings(tx, organizationId, unitId);
+        const differenceSeverity = cashDifferenceSeverity(
+          tenderBreakdown,
+          settings.discrepancyCriticalThresholdCents,
+        );
+        await tx.insert(managementCashShiftTenderCounts).values(
+          tenderBreakdown.map((tender) => ({
+            organizationId,
+            unitId,
+            cashShiftId,
+            ...tender,
+            recordedByIdentityId: identityId,
+          })),
+        );
+        await tx
+          .update(managementCashShifts)
+          .set({
+            status: "closed",
+            expectedCents,
+            countedCents,
+            differenceCents,
+            closedAt: new Date(),
+            closedByIdentityId: identityId,
+            closeReason: input.closeReason,
+            closeIdempotencyKey: idempotencyKey,
+            version: shift.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(managementCashShifts.id, shift.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-shift.closed",
+          "cash_shift",
+          shift.id,
+          {
+            expectedCents,
+            countedCents,
+            differenceCents,
+            drawerInCents,
+            drawerOutCents,
+            tenderBreakdown,
+            differenceSeverity,
+            reviewRequired,
+          },
+        );
+        return {
+          cashShiftId,
+          status: "closed",
+          expectedCents,
+          countedCents,
+          differenceCents,
+          drawerInCents,
+          drawerOutCents,
+          breakdown: tenderBreakdown.map((tender) => ({
+            method: tender.method,
+            amountCents: tender.expectedCents,
+          })),
+          tenderBreakdown,
+          differenceSeverity,
+          reviewRequired,
+        };
+      },
+    );
+  }
+
+  async reviewCashShift(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+    idempotencyKey: string,
+    input: CashShiftReviewInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-shift-review",
       { cashShiftId, ...input },
       async (tx) => {
         await tx.execute(
@@ -10685,62 +11956,57 @@ export class ManagementService {
             code: "CASH_SHIFT_NOT_FOUND",
             message: "Caixa não encontrado nesta unidade.",
           });
-        if (shift.status !== "open")
+        if (shift.status !== "closed")
           throw new ConflictException({
-            code: "CASH_SHIFT_CLOSED",
-            message: "O caixa já foi fechado.",
+            code: "CASH_SHIFT_NOT_REVIEWABLE",
+            message: "Apenas caixas fechados e ainda não revisados podem ser revisados.",
           });
-        const [movements, receipts] = await Promise.all([
-          tx
-            .select({
-              type: managementCashMovements.type,
-              amountCents: managementCashMovements.amountCents,
-            })
-            .from(managementCashMovements)
-            .where(
-              and(
-                eq(managementCashMovements.organizationId, organizationId),
-                eq(managementCashMovements.unitId, unitId),
-                eq(managementCashMovements.cashShiftId, cashShiftId),
-              ),
+        const tenderBreakdown = await tx
+          .select({
+            method: managementCashShiftTenderCounts.method,
+            expectedCents: managementCashShiftTenderCounts.expectedCents,
+            observedCents: managementCashShiftTenderCounts.observedCents,
+            differenceCents: managementCashShiftTenderCounts.differenceCents,
+            source: managementCashShiftTenderCounts.source,
+          })
+          .from(managementCashShiftTenderCounts)
+          .where(
+            and(
+              eq(managementCashShiftTenderCounts.organizationId, organizationId),
+              eq(managementCashShiftTenderCounts.unitId, unitId),
+              eq(managementCashShiftTenderCounts.cashShiftId, cashShiftId),
             ),
-          tx
-            .select({ amountCents: managementReceivablePayments.amountCents })
-            .from(managementReceivablePayments)
-            .where(
-              and(
-                eq(managementReceivablePayments.organizationId, organizationId),
-                eq(managementReceivablePayments.unitId, unitId),
-                eq(managementReceivablePayments.cashShiftId, cashShiftId),
-                eq(managementReceivablePayments.method, "cash"),
-              ),
-            ),
-        ]);
-        const suppliesCents = movements
-          .filter((movement) => movement.type === "supply")
-          .reduce((sum, movement) => sum + movement.amountCents, 0);
-        const withdrawalsCents = movements
-          .filter((movement) => movement.type === "withdrawal")
-          .reduce((sum, movement) => sum + movement.amountCents, 0);
-        const cashReceiptsCents = receipts.reduce((sum, receipt) => sum + receipt.amountCents, 0);
-        const conference = cashConference({
-          openingCents: shift.openingCents,
-          suppliesCents,
-          withdrawalsCents,
-          cashReceiptsCents,
-          countedCents: input.countedCents,
-        });
+          );
+        const reviewRequired =
+          tenderBreakdown.length > 0
+            ? tenderBreakdown.some((tender) => tender.differenceCents !== 0)
+            : Boolean(shift.differenceCents);
+        if (!reviewRequired)
+          throw new ConflictException({
+            code: "CASH_SHIFT_REVIEW_NOT_REQUIRED",
+            message: "O caixa não possui divergência para revisão.",
+          });
+        if (
+          identityId === shift.operatorIdentityId ||
+          identityId === shift.currentResponsibleIdentityId ||
+          identityId === shift.closedByIdentityId
+        )
+          throw new ForbiddenException({
+            code: "CASH_SHIFT_REVIEW_DUAL_CONTROL_REQUIRED",
+            message: "A revisão deve ser feita por outro gestor.",
+          });
+
+        const reviewedAt = new Date();
         await tx
           .update(managementCashShifts)
           .set({
-            status: "closed",
-            ...conference,
-            countedCents: input.countedCents,
-            closedAt: new Date(),
-            closeReason: input.closeReason,
-            closeIdempotencyKey: idempotencyKey,
+            status: "reviewed",
+            reviewedByIdentityId: identityId,
+            reviewedAt,
+            reviewNote: input.note,
+            reviewIdempotencyKey: idempotencyKey,
             version: shift.version + 1,
-            updatedAt: new Date(),
+            updatedAt: reviewedAt,
           })
           .where(eq(managementCashShifts.id, shift.id));
         await this.record(
@@ -10748,33 +12014,423 @@ export class ManagementService {
           identityId,
           organizationId,
           unitId,
-          "management.cash-shift.closed",
+          "management.cash-shift.reviewed",
           "cash_shift",
           shift.id,
-          {
-            ...conference,
-            countedCents: input.countedCents,
-            suppliesCents,
-            withdrawalsCents,
-            cashReceiptsCents,
-          },
+          { differenceCents: shift.differenceCents, tenderBreakdown, note: input.note },
         );
         return {
           cashShiftId,
-          status: "closed",
-          ...conference,
-          countedCents: input.countedCents,
-          suppliesCents,
-          withdrawalsCents,
-          cashReceiptsCents,
+          status: "reviewed",
+          differenceCents: shift.differenceCents,
+          tenderBreakdown,
+          reviewedAt: reviewedAt.toISOString(),
         };
       },
     );
   }
 
+  async getCashSettings(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    return this.cashSettings(this.database.db, organizationId, unitId);
+  }
+
+  async updateCashSettings(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: CashSettingsInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-settings-update",
+      input,
+      async (tx) => {
+        const [settings] = await tx
+          .insert(managementCashSettings)
+          .values({ organizationId, unitId, ...input, updatedByIdentityId: identityId })
+          .onConflictDoUpdate({
+            target: [managementCashSettings.organizationId, managementCashSettings.unitId],
+            set: { ...input, updatedByIdentityId: identityId, updatedAt: new Date() },
+          })
+          .returning({
+            movementApprovalThresholdCents: managementCashSettings.movementApprovalThresholdCents,
+            discrepancyCriticalThresholdCents:
+              managementCashSettings.discrepancyCriticalThresholdCents,
+            maxShiftMinutes: managementCashSettings.maxShiftMinutes,
+          });
+        if (!settings) throw new ConflictException({ code: "CASH_SETTINGS_UPDATE_FAILED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-settings.updated",
+          "cash_settings",
+          unitId,
+          settings,
+        );
+        return settings;
+      },
+    );
+  }
+
+  async handoverCashShift(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+    idempotencyKey: string,
+    input: CashShiftHandoverInput,
+  ) {
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
+    await this.requireRole(input.toIdentityId, organizationId, unitId, CASH_OPERATE_ROLES);
+    if (input.toIdentityId === identityId)
+      throw new ConflictException({
+        code: "CASH_HANDOVER_SAME_RESPONSIBLE",
+        message: "Selecione outro operador para assumir o caixa.",
+      });
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-shift-handover",
+      { cashShiftId, ...input },
+      async (tx) => {
+        const shift = await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId);
+        if (
+          role !== "owner" &&
+          role !== "manager" &&
+          shift.currentResponsibleIdentityId !== identityId
+        )
+          throw new ForbiddenException({
+            code: "CASH_HANDOVER_RESPONSIBLE_REQUIRED",
+            message: "Somente o operador responsável ou um gestor pode transferir o caixa.",
+          });
+        if (shift.currentResponsibleIdentityId === input.toIdentityId)
+          throw new ConflictException({
+            code: "CASH_HANDOVER_SAME_RESPONSIBLE",
+            message: "O operador selecionado já é o responsável pelo caixa.",
+          });
+        const responsibilityId = randomUUID();
+        const occurredAt = new Date();
+        await tx.insert(managementCashShiftResponsibilities).values({
+          id: responsibilityId,
+          organizationId,
+          unitId,
+          cashShiftId,
+          fromIdentityId: shift.currentResponsibleIdentityId,
+          toIdentityId: input.toIdentityId,
+          transferredByIdentityId: identityId,
+          reason: input.reason,
+          occurredAt,
+          idempotencyKey,
+        });
+        await tx
+          .update(managementCashShifts)
+          .set({
+            currentResponsibleIdentityId: input.toIdentityId,
+            version: shift.version + 1,
+            updatedAt: occurredAt,
+          })
+          .where(eq(managementCashShifts.id, shift.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-shift.handed-over",
+          "cash_shift",
+          cashShiftId,
+          {
+            responsibilityId,
+            fromIdentityId: shift.currentResponsibleIdentityId,
+            toIdentityId: input.toIdentityId,
+            reason: input.reason,
+          },
+        );
+        return {
+          cashShiftId,
+          currentResponsibleIdentityId: input.toIdentityId,
+          occurredAt: occurredAt.toISOString(),
+        };
+      },
+    );
+  }
+
+  async listCashApprovals(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    const approvals = await this.database.db
+      .select()
+      .from(managementCashApprovalRequests)
+      .where(
+        and(
+          eq(managementCashApprovalRequests.organizationId, organizationId),
+          eq(managementCashApprovalRequests.unitId, unitId),
+          eq(managementCashApprovalRequests.status, "pending"),
+        ),
+      )
+      .orderBy(asc(managementCashApprovalRequests.createdAt))
+      .limit(200);
+    const requesterIds = [...new Set(approvals.map((approval) => approval.requestedByIdentityId))];
+    const requesterRows =
+      requesterIds.length === 0
+        ? []
+        : await this.database.db
+            .select({ id: identities.id, name: identities.displayName })
+            .from(identities)
+            .where(inArray(identities.id, requesterIds));
+    const names = new Map(requesterRows.map((requester) => [requester.id, requester.name]));
+    return {
+      approvals: approvals.map((approval) => ({
+        id: approval.id,
+        kind: approval.kind,
+        fromCashShiftId: approval.cashShiftId,
+        toCashShiftId: approval.targetCashShiftId,
+        amountCents: approval.amountCents,
+        reason: approval.reason,
+        requestedByName: names.get(approval.requestedByIdentityId) ?? "Usuário",
+        status: approval.status,
+        requestedAt: approval.createdAt,
+      })),
+    };
+  }
+
+  async decideCashApproval(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    approvalId: string,
+    idempotencyKey: string,
+    input: CashApprovalDecisionInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-approval-decision",
+      { approvalId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_cash_approval_requests where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${approvalId}::uuid for update`,
+        );
+        const [approval] = await tx
+          .select()
+          .from(managementCashApprovalRequests)
+          .where(
+            and(
+              eq(managementCashApprovalRequests.organizationId, organizationId),
+              eq(managementCashApprovalRequests.unitId, unitId),
+              eq(managementCashApprovalRequests.id, approvalId),
+            ),
+          )
+          .limit(1);
+        if (!approval)
+          throw new NotFoundException({
+            code: "CASH_APPROVAL_NOT_FOUND",
+            message: "Solicitação de aprovação não encontrada.",
+          });
+        if (approval.status !== "pending")
+          throw new ConflictException({
+            code: "CASH_APPROVAL_ALREADY_DECIDED",
+            message: "Esta solicitação já foi decidida.",
+          });
+        if (approval.requestedByIdentityId === identityId)
+          throw new ForbiddenException({
+            code: "CASH_APPROVAL_DUAL_CONTROL_REQUIRED",
+            message: "O solicitante não pode aprovar a própria operação.",
+          });
+
+        const decidedAt = new Date();
+        let executedMovementId: string | null = null;
+        let executedTransferId: string | null = null;
+        if (input.decision === "approve") {
+          const executionKey = `cash-approval:${approval.id}`;
+          if (approval.kind === "transfer") {
+            if (!approval.targetCashShiftId)
+              throw new ConflictException({ code: "CASH_APPROVAL_TARGET_MISSING" });
+            const executed = await this.executeCashTransfer(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              executionKey,
+              {
+                fromCashShiftId: approval.cashShiftId,
+                toCashShiftId: approval.targetCashShiftId,
+                amountCents: approval.amountCents,
+                reason: approval.reason,
+              },
+            );
+            executedTransferId = executed.transferId;
+          } else {
+            const executed = await this.executeCashMovement(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              approval.cashShiftId,
+              executionKey,
+              {
+                type: approval.kind,
+                amountCents: approval.amountCents,
+                reason: approval.reason,
+              },
+            );
+            executedMovementId = executed.movementId;
+          }
+        }
+        const status = input.decision === "approve" ? ("approved" as const) : ("rejected" as const);
+        await tx
+          .update(managementCashApprovalRequests)
+          .set({
+            status,
+            decidedByIdentityId: identityId,
+            decisionNote: input.note ?? null,
+            decidedAt,
+            executedMovementId,
+            executedTransferId,
+            updatedAt: decidedAt,
+          })
+          .where(eq(managementCashApprovalRequests.id, approval.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          `management.cash-approval.${status}`,
+          "cash_approval",
+          approval.id,
+          { executedMovementId, executedTransferId, note: input.note },
+        );
+        return {
+          approvalId: approval.id,
+          status,
+          executedMovementId,
+          executedTransferId,
+          decidedAt: decidedAt.toISOString(),
+        };
+      },
+    );
+  }
+
+  async updateCashTerminal(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+    idempotencyKey: string,
+    input: CashTerminalUpdateInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_REVIEW_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-terminal-update",
+      { installationId, ...input },
+      async (tx) => {
+        const [terminal] = await tx
+          .select({
+            label: posTerminalProfiles.label,
+            mode: posTerminalProfiles.mode,
+            defaultRoute: posTerminalProfiles.defaultRoute,
+          })
+          .from(posTerminalProfiles)
+          .where(
+            and(
+              eq(posTerminalProfiles.organizationId, organizationId),
+              eq(posTerminalProfiles.unitId, unitId),
+              eq(posTerminalProfiles.installationId, installationId),
+            ),
+          )
+          .limit(1);
+        if (!terminal)
+          throw new NotFoundException({
+            code: "CASH_TERMINAL_NOT_FOUND",
+            message: "Terminal não encontrado nesta unidade.",
+          });
+        if (
+          input.cashRegisterId &&
+          !["cashier", "shared"].includes(terminal.mode) &&
+          !["counter", "cash"].includes(terminal.defaultRoute)
+        )
+          throw new ConflictException({
+            code: "CASH_TERMINAL_NOT_ELIGIBLE",
+            message: "Este perfil de terminal não opera pagamentos de caixa.",
+          });
+        if (input.cashRegisterId) {
+          await this.requireActiveCashRegister(tx, organizationId, unitId, input.cashRegisterId);
+          await tx
+            .insert(managementCashRegisterTerminals)
+            .values({
+              organizationId,
+              unitId,
+              installationId,
+              cashRegisterId: input.cashRegisterId,
+              updatedByIdentityId: identityId,
+            })
+            .onConflictDoUpdate({
+              target: [
+                managementCashRegisterTerminals.organizationId,
+                managementCashRegisterTerminals.unitId,
+                managementCashRegisterTerminals.installationId,
+              ],
+              set: {
+                cashRegisterId: input.cashRegisterId,
+                updatedByIdentityId: identityId,
+                updatedAt: new Date(),
+              },
+            });
+        } else {
+          await tx
+            .delete(managementCashRegisterTerminals)
+            .where(
+              and(
+                eq(managementCashRegisterTerminals.organizationId, organizationId),
+                eq(managementCashRegisterTerminals.unitId, unitId),
+                eq(managementCashRegisterTerminals.installationId, installationId),
+              ),
+            );
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.cash-terminal.updated",
+          "cash_terminal",
+          installationId,
+          { cashRegisterId: input.cashRegisterId },
+        );
+        return { installationId, label: terminal.label, cashRegisterId: input.cashRegisterId };
+      },
+    );
+  }
+
   async listCashShifts(identityId: string, organizationId: string, unitId: string) {
-    await this.requireRole(identityId, organizationId, unitId, CASH_ROLES);
-    const [shifts, movements] = await Promise.all([
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    const [
+      shifts,
+      entries,
+      openTabs,
+      registers,
+      terminals,
+      tenderCounts,
+      approvals,
+      adjustments,
+      operators,
+      settings,
+    ] = await Promise.all([
       this.database.db
         .select()
         .from(managementCashShifts)
@@ -10788,17 +12444,771 @@ export class ManagementService {
         .limit(200),
       this.database.db
         .select()
-        .from(managementCashMovements)
+        .from(managementCashEntries)
         .where(
           and(
-            eq(managementCashMovements.organizationId, organizationId),
-            eq(managementCashMovements.unitId, unitId),
+            eq(managementCashEntries.organizationId, organizationId),
+            eq(managementCashEntries.unitId, unitId),
           ),
         )
-        .orderBy(desc(managementCashMovements.occurredAt))
+        .orderBy(desc(managementCashEntries.occurredAt))
         .limit(500),
+      this.database.db
+        .select({
+          id: posTabs.id,
+          label: posTabs.label,
+          displayNumber: posTabs.displayNumber,
+          totalCents: posTabs.totalCents,
+        })
+        .from(posTabs)
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.status, "open"),
+          ),
+        )
+        .orderBy(asc(posTabs.createdAt))
+        .limit(200),
+      this.database.db
+        .select({
+          id: managementCashRegisters.id,
+          name: managementCashRegisters.name,
+          active: managementCashRegisters.active,
+        })
+        .from(managementCashRegisters)
+        .where(
+          and(
+            eq(managementCashRegisters.organizationId, organizationId),
+            eq(managementCashRegisters.unitId, unitId),
+          ),
+        )
+        .orderBy(asc(managementCashRegisters.name)),
+      this.database.db
+        .select({
+          installationId: posTerminalProfiles.installationId,
+          label: posTerminalProfiles.label,
+          cashRegisterId: managementCashRegisterTerminals.cashRegisterId,
+          lastSeenAt: posPaymentDeviceDiagnostics.lastSeenAt,
+        })
+        .from(posTerminalProfiles)
+        .leftJoin(
+          managementCashRegisterTerminals,
+          and(
+            eq(managementCashRegisterTerminals.organizationId, posTerminalProfiles.organizationId),
+            eq(managementCashRegisterTerminals.unitId, posTerminalProfiles.unitId),
+            eq(managementCashRegisterTerminals.installationId, posTerminalProfiles.installationId),
+          ),
+        )
+        .leftJoin(
+          posPaymentDeviceDiagnostics,
+          and(
+            eq(posPaymentDeviceDiagnostics.organizationId, posTerminalProfiles.organizationId),
+            eq(posPaymentDeviceDiagnostics.unitId, posTerminalProfiles.unitId),
+            eq(posPaymentDeviceDiagnostics.installationId, posTerminalProfiles.installationId),
+          ),
+        )
+        .where(
+          and(
+            eq(posTerminalProfiles.organizationId, organizationId),
+            eq(posTerminalProfiles.unitId, unitId),
+            or(
+              inArray(posTerminalProfiles.mode, ["cashier", "shared"]),
+              inArray(posTerminalProfiles.defaultRoute, ["counter", "cash"]),
+            ),
+          ),
+        )
+        .orderBy(asc(posTerminalProfiles.label)),
+      this.database.db
+        .select()
+        .from(managementCashShiftTenderCounts)
+        .where(
+          and(
+            eq(managementCashShiftTenderCounts.organizationId, organizationId),
+            eq(managementCashShiftTenderCounts.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementCashApprovalRequests)
+        .where(
+          and(
+            eq(managementCashApprovalRequests.organizationId, organizationId),
+            eq(managementCashApprovalRequests.unitId, unitId),
+            eq(managementCashApprovalRequests.status, "pending"),
+          ),
+        )
+        .orderBy(asc(managementCashApprovalRequests.createdAt))
+        .limit(200),
+      this.database.db
+        .select()
+        .from(managementCashAdjustments)
+        .where(
+          and(
+            eq(managementCashAdjustments.organizationId, organizationId),
+            eq(managementCashAdjustments.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementCashAdjustments.occurredAt))
+        .limit(200),
+      this.database.db
+        .selectDistinct({ identityId: identities.id, name: identities.displayName })
+        .from(memberships)
+        .innerJoin(identities, eq(identities.id, memberships.identityId))
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .where(
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            inArray(roleBindings.role, [...CASH_OPERATE_ROLES]),
+            or(isNull(roleBindings.unitId), eq(roleBindings.unitId, unitId)),
+          ),
+        )
+        .orderBy(identities.displayName),
+      this.cashSettings(this.database.db, organizationId, unitId),
     ]);
-    return { shifts, movements };
+    const tabPayments =
+      openTabs.length === 0
+        ? []
+        : await this.database.db
+            .select({
+              tabId: posTabPayments.tabId,
+              amountCents: posTabPayments.amountCents,
+              reversedCents: sql<number>`coalesce(${posPaymentReversals.amountCents}, 0)`.mapWith(
+                Number,
+              ),
+            })
+            .from(posTabPayments)
+            .leftJoin(
+              posPaymentReversals,
+              and(
+                eq(posPaymentReversals.organizationId, posTabPayments.organizationId),
+                eq(posPaymentReversals.unitId, posTabPayments.unitId),
+                eq(posPaymentReversals.paymentId, posTabPayments.id),
+                eq(posPaymentReversals.status, "approved"),
+              ),
+            )
+            .where(
+              and(
+                eq(posTabPayments.organizationId, organizationId),
+                eq(posTabPayments.unitId, unitId),
+                inArray(
+                  posTabPayments.tabId,
+                  openTabs.map((tab) => tab.id),
+                ),
+              ),
+            );
+    const drawerRows =
+      shifts.length === 0
+        ? []
+        : await this.database.db
+            .select({
+              cashShiftId: managementCashEntries.cashShiftId,
+              drawerInCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'in' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+              drawerOutCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'out' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+            })
+            .from(managementCashEntries)
+            .where(
+              and(
+                eq(managementCashEntries.organizationId, organizationId),
+                eq(managementCashEntries.unitId, unitId),
+                inArray(
+                  managementCashEntries.cashShiftId,
+                  shifts.map((shift) => shift.id),
+                ),
+              ),
+            )
+            .groupBy(managementCashEntries.cashShiftId);
+    const drawerByShift = new Map(
+      drawerRows.map((row) => [
+        row.cashShiftId,
+        {
+          drawerInCents: Number(row.drawerInCents),
+          drawerOutCents: Number(row.drawerOutCents),
+        },
+      ]),
+    );
+    const paidByTab = new Map<string, number>();
+    for (const payment of tabPayments)
+      paidByTab.set(
+        payment.tabId,
+        (paidByTab.get(payment.tabId) ?? 0) + payment.amountCents - payment.reversedCents,
+      );
+    const pendingTabs = openTabs.flatMap((tab) => {
+      const paidCents = paidByTab.get(tab.id) ?? 0;
+      const remainingCents = Math.max(0, tab.totalCents - paidCents);
+      return remainingCents > 0
+        ? [
+            {
+              id: tab.id,
+              label:
+                tab.label ??
+                (tab.displayNumber === null ? "Comanda" : `Comanda ${tab.displayNumber}`),
+              totalCents: tab.totalCents,
+              paidCents,
+              remainingCents,
+            },
+          ]
+        : [];
+    });
+    const identityIds = [
+      ...shifts.flatMap((shift) => [
+        shift.operatorIdentityId,
+        shift.currentResponsibleIdentityId,
+        shift.closedByIdentityId,
+        shift.reviewedByIdentityId,
+      ]),
+      ...entries.map((entry) => entry.actorIdentityId),
+      ...approvals.map((approval) => approval.requestedByIdentityId),
+      ...adjustments.map((adjustment) => adjustment.actorIdentityId),
+    ].filter((id): id is string => id !== null);
+    const identityRows =
+      identityIds.length === 0
+        ? []
+        : await this.database.db
+            .select({ id: identities.id, name: identities.displayName })
+            .from(identities)
+            .where(inArray(identities.id, [...new Set(identityIds)]));
+    const names = new Map(identityRows.map((identity) => [identity.id, identity.name]));
+    const registerNames = new Map(registers.map((register) => [register.id, register.name]));
+    const openShiftByRegister = new Map(
+      shifts
+        .filter((shift) => shift.status === "open")
+        .map((shift) => [shift.cashRegisterId, shift.id]),
+    );
+    const canOperate = role === "owner" || role === "manager" || role === "cashier";
+    const tenderByShift = new Map<string, typeof tenderCounts>();
+    for (const tender of tenderCounts)
+      tenderByShift.set(tender.cashShiftId, [
+        ...(tenderByShift.get(tender.cashShiftId) ?? []),
+        tender,
+      ]);
+    const now = Date.now();
+    const terminalViews = terminals.map((terminal) => ({
+      ...terminal,
+      status:
+        terminal.lastSeenAt === null
+          ? ("unpaired" as const)
+          : now - terminal.lastSeenAt.getTime() > 10 * 60_000
+            ? ("offline" as const)
+            : ("online" as const),
+    }));
+    const alerts = [
+      ...shifts
+        .filter(
+          (shift) =>
+            shift.status === "open" &&
+            now - shift.openedAt.getTime() > settings.maxShiftMinutes * 60_000,
+        )
+        .map((shift) => ({
+          code: "CASH_SHIFT_OVERLONG",
+          severity: "warning" as const,
+          message: "Turno aberto acima do tempo recomendado.",
+          cashShiftId: shift.id,
+          cashRegisterId: shift.cashRegisterId,
+        })),
+      ...terminalViews
+        .filter((terminal) => terminal.cashRegisterId === null)
+        .map((terminal) => ({
+          code: "CASH_TERMINAL_UNBOUND",
+          severity: "warning" as const,
+          message: "Terminal sem gaveta vinculada.",
+          installationId: terminal.installationId,
+        })),
+      ...terminalViews
+        .filter((terminal) => terminal.status !== "online")
+        .map((terminal) => ({
+          code: terminal.status === "offline" ? "CASH_TERMINAL_OFFLINE" : "CASH_TERMINAL_UNPAIRED",
+          severity: terminal.status === "offline" ? ("critical" as const) : ("warning" as const),
+          message:
+            terminal.status === "offline"
+              ? "Terminal sem comunicação recente."
+              : "Terminal ainda não pareado com um dispositivo.",
+          installationId: terminal.installationId,
+        })),
+      ...approvals.map((approval) => ({
+        code: "CASH_APPROVAL_PENDING",
+        severity: "warning" as const,
+        message: "Operação de caixa aguardando aprovação.",
+        cashShiftId: approval.cashShiftId,
+      })),
+    ];
+    return {
+      settings,
+      alerts,
+      operators,
+      capabilities: {
+        canOpen: canOperate,
+        canMove: canOperate,
+        canClose: canOperate,
+        canReview: role === "owner" || role === "manager",
+        canViewExpected: role !== "cashier",
+        canManageRegisters: role === "owner" || role === "manager",
+        canTransfer: canOperate,
+        canManageCashSettings: role === "owner" || role === "manager",
+        canManageTerminals: role === "owner" || role === "manager",
+        canApproveCashRequests: role === "owner" || role === "manager",
+        canHandover: canOperate,
+      },
+      registers: registers.map((register) => ({
+        ...register,
+        openShiftId: openShiftByRegister.get(register.id) ?? null,
+      })),
+      availableTerminals: terminalViews,
+      shifts: shifts.map((shift) => ({
+        id: shift.id,
+        cashRegisterId: shift.cashRegisterId,
+        cashRegisterName: registerNames.get(shift.cashRegisterId) ?? "Gaveta",
+        status: shift.status,
+        currentResponsibleIdentityId: shift.currentResponsibleIdentityId,
+        responsibleName: names.get(shift.currentResponsibleIdentityId) ?? "Usuário",
+        openingCents: shift.openingCents,
+        expectedCents:
+          shift.status !== "open"
+            ? shift.expectedCents
+            : role === "cashier"
+              ? null
+              : shift.openingCents +
+                (drawerByShift.get(shift.id)?.drawerInCents ?? 0) -
+                (drawerByShift.get(shift.id)?.drawerOutCents ?? 0),
+        countedCents: shift.countedCents,
+        differenceCents: shift.differenceCents,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        closeReason: shift.closeReason,
+        reviewedAt: shift.reviewedAt,
+        reviewNote: shift.reviewNote,
+        tenderBreakdown: (tenderByShift.get(shift.id) ?? []).map((tender) => ({
+          method: tender.method,
+          expectedCents: tender.expectedCents,
+          observedCents: tender.observedCents,
+          differenceCents: tender.differenceCents,
+          source: tender.source,
+        })),
+        differenceSeverity: cashDifferenceSeverity(
+          tenderByShift.get(shift.id) ?? [],
+          settings.discrepancyCriticalThresholdCents,
+        ),
+        operatorName: names.get(shift.operatorIdentityId) ?? "Usuário",
+        closedByName: shift.closedByIdentityId
+          ? (names.get(shift.closedByIdentityId) ?? "Usuário")
+          : null,
+        reviewedByName: shift.reviewedByIdentityId
+          ? (names.get(shift.reviewedByIdentityId) ?? "Usuário")
+          : null,
+      })),
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        cashShiftId: entry.cashShiftId,
+        direction: entry.direction,
+        entryType: entry.entryType,
+        paymentMethod: entry.paymentMethod,
+        affectsDrawer: entry.affectsDrawer,
+        amountCents: entry.amountCents,
+        description: entry.description,
+        actorName: names.get(entry.actorIdentityId) ?? "Usuário",
+        occurredAt: entry.occurredAt,
+      })),
+      approvals: approvals.map((approval) => ({
+        id: approval.id,
+        kind: approval.kind,
+        fromCashShiftId: approval.cashShiftId,
+        toCashShiftId: approval.targetCashShiftId,
+        amountCents: approval.amountCents,
+        reason: approval.reason,
+        requestedByName: names.get(approval.requestedByIdentityId) ?? "Usuário",
+        status: approval.status,
+        requestedAt: approval.createdAt,
+      })),
+      adjustments: adjustments.map((adjustment) => ({
+        id: adjustment.id,
+        cashRegisterId: adjustment.cashRegisterId,
+        originalCashShiftId: adjustment.originalCashShiftId,
+        direction: adjustment.direction,
+        entryType: adjustment.entryType,
+        paymentMethod: adjustment.paymentMethod,
+        affectsDrawer: adjustment.affectsDrawer,
+        amountCents: adjustment.amountCents,
+        description: adjustment.description,
+        actorName: names.get(adjustment.actorIdentityId) ?? "Usuário",
+        occurredAt: adjustment.occurredAt,
+      })),
+      pendingTabs,
+    };
+  }
+
+  async cashShiftHistory(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: CashShiftHistoryQuery,
+  ) {
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    const offset = reportPageOffset(query.cursor);
+    const [unit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const openedLocalDate = sql<string>`timezone(${unit.timezone}, ${managementCashShifts.openedAt})::date`;
+    const filters = [
+      eq(managementCashShifts.organizationId, organizationId),
+      eq(managementCashShifts.unitId, unitId),
+      query.from ? gte(openedLocalDate, query.from) : undefined,
+      query.to ? lte(openedLocalDate, query.to) : undefined,
+      query.cashRegisterId
+        ? eq(managementCashShifts.cashRegisterId, query.cashRegisterId)
+        : undefined,
+      query.operatorIdentityId
+        ? or(
+            eq(managementCashShifts.operatorIdentityId, query.operatorIdentityId),
+            eq(managementCashShifts.currentResponsibleIdentityId, query.operatorIdentityId),
+          )
+        : undefined,
+      query.status ? eq(managementCashShifts.status, query.status) : undefined,
+    ];
+    const rows = await this.database.db
+      .select()
+      .from(managementCashShifts)
+      .where(and(...filters))
+      .orderBy(desc(managementCashShifts.openedAt), desc(managementCashShifts.id))
+      .offset(offset)
+      .limit(query.limit + 1);
+    const page = rows.slice(0, query.limit);
+    const shiftIds = page.map((shift) => shift.id);
+    const registerIds = [...new Set(page.map((shift) => shift.cashRegisterId))];
+    const identityIds = [
+      ...new Set(
+        page.flatMap((shift) => [
+          shift.operatorIdentityId,
+          shift.currentResponsibleIdentityId,
+          shift.closedByIdentityId,
+          shift.reviewedByIdentityId,
+        ]),
+      ),
+    ].filter((value): value is string => value !== null);
+    const [registers, identityRows, tenders, drawerRows] = await Promise.all([
+      registerIds.length === 0
+        ? []
+        : this.database.db
+            .select({ id: managementCashRegisters.id, name: managementCashRegisters.name })
+            .from(managementCashRegisters)
+            .where(inArray(managementCashRegisters.id, registerIds)),
+      identityIds.length === 0
+        ? []
+        : this.database.db
+            .select({ id: identities.id, name: identities.displayName })
+            .from(identities)
+            .where(inArray(identities.id, identityIds)),
+      shiftIds.length === 0
+        ? []
+        : this.database.db
+            .select()
+            .from(managementCashShiftTenderCounts)
+            .where(
+              and(
+                eq(managementCashShiftTenderCounts.organizationId, organizationId),
+                eq(managementCashShiftTenderCounts.unitId, unitId),
+                inArray(managementCashShiftTenderCounts.cashShiftId, shiftIds),
+              ),
+            ),
+      shiftIds.length === 0
+        ? []
+        : this.database.db
+            .select({
+              cashShiftId: managementCashEntries.cashShiftId,
+              drawerInCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'in' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+              drawerOutCents: sql<number>`coalesce(sum(case when ${managementCashEntries.affectsDrawer} and ${managementCashEntries.direction} = 'out' then ${managementCashEntries.amountCents} else 0 end), 0)::integer`,
+            })
+            .from(managementCashEntries)
+            .where(inArray(managementCashEntries.cashShiftId, shiftIds))
+            .groupBy(managementCashEntries.cashShiftId),
+    ]);
+    const names = new Map(identityRows.map((identity) => [identity.id, identity.name]));
+    const registerNames = new Map(registers.map((register) => [register.id, register.name]));
+    const tenderByShift = new Map<string, typeof tenders>();
+    for (const tender of tenders)
+      tenderByShift.set(tender.cashShiftId, [
+        ...(tenderByShift.get(tender.cashShiftId) ?? []),
+        tender,
+      ]);
+    const drawerByShift = new Map(
+      drawerRows.map((drawer) => [
+        drawer.cashShiftId,
+        {
+          drawerInCents: Number(drawer.drawerInCents),
+          drawerOutCents: Number(drawer.drawerOutCents),
+        },
+      ]),
+    );
+    const settings = await this.cashSettings(this.database.db, organizationId, unitId);
+    const items = page.map((shift) => {
+      const canViewExpected = shift.status !== "open" || role !== "cashier";
+      const liveExpected =
+        shift.openingCents +
+        (drawerByShift.get(shift.id)?.drawerInCents ?? 0) -
+        (drawerByShift.get(shift.id)?.drawerOutCents ?? 0);
+      const tenderBreakdown = (tenderByShift.get(shift.id) ?? []).map((tender) => ({
+        method: tender.method,
+        expectedCents: canViewExpected ? tender.expectedCents : null,
+        observedCents: tender.observedCents,
+        differenceCents: canViewExpected ? tender.differenceCents : null,
+        source: tender.source,
+      }));
+      return {
+        id: shift.id,
+        cashRegisterId: shift.cashRegisterId,
+        cashRegisterName: registerNames.get(shift.cashRegisterId) ?? "Gaveta",
+        status: shift.status,
+        openingCents: shift.openingCents,
+        expectedCents: canViewExpected
+          ? shift.status === "open"
+            ? liveExpected
+            : shift.expectedCents
+          : null,
+        countedCents: shift.countedCents,
+        differenceCents: canViewExpected ? shift.differenceCents : null,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        currentResponsibleIdentityId: shift.currentResponsibleIdentityId,
+        operatorName: names.get(shift.operatorIdentityId) ?? "Usuário",
+        responsibleName: names.get(shift.currentResponsibleIdentityId) ?? "Usuário",
+        closedByName: shift.closedByIdentityId
+          ? (names.get(shift.closedByIdentityId) ?? "Usuário")
+          : null,
+        reviewedByName: shift.reviewedByIdentityId
+          ? (names.get(shift.reviewedByIdentityId) ?? "Usuário")
+          : null,
+        tenderBreakdown,
+        differenceSeverity: cashDifferenceSeverity(
+          tenderByShift.get(shift.id) ?? [],
+          settings.discrepancyCriticalThresholdCents,
+        ),
+      };
+    });
+    return {
+      items,
+      nextCursor: reportNextCursor(offset, items.length, rows.length > query.limit),
+    };
+  }
+
+  async cashShiftDetail(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    cashShiftId: string,
+  ) {
+    const role = await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
+    const [shift] = await this.database.db
+      .select()
+      .from(managementCashShifts)
+      .where(
+        and(
+          eq(managementCashShifts.organizationId, organizationId),
+          eq(managementCashShifts.unitId, unitId),
+          eq(managementCashShifts.id, cashShiftId),
+        ),
+      )
+      .limit(1);
+    if (!shift)
+      throw new NotFoundException({
+        code: "CASH_SHIFT_NOT_FOUND",
+        message: "Caixa não encontrado nesta unidade.",
+      });
+    const [entries, tenderCounts, responsibilities, adjustments, register] = await Promise.all([
+      this.database.db
+        .select()
+        .from(managementCashEntries)
+        .where(
+          and(
+            eq(managementCashEntries.organizationId, organizationId),
+            eq(managementCashEntries.unitId, unitId),
+            eq(managementCashEntries.cashShiftId, cashShiftId),
+          ),
+        )
+        .orderBy(asc(managementCashEntries.occurredAt)),
+      this.database.db
+        .select()
+        .from(managementCashShiftTenderCounts)
+        .where(
+          and(
+            eq(managementCashShiftTenderCounts.organizationId, organizationId),
+            eq(managementCashShiftTenderCounts.unitId, unitId),
+            eq(managementCashShiftTenderCounts.cashShiftId, cashShiftId),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementCashShiftResponsibilities)
+        .where(
+          and(
+            eq(managementCashShiftResponsibilities.organizationId, organizationId),
+            eq(managementCashShiftResponsibilities.unitId, unitId),
+            eq(managementCashShiftResponsibilities.cashShiftId, cashShiftId),
+          ),
+        )
+        .orderBy(asc(managementCashShiftResponsibilities.occurredAt)),
+      this.database.db
+        .select()
+        .from(managementCashAdjustments)
+        .where(
+          and(
+            eq(managementCashAdjustments.organizationId, organizationId),
+            eq(managementCashAdjustments.unitId, unitId),
+            eq(managementCashAdjustments.originalCashShiftId, cashShiftId),
+          ),
+        )
+        .orderBy(asc(managementCashAdjustments.occurredAt)),
+      this.database.db
+        .select({ name: managementCashRegisters.name })
+        .from(managementCashRegisters)
+        .where(eq(managementCashRegisters.id, shift.cashRegisterId))
+        .limit(1)
+        .then((rows) => rows[0]),
+    ]);
+    const identityIds = [
+      shift.operatorIdentityId,
+      shift.currentResponsibleIdentityId,
+      shift.closedByIdentityId,
+      shift.reviewedByIdentityId,
+      ...entries.map((entry) => entry.actorIdentityId),
+      ...responsibilities.flatMap((responsibility) => [
+        responsibility.fromIdentityId,
+        responsibility.toIdentityId,
+        responsibility.transferredByIdentityId,
+      ]),
+      ...adjustments.map((adjustment) => adjustment.actorIdentityId),
+    ].filter((value): value is string => value !== null);
+    const identityRows = await this.database.db
+      .select({ id: identities.id, name: identities.displayName })
+      .from(identities)
+      .where(inArray(identities.id, [...new Set(identityIds)]));
+    const names = new Map(identityRows.map((identity) => [identity.id, identity.name]));
+    const canViewExpected = shift.status !== "open" || role !== "cashier";
+    const drawer = await this.cashDrawerTotals(
+      this.database.db,
+      organizationId,
+      unitId,
+      cashShiftId,
+    );
+    const settings = await this.cashSettings(this.database.db, organizationId, unitId);
+    return {
+      shift: {
+        id: shift.id,
+        cashRegisterId: shift.cashRegisterId,
+        cashRegisterName: register?.name ?? "Gaveta",
+        status: shift.status,
+        openingCents: shift.openingCents,
+        expectedCents: canViewExpected
+          ? shift.status === "open"
+            ? shift.openingCents + drawer.drawerInCents - drawer.drawerOutCents
+            : shift.expectedCents
+          : null,
+        countedCents: shift.countedCents,
+        differenceCents: canViewExpected ? shift.differenceCents : null,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        currentResponsibleIdentityId: shift.currentResponsibleIdentityId,
+        operatorName: names.get(shift.operatorIdentityId) ?? "Usuário",
+        responsibleName: names.get(shift.currentResponsibleIdentityId) ?? "Usuário",
+        closedByName: shift.closedByIdentityId
+          ? (names.get(shift.closedByIdentityId) ?? "Usuário")
+          : null,
+        reviewedByName: shift.reviewedByIdentityId
+          ? (names.get(shift.reviewedByIdentityId) ?? "Usuário")
+          : null,
+        differenceSeverity: cashDifferenceSeverity(
+          tenderCounts,
+          settings.discrepancyCriticalThresholdCents,
+        ),
+      },
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        cashShiftId: entry.cashShiftId,
+        direction: entry.direction,
+        entryType: entry.entryType,
+        paymentMethod: entry.paymentMethod,
+        affectsDrawer: entry.affectsDrawer,
+        amountCents: entry.amountCents,
+        description: entry.description,
+        actorName: names.get(entry.actorIdentityId) ?? "Usuário",
+        occurredAt: entry.occurredAt,
+      })),
+      tenderCounts: tenderCounts.map((tender) => ({
+        method: tender.method,
+        expectedCents: canViewExpected ? tender.expectedCents : null,
+        observedCents: tender.observedCents,
+        differenceCents: canViewExpected ? tender.differenceCents : null,
+        source: tender.source,
+      })),
+      responsibilities: responsibilities.map((responsibility) => ({
+        id: responsibility.id,
+        fromName: names.get(responsibility.fromIdentityId) ?? "Usuário",
+        toName: names.get(responsibility.toIdentityId) ?? "Usuário",
+        transferredByName: names.get(responsibility.transferredByIdentityId) ?? "Usuário",
+        reason: responsibility.reason,
+        occurredAt: responsibility.occurredAt,
+      })),
+      adjustments: adjustments.map((adjustment) => ({
+        id: adjustment.id,
+        cashRegisterId: adjustment.cashRegisterId,
+        originalCashShiftId: adjustment.originalCashShiftId,
+        direction: adjustment.direction,
+        entryType: adjustment.entryType,
+        paymentMethod: adjustment.paymentMethod,
+        affectsDrawer: adjustment.affectsDrawer,
+        amountCents: adjustment.amountCents,
+        description: adjustment.description,
+        actorName: names.get(adjustment.actorIdentityId) ?? "Usuário",
+        occurredAt: adjustment.occurredAt,
+      })),
+    };
+  }
+
+  async exportCashShifts(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: CashShiftExportQuery,
+  ) {
+    let cursor: string | undefined;
+    const items: Record<string, unknown>[] = [];
+    do {
+      const page = await this.cashShiftHistory(identityId, organizationId, unitId, {
+        cursor,
+        limit: 100,
+        from: query.from,
+        to: query.to,
+        cashRegisterId: query.cashRegisterId,
+        operatorIdentityId: query.operatorIdentityId,
+        status: query.status,
+      });
+      items.push(
+        ...page.items.map((shift) => ({
+          caixa: shift.cashRegisterName,
+          status: shift.status,
+          operador: shift.operatorName,
+          responsavel: shift.responsibleName,
+          abertura: shift.openedAt.toISOString(),
+          fechamento: shift.closedAt?.toISOString() ?? "",
+          fundo_centavos: shift.openingCents,
+          esperado_centavos: shift.expectedCents,
+          contado_centavos: shift.countedCents,
+          diferenca_centavos: shift.differenceCents,
+          severidade: shift.differenceSeverity,
+        })),
+      );
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor && items.length < 10_000);
+    const artifact = buildReportArtifact(query.format, items, "Histórico de contas e caixa");
+    return {
+      filename: `historico-caixa-${new Date().toISOString().slice(0, 10)}.${artifact.extension}`,
+      content: artifact.content,
+      contentEncoding: artifact.contentEncoding,
+      mimeType: artifact.mimeType,
+      sha256: artifact.sha256,
+    };
   }
 
   async importReconciliation(
@@ -10898,7 +13308,10 @@ export class ManagementService {
     identityId: string,
     organizationId: string,
     unitId: string,
-    period: ReportPeriodInput,
+    period: ReportPeriodInput & {
+      family?: string;
+      minimumComparableOperatingDays?: number;
+    },
   ) {
     const reportRole = await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
     const [unit] = await this.database.db
@@ -10913,6 +13326,7 @@ export class ManagementService {
     const payablePaymentDate = sql<string>`timezone(${unit.timezone}, ${managementPayablePayments.paidAt})::date`;
     const receivablePaymentDate = sql<string>`timezone(${unit.timezone}, ${managementReceivablePayments.receivedAt})::date`;
     const closedDate = sql<string>`timezone(${unit.timezone}, ${posTabs.closedAt})::date`;
+    const reversalDate = sql<string>`timezone(${unit.timezone}, ${posPaymentReversals.resolvedAt})::date`;
     const inventoryEventDate = sql<string>`timezone(${unit.timezone}, ${managementInventoryEvents.occurredAt})::date`;
     const purchaseCreatedDate = sql<string>`timezone(${unit.timezone}, ${managementPurchaseOrders.createdAt})::date`;
     const receiptReceivedDate = sql<string>`timezone(${unit.timezone}, ${managementPurchaseReceipts.receivedAt})::date`;
@@ -10923,7 +13337,8 @@ export class ManagementService {
       receivables,
       dailyChannelSales,
       productSales,
-      paymentMethods,
+      grossPaymentMethods,
+      paymentReversalMethods,
       tabMetricsRows,
       exceptionMetricsRows,
       cancellationReasons,
@@ -11094,6 +13509,33 @@ export class ManagementService {
             eq(posTabs.status, "closed"),
             gte(closedDate, period.from),
             lte(closedDate, period.to),
+          ),
+        )
+        .groupBy(posTabPayments.method)
+        .orderBy(posTabPayments.method),
+      this.database.db
+        .select({
+          method: posTabPayments.method,
+          reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`.mapWith(
+            Number,
+          ),
+        })
+        .from(posPaymentReversals)
+        .innerJoin(
+          posTabPayments,
+          and(
+            eq(posTabPayments.organizationId, posPaymentReversals.organizationId),
+            eq(posTabPayments.unitId, posPaymentReversals.unitId),
+            eq(posTabPayments.id, posPaymentReversals.paymentId),
+          ),
+        )
+        .where(
+          and(
+            eq(posPaymentReversals.organizationId, organizationId),
+            eq(posPaymentReversals.unitId, unitId),
+            eq(posPaymentReversals.status, "approved"),
+            gte(reversalDate, period.from),
+            lte(reversalDate, period.to),
           ),
         )
         .groupBy(posTabPayments.method)
@@ -11383,6 +13825,9 @@ export class ManagementService {
       previousRevenueCents: number;
       operatingDays: number;
       previousOperatingDays: number;
+      seatCount: number;
+      activeEmployees: number;
+      openHours: number | null;
     };
     const periodsSql = previousPeriod
       ? sql`(values ('current', ${period.from}::date, ${period.to}::date), ('previous', ${previousPeriod.from}::date, ${previousPeriod.to}::date))`
@@ -11451,15 +13896,18 @@ export class ManagementService {
             and timezone(${unit.timezone}, received_at)::date between periods.from_date and periods.to_date
         ) receipts on true
       `),
-      this.database.db.execute<HourlySaleRow>(sql`
+      !period.family || period.family === "overview" || period.family === "sales"
+        ? this.database.db.execute<HourlySaleRow>(sql`
         select extract(hour from timezone(${unit.timezone}, closed_at))::int as hour,
                count(*)::int as "closedTabs", coalesce(sum(total_cents), 0)::int as "revenueCents"
         from pos_tabs
         where organization_id = ${organizationId}::uuid and unit_id = ${unitId}::uuid and status = 'closed'
           and timezone(${unit.timezone}, closed_at)::date between ${period.from}::date and ${period.to}::date
         group by 1 order by 1
-      `),
-      this.database.db.execute<ShiftRow>(sql`
+      `)
+        : Promise.resolve([] as HourlySaleRow[]),
+      !period.family || period.family === "overview" || period.family === "operations"
+        ? this.database.db.execute<ShiftRow>(sql`
         select coalesce(shifts.id::text, 'unassigned') as key,
                coalesce(shifts.label, 'Sem turno vinculado') as label,
                count(*)::int as "closedTabs", coalesce(sum(tabs.guest_count), 0)::int as guests,
@@ -11470,8 +13918,13 @@ export class ManagementService {
         where tabs.organization_id = ${organizationId}::uuid and tabs.unit_id = ${unitId}::uuid and tabs.status = 'closed'
           and timezone(${unit.timezone}, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
         group by shifts.id, shifts.label order by sum(tabs.total_cents) desc, label
-      `),
-      this.database.db.execute<InventoryAnalysisRow>(sql`
+      `)
+        : Promise.resolve([] as ShiftRow[]),
+      !period.family ||
+      period.family === "overview" ||
+      period.family === "inventory" ||
+      period.family === "forecast"
+        ? this.database.db.execute<InventoryAnalysisRow>(sql`
         with consumption as (
           select inventory_item_id,
                  coalesce(sum(abs(quantity_delta::numeric)), 0)::double precision as consumed_quantity,
@@ -11496,8 +13949,10 @@ export class ManagementService {
         where items.organization_id = ${organizationId}::uuid and items.unit_id = ${unitId}::uuid and items.active = true
           and (coalesce(consumption.consumed_quantity, 0) > 0 or coalesce(balances.current_quantity, 0) <> 0)
         order by consumption.consumed_value_cents desc nulls last, items.name
-      `),
-      this.database.db.execute<SupplierPerformanceRow>(sql`
+      `)
+        : Promise.resolve([] as InventoryAnalysisRow[]),
+      !period.family || period.family === "overview" || period.family === "purchasing"
+        ? this.database.db.execute<SupplierPerformanceRow>(sql`
         with order_stats as (
           select supplier_id, count(*)::int as order_count
           from management_purchase_orders
@@ -11533,15 +13988,24 @@ export class ManagementService {
         where suppliers.organization_id = ${organizationId}::uuid and suppliers.unit_id = ${unitId}::uuid
           and (order_stats.order_count is not null or receipt_stats.receipt_count is not null)
         order by coalesce(receipt_stats.receipt_count, 0) desc, suppliers.name
-      `),
-      reportRole === "owner"
+      `)
+        : Promise.resolve([] as SupplierPerformanceRow[]),
+      reportRole === "owner" &&
+      (!period.family || period.family === "overview" || period.family === "multiunit")
         ? this.database.db.execute<MultiunitRow>(sql`
             select units.id::text as key, units.name as label,
                    count(tabs.id) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date)::int as "closedTabs",
                    coalesce(sum(tabs.total_cents) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date), 0)::int as "revenueCents",
                    coalesce(sum(tabs.total_cents) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date), 0)::int as "previousRevenueCents",
                    count(distinct timezone(units.timezone, tabs.closed_at)::date) filter (where timezone(units.timezone, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date)::int as "operatingDays",
-                   count(distinct timezone(units.timezone, tabs.closed_at)::date) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date)::int as "previousOperatingDays"
+                   count(distinct timezone(units.timezone, tabs.closed_at)::date) filter (where ${previousPeriod !== null} and timezone(units.timezone, tabs.closed_at)::date between ${previousPeriod?.from ?? period.from}::date and ${previousPeriod?.to ?? period.to}::date)::int as "previousOperatingDays",
+                   coalesce((select sum(tables.seats) from pos_dining_tables tables where tables.organization_id = units.organization_id and tables.unit_id = units.id and tables.active = true), 0)::int as "seatCount",
+                   coalesce((select count(*) from management_people people where people.organization_id = units.organization_id and people.unit_id = units.id and people.active = true), 0)::int as "activeEmployees",
+                   (select round(sum(extract(epoch from (least(coalesce(shifts.closed_at, now()), ((${period.to}::date + 1)::timestamp at time zone units.timezone)) - greatest(shifts.opened_at, (${period.from}::date::timestamp at time zone units.timezone)))) / 3600.0)::numeric, 2)::double precision
+                      from management_cash_shifts shifts
+                     where shifts.organization_id = units.organization_id and shifts.unit_id = units.id
+                       and shifts.opened_at < ((${period.to}::date + 1)::timestamp at time zone units.timezone)
+                       and coalesce(shifts.closed_at, now()) >= (${period.from}::date::timestamp at time zone units.timezone)) as "openHours"
             from units
             left join pos_tabs tabs on tabs.organization_id = units.organization_id and tabs.unit_id = units.id and tabs.status = 'closed'
             where units.organization_id = ${organizationId}::uuid and units.active = true
@@ -11549,6 +14013,19 @@ export class ManagementService {
           `)
         : Promise.resolve([] as MultiunitRow[]),
     ]);
+    const paymentMethodsByMethod = new Map(
+      grossPaymentMethods.map((row) => [row.method, { ...row }]),
+    );
+    for (const reversal of paymentReversalMethods) {
+      const current = paymentMethodsByMethod.get(reversal.method) ?? {
+        method: reversal.method,
+        quantity: 0,
+        revenueCents: 0,
+      };
+      current.revenueCents -= reversal.reversedCents;
+      paymentMethodsByMethod.set(reversal.method, current);
+    }
+    const paymentMethods = [...paymentMethodsByMethod.values()];
     const receivableIds = receivables.map((entry) => entry.id);
     const lines =
       receivableIds.length === 0
@@ -11901,42 +14378,66 @@ export class ManagementService {
       supplierPerformance,
       multiunit:
         reportRole === "owner"
-          ? multiunitRows.map((row, index) => ({
-              key: row.key,
-              label: row.label,
-              closedTabs: Number(row.closedTabs),
-              revenueCents: Number(row.revenueCents),
-              averageTicketCents:
-                Number(row.closedTabs) > 0
-                  ? Math.round(Number(row.revenueCents) / Number(row.closedTabs))
-                  : null,
-              changePercent:
-                previousPeriod === null
-                  ? null
-                  : reportPercentageChange(
-                      Number(row.revenueCents),
-                      Number(row.previousRevenueCents),
-                    ),
-              rank: index + 1,
-              operatingDays: Number(row.operatingDays),
-              revenuePerOperatingDayCents:
-                Number(row.operatingDays) > 0
-                  ? Math.round(Number(row.revenueCents) / Number(row.operatingDays))
-                  : null,
-              organizationRevenueSharePercent:
-                multiunitRows.reduce((sum, item) => sum + Number(item.revenueCents), 0) > 0
-                  ? Number(
-                      (
-                        (Number(row.revenueCents) /
-                          multiunitRows.reduce((sum, item) => sum + Number(item.revenueCents), 0)) *
-                        100
-                      ).toFixed(2),
-                    )
-                  : null,
-              sameStoreChangePercent:
+          ? multiunitRows.map((row, index) => {
+              const seatCount = Number(row.seatCount);
+              const activeEmployees = Number(row.activeEmployees);
+              const openHours = row.openHours === null ? null : Number(row.openHours);
+              const minimumComparableOperatingDays = period.minimumComparableOperatingDays ?? 7;
+              const comparableStoreEligible =
                 previousPeriod !== null &&
-                Number(row.operatingDays) > 0 &&
-                Number(row.previousOperatingDays) > 0
+                Number(row.operatingDays) >= minimumComparableOperatingDays &&
+                Number(row.previousOperatingDays) >= minimumComparableOperatingDays;
+              return {
+                key: row.key,
+                label: row.label,
+                closedTabs: Number(row.closedTabs),
+                revenueCents: Number(row.revenueCents),
+                averageTicketCents:
+                  Number(row.closedTabs) > 0
+                    ? Math.round(Number(row.revenueCents) / Number(row.closedTabs))
+                    : null,
+                changePercent:
+                  previousPeriod === null
+                    ? null
+                    : reportPercentageChange(
+                        Number(row.revenueCents),
+                        Number(row.previousRevenueCents),
+                      ),
+                rank: index + 1,
+                operatingDays: Number(row.operatingDays),
+                minimumComparableOperatingDays,
+                comparableStoreEligible,
+                revenuePerOperatingDayCents:
+                  Number(row.operatingDays) > 0
+                    ? Math.round(Number(row.revenueCents) / Number(row.operatingDays))
+                    : null,
+                seatCount,
+                activeEmployees,
+                openHours,
+                revenuePerSeatCents:
+                  seatCount > 0 ? Math.round(Number(row.revenueCents) / seatCount) : null,
+                revenuePerOpenHourCents:
+                  openHours !== null && openHours > 0
+                    ? Math.round(Number(row.revenueCents) / openHours)
+                    : null,
+                revenuePerEmployeeCents:
+                  activeEmployees > 0
+                    ? Math.round(Number(row.revenueCents) / activeEmployees)
+                    : null,
+                organizationRevenueSharePercent:
+                  multiunitRows.reduce((sum, item) => sum + Number(item.revenueCents), 0) > 0
+                    ? Number(
+                        (
+                          (Number(row.revenueCents) /
+                            multiunitRows.reduce(
+                              (sum, item) => sum + Number(item.revenueCents),
+                              0,
+                            )) *
+                          100
+                        ).toFixed(2),
+                      )
+                    : null,
+                sameStoreChangePercent: comparableStoreEligible
                   ? reportPercentageChange(
                       Math.round(Number(row.revenueCents) / Number(row.operatingDays)),
                       Math.round(
@@ -11944,7 +14445,8 @@ export class ManagementService {
                       ),
                     )
                   : null,
-            }))
+              };
+            })
           : null,
       quality: { scorePercent: qualityScorePercent, issues: qualityIssues },
     });
@@ -12237,8 +14739,18 @@ export class ManagementService {
         .where(where),
     ]);
     const total = totalRows[0]?.total ?? 0;
+    const accessRows = await this.personAccessRows(
+      this.database.db,
+      organizationId,
+      unitId,
+      items.map((person) => person.id),
+    );
+    const accessByPersonId = new Map(accessRows.map((access) => [access.personId, access]));
     return {
-      items,
+      items: items.map((person) => ({
+        ...person,
+        access: personAccessView(accessByPersonId.get(person.id)),
+      })),
       pagination: {
         page: query.page,
         pageSize: query.pageSize,
@@ -12396,8 +14908,18 @@ export class ManagementService {
       summaries,
       settings,
     );
+    const accessRows = await this.personAccessRows(
+      this.database.db,
+      organizationId,
+      unitId,
+      people.map((person) => person.id),
+    );
+    const accessByPersonId = new Map(accessRows.map((access) => [access.personId, access]));
     return {
-      people,
+      people: people.map((person) => ({
+        ...person,
+        access: personAccessView(accessByPersonId.get(person.id)),
+      })),
       schedules: canManage ? schedules : [],
       timeEntries: timeEntries.map(timeTrackingEntryForRead),
       breaks: breaks.map(timeTrackingBreakForRead),
@@ -13941,13 +16463,436 @@ export class ManagementService {
     );
   }
 
+  async peopleAccessCenter(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    if (!this.terminals) {
+      throw new ServiceUnavailableException({ code: "TERMINAL_ADMIN_UNAVAILABLE" });
+    }
+    return { terminals: await this.terminals.listForScope(organizationId, unitId) };
+  }
+
+  async revokeManagedTerminal(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    terminalSessionId: string,
+    reason: string,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    if (!this.terminals) {
+      throw new ServiceUnavailableException({ code: "TERMINAL_ADMIN_UNAVAILABLE" });
+    }
+    return this.terminals.revokeForScope(
+      identityId,
+      organizationId,
+      unitId,
+      terminalSessionId,
+      reason,
+    );
+  }
+
+  async personAccessOverview(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const [person] = await this.database.db
+      .select({
+        id: managementPeople.id,
+        identityId: managementPeople.identityId,
+        primaryUnitId: managementPeople.unitId,
+      })
+      .from(managementPeople)
+      .where(
+        and(
+          eq(managementPeople.id, personId),
+          eq(managementPeople.organizationId, organizationId),
+          eq(managementPeople.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+
+    const [accessRows, organizationUnits, history, offboarding] = await Promise.all([
+      this.database.db
+        .select({
+          access: managementPersonAccess,
+          unitName: units.name,
+          invitationExpiresAt: membershipInvitations.expiresAt,
+        })
+        .from(managementPersonAccess)
+        .innerJoin(units, eq(units.id, managementPersonAccess.unitId))
+        .leftJoin(
+          membershipInvitations,
+          eq(membershipInvitations.id, managementPersonAccess.invitationId),
+        )
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        )
+        .orderBy(asc(units.name)),
+      this.database.db
+        .select({ id: units.id, name: units.name, active: units.active })
+        .from(units)
+        .where(eq(units.organizationId, organizationId))
+        .orderBy(asc(units.name)),
+      this.database.db
+        .select({
+          id: auditEvents.id,
+          action: auditEvents.action,
+          actorName: identities.displayName,
+          metadata: auditEvents.metadata,
+          occurredAt: auditEvents.occurredAt,
+        })
+        .from(auditEvents)
+        .leftJoin(identities, eq(identities.id, auditEvents.actorIdentityId))
+        .where(
+          and(
+            eq(auditEvents.organizationId, organizationId),
+            eq(auditEvents.entityId, personId),
+            inArray(auditEvents.entityType, ["person", "person_access"]),
+          ),
+        )
+        .orderBy(desc(auditEvents.occurredAt))
+        .limit(50),
+      this.personOffboardingFacts(this.database.db, organizationId, personId, person.identityId),
+    ]);
+    const invitationIds = accessRows
+      .map((row) => row.access.invitationId)
+      .filter((id): id is string => Boolean(id));
+    const deliveries = invitationIds.length
+      ? await this.database.db
+          .select({
+            invitationId: outboxEvents.aggregateId,
+            attempts: outboxEvents.attempts,
+            processedAt: outboxEvents.processedAt,
+            lastError: outboxEvents.lastError,
+          })
+          .from(outboxEvents)
+          .where(
+            and(
+              eq(outboxEvents.topic, "membership.invited"),
+              inArray(outboxEvents.aggregateId, invitationIds),
+            ),
+          )
+      : [];
+    const deliveryByInvitation = new Map(
+      deliveries.map((delivery) => [delivery.invitationId, delivery]),
+    );
+
+    return {
+      units: organizationUnits,
+      assignments: accessRows.map((row) => {
+        const delivery = row.access.invitationId
+          ? deliveryByInvitation.get(row.access.invitationId)
+          : undefined;
+        return {
+          unitId: row.access.unitId,
+          unitName: row.unitName,
+          primary: row.access.unitId === person.primaryUnitId,
+          access: personAccessView({
+            ...row.access,
+            invitationExpiresAt: row.invitationExpiresAt,
+          }),
+          delivery: delivery
+            ? {
+                status: delivery.processedAt
+                  ? ("sent" as const)
+                  : delivery.lastError
+                    ? ("failed" as const)
+                    : ("queued" as const),
+                attempts: delivery.attempts,
+                processedAt: delivery.processedAt?.toISOString() ?? null,
+                lastError: delivery.lastError,
+              }
+            : null,
+        };
+      }),
+      history: history.map((event) => ({
+        ...event,
+        actorName: event.actorName ?? "Sistema",
+        occurredAt: event.occurredAt.toISOString(),
+      })),
+      offboarding,
+    };
+  }
+
+  async personOffboardingPreflight(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const [person] = await this.database.db
+      .select({ identityId: managementPeople.identityId })
+      .from(managementPeople)
+      .where(
+        and(
+          eq(managementPeople.organizationId, organizationId),
+          eq(managementPeople.unitId, unitId),
+          eq(managementPeople.id, personId),
+        ),
+      )
+      .limit(1);
+    if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+    return this.personOffboardingFacts(
+      this.database.db,
+      organizationId,
+      personId,
+      person.identityId,
+    );
+  }
+
+  async assignPersonUnitAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonUnitAccessInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const targetActorRole = await this.requireRole(
+      identityId,
+      organizationId,
+      input.unitId,
+      PEOPLE_ROLES,
+    );
+    this.assertPersonAccessGrant(targetActorRole, input.role);
+    await this.requireSensitiveAccessStepUp(identityId, input.role, input.reauth);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${input.unitId}:${personId}`}, 0))`,
+      );
+      const [person] = await tx
+        .select({ id: managementPeople.id, identityId: managementPeople.identityId })
+        .from(managementPeople)
+        .where(
+          and(
+            eq(managementPeople.id, personId),
+            eq(managementPeople.organizationId, organizationId),
+            eq(managementPeople.unitId, unitId),
+            eq(managementPeople.active, true),
+          ),
+        )
+        .limit(1);
+      if (!person?.identityId) {
+        throw new ConflictException({
+          code: "PERSON_ACCESS_MUST_BE_ACTIVE",
+          message: "Aceite o primeiro convite antes de liberar outras unidades.",
+        });
+      }
+      const [[targetUnit], [sourceAccess], [existing]] = await Promise.all([
+        tx
+          .select({ id: units.id })
+          .from(units)
+          .where(
+            and(
+              eq(units.id, input.unitId),
+              eq(units.organizationId, organizationId),
+              eq(units.active, true),
+            ),
+          )
+          .limit(1),
+        tx
+          .select()
+          .from(managementPersonAccess)
+          .where(
+            and(
+              eq(managementPersonAccess.organizationId, organizationId),
+              eq(managementPersonAccess.unitId, unitId),
+              eq(managementPersonAccess.personId, personId),
+              eq(managementPersonAccess.status, "active"),
+              isNotNull(managementPersonAccess.membershipId),
+            ),
+          )
+          .limit(1),
+        tx
+          .select()
+          .from(managementPersonAccess)
+          .where(
+            and(
+              eq(managementPersonAccess.organizationId, organizationId),
+              eq(managementPersonAccess.unitId, input.unitId),
+              eq(managementPersonAccess.personId, personId),
+            ),
+          )
+          .limit(1),
+      ]);
+      if (!targetUnit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+      if (!sourceAccess?.membershipId) {
+        throw new ConflictException({ code: "PERSON_ACCESS_MUST_BE_ACTIVE" });
+      }
+      if (existing && existing.status !== "terminated" && existing.status !== "canceled") {
+        throw new ConflictException({ code: "PERSON_UNIT_ACCESS_ALREADY_EXISTS" });
+      }
+      const roleBindingId = await this.ensurePersonRoleBinding(
+        tx,
+        sourceAccess.membershipId,
+        input.unitId,
+        input.role,
+      );
+      const changedAt = new Date();
+      const values = {
+        email: sourceAccess.email,
+        role: input.role,
+        status: "active" as const,
+        invitationId: null,
+        membershipId: sourceAccess.membershipId,
+        roleBindingId,
+        statusChangedAt: changedAt,
+        statusChangedByIdentityId: identityId,
+        statusChangeReason: input.reason,
+        updatedAt: changedAt,
+      };
+      if (existing) {
+        await tx
+          .update(managementPersonAccess)
+          .set(values)
+          .where(
+            and(
+              eq(managementPersonAccess.personId, personId),
+              eq(managementPersonAccess.unitId, input.unitId),
+            ),
+          );
+      } else {
+        await tx.insert(managementPersonAccess).values({
+          personId,
+          organizationId,
+          unitId: input.unitId,
+          ...values,
+        });
+      }
+      await this.revokeIdentitySessions(tx, person.identityId);
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        input.unitId,
+        "management.person.access.unit-assigned",
+        "person_access",
+        personId,
+        { role: input.role, reason: input.reason, sourceUnitId: unitId },
+      );
+      return { assigned: true, unitId: input.unitId, role: input.role };
+    });
+  }
+
+  async removePersonUnitAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    targetUnitId: string,
+    input: PersonUnitAccessRemovalInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const targetActorRole = await this.requireRole(
+      identityId,
+      organizationId,
+      targetUnitId,
+      PEOPLE_ROLES,
+    );
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${targetUnitId}:${personId}`}, 0))`,
+      );
+      const [person] = await tx
+        .select({ primaryUnitId: managementPeople.unitId, identityId: managementPeople.identityId })
+        .from(managementPeople)
+        .where(
+          and(
+            eq(managementPeople.id, personId),
+            eq(managementPeople.organizationId, organizationId),
+            eq(managementPeople.unitId, unitId),
+          ),
+        )
+        .limit(1);
+      if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+      if (person.primaryUnitId === targetUnitId) {
+        throw new ConflictException({
+          code: "PERSON_PRIMARY_UNIT_ACCESS",
+          message: "Suspenda o acesso principal pela ficha da pessoa.",
+        });
+      }
+      const access = await this.lockedPersonAccess(tx, organizationId, targetUnitId, personId);
+      this.assertPersonAccessGrant(targetActorRole, access.role);
+      await this.requireSensitiveAccessStepUp(identityId, access.role, input.reauth);
+      if (access.roleBindingId) {
+        await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+      }
+      const changedAt = new Date();
+      await tx
+        .update(managementPersonAccess)
+        .set({
+          status: "terminated",
+          roleBindingId: null,
+          statusChangedAt: changedAt,
+          statusChangedByIdentityId: identityId,
+          statusChangeReason: input.reason,
+          updatedAt: changedAt,
+        })
+        .where(
+          and(
+            eq(managementPersonAccess.personId, personId),
+            eq(managementPersonAccess.unitId, targetUnitId),
+          ),
+        );
+      if (access.membershipId) {
+        await tx
+          .update(terminalSessions)
+          .set({
+            activeActorMembershipId: null,
+            actorEpoch: sql`${terminalSessions.actorEpoch} + 1`,
+            lastActivityAt: null,
+            updatedAt: changedAt,
+          })
+          .where(
+            and(
+              eq(terminalSessions.organizationId, organizationId),
+              eq(terminalSessions.unitId, targetUnitId),
+              eq(terminalSessions.activeActorMembershipId, access.membershipId),
+              isNull(terminalSessions.revokedAt),
+            ),
+          );
+        await this.disableMembershipWithoutRoles(tx, access.membershipId);
+      }
+      await this.revokeIdentitySessions(tx, person.identityId);
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        targetUnitId,
+        "management.person.access.unit-removed",
+        "person_access",
+        personId,
+        { role: access.role, reason: input.reason, sourceUnitId: unitId },
+      );
+      return { removed: true, unitId: targetUnitId };
+    });
+  }
+
   async createPerson(
     identityId: string,
     organizationId: string,
     unitId: string,
     input: PersonInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    if (input.access) {
+      this.assertPersonAccessGrant(actorRole, input.access.role);
+      await this.requireSensitiveAccessStepUp(identityId, input.access.role, input.access.reauth);
+    }
+    if (input.identityId && input.access) {
+      throw new BadRequestException({
+        code: "PERSON_ACCESS_AMBIGUOUS",
+        message: "Use identityId para vínculo existente ou access para convite, não ambos.",
+      });
+    }
     return this.database.db.transaction(async (tx) => {
       if (input.identityId) {
         const [membership] = await tx
@@ -13982,11 +16927,13 @@ export class ManagementService {
           .limit(1);
         if (linked) throw new ConflictException({ code: "PERSON_IDENTITY_ALREADY_LINKED" });
       }
+      const { access: accessInput, ...personInput } = input;
       const id = randomUUID();
       const [person] = await tx
         .insert(managementPeople)
-        .values({ id, organizationId, unitId, ...input })
+        .values({ id, organizationId, unitId, ...personInput })
         .returning();
+      if (!person) throw new Error("Person was not created");
       await this.record(
         tx,
         identityId,
@@ -13995,9 +16942,357 @@ export class ManagementService {
         "management.person.created",
         "person",
         id,
-        { identityId: input.identityId ?? null },
+        { identityId: input.identityId ?? null, accessInvited: Boolean(accessInput) },
       );
-      return person;
+      const access = accessInput
+        ? await this.createPersonAccessInvitation(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            id,
+            accessInput,
+            false,
+          )
+        : { status: "none" as const };
+      return { ...person, access };
+    });
+  }
+
+  async invitePersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonAccessInviteInput,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    this.assertPersonAccessGrant(actorRole, input.role);
+    await this.requireSensitiveAccessStepUp(identityId, input.role, input.reauth);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${unitId}:${personId}`}, 0))`,
+      );
+      return this.createPersonAccessInvitation(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        personId,
+        input,
+        false,
+      );
+    });
+  }
+
+  async resendPersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${unitId}:${personId}`}, 0))`,
+      );
+      const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
+      this.assertPersonAccessGrant(actorRole, access.role);
+      if (access.status !== "pending") {
+        throw new ConflictException({ code: "PERSON_ACCESS_NOT_PENDING" });
+      }
+      return this.createPersonAccessInvitation(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        personId,
+        { email: access.email, role: access.role },
+        true,
+      );
+    });
+  }
+
+  async cancelPersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonStatusInput,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    return this.database.db.transaction(async (tx) => {
+      const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
+      this.assertPersonAccessGrant(actorRole, access.role);
+      if (access.status !== "pending") {
+        throw new ConflictException({ code: "PERSON_ACCESS_NOT_PENDING" });
+      }
+      if (access.invitationId) {
+        await tx
+          .update(membershipInvitations)
+          .set({ acceptedAt: new Date() })
+          .where(
+            and(
+              eq(membershipInvitations.id, access.invitationId),
+              isNull(membershipInvitations.acceptedAt),
+            ),
+          );
+      }
+      const changedAt = new Date();
+      await tx
+        .update(managementPersonAccess)
+        .set({
+          status: "canceled",
+          statusChangedAt: changedAt,
+          statusChangedByIdentityId: identityId,
+          statusChangeReason: input.reason,
+          updatedAt: changedAt,
+        })
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.unitId, unitId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        );
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        "management.person.access.canceled",
+        "person_access",
+        personId,
+        { reason: input.reason, invitationId: access.invitationId },
+      );
+      return { status: "none" as const };
+    });
+  }
+
+  async updatePersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonAccessRoleUpdateInput,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    this.assertPersonAccessGrant(actorRole, input.role);
+    return this.database.db.transaction(async (tx) => {
+      const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
+      await this.requireSensitiveAccessStepUp(
+        identityId,
+        SENSITIVE_PERSON_ACCESS_ROLES.has(access.role) ? access.role : input.role,
+        input.reauth,
+      );
+      if (access.status === "canceled" || access.status === "terminated") {
+        throw new ConflictException({ code: "PERSON_ACCESS_INACTIVE" });
+      }
+      let roleBindingId = access.roleBindingId;
+      if (access.status === "pending" && access.invitationId) {
+        await tx
+          .update(membershipInvitations)
+          .set({ role: input.role })
+          .where(
+            and(
+              eq(membershipInvitations.id, access.invitationId),
+              isNull(membershipInvitations.acceptedAt),
+            ),
+          );
+      }
+      if (access.status === "active") {
+        if (!access.membershipId) throw new ConflictException({ code: "PERSON_ACCESS_CORRUPT" });
+        if (access.roleBindingId) {
+          await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+        }
+        roleBindingId = await this.ensurePersonRoleBinding(
+          tx,
+          access.membershipId,
+          unitId,
+          input.role,
+        );
+      }
+      const changedAt = new Date();
+      const [updated] = await tx
+        .update(managementPersonAccess)
+        .set({
+          role: input.role,
+          roleBindingId,
+          statusChangedAt: changedAt,
+          statusChangedByIdentityId: identityId,
+          statusChangeReason: input.reason,
+          updatedAt: changedAt,
+        })
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.unitId, unitId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        )
+        .returning();
+      const [person] = await tx
+        .select({ identityId: managementPeople.identityId })
+        .from(managementPeople)
+        .where(eq(managementPeople.id, personId))
+        .limit(1);
+      await this.revokeIdentitySessions(tx, person?.identityId ?? null);
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        "management.person.access.role-changed",
+        "person_access",
+        personId,
+        { previousRole: access.role, role: input.role, reason: input.reason },
+      );
+      if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
+      const [invitation] = updated.invitationId
+        ? await tx
+            .select({ expiresAt: membershipInvitations.expiresAt })
+            .from(membershipInvitations)
+            .where(eq(membershipInvitations.id, updated.invitationId))
+            .limit(1)
+        : [];
+      return personAccessView({
+        ...updated,
+        invitationExpiresAt: invitation?.expiresAt ?? null,
+      });
+    });
+  }
+
+  async suspendPersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonStatusInput,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    return this.database.db.transaction(async (tx) => {
+      const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
+      this.assertPersonAccessGrant(actorRole, access.role);
+      if (access.status !== "active") {
+        throw new ConflictException({ code: "PERSON_ACCESS_NOT_ACTIVE" });
+      }
+      if (access.roleBindingId) {
+        await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+      }
+      const changedAt = new Date();
+      const [updated] = await tx
+        .update(managementPersonAccess)
+        .set({
+          status: "suspended",
+          roleBindingId: null,
+          statusChangedAt: changedAt,
+          statusChangedByIdentityId: identityId,
+          statusChangeReason: input.reason,
+          updatedAt: changedAt,
+        })
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.unitId, unitId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        )
+        .returning();
+      const [person] = await tx
+        .select({ identityId: managementPeople.identityId })
+        .from(managementPeople)
+        .where(eq(managementPeople.id, personId))
+        .limit(1);
+      await this.disableMembershipWithoutRoles(tx, access.membershipId);
+      await this.revokeIdentitySessions(tx, person?.identityId ?? null);
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        "management.person.access.suspended",
+        "person_access",
+        personId,
+        { reason: input.reason, role: access.role },
+      );
+      if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
+      return personAccessView({ ...updated, invitationExpiresAt: null });
+    });
+  }
+
+  async reactivatePersonAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    input: PersonAccessReactivateInput,
+  ) {
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    return this.database.db.transaction(async (tx) => {
+      const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
+      if (access.status !== "suspended") {
+        throw new ConflictException({ code: "PERSON_ACCESS_NOT_SUSPENDED" });
+      }
+      const targetRole = input.role ?? access.role;
+      this.assertPersonAccessGrant(actorRole, targetRole);
+      await this.requireSensitiveAccessStepUp(identityId, targetRole, input.reauth);
+      if (!access.membershipId) throw new ConflictException({ code: "PERSON_ACCESS_CORRUPT" });
+      const [person] = await tx
+        .select({ active: managementPeople.active, identityId: managementPeople.identityId })
+        .from(managementPeople)
+        .where(
+          and(
+            eq(managementPeople.organizationId, organizationId),
+            eq(managementPeople.unitId, unitId),
+            eq(managementPeople.id, personId),
+          ),
+        )
+        .limit(1);
+      if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+      if (!person.active) throw new ConflictException({ code: "PERSON_INACTIVE" });
+      await tx
+        .update(memberships)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(eq(memberships.id, access.membershipId));
+      const roleBindingId = await this.ensurePersonRoleBinding(
+        tx,
+        access.membershipId,
+        unitId,
+        targetRole,
+      );
+      const changedAt = new Date();
+      const [updated] = await tx
+        .update(managementPersonAccess)
+        .set({
+          status: "active",
+          role: targetRole,
+          roleBindingId,
+          statusChangedAt: changedAt,
+          statusChangedByIdentityId: identityId,
+          statusChangeReason: input.reason,
+          updatedAt: changedAt,
+        })
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.unitId, unitId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        )
+        .returning();
+      await this.revokeIdentitySessions(tx, person.identityId);
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        "management.person.access.reactivated",
+        "person_access",
+        personId,
+        { reason: input.reason, role: targetRole },
+      );
+      if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
+      return personAccessView({ ...updated, invitationExpiresAt: null });
     });
   }
 
@@ -14095,7 +17390,7 @@ export class ManagementService {
     active: boolean,
     input: PersonStatusInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
+    const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
     return this.database.db.transaction(async (tx) => {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`person-status:${organizationId}:${unitId}:${personId}`}, 0))`,
@@ -14115,24 +17410,45 @@ export class ManagementService {
         )
         .limit(1);
       if (!person) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
-      if (person.active === active) return person;
+      const accesses = await tx
+        .select()
+        .from(managementPersonAccess)
+        .where(
+          and(
+            eq(managementPersonAccess.organizationId, organizationId),
+            eq(managementPersonAccess.personId, personId),
+          ),
+        );
       if (!active) {
-        const [openEntry] = await tx
-          .select({ id: managementTimeEntries.id })
-          .from(managementTimeEntries)
-          .where(
-            and(
-              eq(managementTimeEntries.organizationId, organizationId),
-              eq(managementTimeEntries.unitId, unitId),
-              eq(managementTimeEntries.personId, personId),
-              isNull(managementTimeEntries.clockedOutAt),
-            ),
-          )
-          .limit(1);
-        if (openEntry)
+        if (actorRole !== "owner" && accesses.some((access) => access.unitId !== unitId)) {
+          throw new ForbiddenException({
+            code: "PERSON_MULTIUNIT_OWNER_REQUIRED",
+            message: "Somente o proprietário pode desligar uma pessoa com acesso multiunidade.",
+          });
+        }
+        for (const access of accesses) this.assertPersonAccessGrant(actorRole, access.role);
+      }
+      if (
+        person.active === active &&
+        (active || !accesses.length || accesses.every((access) => access.status === "terminated"))
+      )
+        return person;
+      if (!active) {
+        const preflight = await this.personOffboardingFacts(
+          tx,
+          organizationId,
+          personId,
+          person.identityId,
+        );
+        if (preflight.counts.openTimeEntries)
           throw new ConflictException({
             code: "PERSON_HAS_OPEN_TIME_ENTRY",
             message: "Encerre o turno aberto antes de inativar a pessoa.",
+          });
+        if (preflight.counts.openCashShifts)
+          throw new ConflictException({
+            code: "PERSON_HAS_OPEN_CASH_SHIFT",
+            message: "Transfira ou encerre o caixa sob responsabilidade antes do desligamento.",
           });
       }
       const changedAt = new Date();
@@ -14149,6 +17465,112 @@ export class ManagementService {
         .where(eq(managementPeople.id, personId))
         .returning();
       if (!updated) throw new NotFoundException({ code: "PERSON_NOT_FOUND" });
+      if (!active) {
+        const pendingInvitationIds = accesses
+          .filter((access) => access.invitationId && access.status === "pending")
+          .map((access) => access.invitationId as string);
+        if (pendingInvitationIds.length) {
+          await tx
+            .update(membershipInvitations)
+            .set({ acceptedAt: changedAt })
+            .where(
+              and(
+                inArray(membershipInvitations.id, pendingInvitationIds),
+                isNull(membershipInvitations.acceptedAt),
+              ),
+            );
+        }
+        const roleBindingIds = accesses
+          .map((access) => access.roleBindingId)
+          .filter((id): id is string => Boolean(id));
+        if (roleBindingIds.length) {
+          await tx.delete(roleBindings).where(inArray(roleBindings.id, roleBindingIds));
+        }
+        if (accesses.length) {
+          await tx
+            .update(managementPersonAccess)
+            .set({
+              status: "terminated",
+              roleBindingId: null,
+              statusChangedAt: changedAt,
+              statusChangedByIdentityId: identityId,
+              statusChangeReason: input.reason,
+              updatedAt: changedAt,
+            })
+            .where(
+              and(
+                eq(managementPersonAccess.organizationId, organizationId),
+                eq(managementPersonAccess.personId, personId),
+              ),
+            );
+          const membershipIds = [
+            ...new Set(
+              accesses
+                .map((access) => access.membershipId)
+                .filter((id): id is string => Boolean(id)),
+            ),
+          ];
+          if (membershipIds.length) {
+            await tx
+              .update(terminalSessions)
+              .set({
+                activeActorMembershipId: null,
+                actorEpoch: sql`${terminalSessions.actorEpoch} + 1`,
+                lastActivityAt: null,
+                updatedAt: changedAt,
+              })
+              .where(
+                and(
+                  inArray(terminalSessions.activeActorMembershipId, membershipIds),
+                  isNull(terminalSessions.revokedAt),
+                ),
+              );
+            for (const membershipId of membershipIds) {
+              await this.disableMembershipWithoutRoles(tx, membershipId);
+            }
+          }
+        } else if (person.identityId) {
+          const [legacyMembership] = await tx
+            .select({ id: memberships.id })
+            .from(memberships)
+            .where(
+              and(
+                eq(memberships.organizationId, organizationId),
+                eq(memberships.identityId, person.identityId),
+              ),
+            )
+            .limit(1);
+          if (legacyMembership) {
+            const bindings = await tx
+              .select({ id: roleBindings.id, unitId: roleBindings.unitId, role: roleBindings.role })
+              .from(roleBindings)
+              .where(eq(roleBindings.membershipId, legacyMembership.id));
+            if (bindings.some((binding) => binding.unitId === null)) {
+              throw new ConflictException({
+                code: "PERSON_ACCESS_REVIEW_REQUIRED",
+                message: "O usuário possui acesso global; revise o vínculo antes do desligamento.",
+              });
+            }
+            const unitBindingIds = bindings
+              .filter((binding) => binding.unitId === unitId)
+              .map((binding) => binding.id);
+            if (unitBindingIds.length > 1) {
+              throw new ConflictException({
+                code: "PERSON_ACCESS_REVIEW_REQUIRED",
+                message:
+                  "O usuário possui mais de um perfil nesta unidade; revise o vínculo antes do desligamento.",
+              });
+            }
+            const unitBinding = bindings.find((binding) => binding.unitId === unitId);
+            if (unitBinding) this.assertPersonAccessGrant(actorRole, unitBinding.role);
+            if (unitBindingIds.length) {
+              await tx.delete(roleBindings).where(inArray(roleBindings.id, unitBindingIds));
+            }
+            await this.disableMembershipWithoutRoles(tx, legacyMembership.id);
+          }
+        }
+        await this.revokeIdentitySessions(tx, person.identityId);
+      }
       await this.record(
         tx,
         identityId,
@@ -14157,7 +17579,7 @@ export class ManagementService {
         active ? "management.person.reactivated" : "management.person.inactivated",
         "person",
         personId,
-        { reason: input.reason },
+        { reason: input.reason, accessAssignmentsTerminated: !active ? accesses.length : 0 },
       );
       return updated;
     });

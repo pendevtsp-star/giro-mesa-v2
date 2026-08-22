@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Dashboard;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Documents;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.NumberInvalidations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Periods;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Profile;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Provider;
@@ -16,7 +17,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\fiscal
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\fiscal
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class FiscalRequestBuilder : BaseRequestBuilder
@@ -35,6 +36,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Documents.DocumentsRequestBuilder Documents
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Documents.DocumentsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The numberInvalidations property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.NumberInvalidations.NumberInvalidationsRequestBuilder NumberInvalidations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.NumberInvalidations.NumberInvalidationsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The periods property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Periods.PeriodsRequestBuilder Periods
@@ -61,7 +67,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public FiscalRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/fiscal", pathParameters)
+        public FiscalRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal", pathParameters)
         {
         }
         /// <summary>
@@ -69,7 +75,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public FiscalRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/fiscal", rawUrl)
+        public FiscalRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal", rawUrl)
         {
         }
     }

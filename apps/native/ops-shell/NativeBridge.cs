@@ -8,6 +8,19 @@ public sealed class NativeBridge
     private const string HubUrlPreference = "hub_url";
     private const string DeviceTokenKey = "hub_device_token";
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private readonly SmartPosPaymentService _smartPosPayments;
+    private readonly SmartPosDeviceApiClient _smartPosDeviceApi;
+    private readonly SmartPosDeviceCredentialStore _smartPosCredentialStore;
+
+    internal NativeBridge(
+        SmartPosPaymentService smartPosPayments,
+        SmartPosDeviceApiClient smartPosDeviceApi,
+        SmartPosDeviceCredentialStore smartPosCredentialStore)
+    {
+        _smartPosPayments = smartPosPayments;
+        _smartPosDeviceApi = smartPosDeviceApi;
+        _smartPosCredentialStore = smartPosCredentialStore;
+    }
 
     public Task<DeviceContext> GetDeviceContextAsync()
     {
@@ -325,6 +338,74 @@ public sealed class NativeBridge
         }
     }
 
+    public Task<SmartPosPaymentCapabilities> GetPaymentCapabilitiesAsync() =>
+        _smartPosPayments.GetCapabilitiesAsync();
+
+    public Task<SmartPosPaymentResult> StartPaymentAsync(string attemptId) =>
+        _smartPosPayments.StartAsync(attemptId);
+
+    public Task<SmartPosPaymentResult> RecoverPaymentAsync(string attemptId) =>
+        _smartPosPayments.RecoverAsync(attemptId);
+
+    public Task<SmartPosPaymentResult> CancelPaymentAsync(string attemptId) =>
+        _smartPosPayments.CancelAsync(attemptId);
+
+    public Task<SmartPosPaymentResult> ReversePaymentAsync(string reversalId) =>
+        _smartPosPayments.ReverseAsync(reversalId);
+
+    public async Task<PaymentPairingBridgeResult> RedeemPaymentPairingAsync(
+        string apiBaseUrl,
+        string code)
+    {
+        var device = await GetDeviceContextAsync();
+        var result = await _smartPosDeviceApi.RedeemPairingAsync(
+            apiBaseUrl,
+            code,
+            device.DeviceId);
+        return new(
+            result.Success,
+            result.InstallationId,
+            result.Capabilities?.Provider,
+            result.Capabilities?.Available ?? false,
+            result.ErrorCode);
+    }
+
+    public Task<PendingPaymentPairingBridgeResult> ConsumePendingPaymentPairingAsync()
+    {
+        var pairing = SmartPosPairingDeepLinkInbox.Consume();
+        if (pairing is null)
+            return Task.FromResult(new PendingPaymentPairingBridgeResult(
+                false,
+                null,
+                null,
+                "SMARTPOS_PAIRING_LINK_NOT_AVAILABLE"));
+        return Task.FromResult(new PendingPaymentPairingBridgeResult(
+            true,
+            pairing.ApiBaseUrl,
+            pairing.Code,
+            null));
+    }
+
+    public async Task<PaymentDeviceActionResult> RotatePaymentCredentialAsync()
+    {
+        var result = await _smartPosDeviceApi.RotateCredentialAsync();
+        return new(result.Success, result.CredentialId, result.ErrorCode);
+    }
+
+    public async Task<PaymentDeviceActionResult> SyncPaymentDiagnosticsAsync()
+    {
+        var result = await _smartPosDeviceApi.SendDiagnosticsAsync();
+        return new(result.Success, result.Value?.Provider, result.ErrorCode);
+    }
+
+    public async Task<PaymentOutboxBridgeResult> FlushPaymentResultsAsync()
+    {
+        var result = await _smartPosPayments.FlushResultsAsync();
+        return new(result.Submitted, result.Quarantined, result.Remaining, result.ErrorCode);
+    }
+
+    public Task ClearPaymentPairingAsync() => _smartPosCredentialStore.ClearAsync();
+
     private static async Task<string> ReadErrorCodeAsync(HttpResponseMessage response)
     {
         try
@@ -361,6 +442,23 @@ public sealed class NativeBridge
         string? ErrorCode,
         string? PrinterId,
         bool Duplicate);
+    public sealed record PaymentPairingBridgeResult(
+        bool Success,
+        string? InstallationId,
+        string? Provider,
+        bool Available,
+        string? ErrorCode);
+    public sealed record PendingPaymentPairingBridgeResult(
+        bool Available,
+        string? ApiBaseUrl,
+        string? Code,
+        string? ErrorCode);
+    public sealed record PaymentDeviceActionResult(bool Success, string? Reference, string? ErrorCode);
+    public sealed record PaymentOutboxBridgeResult(
+        int Submitted,
+        int Quarantined,
+        int Remaining,
+        string? ErrorCode);
     private sealed record PairingPayload(string DeviceToken);
     private sealed record HubCommandResponse(bool Duplicate, JsonElement? Result);
     private sealed record PrintGatewayResult(

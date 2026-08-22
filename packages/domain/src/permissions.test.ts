@@ -2,6 +2,26 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { hasPermission } from "./permissions.js";
 
+describe("establishment settings permissions", () => {
+  it("allows only owners and managers to manage settings", () => {
+    assert.equal(hasPermission("owner", "settings.manage"), true);
+    assert.equal(hasPermission("manager", "settings.manage"), true);
+    for (const role of [
+      "waiter",
+      "cashier",
+      "receptionist",
+      "busser",
+      "kds",
+      "delivery",
+      "inventory",
+      "finance",
+      "accountant",
+    ] as const) {
+      assert.equal(hasPermission(role, "settings.manage"), false);
+    }
+  });
+});
+
 const reportPermissions = [
   "reports:read",
   "reports:costs:read",

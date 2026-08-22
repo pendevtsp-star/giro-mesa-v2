@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "moduleVersion": "0.2.3",
+  "provider": "focus",
+  "status": "blocked",
+  "environment": "homologation",
+  "scope": null,
+  "evidence": null,
+  "homologatedAt": null,
+  "blockers": [
+    "credenciais reais da conta integradora Focus NFe",
+    "certificado A1, CSC, IE, série e cadastro tributário da empresa piloto",
+    "autorização, consulta, cancelamento e inutilização aceitos em SEFAZ",
+    "verificação dos XMLs, DANFE, pacote contábil e rollback"
+  ]
+}

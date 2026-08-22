@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  type BusinessHours,
   billingAccess,
+  getBusinessOpenState,
   hasPermission,
   missingActivationItems,
   transitionBilling,
@@ -9,6 +11,65 @@ import {
 } from "./index.js";
 
 describe("critical domain rules", () => {
+  it("calculates establishment hours in the unit timezone", () => {
+    const weekly: BusinessHours["weekly"] = Array.from({ length: 7 }, (_, index) => ({
+      weekday: index + 1,
+      mode: "closed" as const,
+    }));
+    weekly[0] = {
+      weekday: 1,
+      mode: "periods",
+      periods: [{ start: "09:00", end: "17:00", endsNextDay: false }],
+    };
+    assert.deepEqual(
+      getBusinessOpenState(
+        { weekly, exceptions: [] },
+        "America/Sao_Paulo",
+        new Date("2026-08-24T12:00:00.000Z"),
+      ),
+      { open: true, nextChangeAt: "2026-08-24T20:00:00.000Z" },
+    );
+  });
+
+  it("supports overnight periods, open24h and exception precedence", () => {
+    const weekly: BusinessHours["weekly"] = Array.from({ length: 7 }, (_, index) => ({
+      weekday: index + 1,
+      mode: "closed" as const,
+    }));
+    weekly[4] = {
+      weekday: 5,
+      mode: "periods",
+      periods: [{ start: "22:00", end: "02:00", endsNextDay: true }],
+    };
+    const overnight = getBusinessOpenState(
+      { weekly, exceptions: [] },
+      "America/Sao_Paulo",
+      new Date("2026-08-29T04:00:00.000Z"),
+    );
+    assert.equal(overnight.open, true);
+    assert.equal(overnight.nextChangeAt, "2026-08-29T05:00:00.000Z");
+
+    weekly[5] = { weekday: 6, mode: "open24h" };
+    assert.equal(
+      getBusinessOpenState(
+        { weekly, exceptions: [] },
+        "America/Sao_Paulo",
+        new Date("2026-08-29T15:00:00.000Z"),
+      ).open,
+      true,
+    );
+
+    const holiday = getBusinessOpenState(
+      {
+        weekly,
+        exceptions: [{ date: "2026-08-29", mode: "closed" }],
+      },
+      "America/Sao_Paulo",
+      new Date("2026-08-29T04:00:00.000Z"),
+    );
+    assert.equal(holiday.open, false);
+  });
+
   it("allows only declared billing transitions", () => {
     assert.equal(transitionBilling("draft", "START_ONBOARDING"), "onboarding");
     assert.equal(transitionBilling("trial_active", "TRIAL_EXPIRED"), "restricted");
@@ -53,7 +114,8 @@ describe("critical domain rules", () => {
     assert.equal(hasPermission("delivery", "finance:write"), false);
     assert.equal(hasPermission("accountant", "fiscal:documents:read"), true);
     assert.equal(hasPermission("accountant", "fiscal:periods:write"), false);
-    assert.equal(hasPermission("manager", "fiscal:configuration:write"), true);
-    assert.equal(hasPermission("finance", "fiscal:configuration:write"), true);
+    assert.equal(hasPermission("manager", "fiscal:configuration:write"), false);
+    assert.equal(hasPermission("finance", "fiscal:configuration:write"), false);
+    assert.equal(hasPermission("finance", "fiscal:periods:write"), true);
   });
 });

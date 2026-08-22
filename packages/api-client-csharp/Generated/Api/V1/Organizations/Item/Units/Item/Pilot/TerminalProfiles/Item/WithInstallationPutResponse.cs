@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Terminal
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The cashRegisterId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId? CashRegisterId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId CashRegisterId { get; set; }
+#endif
         /// <summary>The compact property</summary>
         public bool? Compact { get; set; }
         /// <summary>The createdAt property</summary>
@@ -32,10 +40,36 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Terminal
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The maxPaymentInstallments property</summary>
+        public int? MaxPaymentInstallments { get; set; }
         /// <summary>The mode property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_mode? Mode { get; set; }
         /// <summary>The organizationId property</summary>
         public Guid? OrganizationId { get; set; }
+        /// <summary>The paymentMethods property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentMethods?>? PaymentMethods { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentMethods?> PaymentMethods { get; set; }
+#endif
+        /// <summary>The paymentProvider property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider? PaymentProvider { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider PaymentProvider { get; set; }
+#endif
+        /// <summary>The paymentStatus property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentStatus? PaymentStatus { get; set; }
+        /// <summary>The paymentSupportsCancel property</summary>
+        public bool? PaymentSupportsCancel { get; set; }
+        /// <summary>The paymentSupportsRecover property</summary>
+        public bool? PaymentSupportsRecover { get; set; }
+        /// <summary>The paymentSupportsReversal property</summary>
+        public bool? PaymentSupportsReversal { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -91,14 +125,22 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Terminal
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "cashRegisterId", n => { CashRegisterId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId.CreateFromDiscriminatorValue); } },
                 { "compact", n => { Compact = n.GetBoolValue(); } },
                 { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
                 { "defaultRoute", n => { DefaultRoute = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_defaultRoute>(); } },
                 { "idempotentReplay", n => { IdempotentReplay = n.GetBoolValue(); } },
                 { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "maxPaymentInstallments", n => { MaxPaymentInstallments = n.GetIntValue(); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_mode>(); } },
                 { "organizationId", n => { OrganizationId = n.GetGuidValue(); } },
+                { "paymentMethods", n => { PaymentMethods = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentMethods>()?.AsList(); } },
+                { "paymentProvider", n => { PaymentProvider = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider.CreateFromDiscriminatorValue); } },
+                { "paymentStatus", n => { PaymentStatus = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentStatus>(); } },
+                { "paymentSupportsCancel", n => { PaymentSupportsCancel = n.GetBoolValue(); } },
+                { "paymentSupportsRecover", n => { PaymentSupportsRecover = n.GetBoolValue(); } },
+                { "paymentSupportsReversal", n => { PaymentSupportsReversal = n.GetBoolValue(); } },
                 { "printerId", n => { PrinterId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_printerId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_printerId.CreateFromDiscriminatorValue); } },
                 { "quickActions", n => { QuickActions = n.GetCollectionOfPrimitiveValues<string>()?.AsList(); } },
                 { "stationId", n => { StationId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_stationId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_stationId.CreateFromDiscriminatorValue); } },
@@ -114,14 +156,22 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Terminal
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId>("cashRegisterId", CashRegisterId);
             writer.WriteBoolValue("compact", Compact);
             writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_defaultRoute>("defaultRoute", DefaultRoute);
             writer.WriteBoolValue("idempotentReplay", IdempotentReplay);
             writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteStringValue("label", Label);
+            writer.WriteIntValue("maxPaymentInstallments", MaxPaymentInstallments);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_mode>("mode", Mode);
             writer.WriteGuidValue("organizationId", OrganizationId);
+            writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentMethods>("paymentMethods", PaymentMethods);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider>("paymentProvider", PaymentProvider);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentStatus>("paymentStatus", PaymentStatus);
+            writer.WriteBoolValue("paymentSupportsCancel", PaymentSupportsCancel);
+            writer.WriteBoolValue("paymentSupportsRecover", PaymentSupportsRecover);
+            writer.WriteBoolValue("paymentSupportsReversal", PaymentSupportsReversal);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_printerId>("printerId", PrinterId);
             writer.WriteCollectionOfPrimitiveValues<string>("quickActions", QuickActions);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_stationId>("stationId", StationId);
@@ -129,6 +179,136 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Terminal
             writer.WriteDateTimeOffsetValue("updatedAt", UpdatedAt);
             writer.WriteGuidValue("updatedByIdentityId", UpdatedByIdentityId);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithInstallationPutResponse_cashRegisterId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1? WithInstallationPutResponseCashRegisterIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1 WithInstallationPutResponseCashRegisterIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_cashRegisterId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.WithInstallationPutResponseCashRegisterIdMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithInstallationPutResponseCashRegisterIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithInstallationPutResponseCashRegisterIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_cashRegisterIdMember1>(null, WithInstallationPutResponseCashRegisterIdMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithInstallationPutResponse_paymentProvider : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1? WithInstallationPutResponsePaymentProviderMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1 WithInstallationPutResponsePaymentProviderMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse.WithInstallationPutResponse_paymentProvider();
+                if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                else {
+                    result.WithInstallationPutResponsePaymentProviderMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithInstallationPutResponsePaymentProviderMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithInstallationPutResponsePaymentProviderMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_paymentProviderMember1>(null, WithInstallationPutResponsePaymentProviderMember1);
+                }
+            }
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutResponse_printerIdMember1"/>, <see cref="string"/>

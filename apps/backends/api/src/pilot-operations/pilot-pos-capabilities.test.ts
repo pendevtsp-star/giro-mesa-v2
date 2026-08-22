@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
+import { paymentTerminalConfigurationSchema } from "@giromesa/contracts";
 import type { SystemRole } from "@giromesa/domain";
 import { ForbiddenException } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.js";
@@ -44,5 +45,18 @@ it("separates routine payment from managerial exceptions", async () => {
         amountCents: 100,
       }),
     "operations:payments:record",
+  );
+});
+
+it("keeps tenant terminal configuration fail-closed without an internal certification", () => {
+  assert.equal(
+    paymentTerminalConfigurationSchema.safeParse({
+      provider: "rede",
+      status: "homologated",
+      methods: ["credit_card"],
+      maxInstallments: 12,
+      supports: { cancel: true, recover: true, reversal: true },
+    }).success,
+    false,
   );
 });

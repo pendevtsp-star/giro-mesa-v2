@@ -3,6 +3,7 @@ import {
   auditEvents,
   buildReportArtifact,
   type Database,
+  identities,
   managementAccountsPayable,
   managementAccountsReceivable,
   managementIdempotency,
@@ -16,13 +17,16 @@ import {
   managementReportExports,
   managementReportSchedules,
   managementReportViews,
+  organizations,
   outboxEvents,
   posCatalogCategories,
   posOrderItems,
   posOrders,
+  posPaymentReversals,
   posProducts,
   posTabPayments,
   posTabs,
+  reservations,
   units,
 } from "@giromesa/db";
 import { hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
@@ -34,7 +38,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { MetricsService, reportEmailDeliveryConfigured } from "../health/health.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -54,10 +58,12 @@ import type {
   ReportAlertListQuery,
   ReportBudgetInput,
   ReportCostBackfillInput,
+  ReportCostPreviewInput,
   ReportDrillDownQuery,
   ReportExportInput,
   ReportExportListQuery,
   ReportMetric,
+  ReportReconciliationClosureInput,
   ReportScheduleCreateInput,
   ReportScheduleUpdateInput,
   ReportViewCreateInput,
@@ -280,7 +286,7 @@ export class ManagementReportService {
   private async operationalIntelligence(
     organizationId: string,
     unitId: string,
-    query: { from: string; to: string },
+    query: { from: string; to: string; family?: ReportExportInput["family"] },
     report: Awaited<ReturnType<ManagementService["reports"]>>,
     viewCosts: boolean,
   ) {
@@ -310,8 +316,21 @@ export class ManagementReportService {
       unmatchedCents: number;
       divergentCents: number;
     };
-    const [laborRows, fiscalRows, reconciliationRows] = await Promise.all([
-      this.database.db.execute<LaborRow>(sql`
+    type ReservationForecastRow = {
+      date: string;
+      reservations: number;
+      guests: number;
+    };
+    const includeLabor = !query.family || query.family === "overview" || query.family === "labor";
+    const includeReconciliation =
+      !query.family || query.family === "overview" || query.family === "reconciliation";
+    const closureEntityId = `${unitId}:${query.from}:${query.to}`;
+    const includeForecast =
+      !query.family || query.family === "overview" || query.family === "forecast";
+    const [laborRows, fiscalRows, reconciliationRows, closureRows, reservationRows] =
+      await Promise.all([
+        includeLabor
+          ? this.database.db.execute<LaborRow>(sql`
         with breaks as (
           select time_entry_id,
                  coalesce(sum(extract(epoch from (ended_at - started_at)) / 60.0), 0) as minutes
@@ -362,8 +381,10 @@ export class ManagementReportService {
                count(*) filter (where worked_minutes > 0 and hourly_rate_cents is null)::int as "missingRates",
                coalesce(round(sum(worked_minutes * hourly_rate_cents / 60.0) filter (where hourly_rate_cents is not null)), 0)::int as "coveredCostCents"
         from combined group by role_label order by "workedMinutes" desc, role_label
-      `),
-      this.database.db.execute<FiscalRow>(sql`
+      `)
+          : Promise.resolve([] as LaborRow[]),
+        includeReconciliation
+          ? this.database.db.execute<FiscalRow>(sql`
         select count(*)::int as "documentCount",
                count(*) filter (where status = 'authorized')::int as "authorizedCount",
                count(*) filter (where status = 'rejected')::int as "rejectedCount",
@@ -373,8 +394,10 @@ export class ManagementReportService {
         from fiscal_documents
         where organization_id = ${organizationId}::uuid and unit_id = ${unitId}::uuid
           and timezone(${report.timezone}, issued_at)::date between ${query.from}::date and ${query.to}::date
-      `),
-      this.database.db.execute<ReconciliationRow>(sql`
+      `)
+          : Promise.resolve([] as FiscalRow[]),
+        includeReconciliation
+          ? this.database.db.execute<ReconciliationRow>(sql`
         select count(*) filter (where entries.status = 'matched')::int as "matchedCount",
                count(*) filter (where entries.status = 'unmatched')::int as "unmatchedCount",
                count(*) filter (where entries.status = 'divergent')::int as "divergentCount",
@@ -386,8 +409,55 @@ export class ManagementReportService {
           on imports.organization_id = entries.organization_id and imports.unit_id = entries.unit_id and imports.id = entries.import_id
         where entries.organization_id = ${organizationId}::uuid and entries.unit_id = ${unitId}::uuid
           and timezone(${report.timezone}, imports.imported_at)::date between ${query.from}::date and ${query.to}::date
-      `),
-    ]);
+      `)
+          : Promise.resolve([] as ReconciliationRow[]),
+        includeReconciliation
+          ? this.database.db
+              .select({
+                action: auditEvents.action,
+                actorIdentityId: auditEvents.actorIdentityId,
+                metadata: auditEvents.metadata,
+                occurredAt: auditEvents.occurredAt,
+              })
+              .from(auditEvents)
+              .where(
+                and(
+                  eq(auditEvents.organizationId, organizationId),
+                  eq(auditEvents.unitId, unitId),
+                  eq(auditEvents.entityType, "management_report_reconciliation_closure"),
+                  eq(auditEvents.entityId, closureEntityId),
+                ),
+              )
+              .orderBy(desc(auditEvents.occurredAt))
+              .limit(1)
+          : Promise.resolve([]),
+        includeForecast
+          ? this.database.db
+              .select({
+                date: sql<string>`timezone(${report.timezone}, ${reservations.scheduledAt})::date`.mapWith(
+                  String,
+                ),
+                reservations: sql<number>`count(*)::int`.mapWith(Number),
+                guests: sql<number>`coalesce(sum(${reservations.partySize}), 0)::int`.mapWith(
+                  Number,
+                ),
+              })
+              .from(reservations)
+              .where(
+                and(
+                  eq(reservations.organizationId, organizationId),
+                  eq(reservations.unitId, unitId),
+                  ne(reservations.status, "canceled"),
+                  sql`timezone(${report.timezone}, ${reservations.scheduledAt})::date > ${query.to}::date`,
+                  sql`timezone(${report.timezone}, ${reservations.scheduledAt})::date <= ${query.to}::date + 7`,
+                ),
+              )
+              // ponytail: positional grouping avoids PostgreSQL treating repeated timezone
+              // parameters as different expressions; replace only if the projection changes.
+              .groupBy(sql.raw("1"))
+              .orderBy(sql.raw("1"))
+          : Promise.resolve([] as ReservationForecastRow[]),
+      ]);
     const laborRoles = laborRows.map((row) => ({
       roleLabel: row.roleLabel,
       people: Number(row.people),
@@ -425,6 +495,30 @@ export class ManagementReportService {
       unmatchedCents: 0,
       divergentCents: 0,
     };
+    const closureEvent = closureRows[0];
+    const closureMetadata = closureEvent?.metadata ?? {};
+    const closureChecklist =
+      closureMetadata.checklist && typeof closureMetadata.checklist === "object"
+        ? (closureMetadata.checklist as Record<string, unknown>)
+        : {};
+    const closure = {
+      status: closureEvent?.action.endsWith(".closed") ? ("closed" as const) : ("open" as const),
+      closedAt: closureEvent?.action.endsWith(".closed")
+        ? closureEvent.occurredAt.toISOString()
+        : null,
+      closedByIdentityId: closureEvent?.action.endsWith(".closed")
+        ? closureEvent.actorIdentityId
+        : null,
+      note: typeof closureMetadata.note === "string" ? closureMetadata.note : "",
+      evidence: Array.isArray(closureMetadata.evidence)
+        ? closureMetadata.evidence.filter((value): value is string => typeof value === "string")
+        : [],
+      checklist: {
+        payments: closureChecklist.payments === true,
+        fiscal: closureChecklist.fiscal === true,
+        external: closureChecklist.external === true,
+      },
+    };
     const posRevenueCents = report.reportFamilies.sales.netRevenueCents;
     const paymentCents = report.breakdowns.paymentMethods.reduce(
       (sum, row) => sum + row.revenueCents,
@@ -434,6 +528,15 @@ export class ManagementReportService {
       dailySeries: report.dailySeries,
       cashFlow: report.cashFlow,
       inventory: report.reportFamilies.inventory.analysis,
+      futureDemand: reservationRows.map((row) => ({
+        date: row.date,
+        reservations: Number(row.reservations),
+        guests: Number(row.guests),
+        demandFloorCents:
+          report.reportFamilies.sales.averageSpendPerGuestCents === null
+            ? 0
+            : Number(row.guests) * report.reportFamilies.sales.averageSpendPerGuestCents,
+      })),
     });
     return {
       labor: {
@@ -490,6 +593,7 @@ export class ManagementReportService {
           unmatchedCents: Number(external.unmatchedCents),
           divergentCents: Number(external.divergentCents),
         },
+        closure,
       },
       forecast,
     };
@@ -501,13 +605,17 @@ export class ManagementReportService {
     unitId: string,
     query: Omit<ReportExportInput, "family" | "format"> & {
       family?: ReportExportInput["family"];
+      minimumComparableOperatingDays?: number;
     },
   ) {
     return this.measured("read", async () => {
       const permissions = await this.permissions(identityId, organizationId, unitId);
+      const includeBudget = !query.family || query.family === "overview";
       const [report, budget] = await Promise.all([
         this.management.reports(identityId, organizationId, unitId, query),
-        this.periodBudget(organizationId, unitId, query.from, query.to),
+        includeBudget
+          ? this.periodBudget(organizationId, unitId, query.from, query.to)
+          : Promise.resolve(null),
       ]);
       const intelligence = await this.operationalIntelligence(
         organizationId,
@@ -623,12 +731,55 @@ export class ManagementReportService {
         reportFamilies: { ...reportFamilies, ...intelligence },
         meta: {
           ...report.meta,
+          queryFamily: query.family ?? "overview",
           coverage: {
             ...report.meta.coverage,
             budget: budgetWithAlerts?.coverage ?? "unavailable",
             labor: intelligence.labor.coverage,
             reconciliation: intelligence.reconciliation.coverage,
-            forecast: intelligence.forecast.sampleDays > 0 ? "complete" : "unavailable",
+            forecast: intelligence.forecast.available ? "complete" : "unavailable",
+          },
+          indicators: {
+            revenue: {
+              coverage: report.meta.coverage.sales,
+              dataThrough: report.meta.dataThrough,
+              sources: ["pos_tabs", "pos_tab_payments"],
+            },
+            cashFlow: {
+              coverage: report.meta.coverage.cashFlow,
+              dataThrough: report.meta.dataThrough,
+              sources: ["management_receivable_payments", "management_payable_payments"],
+            },
+            profitability: {
+              coverage: report.meta.coverage.costs,
+              dataThrough: report.meta.dataThrough,
+              sources: ["management_receivable_lines", "pos_order_items"],
+            },
+            inventory: {
+              coverage: reportFamilies.inventory.coverage,
+              dataThrough: report.meta.dataThrough,
+              sources: ["management_inventory_events", "management_stock_balances"],
+            },
+            labor: {
+              coverage: intelligence.labor.coverage,
+              dataThrough: report.meta.dataThrough,
+              sources: ["management_time_entries", "management_schedules"],
+            },
+            reconciliation: {
+              coverage: intelligence.reconciliation.coverage,
+              dataThrough: report.meta.dataThrough,
+              sources: ["fiscal_documents", "management_reconciliation_entries"],
+            },
+            forecast: {
+              coverage: intelligence.forecast.available ? "complete" : "unavailable",
+              dataThrough: report.meta.dataThrough,
+              sources: ["pos_tabs", "management_inventory_events"],
+            },
+            budget: {
+              coverage: budgetWithAlerts?.coverage ?? "unavailable",
+              dataThrough: report.meta.dataThrough,
+              sources: ["management_report_budgets"],
+            },
           },
         },
         budget: budgetWithAlerts,
@@ -933,40 +1084,55 @@ export class ManagementReportService {
       }));
     }
     if (query.dimension === "payment_method") {
-      const rows = await this.database.db
-        .select({
-          id: posTabPayments.id,
-          occurredAt: posTabs.closedAt,
-          localDate: closedDate.mapWith(String),
-          amountCents: posTabPayments.amountCents,
-        })
-        .from(posTabPayments)
-        .innerJoin(
-          posTabs,
-          and(
-            eq(posTabs.organizationId, organizationId),
-            eq(posTabs.unitId, unitId),
-            eq(posTabs.id, posTabPayments.tabId),
-          ),
-        )
-        .where(
-          and(
-            eq(posTabPayments.organizationId, organizationId),
-            eq(posTabPayments.unitId, unitId),
-            eq(posTabs.status, "closed"),
-            eq(posTabPayments.method, query.key as "cash"),
-            gte(closedDate, query.from),
-            lte(closedDate, query.to),
-          ),
-        )
-        .orderBy(desc(posTabs.closedAt), desc(posTabPayments.id))
-        .limit(limit)
-        .offset(offset);
+      const rows = await this.database.db.execute<{
+        id: string;
+        occurredAt: Date | string;
+        localDate: string;
+        amountCents: number;
+        referenceType: "payment" | "payment_reversal";
+      }>(sql`
+        select payments.id,
+               tabs.closed_at as "occurredAt",
+               timezone(${timezone}, tabs.closed_at)::date::text as "localDate",
+               payments.amount_cents::int as "amountCents",
+               'payment'::text as "referenceType"
+          from pos_tab_payments payments
+          join pos_tabs tabs
+            on tabs.organization_id=payments.organization_id
+           and tabs.unit_id=payments.unit_id
+           and tabs.id=payments.tab_id
+         where payments.organization_id=${organizationId}::uuid
+           and payments.unit_id=${unitId}::uuid
+           and payments.method=${query.key}
+           and tabs.status='closed'
+           and timezone(${timezone},tabs.closed_at)::date between ${query.from}::date and ${query.to}::date
+        union all
+        select reversals.id,
+               reversals.resolved_at as "occurredAt",
+               timezone(${timezone}, reversals.resolved_at)::date::text as "localDate",
+               (-reversals.amount_cents)::int as "amountCents",
+               'payment_reversal'::text as "referenceType"
+          from pos_payment_reversals reversals
+          join pos_tab_payments payments
+            on payments.organization_id=reversals.organization_id
+           and payments.unit_id=reversals.unit_id
+           and payments.id=reversals.payment_id
+         where reversals.organization_id=${organizationId}::uuid
+           and reversals.unit_id=${unitId}::uuid
+           and reversals.status='approved'
+           and payments.method=${query.key}
+           and timezone(${timezone},reversals.resolved_at)::date between ${query.from}::date and ${query.to}::date
+         order by "occurredAt" desc, id desc
+         limit ${limit} offset ${offset}
+      `);
       return rows.map((row) => ({
         referenceId: row.id,
-        occurredAt: row.occurredAt?.toISOString() ?? null,
+        occurredAt:
+          row.occurredAt instanceof Date
+            ? row.occurredAt.toISOString()
+            : new Date(row.occurredAt).toISOString(),
         localDate: row.localDate,
-        referenceType: "payment",
+        referenceType: row.referenceType,
         label: query.key,
         amountCents: row.amountCents,
         quantity: 1,
@@ -1449,31 +1615,65 @@ export class ManagementReportService {
       return total(row);
     }
     if (query.dimension === "payment_method") {
-      const [row] = await this.database.db
-        .select({
-          amountCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)`.mapWith(Number),
-          quantity: sql<number>`count(*)::int`.mapWith(Number),
-        })
-        .from(posTabPayments)
-        .innerJoin(
-          posTabs,
-          and(
-            eq(posTabs.organizationId, organizationId),
-            eq(posTabs.unitId, unitId),
-            eq(posTabs.id, posTabPayments.tabId),
+      const reversalDate = sql<string>`timezone(${timezone}, ${posPaymentReversals.resolvedAt})::date`;
+      const [[paymentRow], [reversalRow]] = await Promise.all([
+        this.database.db
+          .select({
+            amountCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)`.mapWith(
+              Number,
+            ),
+            quantity: sql<number>`count(*)::int`.mapWith(Number),
+          })
+          .from(posTabPayments)
+          .innerJoin(
+            posTabs,
+            and(
+              eq(posTabs.organizationId, organizationId),
+              eq(posTabs.unitId, unitId),
+              eq(posTabs.id, posTabPayments.tabId),
+            ),
+          )
+          .where(
+            and(
+              eq(posTabPayments.organizationId, organizationId),
+              eq(posTabPayments.unitId, unitId),
+              eq(posTabs.status, "closed"),
+              eq(posTabPayments.method, query.key as "cash"),
+              gte(closedDate, query.from),
+              lte(closedDate, query.to),
+            ),
           ),
-        )
-        .where(
-          and(
-            eq(posTabPayments.organizationId, organizationId),
-            eq(posTabPayments.unitId, unitId),
-            eq(posTabs.status, "closed"),
-            eq(posTabPayments.method, query.key as "cash"),
-            gte(closedDate, query.from),
-            lte(closedDate, query.to),
+        this.database.db
+          .select({
+            amountCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`.mapWith(
+              Number,
+            ),
+            quantity: sql<number>`count(*)::int`.mapWith(Number),
+          })
+          .from(posPaymentReversals)
+          .innerJoin(
+            posTabPayments,
+            and(
+              eq(posTabPayments.organizationId, posPaymentReversals.organizationId),
+              eq(posTabPayments.unitId, posPaymentReversals.unitId),
+              eq(posTabPayments.id, posPaymentReversals.paymentId),
+            ),
+          )
+          .where(
+            and(
+              eq(posPaymentReversals.organizationId, organizationId),
+              eq(posPaymentReversals.unitId, unitId),
+              eq(posPaymentReversals.status, "approved"),
+              eq(posTabPayments.method, query.key as "cash"),
+              gte(reversalDate, query.from),
+              lte(reversalDate, query.to),
+            ),
           ),
-        );
-      return total(row);
+      ]);
+      return {
+        amountCents: (paymentRow?.amountCents ?? 0) - (reversalRow?.amountCents ?? 0),
+        quantity: (paymentRow?.quantity ?? 0) + (reversalRow?.quantity ?? 0),
+      };
     }
     if (query.key === "cash_inflows" || query.key === "cash_outflows") {
       const table =
@@ -1605,13 +1805,46 @@ export class ManagementReportService {
         }
         const report = await this.reports(identityId, organizationId, unitId, query);
         const rows = this.exportRows(report, query.family);
+        const [organization] = await tx
+          .select({ organizationName: organizations.tradeName, unitName: units.name })
+          .from(organizations)
+          .innerJoin(units, and(eq(units.organizationId, organizations.id), eq(units.id, unitId)))
+          .where(eq(organizations.id, organizationId))
+          .limit(1);
+        const [requester] = await tx
+          .select({ displayName: identities.displayName })
+          .from(identities)
+          .where(eq(identities.id, identityId))
+          .limit(1);
+        const id = randomUUID();
+        const now = new Date();
         const artifact = buildReportArtifact(
           query.format,
           rows,
           `Relatório GiroMesa ${query.from} a ${query.to}`,
+          {
+            subtitle: "Exportação auditada",
+            organizationName: organization?.organizationName,
+            unitName: organization?.unitName,
+            period: report.period,
+            timezone: report.timezone,
+            generatedAt: report.meta.generatedAt,
+            generatedBy: requester?.displayName,
+            reference: id,
+            classification: "Confidencial — uso interno",
+            family: query.family,
+            filters: {
+              comparação: query.comparisonMode,
+              custos_incluídos: report.capabilities.viewCosts,
+            },
+            warnings:
+              report.incomeStatement.costCoverage.coverage === "complete"
+                ? []
+                : [
+                    "A cobertura de custos está incompleta; margens e resultados não devem ser interpretados como definitivos.",
+                  ],
+          },
         );
-        const id = randomUUID();
-        const now = new Date();
         const expiresAt = new Date(now.getTime() + 30 * 86_400_000);
         const [created] = await tx
           .insert(managementReportExports)
@@ -2075,6 +2308,8 @@ export class ManagementReportService {
       name: row.name,
       visibility: row.visibility,
       query: row.query,
+      isDefault: row.query.isDefault === true,
+      sortOrder: Number.isInteger(row.query.sortOrder) ? Number(row.query.sortOrder) : 0,
       ownerIdentityId: row.ownerIdentityId,
       version: row.version,
       updatedAt: row.updatedAt,
@@ -2102,7 +2337,13 @@ export class ManagementReportService {
         ),
       )
       .orderBy(desc(managementReportViews.updatedAt));
-    return { views: rows.map((row) => this.viewDto(row)) };
+    return {
+      views: rows
+        .map((row) => this.viewDto(row))
+        .sort(
+          (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
+        ),
+    };
   }
 
   async createView(
@@ -2123,6 +2364,21 @@ export class ManagementReportService {
       input,
       async (tx) => {
         const id = randomUUID();
+        if (input.isDefault) {
+          await tx
+            .update(managementReportViews)
+            .set({
+              query: sql`jsonb_set(${managementReportViews.query}, '{isDefault}', 'false'::jsonb, true)`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(managementReportViews.organizationId, organizationId),
+                eq(managementReportViews.unitId, unitId),
+                eq(managementReportViews.ownerIdentityId, identityId),
+              ),
+            );
+        }
         const [row] = await tx
           .insert(managementReportViews)
           .values({
@@ -2130,7 +2386,13 @@ export class ManagementReportService {
             organizationId,
             unitId,
             ownerIdentityId: identityId,
-            ...input,
+            name: input.name,
+            visibility: input.visibility,
+            query: {
+              ...input.query,
+              isDefault: input.isDefault ?? false,
+              sortOrder: input.sortOrder ?? 0,
+            },
           })
           .returning();
         if (!row) throw new ConflictException({ code: "REPORT_VIEW_WRITE_FAILED" });
@@ -2142,7 +2404,12 @@ export class ManagementReportService {
           "management.report_view.created",
           "management_report_view",
           id,
-          { visibility: row.visibility, family: row.query.family },
+          {
+            visibility: row.visibility,
+            family: row.query.family,
+            isDefault: row.query.isDefault === true,
+            sortOrder: row.query.sortOrder ?? 0,
+          },
         );
         return this.viewDto(row);
       },
@@ -2181,12 +2448,32 @@ export class ManagementReportService {
         if (existing.ownerIdentityId !== identityId) this.assertPermission(permissions.manageViews);
         if (existing.version !== input.version)
           throw new ConflictException({ code: "REPORT_VIEW_VERSION_CONFLICT" });
+        if (input.isDefault) {
+          await tx
+            .update(managementReportViews)
+            .set({
+              query: sql`jsonb_set(${managementReportViews.query}, '{isDefault}', 'false'::jsonb, true)`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(managementReportViews.organizationId, organizationId),
+                eq(managementReportViews.unitId, unitId),
+                eq(managementReportViews.ownerIdentityId, existing.ownerIdentityId),
+                ne(managementReportViews.id, viewId),
+              ),
+            );
+        }
         const [row] = await tx
           .update(managementReportViews)
           .set({
             name: input.name,
             visibility: input.visibility,
-            query: input.query,
+            query: {
+              ...input.query,
+              isDefault: input.isDefault ?? existing.query.isDefault ?? false,
+              sortOrder: input.sortOrder ?? existing.query.sortOrder ?? 0,
+            },
             version: input.version + 1,
             updatedAt: new Date(),
           })
@@ -2206,7 +2493,12 @@ export class ManagementReportService {
           "management.report_view.updated",
           "management_report_view",
           viewId,
-          { visibility: row.visibility, version: row.version },
+          {
+            visibility: row.visibility,
+            version: row.version,
+            isDefault: row.query.isDefault === true,
+            sortOrder: row.query.sortOrder ?? 0,
+          },
         );
         return this.viewDto(row);
       },
@@ -2305,7 +2597,43 @@ export class ManagementReportService {
       )
       .orderBy(managementReportAlerts.dueAt, desc(managementReportAlerts.updatedAt))
       .limit(200);
-    return { alerts: rows.map((row) => this.alertDto(row)) };
+    const historyRows = rows.length
+      ? await this.database.db
+          .select({
+            action: auditEvents.action,
+            actorIdentityId: auditEvents.actorIdentityId,
+            entityId: auditEvents.entityId,
+            metadata: auditEvents.metadata,
+            occurredAt: auditEvents.occurredAt,
+          })
+          .from(auditEvents)
+          .where(
+            and(
+              eq(auditEvents.organizationId, organizationId),
+              eq(auditEvents.unitId, unitId),
+              eq(auditEvents.entityType, "management_report_alert"),
+              inArray(
+                auditEvents.entityId,
+                rows.map((row) => row.id),
+              ),
+            ),
+          )
+          .orderBy(desc(auditEvents.occurredAt))
+      : [];
+    return {
+      alerts: rows.map((row) => ({
+        ...this.alertDto(row),
+        history: historyRows
+          .filter((event) => event.entityId === row.id)
+          .map((event) => ({
+            action: event.action,
+            actorIdentityId: event.actorIdentityId,
+            occurredAt: event.occurredAt,
+            status: typeof event.metadata.status === "string" ? event.metadata.status : null,
+            comment: typeof event.metadata.comment === "string" ? event.metadata.comment : null,
+          })),
+      })),
+    };
   }
 
   async evaluateAlerts(
@@ -2328,6 +2656,7 @@ export class ManagementReportService {
           severity: "warning" as const,
           actualCents: alert.actualCents,
           targetCents: alert.targetCents,
+          source: { family: "overview", route: "reports" },
         })),
       ...report.reportFamilies.quality.issues.map((issue) => ({
         kind: `quality:${issue.key}`,
@@ -2336,6 +2665,7 @@ export class ManagementReportService {
         severity: issue.severity,
         actualCents: null,
         targetCents: null,
+        source: { family: "quality", route: "reports" },
       })),
       ...(report.reportFamilies.reconciliation.fiscalDifferenceCents === 0
         ? []
@@ -2347,6 +2677,12 @@ export class ManagementReportService {
               severity: "critical" as const,
               actualCents: report.reportFamilies.reconciliation.fiscalAuthorizedCents,
               targetCents: report.reportFamilies.reconciliation.posRevenueCents,
+              source: {
+                family: "reconciliation",
+                dimension: "reconciliation",
+                key: "fiscal",
+                route: "reports",
+              },
             },
           ]),
       ...(report.reportFamilies.reconciliation.paymentDifferenceCents === 0
@@ -2359,6 +2695,12 @@ export class ManagementReportService {
               severity: "critical" as const,
               actualCents: report.reportFamilies.reconciliation.paymentCents,
               targetCents: report.reportFamilies.reconciliation.posRevenueCents,
+              source: {
+                family: "reconciliation",
+                dimension: "reconciliation",
+                key: "payments",
+                route: "reports",
+              },
             },
           ]),
       ...(report.reportFamilies.labor.overtimeMinutes &&
@@ -2371,6 +2713,12 @@ export class ManagementReportService {
               severity: "warning" as const,
               actualCents: null,
               targetCents: null,
+              source: {
+                family: "labor",
+                dimension: "labor",
+                key: "overtime",
+                route: "reports",
+              },
             },
           ]
         : []),
@@ -2394,13 +2742,25 @@ export class ManagementReportService {
               unitId,
               occurrenceKey,
               ...candidate,
-              source: { period: { from: input.from, to: input.to } },
+              source: { period: { from: input.from, to: input.to }, ...candidate.source },
               dueAt,
               updatedByIdentityId: identityId,
             })
             .onConflictDoNothing()
             .returning({ id: managementReportAlerts.id });
           created += inserted.length;
+          if (inserted[0]) {
+            await this.record(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              "management.report_alert.created",
+              "management_report_alert",
+              inserted[0].id,
+              { status: "open", kind: candidate.kind },
+            );
+          }
         }
         const evaluationId = randomUUID();
         await this.record(
@@ -2473,11 +2833,139 @@ export class ManagementReportService {
           "management.report_alert.updated",
           "management_report_alert",
           alertId,
-          { status: row.status, assignedToIdentityId: row.assignedToIdentityId, dueAt: row.dueAt },
+          {
+            status: row.status,
+            assignedToIdentityId: row.assignedToIdentityId,
+            dueAt: row.dueAt,
+            comment: input.comment,
+          },
         );
         return this.alertDto(row);
       },
     );
+  }
+
+  async closeReconciliation(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReportReconciliationClosureInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    this.assertPermission(permissions.manageAlerts);
+    if (input.status === "closed" && !Object.values(input.checklist).every(Boolean)) {
+      throw new BadRequestException({
+        code: "REPORT_RECONCILIATION_CHECKLIST_INCOMPLETE",
+        message: "Conclua a revisÃ£o fiscal, de pagamentos e da conciliaÃ§Ã£o externa.",
+      });
+    }
+    const entityId = `${unitId}:${input.from}:${input.to}`;
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "report-reconciliation-closure",
+      input,
+      async (tx) => {
+        const action =
+          input.status === "closed"
+            ? "management.report_reconciliation.closed"
+            : "management.report_reconciliation.reopened";
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          action,
+          "management_report_reconciliation_closure",
+          entityId,
+          {
+            period: { from: input.from, to: input.to },
+            checklist: input.checklist,
+            note: input.note,
+            evidence: input.evidence,
+          },
+        );
+        return {
+          status: input.status,
+          closedAt: input.status === "closed" ? new Date().toISOString() : null,
+          closedByIdentityId: input.status === "closed" ? identityId : null,
+          checklist: input.checklist,
+          note: input.note,
+          evidence: input.evidence,
+        };
+      },
+    );
+  }
+
+  private costBackfillCandidatesQuery(
+    organizationId: string,
+    unitId: string,
+    timezone: string,
+    input: Pick<ReportCostPreviewInput, "from" | "to">,
+  ) {
+    return sql`
+      select items.id, items.quantity, prices.cost_cents as "catalogCostCents"
+      from pos_order_items items
+      inner join pos_orders orders on orders.organization_id = items.organization_id and orders.unit_id = items.unit_id and orders.id = items.order_id
+      inner join pos_tabs tabs on tabs.organization_id = orders.organization_id and tabs.unit_id = orders.unit_id and tabs.id = orders.tab_id
+      left join pos_product_prices prices on prices.organization_id = items.organization_id and prices.unit_id = items.unit_id and prices.product_id = items.product_id
+      where items.organization_id = ${organizationId}::uuid and items.unit_id = ${unitId}::uuid
+        and items.status <> 'canceled' and items.cost_cents is null and tabs.status = 'closed'
+        and timezone(${timezone}, tabs.closed_at)::date between ${input.from}::date and ${input.to}::date
+      order by items.id
+    `;
+  }
+
+  async previewCosts(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: ReportCostPreviewInput,
+  ) {
+    const permissions = await this.permissions(identityId, organizationId, unitId);
+    this.assertPermission(permissions.viewCosts && permissions.backfillCosts);
+    const [unit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const candidates = await this.database.db.execute<{
+      id: string;
+      quantity: number;
+      catalogCostCents: number | null;
+    }>(this.costBackfillCandidatesQuery(organizationId, unitId, unit.timezone, input));
+    let estimatedCount = 0;
+    let estimatedTotalCents = 0;
+    for (const candidate of candidates) {
+      const estimated =
+        candidate.catalogCostCents === null
+          ? null
+          : Number(candidate.catalogCostCents) * Number(candidate.quantity);
+      if (
+        estimated === null ||
+        !Number.isSafeInteger(estimated) ||
+        estimated < 0 ||
+        estimated > 2_147_483_647
+      )
+        continue;
+      estimatedCount += 1;
+      estimatedTotalCents += estimated;
+    }
+    const candidateCount = candidates.length;
+    return {
+      candidateCount,
+      estimatedCount,
+      unavailableCount: candidateCount - estimatedCount,
+      estimatedTotalCents,
+      coverageBefore: candidateCount > 0 ? 0 : 100,
+      coverageAfter:
+        candidateCount === 0 ? 100 : Number(((estimatedCount / candidateCount) * 100).toFixed(1)),
+      source: "catalog_current_cost" as const,
+    };
   }
 
   async backfillCosts(
@@ -2507,17 +2995,7 @@ export class ManagementReportService {
           id: string;
           quantity: number;
           catalogCostCents: number | null;
-        }>(sql`
-          select items.id, items.quantity, prices.cost_cents as "catalogCostCents"
-          from pos_order_items items
-          inner join pos_orders orders on orders.organization_id = items.organization_id and orders.unit_id = items.unit_id and orders.id = items.order_id
-          inner join pos_tabs tabs on tabs.organization_id = orders.organization_id and tabs.unit_id = orders.unit_id and tabs.id = orders.tab_id
-          left join pos_product_prices prices on prices.organization_id = items.organization_id and prices.unit_id = items.unit_id and prices.product_id = items.product_id
-          where items.organization_id = ${organizationId}::uuid and items.unit_id = ${unitId}::uuid
-            and items.status <> 'canceled' and items.cost_cents is null and tabs.status = 'closed'
-            and timezone(${unit.timezone}, tabs.closed_at)::date between ${input.from}::date and ${input.to}::date
-          order by items.id for update of items
-        `);
+        }>(this.costBackfillCandidatesQuery(organizationId, unitId, unit.timezone, input));
         const [run] = await tx
           .insert(managementReportCostBackfills)
           .values({

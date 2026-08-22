@@ -125,7 +125,7 @@ export function CatalogCategoryHeader({
 
         {showReorder && (
           <fieldset className="catalog-category-header__order">
-            <legend className="catalog-visually-hidden">Reordenar categoria</legend>
+            <legend className="gm-sr-only">Reordenar categoria</legend>
             <Button
               aria-label="Mover categoria para cima"
               className="catalog-card-icon-btn"

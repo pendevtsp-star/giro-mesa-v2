@@ -1,4 +1,4 @@
-import { Badge, Button, Input, Label } from "@giromesa/ui";
+import { Badge, Button, FormField, Input } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api, type LoginResponse, type MfaChallengeProof } from "../../api";
 import { Brand } from "./Brand";
@@ -97,24 +97,24 @@ export function LoginScreen({
           <p className="muted">Use o e-mail vinculado à sua organização.</p>
           <form onSubmit={handleSubmit} className="form-stack">
             {!challengeToken && (
-              <Label>
-                E-mail
+              <FormField htmlFor="login-email" label="E-mail">
                 <Input
                   autoComplete="username"
+                  id="login-email"
                   inputMode="email"
                   onChange={(event) => setEmail(event.target.value)}
                   required
                   type="email"
                   value={email}
                 />
-              </Label>
+              </FormField>
             )}
             {!challengeToken && (
-              <Label>
-                Senha
+              <FormField htmlFor="login-password" label="Senha">
                 <span className="password-field">
                   <Input
                     autoComplete="current-password"
+                    id="login-password"
                     onChange={(event) => setPassword(event.target.value)}
                     required
                     type={showPassword ? "text" : "password"}
@@ -131,7 +131,7 @@ export function LoginScreen({
                     {showPassword ? "Ocultar" : "Mostrar"}
                   </Button>
                 </span>
-              </Label>
+              </FormField>
             )}
             {!challengeToken && (
               <div className="form-inline">
@@ -183,10 +183,13 @@ export function LoginScreen({
                     Código de recuperação
                   </Button>
                 </fieldset>
-                <Label>
-                  {proofMode === "totp" ? "Código de 6 dígitos" : "Código de recuperação"}
+                <FormField
+                  htmlFor="login-mfa-proof"
+                  label={proofMode === "totp" ? "Código de 6 dígitos" : "Código de recuperação"}
+                >
                   <Input
                     autoComplete="one-time-code"
+                    id="login-mfa-proof"
                     inputMode={proofMode === "totp" ? "numeric" : "text"}
                     maxLength={proofMode === "totp" ? 6 : 64}
                     minLength={proofMode === "totp" ? 6 : 12}
@@ -201,7 +204,7 @@ export function LoginScreen({
                     required
                     value={mfaProof}
                   />
-                </Label>
+                </FormField>
                 <Button
                   className="link-button"
                   onClick={() => {

@@ -3,7 +3,6 @@
 @import "./features/shell/shell.css" layer(legacy);
 @import "./styles/operational.css" layer(legacy);
 @import "./features/salon/salon.css" layer(legacy);
-@import "./features/catalog/catalog.css" layer(legacy);
 @import "./features/delivery/delivery.css" layer(legacy);
 @import "./styles/management.css" layer(legacy);
 @import "./styles/growth.css" layer(legacy);

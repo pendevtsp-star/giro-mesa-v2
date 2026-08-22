@@ -1,5 +1,6 @@
 import { EmptyState } from "@giromesa/ui";
 import { lazy } from "react";
+import type { DeviceContext } from "../bridge";
 import type { Profile, RouteId } from "../domain";
 import type { KdsArea } from "../features/kds/kds.navigation";
 import type { PilotDispatcher, PilotLoader } from "../operational-dispatch";
@@ -78,6 +79,14 @@ const RealReservationsPage = lazy(() =>
 const RealPlatformPage = lazy(() =>
   import("../platform").then((module) => ({ default: module.RealPlatformPage })),
 );
+const DeviceSetupPage = lazy(() =>
+  import("../features/device/DeviceSetupPage").then((module) => ({
+    default: module.DeviceSetupPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("../features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
+);
 
 export const pageMeta: Partial<Record<RouteId, { title: string; description: string }>> = {
   dashboard: {
@@ -149,9 +158,17 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
     title: "Multiunidade",
     description: "Resumo consolidado dos registros persistidos na organização.",
   },
+  settings: {
+    title: "Configurações do estabelecimento",
+    description: "Organização, unidade, marca e horários de funcionamento.",
+  },
   platform: {
     title: "Plataforma",
     description: "Organizações, unidades e saúde operacional.",
+  },
+  device: {
+    title: "SmartPOS e dispositivos",
+    description: "Pareamento, saúde, conciliação e diagnóstico dos terminais.",
   },
   alerts: {
     title: "Central de alertas",
@@ -179,6 +196,8 @@ export function PageContent({
   refreshToken,
   session,
   profile,
+  runtime,
+  onEstablishmentSettingsSaved,
 }: {
   dispatchPilot: PilotDispatcher;
   loadPilot: PilotLoader;
@@ -188,6 +207,10 @@ export function PageContent({
   refreshToken: number;
   session: Session;
   profile: Profile;
+  runtime: DeviceContext;
+  onEstablishmentSettingsSaved: (
+    settings: import("@giromesa/contracts").EstablishmentSettings,
+  ) => void;
 }) {
   const managementScope = {
     organizationId: session.organizationId,
@@ -199,6 +222,8 @@ export function PageContent({
     ...managementScope,
     identityId: session.identityId,
     membershipId: session.membershipId,
+    installationId: runtime.deviceId,
+    embedded: runtime.embedded,
     dispatch: dispatchPilot,
     load: loadPilot,
   };
@@ -238,7 +263,16 @@ export function PageContent({
     case "reports":
       return <RealReportsPage scope={managementScope} />;
     case "fiscal":
-      return <RealFiscalPage scope={managementScope} />;
+      return (
+        <RealFiscalPage
+          canCancelDocuments={profile.id === "owner"}
+          canClosePeriods={["owner", "finance"].includes(profile.id)}
+          canConfigure={profile.id === "owner"}
+          canReopenPeriods={profile.id === "owner"}
+          companyDefaults={{ tradeName: session.organization.name, city: session.unit.city ?? "" }}
+          scope={managementScope}
+        />
+      );
     case "accountant":
       return <RealAccountantPage scope={managementScope} />;
     case "people":
@@ -258,11 +292,33 @@ export function PageContent({
       return <RealCrmPage scope={managementScope} />;
     case "multiunit":
       return <RealMultiunitPage scope={managementScope} />;
+    case "settings":
+      return (
+        <SettingsPage
+          onSaved={onEstablishmentSettingsSaved}
+          organizationId={session.organizationId}
+          profileId={profile.id}
+          unitId={session.unitId}
+          units={session.organization.units.filter((unit) =>
+            session.settingsManageUnitIds?.includes(unit.id),
+          )}
+        />
+      );
     case "platform":
       return session.platformAdmin ? (
         <RealPlatformPage refreshToken={refreshToken} />
       ) : (
         <UnavailableRealPage title="Administração da plataforma" />
+      );
+    case "device":
+      return (
+        <DeviceSetupPage
+          canManage={["owner", "manager"].includes(profile.id)}
+          canReconcile={["owner", "manager", "finance"].includes(profile.id)}
+          organizationId={session.organizationId}
+          runtime={runtime}
+          unitId={session.unitId}
+        />
       );
     case "alerts":
       return <UnavailableRealPage title="Central de alertas" />;

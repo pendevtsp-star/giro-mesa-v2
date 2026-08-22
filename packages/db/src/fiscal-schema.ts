@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   date,
   foreignKey,
   index,
@@ -13,7 +15,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { posOrders, posProducts } from "./operations-schema.js";
+import { posOrders, posProducts, posTabs } from "./operations-schema.js";
 import { identities, legalEntities, organizations, units } from "./schema.js";
 
 const timestamps = {
@@ -42,6 +44,11 @@ export const accountingExportStatus = pgEnum("accounting_export_status", [
   "pending",
   "ready",
   "failed",
+]);
+export const fiscalNumberInvalidationStatus = pgEnum("fiscal_number_invalidation_status", [
+  "processing",
+  "invalidated",
+  "rejected",
 ]);
 
 export const fiscalProfiles = pgTable(
@@ -143,6 +150,7 @@ export const fiscalDocuments = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     unitId: uuid("unit_id").notNull(),
+    tabId: uuid("tab_id"),
     orderId: uuid("order_id"),
     model: fiscalDocumentModel("model").notNull(),
     environment: fiscalEnvironment("environment").notNull(),
@@ -181,16 +189,57 @@ export const fiscalDocuments = pgTable(
       table.status,
       table.issuedAt,
     ),
+    index("fiscal_documents_tab_idx").on(table.organizationId, table.unitId, table.tabId),
     foreignKey({
       name: "fiscal_documents_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("restrict"),
     foreignKey({
+      name: "fiscal_documents_tab_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "fiscal_documents_order_fk",
       columns: [table.organizationId, table.unitId, table.orderId],
       foreignColumns: [posOrders.organizationId, posOrders.unitId, posOrders.id],
     }).onDelete("restrict"),
+  ],
+);
+
+export const fiscalDocumentArtifacts = pgTable(
+  "fiscal_document_artifacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    documentId: uuid("document_id").notNull(),
+    kind: varchar("kind", { length: 24 }).notNull(),
+    storageKey: text("storage_key").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    bytes: integer("bytes").notNull(),
+    contentType: varchar("content_type", { length: 80 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("fiscal_document_artifacts_kind_unique").on(table.documentId, table.kind),
+    index("fiscal_document_artifacts_scope_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.documentId,
+    ),
+    foreignKey({
+      name: "fiscal_document_artifacts_document_fk",
+      columns: [table.organizationId, table.unitId, table.documentId],
+      foreignColumns: [fiscalDocuments.organizationId, fiscalDocuments.unitId, fiscalDocuments.id],
+    }).onDelete("cascade"),
+    check(
+      "fiscal_document_artifacts_kind_check",
+      sql`${table.kind} IN ('authorization_xml', 'cancellation_xml', 'danfe_pdf')`,
+    ),
+    check("fiscal_document_artifacts_bytes_check", sql`${table.bytes} > 0`),
+    check("fiscal_document_artifacts_sha_check", sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
   ],
 );
 
@@ -415,5 +464,54 @@ export const fiscalWebhookReceipts = pgTable(
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
+  ],
+);
+
+export const fiscalNumberInvalidations = pgTable(
+  "fiscal_number_invalidations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull(),
+    environment: fiscalEnvironment("environment").notNull(),
+    series: varchar("series", { length: 20 }).notNull(),
+    initialNumber: integer("initial_number").notNull(),
+    finalNumber: integer("final_number").notNull(),
+    justification: text("justification").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    status: fiscalNumberInvalidationStatus("status").notNull().default("processing"),
+    providerReference: varchar("provider_reference", { length: 160 }),
+    xmlStorageKey: text("xml_storage_key"),
+    xmlSha256: varchar("xml_sha256", { length: 64 }),
+    errorCode: varchar("error_code", { length: 80 }),
+    errorMessage: text("error_message"),
+    requestedByIdentityId: uuid("requested_by_identity_id")
+      .notNull()
+      .references(() => identities.id, { onDelete: "restrict" }),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("fiscal_number_invalidations_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("fiscal_number_invalidations_scope_time_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "fiscal_number_invalidations_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    check(
+      "fiscal_number_invalidations_range_check",
+      sql`${table.initialNumber} > 0 AND ${table.finalNumber} >= ${table.initialNumber}`,
+    ),
   ],
 );

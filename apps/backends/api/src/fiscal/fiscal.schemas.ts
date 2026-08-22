@@ -98,8 +98,12 @@ export const focusCompanyOnboardingSchema = z
     cscHomologationId: optionalDigits(1, 6),
   })
   .superRefine((value, context) => {
-    if (!value.enableNfce && !value.enableNfe && !value.enableNfse) {
-      context.addIssue({ code: "custom", message: "Habilite ao menos um modelo fiscal." });
+    if (!value.enableNfce || value.enableNfe || value.enableNfse) {
+      context.addIssue({
+        code: "custom",
+        message: "O GiroMesa emite somente NFC-e nesta versão.",
+        path: ["enableNfce"],
+      });
     }
     for (const [code, id, path] of [
       [value.cscProduction, value.cscProductionId, "cscProduction"],
@@ -138,18 +142,16 @@ const taxClassificationSchema = z
       .string()
       .regex(/^\d{3}$/)
       .optional(),
-    cstPis: z
-      .string()
-      .regex(/^\d{2}$/)
-      .optional(),
-    cstCofins: z
-      .string()
-      .regex(/^\d{2}$/)
-      .optional(),
+    cstPis: z.string().regex(/^\d{2}$/),
+    cstCofins: z.string().regex(/^\d{2}$/),
     cstIbsCbs: z.string().trim().min(1).max(10).optional(),
     cClassTrib: z.string().trim().min(1).max(20).optional(),
   })
   .catchall(z.unknown())
+  .refine((value) => Boolean(value.cstIcms || value.csosn), {
+    message: "Informe CST ICMS ou CSOSN.",
+    path: ["csosn"],
+  })
   .refine((value) => JSON.stringify(value).length <= 32_000, "Classificação fiscal muito grande.");
 
 export const productTaxRevisionSchema = z
@@ -176,6 +178,23 @@ export const productTaxRevisionBulkSchema = z
   .refine((value) => !value.effectiveUntil || value.effectiveUntil >= value.effectiveFrom, {
     message: "A vigência final deve ser posterior à inicial.",
     path: ["effectiveUntil"],
+  });
+
+export const productTaxRevisionImportSchema = z
+  .object({ rows: z.array(productTaxRevisionSchema).min(1).max(500) })
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    value.rows.forEach((row, index) => {
+      if (!seen.has(row.productId)) {
+        seen.add(row.productId);
+        return;
+      }
+      context.addIssue({
+        code: "custom",
+        message: "Cada produto deve aparecer apenas uma vez na importação.",
+        path: ["rows", index, "productId"],
+      });
+    });
   });
 
 const attachmentSchema = z.object({
@@ -207,6 +226,21 @@ export const resolveAccountantRequestSchema = z.object({
 export const reopenFiscalPeriodSchema = z.object({
   reason: z.string().trim().min(10).max(2_000),
 });
+
+export const fiscalNumberInvalidationSchema = z
+  .object({
+    series: z
+      .string()
+      .trim()
+      .regex(/^\d{1,3}$/),
+    initialNumber: z.number().int().positive().max(999_999_999),
+    finalNumber: z.number().int().positive().max(999_999_999),
+    justification: z.string().trim().min(15).max(255),
+  })
+  .refine((value) => value.finalNumber >= value.initialNumber, {
+    message: "O número final deve ser maior ou igual ao inicial.",
+    path: ["finalNumber"],
+  });
 
 const fiscalResultStatus = z.enum([
   "processing",
@@ -285,8 +319,10 @@ export type CancelFiscalDocumentInput = z.infer<typeof cancelFiscalDocumentSchem
 export type ProductTaxRevisionListQuery = z.infer<typeof productTaxRevisionListQuerySchema>;
 export type ProductTaxRevisionInput = z.infer<typeof productTaxRevisionSchema>;
 export type ProductTaxRevisionBulkInput = z.infer<typeof productTaxRevisionBulkSchema>;
+export type ProductTaxRevisionImportInput = z.infer<typeof productTaxRevisionImportSchema>;
 export type AccountantRequestListQuery = z.infer<typeof accountantRequestListQuerySchema>;
 export type AccountantRequestInput = z.infer<typeof accountantRequestSchema>;
 export type ResolveAccountantRequestInput = z.infer<typeof resolveAccountantRequestSchema>;
 export type ReopenFiscalPeriodInput = z.infer<typeof reopenFiscalPeriodSchema>;
+export type FiscalNumberInvalidationInput = z.infer<typeof fiscalNumberInvalidationSchema>;
 export type EdgeFiscalEvent = z.infer<typeof edgeFiscalEventSchema>;

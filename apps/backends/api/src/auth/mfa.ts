@@ -32,7 +32,7 @@ export function verifiedTotpCounter(secret: string, code: string, now = Date.now
   for (const offset of [-1, 0, 1]) {
     const counter = currentCounter + offset;
     if (counter < 0) continue;
-    const expected = Buffer.from(totp(secret, counter));
+    const expected = Buffer.from(totpCode(secret, counter));
     if (candidate.length === expected.length && timingSafeEqual(candidate, expected))
       return counter;
   }
@@ -75,7 +75,7 @@ export function otpauthUri(secret: string, email: string) {
   return `otpauth://totp/${encodeURIComponent(`${issuer}:${email}`)}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
 }
 
-function totp(secret: string, counter: number) {
+export function totpCode(secret: string, counter: number) {
   const message = Buffer.alloc(8);
   message.writeBigUInt64BE(BigInt(counter));
   const digest = createHmac("sha1", decodeBase32(secret)).update(message).digest();

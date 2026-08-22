@@ -19,7 +19,9 @@ export const routePermissions: Record<RouteId, Permission> = {
   reservations: "reservations.manage",
   crm: "growth.manage",
   multiunit: "multiunit.view",
+  settings: "settings.manage",
   platform: "platform.manage",
+  device: "dashboard.view",
   alerts: "alerts.view",
 };
 

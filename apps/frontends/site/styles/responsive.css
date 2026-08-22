@@ -46,6 +46,9 @@
   .security-card {
     padding: 25px;
   }
+  .install-page-content {
+    grid-template-columns: 1fr;
+  }
   .recovery-panel ul {
     columns: 1;
   }
@@ -162,6 +165,25 @@
   }
   .plan ul {
     min-height: auto;
+  }
+  .install-page-content {
+    padding-top: 28px;
+  }
+  .install-diagnostic,
+  .install-expectations {
+    padding: var(--gm-space-4);
+  }
+  .install-diagnostic-heading {
+    flex-direction: column;
+  }
+  .install-capability {
+    max-width: none;
+  }
+  .install-device-fields {
+    grid-template-columns: 1fr;
+  }
+  .install-page ~ .whatsapp {
+    display: none;
   }
 }
 

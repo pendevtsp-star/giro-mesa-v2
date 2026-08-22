@@ -632,9 +632,19 @@ export const payableSchema = z.object({
   dueDate: date,
 });
 
+export const cashPaymentMethodSchema = z.enum([
+  "cash",
+  "pix",
+  "credit_card",
+  "debit_card",
+  "bank_transfer",
+  "other",
+]);
+
 export const financialPaymentSchema = z.object({
   amountCents: positiveCents,
-  method: z.string().trim().min(2).max(32),
+  method: cashPaymentMethodSchema,
+  cashRegisterId: id.optional(),
   reference: z.string().trim().min(1).max(160).optional(),
   occurredAt: instant.optional(),
 });
@@ -662,17 +672,127 @@ export const receivablePaymentSchema = financialPaymentSchema.extend({
   cashShiftId: id.optional(),
 });
 
-export const openCashShiftSchema = z.object({ openingCents: cents });
+export const openCashShiftSchema = z.object({
+  openingCents: cents,
+  cashRegisterId: id.optional(),
+});
+export const cashRegisterCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+export const cashRegisterUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((value) => value.name !== undefined || value.active !== undefined, {
+    message: "Informe ao menos uma alteração.",
+  });
+export const cashTransferSchema = z
+  .object({
+    fromCashShiftId: id,
+    toCashShiftId: id,
+    amountCents: positiveCents,
+    reason: z.string().trim().min(3).max(1_000),
+  })
+  .refine((value) => value.fromCashShiftId !== value.toCashShiftId, {
+    message: "Origem e destino devem ser caixas diferentes.",
+    path: ["toCashShiftId"],
+  });
 export const cashMovementSchema = z.object({
   type: z.enum(["supply", "withdrawal"]),
   amountCents: positiveCents,
   reason: z.string().trim().min(3).max(1_000),
   occurredAt: instant.optional(),
 });
-export const closeCashShiftSchema = z.object({
-  countedCents: cents,
-  closeReason: z.string().trim().min(3).max(1_000).optional(),
+export const closeCashShiftSchema = z
+  .object({
+    countedCents: cents.optional(),
+    tenderCounts: z
+      .array(
+        z.object({
+          method: cashPaymentMethodSchema,
+          observedCents: cents,
+          source: z.literal("manual"),
+        }),
+      )
+      .min(1)
+      .max(cashPaymentMethodSchema.options.length)
+      .optional(),
+    closeReason: z.string().trim().min(3).max(1_000).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.countedCents === undefined && value.tenderCounts === undefined)
+      context.addIssue({
+        code: "custom",
+        message: "Informe a contagem por forma de pagamento.",
+        path: ["tenderCounts"],
+      });
+    const methods = value.tenderCounts?.map((count) => count.method) ?? [];
+    if (new Set(methods).size !== methods.length)
+      context.addIssue({
+        code: "custom",
+        message: "Cada forma de pagamento deve aparecer uma única vez.",
+        path: ["tenderCounts"],
+      });
+    if (value.tenderCounts && !methods.includes("cash"))
+      context.addIssue({
+        code: "custom",
+        message: "A conferência deve incluir dinheiro.",
+        path: ["tenderCounts"],
+      });
+  });
+export const cashShiftReviewSchema = z.object({
+  note: z.string().trim().min(3).max(1_000),
 });
+export const cashSettingsSchema = z.object({
+  movementApprovalThresholdCents: cents,
+  discrepancyCriticalThresholdCents: cents,
+  maxShiftMinutes: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(7 * 24 * 60),
+});
+export const cashShiftHandoverSchema = z.object({
+  toIdentityId: id,
+  reason: z.string().trim().min(3).max(1_000),
+});
+export const cashApprovalDecisionSchema = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    note: z.string().trim().min(3).max(1_000).optional(),
+  })
+  .refine((value) => value.decision !== "reject" || value.note !== undefined, {
+    message: "Informe o motivo da rejeição.",
+    path: ["note"],
+  });
+export const cashTerminalUpdateSchema = z.object({
+  cashRegisterId: id.nullable(),
+});
+const cashShiftHistoryQueryBaseSchema = z.object({
+  from: date.optional(),
+  to: date.optional(),
+  cashRegisterId: id.optional(),
+  operatorIdentityId: id.optional(),
+  status: z.enum(["open", "closed", "reviewed"]).optional(),
+});
+const cashShiftPeriodIsValid = (value: { from?: string; to?: string }) =>
+  !value.from || !value.to || value.from <= value.to;
+export const cashShiftHistoryQuerySchema = cashShiftHistoryQueryBaseSchema
+  .extend({
+    cursor: z.string().trim().min(1).max(500).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .refine(cashShiftPeriodIsValid, {
+    message: "O início do período deve ser anterior ao fim.",
+    path: ["from"],
+  });
+export const cashShiftExportQuerySchema = cashShiftHistoryQueryBaseSchema
+  .extend({ format: z.enum(["csv", "pdf"]).default("csv") })
+  .refine(cashShiftPeriodIsValid, {
+    message: "O início do período deve ser anterior ao fim.",
+    path: ["from"],
+  });
 
 export const reconciliationSchema = z.object({
   source: z.enum(["manual", "imported"]),
@@ -698,7 +818,65 @@ export const reconciliationSchema = z.object({
     .max(5_000),
 });
 
-export const personSchema = z.object({
+export const personAccessRoleSchema = z.enum([
+  "owner",
+  "manager",
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+  "inventory",
+  "finance",
+  "accountant",
+]);
+
+const personAccessEmailSchema = z.string().trim().toLowerCase().email().max(254);
+
+export const personAccessStepUpSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(200).optional(),
+    mfaCode: z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
+  })
+  .refine((value) => Boolean(value.currentPassword) !== Boolean(value.mfaCode), {
+    message: "Confirme com a senha atual ou com um código MFA.",
+  });
+
+export const personAccessInviteSchema = z.object({
+  email: personAccessEmailSchema,
+  role: personAccessRoleSchema,
+  reauth: personAccessStepUpSchema.optional(),
+});
+
+export const personAccessRoleUpdateSchema = z.object({
+  role: personAccessRoleSchema,
+  reason: z.string().trim().min(5).max(1_000),
+  reauth: personAccessStepUpSchema.optional(),
+});
+
+export const personAccessReactivateSchema = z.object({
+  role: personAccessRoleSchema.optional(),
+  reason: z.string().trim().min(5).max(1_000),
+  reauth: personAccessStepUpSchema.optional(),
+});
+
+export const personUnitAccessSchema = z.object({
+  unitId: id,
+  role: personAccessRoleSchema,
+  reason: z.string().trim().min(5).max(1_000),
+  reauth: personAccessStepUpSchema.optional(),
+});
+
+export const personUnitAccessRemovalSchema = z.object({
+  reason: z.string().trim().min(5).max(1_000),
+  reauth: personAccessStepUpSchema.optional(),
+});
+
+const personFieldsSchema = z.object({
   identityId: id.optional(),
   name,
   employmentCode: z.string().trim().min(1).max(80).optional(),
@@ -707,7 +885,11 @@ export const personSchema = z.object({
   hiredAt: date.optional(),
 });
 
-export const personUpdateSchema = personSchema
+export const personSchema = personFieldsSchema.extend({
+  access: personAccessInviteSchema.optional(),
+});
+
+export const personUpdateSchema = personFieldsSchema
   .partial()
   .extend({
     identityId: id.nullable().optional(),
@@ -1119,10 +1301,25 @@ export type FinancialPaymentInput = z.infer<typeof financialPaymentSchema>;
 export type ReceivableInput = z.infer<typeof receivableSchema>;
 export type ReceivablePaymentInput = z.infer<typeof receivablePaymentSchema>;
 export type OpenCashShiftInput = z.infer<typeof openCashShiftSchema>;
+export type CashRegisterCreateInput = z.infer<typeof cashRegisterCreateSchema>;
+export type CashRegisterUpdateInput = z.infer<typeof cashRegisterUpdateSchema>;
+export type CashTransferInput = z.infer<typeof cashTransferSchema>;
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
 export type CloseCashShiftInput = z.infer<typeof closeCashShiftSchema>;
+export type CashShiftReviewInput = z.infer<typeof cashShiftReviewSchema>;
+export type CashSettingsInput = z.infer<typeof cashSettingsSchema>;
+export type CashShiftHandoverInput = z.infer<typeof cashShiftHandoverSchema>;
+export type CashApprovalDecisionInput = z.infer<typeof cashApprovalDecisionSchema>;
+export type CashTerminalUpdateInput = z.infer<typeof cashTerminalUpdateSchema>;
+export type CashShiftHistoryQuery = z.infer<typeof cashShiftHistoryQuerySchema>;
+export type CashShiftExportQuery = z.infer<typeof cashShiftExportQuerySchema>;
 export type ReconciliationInput = z.infer<typeof reconciliationSchema>;
 export type PersonInput = z.infer<typeof personSchema>;
+export type PersonAccessInviteInput = z.infer<typeof personAccessInviteSchema>;
+export type PersonAccessRoleUpdateInput = z.infer<typeof personAccessRoleUpdateSchema>;
+export type PersonAccessReactivateInput = z.infer<typeof personAccessReactivateSchema>;
+export type PersonUnitAccessInput = z.infer<typeof personUnitAccessSchema>;
+export type PersonUnitAccessRemovalInput = z.infer<typeof personUnitAccessRemovalSchema>;
 export type PersonUpdateInput = z.infer<typeof personUpdateSchema>;
 export type PersonStatusInput = z.infer<typeof personStatusSchema>;
 export type PeopleListQuery = z.infer<typeof peopleListQuerySchema>;

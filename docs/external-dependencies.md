@@ -15,11 +15,25 @@ O código deve falhar de forma segura quando estas dependências estiverem ausen
 | OpenAI | chave, política de dados e base de ajuda aprovada | busca determinística |
 | Contabilidade e folha | fornecedores escolhidos, contratos de API e mapeamento contábil | API pública/webhooks disponíveis; nenhum fornecedor presumido |
 | Piloto | empresa, rede, impressoras, produtos, mesas, equipe e dados fiscais | depende de tenant real configurado |
+| SmartPOS | terminal de desenvolvimento, modelo/Android/firmware exatos, credenciais, contrato do SDK/deeplink, assinatura, loja, atestação disponível e roteiro do fornecedor | PWA, pareamento P-256, matriz/kill switch, tentativas, outbox, estorno, conciliação, observabilidade, UI e bridge fail-closed implementados; Rede/PayGo/Stone/Getnet/Cielo/PagBank permanecem desabilitados sem adaptador, terminal físico e homologação |
 | Impressão e bump bar KDS | modelo de impressora, rede/VLAN, tabela de caracteres, largura da bobina e homologação do hardware | ESC/POS TCP, recibo 58/80 mm, corte, fila idempotente e ponte nativa implementados; `window.print()` permanece como contingência. USB/Bluetooth, leitura de sensores e roteamento KDS por praça dependem do equipamento escolhido |
 | Hub em produção | certificado TLS local, instalador, provisionamento e cofre de segredos | SQLCipher, replay e reconciliação validados localmente |
 | Geocodificação | provedor e chave para converter endereço em coordenadas | coordenadas informadas são validadas por ponto-no-polígono; conversão automática de endereço continua bloqueada |
 
 Documentos jurídicos e procedimentos LGPD são modelos técnicos e exigem revisão profissional antes da publicação comercial.
+
+## Gate externo SmartPOS
+
+`config/smartpos-release.json` é a declaração versionada do que pode ser publicado. Ela começa com todos os fornecedores bloqueados. `pnpm smartpos:release-check` impede configurar uma URL de loja para Rede, PayGo ou Stone enquanto o fornecedor não estiver `homologated` com terminal, aplicativo assinado e evidências imutáveis. O gate não valida a autenticidade de um documento externo e não substitui o aceite do fornecedor.
+
+| Fornecedor | Dependência externa ainda necessária | Canal oficial de início |
+|---|---|---|
+| Rede / Itaú | cadastro da software house, materiais e credenciais aplicáveis, modelo/firmware piloto, assinatura/publicação na Laranjinha Store, roteiro físico e aceite | [Programa Conexão Itaú](https://www.itau.com.br/empresas/conexaoitau/parceiros) |
+| PayGo | abertura do atendimento de integração, licenciamento/credenciais, confirmação da matriz terminal/adquirente e envio do roteiro/evidências | [Portal de desenvolvimento PayGo](https://paygodev.readme.io/) |
+| Stone | credenciais/canal comercial, modelo e firmware aceitos, deeplink testado no terminal, publicação e aceite | [SDK Android Stone](https://sdkandroid.stone.com.br/reference/explicacao-deeplink) |
+| Getnet, Cielo e PagBank | projeto específico conforme as restrições do fornecedor, credenciais, dispositivo, assinatura/publicação e homologação | obter durante o onboarding oficial; nenhum link de aplicativo está configurado |
+
+Links de marketing, deeplinks genéricos e URLs inferidas não são URLs de instalação. `NEXT_PUBLIC_REDE_STORE_URL`, `NEXT_PUBLIC_PAYGO_STORE_URL` e `NEXT_PUBLIC_STONE_STORE_URL` ficam vazias até o fornecedor fornecer e aprovar o endereço específico do aplicativo GiroMesa.
 
 ## Fronteira dos terminais KDS
 

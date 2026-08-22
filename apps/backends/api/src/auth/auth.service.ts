@@ -27,7 +27,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import * as argon2 from "argon2";
-import { and, desc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { isPlatformAdminEmail } from "../platform/platform-access.js";
 import type { GoogleAuthIntent, GoogleProfile } from "./google-oauth.js";
@@ -51,6 +51,10 @@ export interface AuthContext {
   displayName: string;
   sessionId: string;
   expiresAt: Date;
+  authKind?: "identity" | "terminal";
+  organizationId?: string;
+  unitId?: string;
+  actorEpoch?: number;
 }
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -518,6 +522,70 @@ export class AuthService {
       )
       .limit(1);
     return record ?? null;
+  }
+
+  async verifyStepUp(
+    identityId: string,
+    proof: { currentPassword?: string; mfaCode?: string } | undefined,
+  ) {
+    if (!proof || Boolean(proof.currentPassword) === Boolean(proof.mfaCode)) {
+      throw new UnauthorizedException({
+        code: "ACCESS_STEP_UP_REQUIRED",
+        message: "Confirme sua identidade para liberar este perfil sensível.",
+      });
+    }
+
+    let method: "password" | "mfa" | null = null;
+    if (proof.currentPassword) {
+      const [credential] = await this.database.db
+        .select({ passwordHash: passwordCredentials.passwordHash })
+        .from(passwordCredentials)
+        .where(eq(passwordCredentials.identityId, identityId))
+        .limit(1);
+      const valid = credential
+        ? await argon2.verify(credential.passwordHash, proof.currentPassword)
+        : false;
+      if (!credential) await argon2.hash(proof.currentPassword);
+      if (valid) method = "password";
+    } else if (proof.mfaCode) {
+      const [factor] = await this.database.db
+        .select()
+        .from(mfaFactors)
+        .where(and(eq(mfaFactors.identityId, identityId), isNotNull(mfaFactors.verifiedAt)))
+        .limit(1);
+      if (factor) {
+        const key = this.getMfaKey();
+        const acceptedCounter = verifiedTotpCounter(decryptMfaSecret(factor, key), proof.mfaCode);
+        if (acceptedCounter !== null) {
+          const [marker] = await this.database.db
+            .insert(mfaChallenges)
+            .values({
+              identityId,
+              tokenHash: totpReplayHash(identityId, acceptedCounter, key),
+              attempts: 0,
+              expiresAt: new Date((acceptedCounter + 2) * 30_000),
+              usedAt: new Date(),
+            })
+            .onConflictDoNothing({ target: mfaChallenges.tokenHash })
+            .returning({ id: mfaChallenges.id });
+          if (marker) method = "mfa";
+        }
+      }
+    }
+
+    if (!method) {
+      throw new UnauthorizedException({
+        code: "ACCESS_STEP_UP_INVALID",
+        message: "A confirmação de identidade não foi aceita.",
+      });
+    }
+    await this.database.db.insert(auditEvents).values({
+      actorIdentityId: identityId,
+      action: "auth.step_up_verified",
+      entityType: "identity",
+      entityId: identityId,
+      metadata: { method },
+    });
   }
 
   async revoke(sessionId: string, identityId: string) {

@@ -19,7 +19,9 @@ export const routeIds: RouteId[] = [
   "reservations",
   "crm",
   "multiunit",
+  "settings",
   "platform",
+  "device",
   "alerts",
 ];
 

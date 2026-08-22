@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { openTabSchema, terminalProfileSchema } from "./pilot-schemas.js";
+import { openTabSchema, paymentSchema, terminalProfileSchema } from "./pilot-schemas.js";
 
 const tableId = "00000000-0000-4000-8000-000000000001";
 const reservationId = "00000000-0000-4000-8000-000000000002";
 const waitlistEntryId = "00000000-0000-4000-8000-000000000003";
+const cashRegisterId = "00000000-0000-4000-8000-000000000004";
+const installationId = "00000000-0000-4000-8000-000000000005";
 
 it("requires one table and only one reception source when seating a guest", () => {
   assert.equal(openTabSchema.safeParse({ tableId, reservationId, guestCount: 2 }).success, true);
@@ -33,5 +35,14 @@ it("accepts only bounded operational terminal profiles", () => {
   assert.equal(
     terminalProfileSchema.safeParse({ ...valid, quickActions: Array(9).fill("print") }).success,
     false,
+  );
+  assert.equal(
+    terminalProfileSchema.safeParse({ ...valid, cashRegisterId }).data?.cashRegisterId,
+    cashRegisterId,
+  );
+  assert.equal(
+    paymentSchema.safeParse({ method: "cash", amountCents: 100, cashRegisterId, installationId })
+      .success,
+    true,
   );
 });

@@ -33,10 +33,18 @@
   margin-bottom: 1.2rem;
   padding: 0.7rem;
 }
-.unit-chip span:nth-child(2) {
+.unit-chip > span:last-child {
   display: grid;
   gap: 0.18rem;
   min-width: 0;
+}
+.unit-chip__logo {
+  background: var(--gm-surface);
+  border-radius: 7px;
+  flex: 0 0 auto;
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
 }
 .unit-chip strong {
   font-size: 0.78rem;
@@ -639,12 +647,26 @@
   min-width: 0;
 }
 .topbar__scope {
-  display: grid;
+  align-items: center;
+  display: flex;
   gap: 2px;
   max-width: 220px;
   min-width: 0;
   padding: 2px 0;
   text-align: left;
+}
+.topbar__scope-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.topbar__unit-logo {
+  border: 1px solid var(--gm-border);
+  border-radius: 7px;
+  flex: 0 0 auto;
+  height: 34px;
+  object-fit: contain;
+  width: 34px;
 }
 .topbar__scope .org-label {
   color: var(--gm-muted);
@@ -722,16 +744,26 @@
 }
 .topbar-clock {
   align-items: center;
+  border-left: 1px solid var(--gm-border);
   color: var(--gm-muted);
   display: inline-flex;
   flex-shrink: 0;
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
   gap: 5px;
+  padding-left: 8px;
+}
+.topbar-clock__date {
+  min-width: 7.5rem;
 }
 .topbar-clock__time {
   color: var(--gm-ink);
-  font-size: 0.78rem;
+  font-size: 0.86rem;
+  min-width: 3rem;
+  text-align: right;
+}
+.topbar-clock__separator {
+  color: var(--gm-border-strong, var(--gm-border));
 }
 .topbar__popover-anchor {
   position: relative;
@@ -757,6 +789,8 @@
   font-size: 0.72rem;
   font-weight: 700;
   gap: 6px;
+  justify-content: center;
+  min-width: 92px;
   padding: 6px 10px;
   white-space: nowrap;
 }
@@ -1066,7 +1100,7 @@
   width: 100%;
   margin-bottom: 0.8rem;
 }
-.sidebar--collapsed .unit-chip span:nth-child(2) {
+.sidebar--collapsed .unit-chip > span:last-child {
   display: none;
 }
 

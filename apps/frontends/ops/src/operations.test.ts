@@ -4,7 +4,9 @@ import {
   parseKds,
   parsePilotCatalog,
   parsePilotFloor,
+  parseTabDetail,
   summarizeOperationalLoad,
+  summarizeTabPayments,
   usesQuickServiceMode,
 } from "./operations";
 
@@ -14,6 +16,95 @@ describe("contratos operacionais reais", () => {
     expect(usesQuickServiceMode("bar")).toBe(true);
     expect(usesQuickServiceMode("full_service")).toBe(false);
     expect(usesQuickServiceMode("hybrid")).toBe(false);
+  });
+
+  it("normaliza pagamentos legados e calcula o recebido pelo valor líquido", () => {
+    const base = {
+      tab: {
+        id: "tab-1",
+        status: "open",
+        guestCount: 1,
+        serviceChargeBasisPoints: 0,
+        tipCents: 0,
+        subtotalCents: 2_000,
+        discountCents: 0,
+        serviceChargeCents: 0,
+        totalCents: 2_000,
+        version: 1,
+      },
+      orders: [],
+      items: [],
+      events: [],
+      presence: [],
+    };
+    const detail = parseTabDetail({
+      ...base,
+      payments: [
+        {
+          id: "payment-posted",
+          method: "cash",
+          amountCents: 1_000,
+          reference: null,
+          createdAt: "2026-08-21T12:00:00.000Z",
+        },
+        {
+          id: "payment-reversed",
+          method: "credit_card",
+          amountCents: 600,
+          reversedCents: 600,
+          netAmountCents: 0,
+          financialStatus: "reversed",
+          reference: "NSU-1",
+          createdAt: "2026-08-21T12:05:00.000Z",
+        },
+      ],
+    });
+
+    expect(detail.payments[0]).toMatchObject({
+      reversedCents: 0,
+      netAmountCents: 1_000,
+      financialStatus: "posted",
+    });
+    expect(summarizeTabPayments(detail.payments)).toEqual({
+      grossPaidCents: 1_600,
+      reversedCents: 600,
+      paidCents: 1_000,
+    });
+  });
+
+  it("rejeita totais financeiros incoerentes no pagamento", () => {
+    expect(() =>
+      parseTabDetail({
+        tab: {
+          id: "tab-1",
+          status: "open",
+          guestCount: 1,
+          serviceChargeBasisPoints: 0,
+          tipCents: 0,
+          subtotalCents: 1_000,
+          discountCents: 0,
+          serviceChargeCents: 0,
+          totalCents: 1_000,
+          version: 1,
+        },
+        orders: [],
+        items: [],
+        payments: [
+          {
+            id: "payment-1",
+            method: "pix",
+            amountCents: 1_000,
+            reversedCents: 400,
+            netAmountCents: 1_000,
+            financialStatus: "reversed",
+            reference: null,
+            createdAt: "2026-08-21T12:00:00.000Z",
+          },
+        ],
+        events: [],
+        presence: [],
+      }),
+    ).toThrow(InvalidPilotPayloadError);
   });
 
   it("compõe preço, disponibilidade e complementos do catálogo", () => {

@@ -16,14 +16,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The amountCents property</summary>
         public int? AmountCents { get; set; }
+        /// <summary>The cashRegisterId property</summary>
+        public Guid? CashRegisterId { get; set; }
         /// <summary>The method property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Method { get; set; }
-#nullable restore
-#else
-        public string Method { get; set; }
-#endif
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item.Payments.PaymentsPostRequestBody_method? Method { get; set; }
         /// <summary>The occurredAt property</summary>
         public DateTimeOffset? OccurredAt { get; set; }
         /// <summary>The reference property</summary>
@@ -60,7 +56,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
-                { "method", n => { Method = n.GetStringValue(); } },
+                { "cashRegisterId", n => { CashRegisterId = n.GetGuidValue(); } },
+                { "method", n => { Method = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item.Payments.PaymentsPostRequestBody_method>(); } },
                 { "occurredAt", n => { OccurredAt = n.GetDateTimeOffsetValue(); } },
                 { "reference", n => { Reference = n.GetStringValue(); } },
             };
@@ -73,7 +70,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
-            writer.WriteStringValue("method", Method);
+            writer.WriteGuidValue("cashRegisterId", CashRegisterId);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item.Payments.PaymentsPostRequestBody_method>("method", Method);
             writer.WriteDateTimeOffsetValue("occurredAt", OccurredAt);
             writer.WriteStringValue("reference", Reference);
             writer.WriteAdditionalData(AdditionalData);

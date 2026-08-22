@@ -21,13 +21,15 @@ Worker ────────────> outbox do banco + provedores extern
 | Bootstrap do Ops | `apps/frontends/ops/src/main.tsx`, `src/App.tsx` | `src/app/PageContent.tsx`, `src/features/shell/OperationalApp.tsx` |
 | Atendimento | `apps/frontends/ops/src/features/salon/SalonPage.tsx` | `operations.shared.tsx`, `operational-dispatch.ts`, API `pilot-operations` |
 | Balcão/comanda | `apps/frontends/ops/src/features/counter/CounterPage.tsx` | `features/counter/`, API `pilot-pos.*` |
+| SmartPOS/PWA | `apps/frontends/ops/src/features/counter/SmartPosPaymentModal.tsx`, `src/features/device/{DeviceSetupPage,SmartPosAdminPanel}.tsx`, `src/pwa.ts` | API `pilot-payment-*.controller.ts`/`pilot-{pos,smartpos}.service.ts`, `packages/db/src/operations-schema.ts`, `apps/native/ops-shell/SmartPos*.cs`, `docs/runbooks/smartpos.md` |
 | Produção KDS | `apps/frontends/ops/src/features/kds/KdsPage.tsx`, `KdsSettingsPage.tsx` | `kds.navigation.ts`, shell `OperationalApp.tsx`, `operations.shared.tsx`, `operational-dispatch.ts`, API `pilot-pos.*`, Edge Hub |
 | Cardápio operacional | `apps/frontends/ops/src/features/catalog/CatalogPage.tsx` | `CatalogExperience.tsx`, `components/`, `catalog.css`, API `pilot-catalog.*` |
 | Delivery | `apps/frontends/ops/src/features/delivery/DeliveryPage.tsx` | `src/growth.shared.tsx`, `src/realtime.ts`, API `growth/`, `packages/db/src/growth-schema.ts` |
 | Estoque e compras | `apps/frontends/ops/src/features/inventory/InventoryPage.tsx`, `features/purchases/PurchasesPage.tsx` | `InventoryWorkspace.tsx`, `InventoryModals.tsx`, `management.shared.tsx`, API `management/`, worker `inventory.ts` e `packages/db/src/management-schema.ts` |
 | Pessoas | `apps/frontends/ops/src/features/people/PeoplePage.tsx`, `TimeClockBanner.tsx` | `management.shared.tsx`, `api.ts`, API `management/management.{controller,service,schemas,rules}.ts`, `packages/db/src/management-schema.ts` e `tests/e2e-real/people-production.spec.ts` |
+| Configurações do estabelecimento | `apps/frontends/ops/src/features/settings/SettingsPage.tsx` | Ops `api.ts`/shell, API `organizations/`, branding do catálogo e `packages/contracts`/`packages/domain` |
 | Fechamento da equipe | `apps/frontends/ops/src/features/waiter-settlements/WaiterSettlementsPage.tsx` | `waiter-settlements.ts`, `api.ts`, API `management/management-settlements.*` e `packages/db/src/settlement-schema.ts` |
-| Relatórios | `apps/frontends/ops/src/features/reports/ReportsPage.tsx` | `management.shared.tsx`, API `management/management-report.*`, worker `reports.ts` e `packages/db/src/{management,operations}-schema.ts` |
+| Relatórios | `apps/frontends/ops/src/features/reports/ReportsPage.tsx` | famílias em `features/reports/families/`, recursos persistentes em `ReportEnhancements.tsx`, `management.shared.tsx`, API `management/management-report.*`, worker `reports.ts` e `packages/db/src/{management,operations}-schema.ts` |
 | Fiscal e Contador | `apps/frontends/ops/src/features/fiscal/FiscalPages.tsx` | `features/fiscal/fiscal.ts`, API `fiscal/`, `packages/db/src/fiscal-schema.ts` e ciclo fiscal do Edge Hub |
 | Publicação/QR do Cardápio | `apps/backends/api/src/public-menu/`, `pilot-catalog.service.ts` | `apps/frontends/customer/components/menu-experience.tsx`, tokens de mesa e mídia pública |
 | Shell/UI global | `apps/frontends/ops/src/features/shell/OperationalApp.tsx` | `src/styles/`, `packages/ui` |
@@ -51,8 +53,10 @@ Worker ────────────> outbox do banco + provedores extern
 | Alterar Delivery | feature `delivery`, `growth.shared.tsx`, `realtime.ts`, API `growth`, schema `growth` | regras + integração PostgreSQL + teste E2E real em 375 px |
 | Alterar Estoque/compras | features `inventory` e `purchases`, `management.shared.tsx`, API `management`, worker `inventory.ts`, schema `management` | regras + integração PostgreSQL + typechecks API/worker/Ops + mobile 390 px |
 | Alterar Pessoas/ponto/comissões | feature `people`, `management.shared.tsx`, API `management`, schema `management` | regras de autorização/dinheiro + migration limpa/reaplicada + integração PostgreSQL + E2E real light/dark em 375 px |
+| Alterar configurações do estabelecimento | feature `settings`, shell/auth, API `organizations`, branding/publicação do catálogo e contratos/domínio | contratos + RBAC/tenant + API/Ops/customer typechecks + publicação pública + mobile/dark/WCAG |
 | Alterar fechamento da equipe | feature `waiter-settlements`, `api.ts`, API `management-settlements`, schema `settlement` | regras financeiras/RBAC + migration limpa/reaplicada + integração PostgreSQL + typechecks API/Ops + E2E real em 375 px |
 | Alterar preço/pagamento | contracts, domain, db, serviço API proprietário | unitário + integração + idempotência/audit |
+| Alterar SmartPOS | feature `counter`/`device`, `src/pwa.ts`, API `pilot-payment-*`/`pilot-pos`, schema de operações e shell MAUI | contratos + concorrência PostgreSQL + typechecks API/Ops + self-check nativo + E2E 360 px + terminal homologado antes de produção |
 | Alterar Relatórios | feature `reports`, `management.shared.tsx`, API `management/management-report.*`, worker `reports.ts`, schemas `management`/`operations` | regras financeiras/RBAC + migration PostgreSQL + typechecks API/worker/Ops + E2E real em 375 px |
 | Alterar Fiscal/Contador | feature `fiscal`, API `fiscal`, schema fiscal e eventos `fiscal.*` do Edge Hub | unitários de regras + migration + typechecks API/Ops + testes .NET quando houver SDK |
 | Alterar autenticação/tenant | API `auth/common/organizations`, Ops `auth` | testes de autorização e isolamento de tenant |

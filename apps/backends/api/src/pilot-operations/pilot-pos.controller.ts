@@ -15,6 +15,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBody,
   ApiConflictResponse,
   ApiOkResponse,
   ApiQuery,
@@ -112,11 +113,31 @@ import {
   openOperationalShiftSchema,
   openTabSchema,
   orderSchema,
+  type PaymentAttemptCreateInput,
+  type PaymentDevicePairingCreateInput,
+  type PaymentHomologationRunInput,
   type PaymentInput,
+  type PaymentReconciliationQueryInput,
+  type PaymentReversalCreateInput,
   type PrintJobInput,
   type PrintJobQueryInput,
   type PrintJobStatusInput,
+  paymentAttemptCreateSchema,
+  paymentAttemptLookupResponseSchema,
+  paymentAttemptMutationResponseSchema,
+  paymentDeviceListResponseSchema,
+  paymentDevicePairingCreateSchema,
+  paymentDevicePairingResponseSchema,
+  paymentHomologationRunListResponseSchema,
+  paymentHomologationRunMutationResponseSchema,
+  paymentHomologationRunSchema,
+  paymentOperationsHealthResponseSchema,
+  paymentReconciliationListResponseSchema,
+  paymentReconciliationQuerySchema,
+  paymentReversalCreateSchema,
+  paymentReversalResponseSchema,
   paymentSchema,
+  paymentTerminalCapabilityResponseSchema,
   printJobQuerySchema,
   printJobSchema,
   printJobStatusSchema,
@@ -163,6 +184,7 @@ import {
   type UpdateTabInput,
   updateTabSchema,
 } from "./pilot-schemas.js";
+import { PilotSmartPosService } from "./pilot-smartpos.service.js";
 
 @UseGuards(SessionGuard)
 @Controller([
@@ -170,7 +192,10 @@ import {
   "v1/organizations/:organizationId/units/:unitId/pilot",
 ])
 export class PilotPosController {
-  constructor(private readonly pos: PilotPosService) {}
+  constructor(
+    private readonly pos: PilotPosService,
+    private readonly smartPos: PilotSmartPosService,
+  ) {}
 
   @Get("floor")
   floor(
@@ -478,6 +503,178 @@ export class PilotPosController {
     );
   }
 
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentTerminalCapabilityResponseSchema) })
+  @Get("installations/:installationId/payment-capabilities")
+  getPaymentCapabilities(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+  ) {
+    return this.pos.getPaymentCapabilities(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      installationId,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentDevicePairingResponseSchema) })
+  @Post("payment-devices/pairing-codes")
+  createPaymentDevicePairing(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(paymentDevicePairingCreateSchema)) body: PaymentDevicePairingCreateInput,
+  ) {
+    return this.smartPos.createPairingCode(request.auth.identityId, organizationId, unitId, body);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentDeviceListResponseSchema) })
+  @Get("payment-devices")
+  listPaymentDevices(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.smartPos.listDevices(request.auth.identityId, organizationId, unitId);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentOperationsHealthResponseSchema) })
+  @Get("payment-operations/health")
+  paymentOperationsHealth(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.smartPos.health(request.auth.identityId, organizationId, unitId);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentReconciliationListResponseSchema) })
+  @Get("payment-reconciliation")
+  listPaymentReconciliation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(paymentReconciliationQuerySchema)) query: PaymentReconciliationQueryInput,
+  ) {
+    return this.smartPos.listReconciliation(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentHomologationRunMutationResponseSchema) })
+  @Post("payment-homologation-runs")
+  recordPaymentHomologationRun(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(paymentHomologationRunSchema)) body: PaymentHomologationRunInput,
+  ) {
+    return this.smartPos.recordHomologationRun(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      body,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentHomologationRunListResponseSchema) })
+  @Get("payment-homologation-runs")
+  listPaymentHomologationRuns(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.smartPos.listHomologationRuns(request.auth.identityId, organizationId, unitId);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentAttemptMutationResponseSchema) })
+  @Post("tabs/:tabId/payment-attempts")
+  createPaymentAttempt(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("tabId", ParseUUIDPipe) tabId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(paymentAttemptCreateSchema)) body: PaymentAttemptCreateInput,
+  ) {
+    return this.pos.createPaymentAttempt(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      tabId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentAttemptLookupResponseSchema) })
+  @Get("payment-attempts/:attemptId")
+  getPaymentAttempt(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("attemptId", ParseUUIDPipe) attemptId: string,
+  ) {
+    return this.pos.getPaymentAttempt(request.auth.identityId, organizationId, unitId, attemptId);
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentAttemptMutationResponseSchema) })
+  @Post("payment-attempts/:attemptId/recover")
+  recoverPaymentAttempt(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("attemptId", ParseUUIDPipe) attemptId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.recoverPaymentAttempt(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      attemptId,
+      idempotencyKey,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentAttemptMutationResponseSchema) })
+  @Post("payment-attempts/:attemptId/cancel")
+  cancelPaymentAttempt(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("attemptId", ParseUUIDPipe) attemptId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.cancelPaymentAttempt(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      attemptId,
+      idempotencyKey,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(paymentReversalResponseSchema) })
+  @Post("payments/:paymentId/reversals")
+  requestPaymentReversal(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("paymentId", ParseUUIDPipe) paymentId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(paymentReversalCreateSchema)) body: PaymentReversalCreateInput,
+  ) {
+    return this.pos.requestPaymentReversal(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      paymentId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @ApiBody({ schema: toOpenApiSchema(paymentSchema) })
   @Post("tabs/:tabId/payments")
   recordPayment(
     @Req() request: AuthenticatedRequest,

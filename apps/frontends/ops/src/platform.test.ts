@@ -19,6 +19,26 @@ describe("painel real da plataforma", () => {
         },
       ],
       recentContacts: [],
+      fiscalIntegrations: [
+        {
+          organizationId: "org-1",
+          organizationName: "Bar da Ana",
+          unitId: "unit-1",
+          unitName: "Centro",
+          document: "05953016000132",
+          provider: "focus",
+          environment: "homologation",
+          profileUpdatedAt: "2026-08-09T20:00:00.000Z",
+          companyId: "42",
+          status: "ready",
+          certificateValidUntil: "2027-08-09",
+          lastCheckedAt: "2026-08-09T20:00:00.000Z",
+          hasHomologationCredential: true,
+          hasProductionCredential: false,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
+      ],
       recentOrganizations: [
         {
           id: "org-1",
@@ -37,6 +57,7 @@ describe("painel real da plataforma", () => {
     expect(overview.recentTrialApplications[0]?.businessName).toBe("Bar da Ana");
     expect(overview.health.failedJobs).toBe(1);
     expect(overview.recentOrganizations[0]?.tone).toBe("warning");
+    expect(overview.fiscalIntegrations[0]?.hasHomologationCredential).toBe(true);
   });
 
   it("rejeita payload sem contadores", () => {

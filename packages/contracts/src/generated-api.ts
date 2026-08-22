@@ -228,6 +228,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_importTaxRevisions[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/tax-revisions/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_importTaxRevisions[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/dashboard": {
     parameters: {
       query?: never;
@@ -350,6 +382,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["FiscalController_reconcileDocument[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/artifacts/{kind}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_documentArtifact[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/documents/{documentId}/artifacts/{kind}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_documentArtifact[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -508,6 +572,102 @@ export interface paths {
       cookie?: never;
     };
     get: operations["FiscalController_accountantPackage[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/package/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantPackageContent[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/package/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantPackageContent[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/number-invalidations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_numberInvalidations[0]"];
+    put?: never;
+    post: operations["FiscalController_invalidateNumbers[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/number-invalidations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_numberInvalidations[1]"];
+    put?: never;
+    post: operations["FiscalController_invalidateNumbers[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/number-invalidations/{invalidationId}/artifact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_numberInvalidationArtifact[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/number-invalidations/{invalidationId}/artifact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_numberInvalidationArtifact[1]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1396,6 +1556,198 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/terminal-pin": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["TerminalSessionController_configurePin[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-pin": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["TerminalSessionController_configurePin[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/terminal-pin/{membershipId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["TerminalSessionController_revokePin[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-pin/{membershipId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["TerminalSessionController_revokePin[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/terminal-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TerminalSessionController_status[0]"];
+    put?: never;
+    post: operations["TerminalSessionController_create[0]"];
+    delete: operations["TerminalSessionController_close[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TerminalSessionController_status[1]"];
+    put?: never;
+    post: operations["TerminalSessionController_create[1]"];
+    delete: operations["TerminalSessionController_close[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/terminal-session/unlock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_unlock[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-session/unlock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_unlock[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/terminal-session/activity": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_activity[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-session/activity": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_activity[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/terminal-session/lock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_lock[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/terminal-session/lock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TerminalSessionController_lock[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations": {
     parameters: {
       query?: never;
@@ -1454,6 +1806,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["OrganizationsController_revokeDevice[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_getSettings[0]"];
+    put: operations["OrganizationsController_updateUnitSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_getSettings[1]"];
+    put: operations["OrganizationsController_updateUnitSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["OrganizationsController_updateOrganizationSettings[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["OrganizationsController_updateOrganizationSettings[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{sourceUnitId}/settings/copy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_copyUnitSettings[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{sourceUnitId}/settings/copy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_copyUnitSettings[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3796,6 +4244,358 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/installations/{installationId}/payment-capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getPaymentCapabilities[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/installations/{installationId}/payment-capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getPaymentCapabilities[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-devices/pairing-codes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPaymentDevicePairing[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-devices/pairing-codes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPaymentDevicePairing[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-devices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentDevices[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-devices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentDevices[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-operations/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_paymentOperationsHealth[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-operations/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_paymentOperationsHealth[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-reconciliation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentReconciliation[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-reconciliation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentReconciliation[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-homologation-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentHomologationRuns[0]"];
+    put?: never;
+    post: operations["PilotPosController_recordPaymentHomologationRun[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-homologation-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_listPaymentHomologationRuns[1]"];
+    put?: never;
+    post: operations["PilotPosController_recordPaymentHomologationRun[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/payment-attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPaymentAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/payment-attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPaymentAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getPaymentAttempt[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_getPaymentAttempt[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}/recover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recoverPaymentAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}/recover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_recoverPaymentAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelPaymentAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payment-attempts/{attemptId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_cancelPaymentAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/payments/{paymentId}/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_requestPaymentReversal[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/payments/{paymentId}/reversals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_requestPaymentReversal[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/payments": {
     parameters: {
       query?: never;
@@ -5485,6 +6285,358 @@ export interface paths {
     };
     get?: never;
     put: operations["PilotPosController_setKdsProductAvailability[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-pairings/redeem": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_redeemPairing[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-pairings/redeem": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_redeemPairing[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-credentials/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_rotateCredential[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-credentials/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_rotateCredential[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-diagnostics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_reportDiagnostics[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-diagnostics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_reportDiagnostics[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-attempts/{attemptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPaymentDeviceController_getAttempt[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-attempts/{attemptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPaymentDeviceController_getAttempt[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-attempts/{attemptId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_claimAttempt[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-attempts/{attemptId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_claimAttempt[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-attempts/{attemptId}/result": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_recordResult[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-attempts/{attemptId}/result": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_recordResult[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-reversals/{reversalId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_claimReversal[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-reversals/{reversalId}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_claimReversal[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/payment-reversals/{reversalId}/result": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_recordReversalResult[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/payment-reversals/{reversalId}/result": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentDeviceController_recordReversalResult[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/internal/organizations/{organizationId}/units/{unitId}/payment-terminals/certifications/{certificationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPaymentInternalController_configureCertification[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/v1/organizations/{organizationId}/units/{unitId}/payment-terminals/certifications/{certificationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPaymentInternalController_configureCertification[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/internal/organizations/{organizationId}/units/{unitId}/payment-terminals/reconciliation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentInternalController_ingestReconciliation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/v1/organizations/{organizationId}/units/{unitId}/payment-terminals/reconciliation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPaymentInternalController_ingestReconciliation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/internal/organizations/{organizationId}/units/{unitId}/payment-terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPaymentInternalController_configure[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/v1/organizations/{organizationId}/units/{unitId}/payment-terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPaymentInternalController_configure[1]"];
     post?: never;
     delete?: never;
     options?: never;
@@ -7444,6 +8596,326 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashSettings[0]"];
+    put: operations["ManagementController_updateCashSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashSettings[1]"];
+    put: operations["ManagementController_updateCashSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashShiftHistory[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashShiftHistory[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_exportCashShifts[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_exportCashShifts[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/detail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashShiftDetail[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/detail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashShiftDetail[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateCashTerminal[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-terminals/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateCashTerminal[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-approvals/{approvalId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideCashApproval[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-approvals/{approvalId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideCashApproval[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-approvals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashApprovals[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-approvals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_cashApprovals[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-registers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createCashRegister[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-registers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_createCashRegister[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-registers/{cashRegisterId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateCashRegister[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-registers/{cashRegisterId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateCashRegister[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferCash[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-transfers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_transferCash[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/movements": {
     parameters: {
       query?: never;
@@ -7476,6 +8948,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/handover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_handoverCashShift[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/handover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_handoverCashShift[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/close": {
     parameters: {
       query?: never;
@@ -7502,6 +9006,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_closeCashShift[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewCashShift[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reviewCashShift[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -7918,6 +9454,70 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_backfillReportCosts[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/costs/backfill/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_previewReportCosts[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/costs/backfill/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_previewReportCosts[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reports/reconciliation/closure": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeReportReconciliation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reports/reconciliation/closure": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_closeReportReconciliation[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -8494,6 +10094,390 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_decideTimeCorrection[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/access-center": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleAccessCenter[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/access-center": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_peopleAccessCenter[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/terminals/{terminalSessionId}/revoke": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_revokeManagedTerminal[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/terminals/{terminalSessionId}/revoke": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_revokeManagedTerminal[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access-overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personAccessOverview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access-overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personAccessOverview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/offboarding-preflight": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personOffboardingPreflight[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/offboarding-preflight": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_personOffboardingPreflight[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/units": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_assignPersonUnitAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/units": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_assignPersonUnitAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/units/{targetUnitId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_removePersonUnitAccess[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/units/{targetUnitId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["ManagementController_removePersonUnitAccess[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/invite": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_invitePersonAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/invite": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_invitePersonAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/resend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resendPersonAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/resend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resendPersonAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPersonAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPersonAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePersonAccess[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePersonAccess[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/suspend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_suspendPersonAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/suspend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_suspendPersonAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/reactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reactivatePersonAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/people/{personId}/access/reactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reactivatePersonAccess[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -11152,6 +13136,17 @@ export interface components {
             revenuePerOperatingDayCents: number | null;
             organizationRevenueSharePercent: number | null;
             sameStoreChangePercent: number | null;
+            minimumComparableOperatingDays: number;
+            comparableStoreEligible: boolean;
+            seatCount: number;
+            activeEmployees: number;
+            openHours: number | null;
+            /** Format: int64 */
+            revenuePerSeatCents: number | null;
+            /** Format: int64 */
+            revenuePerOpenHourCents: number | null;
+            /** Format: int64 */
+            revenuePerEmployeeCents: number | null;
           }[];
         };
         quality: {
@@ -11205,10 +13200,15 @@ export interface components {
           external: {
             [key: string]: number;
           };
+          closure: {
+            [key: string]: unknown;
+          };
         };
         forecast: {
           /** @enum {string} */
-          method: "historical_daily_average_v1";
+          method: "weekday_seasonality_v2";
+          available: boolean;
+          minimumSampleDays: number;
           horizonDays: number;
           sampleDays: number;
           /** @enum {string} */
@@ -11220,6 +13220,9 @@ export interface components {
           cash: {
             [key: string]: number;
           };
+          calendarSignals: {
+            [key: string]: unknown;
+          }[];
           purchases: {
             [key: string]: unknown;
           }[];
@@ -11253,6 +13256,15 @@ export interface components {
           reconciliation: "complete" | "partial" | "unavailable";
           /** @enum {string} */
           forecast: "complete" | "partial" | "unavailable";
+        };
+        indicators: {
+          [key: string]: {
+            /** @enum {string} */
+            coverage: "complete" | "partial" | "unavailable";
+            /** Format: date */
+            dataThrough: string | null;
+            sources: string[];
+          };
         };
       };
       budget: {
@@ -11437,6 +13449,8 @@ export interface components {
       query: {
         [key: string]: unknown;
       };
+      isDefault: boolean;
+      sortOrder: number;
       /** Format: uuid */
       ownerIdentityId: string;
       version: number;
@@ -11470,6 +13484,8 @@ export interface components {
       /** @enum {string} */
       visibility: "private" | "unit" | "organization";
       query: components["schemas"]["ManagementReportViewQuery"];
+      isDefault?: boolean;
+      sortOrder?: number;
       version?: number;
     };
     ManagementReportViews: {
@@ -11495,6 +13511,12 @@ export interface components {
       dueAt?: string | null;
       /** Format: date-time */
       resolvedAt?: string | null;
+      source?: {
+        [key: string]: unknown;
+      };
+      history?: {
+        [key: string]: unknown;
+      }[];
       version: number;
       /** Format: date-time */
       updatedAt: string;
@@ -11972,8 +13994,8 @@ export interface operations {
             origin: number;
             cstIcms?: string;
             csosn?: string;
-            cstPis?: string;
-            cstCofins?: string;
+            cstPis: string;
+            cstCofins: string;
             cstIbsCbs?: string;
             cClassTrib?: string;
           } & {
@@ -12040,8 +14062,8 @@ export interface operations {
             origin: number;
             cstIcms?: string;
             csosn?: string;
-            cstPis?: string;
-            cstCofins?: string;
+            cstPis: string;
+            cstCofins: string;
             cstIbsCbs?: string;
             cClassTrib?: string;
           } & {
@@ -12087,8 +14109,8 @@ export interface operations {
             origin: number;
             cstIcms?: string;
             csosn?: string;
-            cstPis?: string;
-            cstCofins?: string;
+            cstPis: string;
+            cstCofins: string;
             cstIbsCbs?: string;
             cClassTrib?: string;
           } & {
@@ -12134,13 +14156,113 @@ export interface operations {
             origin: number;
             cstIcms?: string;
             csosn?: string;
-            cstPis?: string;
-            cstCofins?: string;
+            cstPis: string;
+            cstCofins: string;
             cstIbsCbs?: string;
             cClassTrib?: string;
           } & {
             [key: string]: unknown;
           };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_importTaxRevisions[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          rows: {
+            /** Format: uuid */
+            productId: string;
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status?: "draft" | "active";
+            effectiveFrom: string;
+            effectiveUntil?: string;
+            classification: {
+              ncm: string;
+              cfop: string;
+              cest?: string;
+              origin: number;
+              cstIcms?: string;
+              csosn?: string;
+              cstPis: string;
+              cstCofins: string;
+              cstIbsCbs?: string;
+              cClassTrib?: string;
+            } & {
+              [key: string]: unknown;
+            };
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_importTaxRevisions[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          rows: {
+            /** Format: uuid */
+            productId: string;
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status?: "draft" | "active";
+            effectiveFrom: string;
+            effectiveUntil?: string;
+            classification: {
+              ncm: string;
+              cfop: string;
+              cest?: string;
+              origin: number;
+              cstIcms?: string;
+              csosn?: string;
+              cstPis: string;
+              cstCofins: string;
+              cstIbsCbs?: string;
+              cClassTrib?: string;
+            } & {
+              [key: string]: unknown;
+            };
+          }[];
         };
       };
     };
@@ -12310,6 +14432,50 @@ export interface operations {
     requestBody?: never;
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_documentArtifact[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+        kind: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_documentArtifact[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        documentId: string;
+        kind: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -12534,6 +14700,190 @@ export interface operations {
       path: {
         organizationId: string;
         unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantPackageContent[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_accountantPackageContent[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_numberInvalidations[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_invalidateNumbers[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          series: string;
+          initialNumber: number;
+          finalNumber: number;
+          justification: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_numberInvalidations[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_invalidateNumbers[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          series: string;
+          initialNumber: number;
+          finalNumber: number;
+          justification: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_numberInvalidationArtifact[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        invalidationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "FiscalController_numberInvalidationArtifact[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        invalidationId: string;
       };
       cookie?: never;
     };
@@ -13822,6 +16172,350 @@ export interface operations {
       };
     };
   };
+  "TerminalSessionController_configurePin[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          membershipId: string;
+          currentPassword: string;
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_configurePin[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          membershipId: string;
+          currentPassword: string;
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_revokePin[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        membershipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_revokePin[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        membershipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_status[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_create[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          deviceId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_close[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_status[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_create[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          organizationId: string;
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          deviceId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_close[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_unlock[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          membershipId: string;
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_unlock[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          membershipId: string;
+          pin: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_activity[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          actorEpoch: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_activity[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          actorEpoch: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_lock[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "TerminalSessionController_lock[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "OrganizationsController_list[0]": {
     parameters: {
       query?: never;
@@ -13951,6 +16645,802 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  "OrganizationsController_getSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              hasUnpublishedChanges: boolean;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_updateUnitSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          timezone: string;
+          presentation: {
+            displayName: string;
+            /** @default null */
+            slogan?: string | null;
+            /** @default null */
+            logoUrl?: string | null;
+            primaryColor: string;
+            accentColor: string;
+            /** @default null */
+            notice?: string | null;
+            /** @default null */
+            address?: string | null;
+            /** @default null */
+            phone?: string | null;
+            /** @default null */
+            instagram?: string | null;
+            /** @default null */
+            openingHours?: string | null;
+            /** @default null */
+            serviceTaxNotice?: string | null;
+            /** @default null */
+            corkageFeeNotice?: string | null;
+            /** @default null */
+            wifi?: {
+              ssid: string;
+              password: string;
+            } | null;
+          };
+          businessHours: {
+            weekly: (
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "closed";
+                }
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "open24h";
+                }
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "periods";
+                  periods: {
+                    start: string;
+                    end: string;
+                    /** @default false */
+                    endsNextDay?: boolean;
+                  }[];
+                }
+            )[];
+            /** @default [] */
+            exceptions?: (
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "closed";
+                }
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "open24h";
+                }
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "periods";
+                  periods: {
+                    start: string;
+                    end: string;
+                    /** @default false */
+                    endsNextDay?: boolean;
+                  }[];
+                }
+            )[];
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              hasUnpublishedChanges: boolean;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_getSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              hasUnpublishedChanges: boolean;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_updateUnitSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          timezone: string;
+          presentation: {
+            displayName: string;
+            /** @default null */
+            slogan?: string | null;
+            /** @default null */
+            logoUrl?: string | null;
+            primaryColor: string;
+            accentColor: string;
+            /** @default null */
+            notice?: string | null;
+            /** @default null */
+            address?: string | null;
+            /** @default null */
+            phone?: string | null;
+            /** @default null */
+            instagram?: string | null;
+            /** @default null */
+            openingHours?: string | null;
+            /** @default null */
+            serviceTaxNotice?: string | null;
+            /** @default null */
+            corkageFeeNotice?: string | null;
+            /** @default null */
+            wifi?: {
+              ssid: string;
+              password: string;
+            } | null;
+          };
+          businessHours: {
+            weekly: (
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "closed";
+                }
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "open24h";
+                }
+              | {
+                  weekday: number;
+                  /** @enum {string} */
+                  mode: "periods";
+                  periods: {
+                    start: string;
+                    end: string;
+                    /** @default false */
+                    endsNextDay?: boolean;
+                  }[];
+                }
+            )[];
+            /** @default [] */
+            exceptions?: (
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "closed";
+                }
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "open24h";
+                }
+              | {
+                  /** Format: date */
+                  date: string;
+                  /** @enum {string} */
+                  mode: "periods";
+                  periods: {
+                    start: string;
+                    end: string;
+                    /** @default false */
+                    endsNextDay?: boolean;
+                  }[];
+                }
+            )[];
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              hasUnpublishedChanges: boolean;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_updateOrganizationSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            id: string;
+            legalName: string;
+            tradeName: string;
+            document: string;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_updateOrganizationSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          tradeName: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            id: string;
+            legalName: string;
+            tradeName: string;
+            document: string;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_copyUnitSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        sourceUnitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          targetUnitIds: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            sourceUnitId: string;
+            targetUnitIds: string[];
+            idempotentReplay: boolean;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_copyUnitSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        sourceUnitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          targetUnitIds: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            sourceUnitId: string;
+            targetUnitIds: string[];
+            idempotentReplay: boolean;
+          };
+        };
       };
     };
   };
@@ -19372,6 +22862,1458 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_getPaymentCapabilities[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getPaymentCapabilities[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createPaymentDevicePairing[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 300 */
+          expiresInSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            pairingId: string;
+            code: string;
+            qrPayload: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createPaymentDevicePairing[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 300 */
+          expiresInSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            pairingId: string;
+            code: string;
+            qrPayload: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentDevices[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            devices: {
+              /** Format: uuid */
+              installationId: string;
+              label: string;
+              /** Format: date-time */
+              enrolledAt: string;
+              revokedAt: string | null;
+              lastSeenAt: string | null;
+              reportedDiagnostics: {
+                manufacturer: string;
+                model: string;
+                androidVersion: string;
+                firmwareVersion: string;
+                appVersion: string;
+                packageName: string;
+                signingCertificateSha256: string;
+                /** Format: date-time */
+                lastSeenAt: string;
+              } | null;
+              capabilities: {
+                /** Format: uuid */
+                installationId: string;
+                available: boolean;
+                /** @enum {string} */
+                status: "disabled" | "pending" | "homologated" | "suspended";
+                provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+                methods: ("credit_card" | "debit_card" | "pix")[];
+                maxInstallments: number;
+                supports: {
+                  cancel: boolean;
+                  recover: boolean;
+                  reversal: boolean;
+                };
+                reason: string | null;
+                certificationId: string | null;
+                diagnosticsMatch: boolean;
+                killSwitch: {
+                  enabled: boolean;
+                  reason: string | null;
+                };
+              };
+              certification: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+                /** @enum {string} */
+                status: "approved" | "suspended";
+                killSwitchEnabled: boolean;
+                killSwitchReason: string | null;
+              } | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentDevices[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            devices: {
+              /** Format: uuid */
+              installationId: string;
+              label: string;
+              /** Format: date-time */
+              enrolledAt: string;
+              revokedAt: string | null;
+              lastSeenAt: string | null;
+              reportedDiagnostics: {
+                manufacturer: string;
+                model: string;
+                androidVersion: string;
+                firmwareVersion: string;
+                appVersion: string;
+                packageName: string;
+                signingCertificateSha256: string;
+                /** Format: date-time */
+                lastSeenAt: string;
+              } | null;
+              capabilities: {
+                /** Format: uuid */
+                installationId: string;
+                available: boolean;
+                /** @enum {string} */
+                status: "disabled" | "pending" | "homologated" | "suspended";
+                provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+                methods: ("credit_card" | "debit_card" | "pix")[];
+                maxInstallments: number;
+                supports: {
+                  cancel: boolean;
+                  recover: boolean;
+                  reversal: boolean;
+                };
+                reason: string | null;
+                certificationId: string | null;
+                diagnosticsMatch: boolean;
+                killSwitch: {
+                  enabled: boolean;
+                  reason: string | null;
+                };
+              };
+              certification: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+                /** @enum {string} */
+                status: "approved" | "suspended";
+                killSwitchEnabled: boolean;
+                killSwitchReason: string | null;
+              } | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_paymentOperationsHealth[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            generatedAt: string;
+            summary: {
+              unknownAttempts: number;
+              staleProcessingAttempts: number;
+              offlineDevices: number;
+              reconciliationDivergences: number;
+            };
+            incidents: {
+              /** @enum {string} */
+              kind:
+                | "unknown_attempt"
+                | "stale_processing"
+                | "offline_device"
+                | "reconciliation_divergence";
+              /** @enum {string} */
+              severity: "warning" | "critical";
+              /** Format: uuid */
+              entityId: string;
+              label: string;
+              /** Format: date-time */
+              occurredAt: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_paymentOperationsHealth[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: date-time */
+            generatedAt: string;
+            summary: {
+              unknownAttempts: number;
+              staleProcessingAttempts: number;
+              offlineDevices: number;
+              reconciliationDivergences: number;
+            };
+            incidents: {
+              /** @enum {string} */
+              kind:
+                | "unknown_attempt"
+                | "stale_processing"
+                | "offline_device"
+                | "reconciliation_divergence";
+              /** @enum {string} */
+              severity: "warning" | "critical";
+              /** Format: uuid */
+              entityId: string;
+              label: string;
+              /** Format: date-time */
+              occurredAt: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentReconciliation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            entries: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              providerSettlementId: string;
+              providerReference: string;
+              grossCents: number;
+              feeCents: number;
+              netCents: number;
+              /** Format: date-time */
+              expectedSettlementAt: string;
+              settledAt: string | null;
+              /** @enum {string} */
+              status: "pending" | "matched" | "divergent" | "settled" | "reversed";
+              /** @enum {string} */
+              source: "api" | "webhook" | "import";
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
+            summary: {
+              grossCents: number;
+              feeCents: number;
+              netCents: number;
+              divergences: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentReconciliation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            entries: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              providerSettlementId: string;
+              providerReference: string;
+              grossCents: number;
+              feeCents: number;
+              netCents: number;
+              /** Format: date-time */
+              expectedSettlementAt: string;
+              settledAt: string | null;
+              /** @enum {string} */
+              status: "pending" | "matched" | "divergent" | "settled" | "reversed";
+              /** @enum {string} */
+              source: "api" | "webhook" | "import";
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
+            summary: {
+              grossCents: number;
+              feeCents: number;
+              netCents: number;
+              divergences: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentHomologationRuns[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            runs: {
+              /** Format: uuid */
+              certificationId: string;
+              /** Format: uuid */
+              installationId: string;
+              terminalSerialHash: string;
+              /** @enum {string} */
+              environment: "sandbox" | "homologation" | "production";
+              checklist: {
+                debitApproved: boolean;
+                creditApproved: boolean;
+                installmentsApproved: boolean;
+                pixApproved: boolean;
+                declinedHandled: boolean;
+                canceledHandled: boolean;
+                networkRecoveryHandled: boolean;
+                reversalApproved: boolean;
+                receiptValidated: boolean;
+              };
+              evidenceReference: string;
+              /** @default null */
+              notes: string | null;
+              /** Format: uuid */
+              id: string;
+              passed: boolean;
+              /** Format: uuid */
+              recordedByIdentityId: string;
+              /** Format: date-time */
+              createdAt: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recordPaymentHomologationRun[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          certificationId: string;
+          /** Format: uuid */
+          installationId: string;
+          terminalSerialHash: string;
+          /** @enum {string} */
+          environment: "sandbox" | "homologation" | "production";
+          checklist: {
+            debitApproved: boolean;
+            creditApproved: boolean;
+            installmentsApproved: boolean;
+            pixApproved: boolean;
+            declinedHandled: boolean;
+            canceledHandled: boolean;
+            networkRecoveryHandled: boolean;
+            reversalApproved: boolean;
+            receiptValidated: boolean;
+          };
+          evidenceReference: string;
+          /** @default null */
+          notes?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            run: {
+              /** Format: uuid */
+              certificationId: string;
+              /** Format: uuid */
+              installationId: string;
+              terminalSerialHash: string;
+              /** @enum {string} */
+              environment: "sandbox" | "homologation" | "production";
+              checklist: {
+                debitApproved: boolean;
+                creditApproved: boolean;
+                installmentsApproved: boolean;
+                pixApproved: boolean;
+                declinedHandled: boolean;
+                canceledHandled: boolean;
+                networkRecoveryHandled: boolean;
+                reversalApproved: boolean;
+                receiptValidated: boolean;
+              };
+              evidenceReference: string;
+              /** @default null */
+              notes: string | null;
+              /** Format: uuid */
+              id: string;
+              passed: boolean;
+              /** Format: uuid */
+              recordedByIdentityId: string;
+              /** Format: date-time */
+              createdAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_listPaymentHomologationRuns[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            runs: {
+              /** Format: uuid */
+              certificationId: string;
+              /** Format: uuid */
+              installationId: string;
+              terminalSerialHash: string;
+              /** @enum {string} */
+              environment: "sandbox" | "homologation" | "production";
+              checklist: {
+                debitApproved: boolean;
+                creditApproved: boolean;
+                installmentsApproved: boolean;
+                pixApproved: boolean;
+                declinedHandled: boolean;
+                canceledHandled: boolean;
+                networkRecoveryHandled: boolean;
+                reversalApproved: boolean;
+                receiptValidated: boolean;
+              };
+              evidenceReference: string;
+              /** @default null */
+              notes: string | null;
+              /** Format: uuid */
+              id: string;
+              passed: boolean;
+              /** Format: uuid */
+              recordedByIdentityId: string;
+              /** Format: date-time */
+              createdAt: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recordPaymentHomologationRun[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          certificationId: string;
+          /** Format: uuid */
+          installationId: string;
+          terminalSerialHash: string;
+          /** @enum {string} */
+          environment: "sandbox" | "homologation" | "production";
+          checklist: {
+            debitApproved: boolean;
+            creditApproved: boolean;
+            installmentsApproved: boolean;
+            pixApproved: boolean;
+            declinedHandled: boolean;
+            canceledHandled: boolean;
+            networkRecoveryHandled: boolean;
+            reversalApproved: boolean;
+            receiptValidated: boolean;
+          };
+          evidenceReference: string;
+          /** @default null */
+          notes?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            run: {
+              /** Format: uuid */
+              certificationId: string;
+              /** Format: uuid */
+              installationId: string;
+              terminalSerialHash: string;
+              /** @enum {string} */
+              environment: "sandbox" | "homologation" | "production";
+              checklist: {
+                debitApproved: boolean;
+                creditApproved: boolean;
+                installmentsApproved: boolean;
+                pixApproved: boolean;
+                declinedHandled: boolean;
+                canceledHandled: boolean;
+                networkRecoveryHandled: boolean;
+                reversalApproved: boolean;
+                receiptValidated: boolean;
+              };
+              evidenceReference: string;
+              /** @default null */
+              notes: string | null;
+              /** Format: uuid */
+              id: string;
+              passed: boolean;
+              /** Format: uuid */
+              recordedByIdentityId: string;
+              /** Format: date-time */
+              createdAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createPaymentAttempt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          method: "credit_card" | "debit_card" | "pix";
+          amountCents: number;
+          /** @default 1 */
+          installments?: number;
+          /** Format: uuid */
+          installationId: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_createPaymentAttempt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          method: "credit_card" | "debit_card" | "pix";
+          amountCents: number;
+          /** @default 1 */
+          installments?: number;
+          /** Format: uuid */
+          installationId: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getPaymentAttempt[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_getPaymentAttempt[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recoverPaymentAttempt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_recoverPaymentAttempt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelPaymentAttempt[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_cancelPaymentAttempt[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "start" | "recover" | "cancel";
+              /** Format: uuid */
+              attemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            } | null;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_requestPaymentReversal[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "reverse" | "recover";
+              /** Format: uuid */
+              reversalId: string;
+              /** Format: uuid */
+              paymentAttemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_requestPaymentReversal[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "reverse" | "recover";
+              /** Format: uuid */
+              reversalId: string;
+              /** Format: uuid */
+              paymentAttemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
   "PilotPosController_recordPayment[0]": {
     parameters: {
       query?: never;
@@ -19392,6 +24334,10 @@ export interface operations {
           method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
           amountCents: number;
           reference?: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
+          /** Format: uuid */
+          installationId?: string;
         };
       };
     };
@@ -19424,6 +24370,10 @@ export interface operations {
           method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
           amountCents: number;
           reference?: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
+          /** Format: uuid */
+          installationId?: string;
         };
       };
     };
@@ -21008,8 +25958,17 @@ export interface operations {
             defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
             printerId: string | null;
             stationId: string | null;
+            cashRegisterId: string | null;
             compact: boolean;
             quickActions: string[];
+            paymentProvider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            /** @enum {string} */
+            paymentStatus: "disabled" | "pending" | "homologated" | "suspended";
+            paymentMethods: ("credit_card" | "debit_card" | "pix")[];
+            maxPaymentInstallments: number;
+            paymentSupportsCancel: boolean;
+            paymentSupportsRecover: boolean;
+            paymentSupportsReversal: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -21045,6 +26004,7 @@ export interface operations {
           defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
           printerId: string | null;
           stationId: string | null;
+          cashRegisterId?: string | null;
           compact: boolean;
           quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
         };
@@ -21070,8 +26030,17 @@ export interface operations {
             defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
             printerId: string | null;
             stationId: string | null;
+            cashRegisterId: string | null;
             compact: boolean;
             quickActions: string[];
+            paymentProvider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            /** @enum {string} */
+            paymentStatus: "disabled" | "pending" | "homologated" | "suspended";
+            paymentMethods: ("credit_card" | "debit_card" | "pix")[];
+            maxPaymentInstallments: number;
+            paymentSupportsCancel: boolean;
+            paymentSupportsRecover: boolean;
+            paymentSupportsReversal: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -21116,8 +26085,17 @@ export interface operations {
             defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
             printerId: string | null;
             stationId: string | null;
+            cashRegisterId: string | null;
             compact: boolean;
             quickActions: string[];
+            paymentProvider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            /** @enum {string} */
+            paymentStatus: "disabled" | "pending" | "homologated" | "suspended";
+            paymentMethods: ("credit_card" | "debit_card" | "pix")[];
+            maxPaymentInstallments: number;
+            paymentSupportsCancel: boolean;
+            paymentSupportsRecover: boolean;
+            paymentSupportsReversal: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -21153,6 +26131,7 @@ export interface operations {
           defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
           printerId: string | null;
           stationId: string | null;
+          cashRegisterId?: string | null;
           compact: boolean;
           quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
         };
@@ -21178,8 +26157,17 @@ export interface operations {
             defaultRoute: "dashboard" | "reservations" | "salon" | "counter" | "cash" | "kds";
             printerId: string | null;
             stationId: string | null;
+            cashRegisterId: string | null;
             compact: boolean;
             quickActions: string[];
+            paymentProvider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            /** @enum {string} */
+            paymentStatus: "disabled" | "pending" | "homologated" | "suspended";
+            paymentMethods: ("credit_card" | "debit_card" | "pix")[];
+            maxPaymentInstallments: number;
+            paymentSupportsCancel: boolean;
+            paymentSupportsRecover: boolean;
+            paymentSupportsReversal: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -27204,6 +32192,1320 @@ export interface operations {
       };
     };
   };
+  "PilotPaymentDeviceController_redeemPairing[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code: string;
+          /** Format: uuid */
+          installationId: string;
+          publicKeySpki: string;
+          diagnostics: {
+            manufacturer: string;
+            model: string;
+            androidVersion: string;
+            firmwareVersion: string;
+            appVersion: string;
+            packageName: string;
+            signingCertificateSha256: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: date-time */
+            credentialExpiresAt: string;
+            /** Format: date-time */
+            rotateAfter: string;
+            /** Format: date-time */
+            previousCredentialValidUntil?: string;
+            capabilities?: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_redeemPairing[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code: string;
+          /** Format: uuid */
+          installationId: string;
+          publicKeySpki: string;
+          diagnostics: {
+            manufacturer: string;
+            model: string;
+            androidVersion: string;
+            firmwareVersion: string;
+            appVersion: string;
+            packageName: string;
+            signingCertificateSha256: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: date-time */
+            credentialExpiresAt: string;
+            /** Format: date-time */
+            rotateAfter: string;
+            /** Format: date-time */
+            previousCredentialValidUntil?: string;
+            capabilities?: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_rotateCredential[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          rotationId: string;
+          newPublicKeySpki: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: date-time */
+            credentialExpiresAt: string;
+            /** Format: date-time */
+            rotateAfter: string;
+            /** Format: date-time */
+            previousCredentialValidUntil?: string;
+            capabilities?: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_rotateCredential[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          rotationId: string;
+          newPublicKeySpki: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId?: string;
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: date-time */
+            credentialExpiresAt: string;
+            /** Format: date-time */
+            rotateAfter: string;
+            /** Format: date-time */
+            previousCredentialValidUntil?: string;
+            capabilities?: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_reportDiagnostics[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          manufacturer: string;
+          model: string;
+          androidVersion: string;
+          firmwareVersion: string;
+          appVersion: string;
+          packageName: string;
+          signingCertificateSha256: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_reportDiagnostics[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          manufacturer: string;
+          model: string;
+          androidVersion: string;
+          firmwareVersion: string;
+          appVersion: string;
+          packageName: string;
+          signingCertificateSha256: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_getAttempt[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_getAttempt[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_claimAttempt[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            /** @enum {string} */
+            action: "start" | "recover" | "cancel";
+            capabilities: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+            certification: {
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              status: "approved" | "suspended";
+              killSwitchEnabled: boolean;
+              killSwitchReason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_claimAttempt[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            /** @enum {string} */
+            action: "start" | "recover" | "cancel";
+            capabilities: {
+              /** Format: uuid */
+              installationId: string;
+              available: boolean;
+              /** @enum {string} */
+              status: "disabled" | "pending" | "homologated" | "suspended";
+              provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+              methods: ("credit_card" | "debit_card" | "pix")[];
+              maxInstallments: number;
+              supports: {
+                cancel: boolean;
+                recover: boolean;
+                reversal: boolean;
+              };
+              reason: string | null;
+              certificationId: string | null;
+              diagnosticsMatch: boolean;
+              killSwitch: {
+                enabled: boolean;
+                reason: string | null;
+              };
+            };
+            certification: {
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              status: "approved" | "suspended";
+              killSwitchEnabled: boolean;
+              killSwitchReason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_recordResult[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resultId: string;
+          /** @enum {string} */
+          status: "processing" | "approved" | "declined" | "canceled" | "unknown";
+          providerReference?: string;
+          authorizationCode?: string;
+          failureCode?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            paymentId?: string | null;
+            idempotentReplay: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_recordResult[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resultId: string;
+          /** @enum {string} */
+          status: "processing" | "approved" | "declined" | "canceled" | "unknown";
+          providerReference?: string;
+          authorizationCode?: string;
+          failureCode?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attempt: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              tabId: string;
+              /** Format: uuid */
+              installationId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+              /** @enum {string} */
+              method: "credit_card" | "debit_card" | "pix";
+              amountCents: number;
+              installments: number;
+              /** @enum {string} */
+              status:
+                | "created"
+                | "processing"
+                | "approved"
+                | "declined"
+                | "canceled"
+                | "unknown"
+                | "reversed";
+              providerReference: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** Format: date-time */
+              expiresAt: string;
+              processingAt: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            paymentId?: string | null;
+            idempotentReplay: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_claimReversal[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        reversalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "reverse" | "recover";
+              /** Format: uuid */
+              reversalId: string;
+              /** Format: uuid */
+              paymentAttemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_claimReversal[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        reversalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            action: {
+              /** @enum {string} */
+              type: "reverse" | "recover";
+              /** Format: uuid */
+              reversalId: string;
+              /** Format: uuid */
+              paymentAttemptId: string;
+              /** @enum {string} */
+              provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_recordReversalResult[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        reversalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resultId: string;
+          /** @enum {string} */
+          status: "processing" | "approved" | "declined" | "canceled" | "unknown";
+          providerReference?: string;
+          authorizationCode?: string;
+          failureCode?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentDeviceController_recordReversalResult[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        reversalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          resultId: string;
+          /** @enum {string} */
+          status: "processing" | "approved" | "declined" | "canceled" | "unknown";
+          providerReference?: string;
+          authorizationCode?: string;
+          failureCode?: string;
+          /** Format: date-time */
+          occurredAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reversal: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              paymentId: string;
+              /** Format: uuid */
+              installationId: string;
+              amountCents: number;
+              reason: string;
+              /** @enum {string} */
+              status: "pending" | "processing" | "approved" | "declined" | "canceled" | "unknown";
+              providerReference: string | null;
+              failureCode: string | null;
+              resolvedAt: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentInternalController_configureCertification[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        certificationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          /** @enum {string} */
+          status: "approved" | "suspended";
+          diagnostics: {
+            manufacturer: string;
+            model: string;
+            androidVersion: string;
+            firmwareVersion: string;
+            appVersion: string;
+            packageName: string;
+            signingCertificateSha256: string;
+          };
+          methods: ("credit_card" | "debit_card" | "pix")[];
+          maxInstallments: number;
+          supports: {
+            cancel: boolean;
+            recover: boolean;
+            reversal: boolean;
+          };
+          /** @default false */
+          killSwitchEnabled?: boolean;
+          /** @default null */
+          killSwitchReason?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPaymentInternalController_configureCertification[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        certificationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          /** @enum {string} */
+          status: "approved" | "suspended";
+          diagnostics: {
+            manufacturer: string;
+            model: string;
+            androidVersion: string;
+            firmwareVersion: string;
+            appVersion: string;
+            packageName: string;
+            signingCertificateSha256: string;
+          };
+          methods: ("credit_card" | "debit_card" | "pix")[];
+          maxInstallments: number;
+          supports: {
+            cancel: boolean;
+            recover: boolean;
+            reversal: boolean;
+          };
+          /** @default false */
+          killSwitchEnabled?: boolean;
+          /** @default null */
+          killSwitchReason?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPaymentInternalController_ingestReconciliation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          providerSettlementId: string;
+          providerReference: string;
+          grossCents: number;
+          feeCents: number;
+          netCents: number;
+          /** Format: date-time */
+          expectedSettlementAt: string;
+          /** @default null */
+          settledAt?: string | null;
+          /** @enum {string} */
+          status: "pending" | "matched" | "divergent" | "settled" | "reversed";
+          /** @enum {string} */
+          source: "api" | "webhook" | "import";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPaymentInternalController_ingestReconciliation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          providerSettlementId: string;
+          providerReference: string;
+          grossCents: number;
+          feeCents: number;
+          netCents: number;
+          /** Format: date-time */
+          expectedSettlementAt: string;
+          /** @default null */
+          settledAt?: string | null;
+          /** @enum {string} */
+          status: "pending" | "matched" | "divergent" | "settled" | "reversed";
+          /** @enum {string} */
+          source: "api" | "webhook" | "import";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPaymentInternalController_configure[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          /** @enum {string} */
+          status: "disabled" | "pending" | "homologated" | "suspended";
+          certificationId?: string | null;
+          methods: ("credit_card" | "debit_card" | "pix")[];
+          maxInstallments: number;
+          supports: {
+            cancel: boolean;
+            recover: boolean;
+            reversal: boolean;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
+  "PilotPaymentInternalController_configure[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
+          /** @enum {string} */
+          status: "disabled" | "pending" | "homologated" | "suspended";
+          certificationId?: string | null;
+          methods: ("credit_card" | "debit_card" | "pix")[];
+          maxInstallments: number;
+          supports: {
+            cancel: boolean;
+            recover: boolean;
+            reversal: boolean;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            installationId: string;
+            available: boolean;
+            /** @enum {string} */
+            status: "disabled" | "pending" | "homologated" | "suspended";
+            provider: ("rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank") | null;
+            methods: ("credit_card" | "debit_card" | "pix")[];
+            maxInstallments: number;
+            supports: {
+              cancel: boolean;
+              recover: boolean;
+              reversal: boolean;
+            };
+            reason: string | null;
+            certificationId: string | null;
+            diagnosticsMatch: boolean;
+            killSwitch: {
+              enabled: boolean;
+              reason: string | null;
+            };
+          };
+        };
+      };
+    };
+  };
   "PlatformController_overview[0]": {
     parameters: {
       query?: never;
@@ -31425,7 +37727,10 @@ export interface operations {
       content: {
         "application/json": {
           amountCents: number;
-          method: string;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
@@ -31458,7 +37763,10 @@ export interface operations {
       content: {
         "application/json": {
           amountCents: number;
-          method: string;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
@@ -31573,7 +37881,10 @@ export interface operations {
       content: {
         "application/json": {
           amountCents: number;
-          method: string;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
@@ -31608,7 +37919,10 @@ export interface operations {
       content: {
         "application/json": {
           amountCents: number;
-          method: string;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
@@ -31662,6 +37976,8 @@ export interface operations {
       content: {
         "application/json": {
           openingCents: number;
+          /** Format: uuid */
+          cashRegisterId?: string;
         };
       };
     };
@@ -31710,6 +38026,572 @@ export interface operations {
       content: {
         "application/json": {
           openingCents: number;
+          /** Format: uuid */
+          cashRegisterId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          movementApprovalThresholdCents: number;
+          discrepancyCriticalThresholdCents: number;
+          maxShiftMinutes: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          movementApprovalThresholdCents: number;
+          discrepancyCriticalThresholdCents: number;
+          maxShiftMinutes: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashShiftHistory[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashShiftHistory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportCashShifts[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportCashShifts[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashShiftDetail[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashShiftDetail[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashTerminal[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          cashRegisterId: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashTerminal[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          cashRegisterId: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideCashApproval[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        approvalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideCashApproval[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        approvalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashApprovals[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cashApprovals[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createCashRegister[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_createCashRegister[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashRegister[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashRegisterId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateCashRegister[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashRegisterId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name?: string;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transferCash[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          fromCashShiftId: string;
+          /** Format: uuid */
+          toCashShiftId: string;
+          amountCents: number;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_transferCash[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          fromCashShiftId: string;
+          /** Format: uuid */
+          toCashShiftId: string;
+          amountCents: number;
+          reason: string;
         };
       };
     };
@@ -31790,6 +38672,68 @@ export interface operations {
       };
     };
   };
+  "ManagementController_handoverCashShift[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          toIdentityId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_handoverCashShift[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          toIdentityId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_closeCashShift[0]": {
     parameters: {
       query?: never;
@@ -31806,7 +38750,14 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          countedCents: number;
+          countedCents?: number;
+          tenderCounts?: {
+            /** @enum {string} */
+            method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+            observedCents: number;
+            /** @enum {string} */
+            source: "manual";
+          }[];
           closeReason?: string;
         };
       };
@@ -31836,8 +38787,73 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          countedCents: number;
+          countedCents?: number;
+          tenderCounts?: {
+            /** @enum {string} */
+            method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+            observedCents: number;
+            /** @enum {string} */
+            source: "manual";
+          }[];
           closeReason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewCashShift[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reviewCashShift[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashShiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          note: string;
         };
       };
     };
@@ -31944,6 +38960,20 @@ export interface operations {
         from: string;
         to: string;
         comparisonMode?: "previous_period" | "previous_year" | "none";
+        family?:
+          | "overview"
+          | "sales"
+          | "exceptions"
+          | "inventory"
+          | "purchasing"
+          | "operations"
+          | "profitability"
+          | "multiunit"
+          | "quality"
+          | "labor"
+          | "reconciliation"
+          | "forecast";
+        minimumComparableOperatingDays?: number;
       };
       header?: never;
       path: {
@@ -31971,6 +39001,20 @@ export interface operations {
         from: string;
         to: string;
         comparisonMode?: "previous_period" | "previous_year" | "none";
+        family?:
+          | "overview"
+          | "sales"
+          | "exceptions"
+          | "inventory"
+          | "purchasing"
+          | "operations"
+          | "profitability"
+          | "multiunit"
+          | "quality"
+          | "labor"
+          | "reconciliation"
+          | "forecast";
+        minimumComparableOperatingDays?: number;
       };
       header?: never;
       path: {
@@ -32792,6 +39836,7 @@ export interface operations {
           assignedToIdentityId?: string | null;
           /** Format: date-time */
           dueAt?: string | null;
+          comment?: string;
           version: number;
         };
       };
@@ -32830,6 +39875,7 @@ export interface operations {
           assignedToIdentityId?: string | null;
           /** Format: date-time */
           dueAt?: string | null;
+          comment?: string;
           version: number;
         };
       };
@@ -32913,6 +39959,160 @@ export interface operations {
           comparisonMode?: "previous_period" | "previous_year" | "none";
           /** @enum {boolean} */
           allowEstimated: true;
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_previewReportCosts[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_previewReportCosts[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_closeReportReconciliation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /** @enum {string} */
+          status: "open" | "closed";
+          checklist: {
+            [key: string]: boolean;
+          };
+          note: string;
+          evidence?: string[];
+        };
+      };
+    };
+    responses: {
+      /** @description Operação de relatório concluída. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  "ManagementController_closeReportReconciliation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: date */
+          from: string;
+          /** Format: date */
+          to: string;
+          /** @enum {string} */
+          comparisonMode?: "previous_period" | "previous_year" | "none";
+          /** @enum {string} */
+          status: "open" | "closed";
+          checklist: {
+            [key: string]: boolean;
+          };
+          note: string;
+          evidence?: string[];
         };
       };
     };
@@ -33354,6 +40554,27 @@ export interface operations {
           roleLabel: string;
           hourlyRateCents?: number;
           hiredAt?: string;
+          access?: {
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role:
+              | "owner"
+              | "manager"
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+              | "finance"
+              | "accountant";
+            reauth?: {
+              currentPassword?: string;
+              mfaCode?: string;
+            };
+          };
         };
       };
     };
@@ -33406,6 +40627,27 @@ export interface operations {
           roleLabel: string;
           hourlyRateCents?: number;
           hiredAt?: string;
+          access?: {
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role:
+              | "owner"
+              | "manager"
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+              | "finance"
+              | "accountant";
+            reauth?: {
+              currentPassword?: string;
+              mfaCode?: string;
+            };
+          };
         };
       };
     };
@@ -34416,6 +41658,756 @@ export interface operations {
           /** @enum {string} */
           decision: "approve" | "reject";
           reviewNote?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleAccessCenter[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_peopleAccessCenter[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_revokeManagedTerminal[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        terminalSessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_revokeManagedTerminal[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        terminalSessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personAccessOverview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personAccessOverview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personOffboardingPreflight[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_personOffboardingPreflight[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_assignPersonUnitAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_assignPersonUnitAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_removePersonUnitAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+        targetUnitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_removePersonUnitAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+        targetUnitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_invitePersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: email */
+          email: string;
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_invitePersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: email */
+          email: string;
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resendPersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resendPersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          role:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_suspendPersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_suspendPersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reactivatePersonAccess[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          role?:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reactivatePersonAccess[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        personId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          role?:
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant";
+          reason: string;
+          reauth?: {
+            currentPassword?: string;
+            mfaCode?: string;
+          };
         };
       };
     };

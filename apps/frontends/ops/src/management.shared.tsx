@@ -624,8 +624,8 @@ export interface ReportData {
   comparison: {
     mode: ReportComparisonMode;
     revenueCents: number;
-    previousRevenueCents: number;
-    changeCents: number;
+    previousRevenueCents: number | null;
+    changeCents: number | null;
     changePercent: number | null;
   } | null;
   dailySeries: Array<{
@@ -678,6 +678,10 @@ export interface ReportData {
       reconciliation: ReportCoverage;
       forecast: ReportCoverage;
     };
+    indicators: Record<
+      string,
+      { coverage: ReportCoverage; dataThrough: string | null; sources: string[] }
+    >;
   } | null;
   capabilities: ReportCapabilities;
   budget: {
@@ -822,6 +826,14 @@ export interface ReportFamilies {
       revenuePerOperatingDayCents: number | null;
       organizationRevenueSharePercent: number | null;
       sameStoreChangePercent: number | null;
+      minimumComparableOperatingDays: number;
+      comparableStoreEligible: boolean;
+      seatCount: number;
+      activeEmployees: number;
+      openHours: number | null;
+      revenuePerSeatCents: number | null;
+      revenuePerOpenHourCents: number | null;
+      revenuePerEmployeeCents: number | null;
     }>;
   };
   quality: {
@@ -871,9 +883,19 @@ export interface ReportFamilies {
       unmatchedCents: number;
       divergentCents: number;
     };
+    closure: {
+      status: "open" | "closed";
+      closedAt: string | null;
+      closedByIdentityId: string | null;
+      note: string;
+      evidence: string[];
+      checklist: { payments: boolean; fiscal: boolean; external: boolean };
+    };
   };
   forecast: {
-    method: "historical_daily_average_v1";
+    method: "weekday_seasonality_v2";
+    available: boolean;
+    minimumSampleDays: number;
     horizonDays: number;
     sampleDays: number;
     confidence: "low" | "medium" | "high";
@@ -885,6 +907,13 @@ export interface ReportFamilies {
       upperBoundCents: number;
     };
     cash: { inflowsCents: number; outflowsCents: number; netCents: number };
+    calendarSignals: Array<{
+      date: string;
+      reservations: number;
+      guests: number;
+      demandFloorCents: number;
+      applied: boolean;
+    }>;
     purchases: Array<{
       key: string;
       label: string;
@@ -1024,6 +1053,8 @@ export interface ReportScheduleData {
 
 export interface CashShift {
   id: string;
+  cashRegisterId: string;
+  cashRegisterName: string;
   status: string;
   openingCents: number;
   expectedCents: number | null;
@@ -1031,11 +1062,186 @@ export interface CashShift {
   differenceCents: number | null;
   openedAt: string | null;
   closedAt: string | null;
+  operatorName: string | null;
+  closedByName: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  currentResponsibleIdentityId: string | null;
+  responsibleName: string | null;
+  tenderBreakdown: CashTenderCount[];
+  differenceSeverity: "none" | "warning" | "critical";
+}
+
+export interface CashTenderCount {
+  method: string;
+  expectedCents: number;
+  observedCents: number;
+  differenceCents: number;
+  source: "manual" | "smartpos";
+}
+
+export interface CashRegister {
+  id: string;
+  name: string;
+  active: boolean;
+  openShiftId: string | null;
+}
+
+export interface CashRegisterTerminal {
+  installationId: string;
+  label: string;
+  cashRegisterId: string | null;
+  status: "online" | "offline" | "unpaired";
+  lastSeenAt: string | null;
+}
+
+export interface CashSettings {
+  movementApprovalThresholdCents: number;
+  discrepancyCriticalThresholdCents: number;
+  maxShiftMinutes: number;
+}
+
+export interface CashAlert {
+  code: string;
+  severity: "warning" | "critical";
+  message: string;
+  cashShiftId: string | null;
+  cashRegisterId: string | null;
+  installationId: string | null;
+}
+
+export interface CashOperator {
+  identityId: string;
+  name: string;
+}
+
+export interface CashApproval {
+  id: string;
+  kind: "supply" | "withdrawal" | "transfer";
+  fromCashShiftId: string;
+  toCashShiftId: string | null;
+  amountCents: number;
+  reason: string;
+  requestedByName: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string | null;
+}
+
+export interface CashAdjustment {
+  id: string;
+  cashRegisterId: string | null;
+  originalCashShiftId: string | null;
+  direction: "in" | "out";
+  entryType: string;
+  paymentMethod: string | null;
+  affectsDrawer: boolean;
+  amountCents: number;
+  description: string | null;
+  actorName: string | null;
+  occurredAt: string | null;
+}
+
+export interface CashEntry {
+  id: string;
+  cashShiftId: string;
+  direction: "in" | "out";
+  entryType: string;
+  paymentMethod: string | null;
+  affectsDrawer: boolean;
+  amountCents: number;
+  description: string | null;
+  actorName: string | null;
+  occurredAt: string | null;
+}
+
+export interface PendingCashTab {
+  id: string;
+  label: string;
+  totalCents: number;
+  paidCents: number;
+  remainingCents: number;
+}
+
+export interface CashCapabilities {
+  canOpen: boolean;
+  canMove: boolean;
+  canClose: boolean;
+  canReview: boolean;
+  canViewExpected: boolean;
+  canManageRegisters: boolean;
+  canTransfer: boolean;
+  canManageCashSettings: boolean;
+  canManageTerminals: boolean;
+  canApproveCashRequests: boolean;
+  canHandover: boolean;
 }
 
 export interface CashData {
+  settings: CashSettings;
+  alerts: CashAlert[];
+  operators: CashOperator[];
+  approvals: CashApproval[];
+  adjustments: CashAdjustment[];
+  registers: CashRegister[];
+  availableTerminals: CashRegisterTerminal[];
   shifts: CashShift[];
-  movements: Row[];
+  entries: CashEntry[];
+  pendingTabs: PendingCashTab[];
+  capabilities: CashCapabilities;
+}
+
+export interface CashHistoryItem {
+  id: string;
+  cashRegisterId: string;
+  cashRegisterName: string;
+  status: string;
+  openingCents: number;
+  expectedCents: number | null;
+  countedCents: number | null;
+  differenceCents: number | null;
+  differenceSeverity: "none" | "warning" | "critical";
+  openedAt: string | null;
+  closedAt: string | null;
+  operatorName: string | null;
+  responsibleName: string | null;
+  closedByName: string | null;
+}
+
+export interface CashHistoryPage {
+  items: CashHistoryItem[];
+  nextCursor: string | null;
+}
+
+export interface CashResponsibilityChange {
+  id: string;
+  fromName: string;
+  toName: string;
+  transferredByName: string;
+  reason: string;
+  occurredAt: string | null;
+}
+
+export interface CashShiftDetail {
+  shift: CashHistoryItem;
+  entries: CashEntry[];
+  tenderCounts: CashTenderCount[];
+  responsibilities: CashResponsibilityChange[];
+  adjustments: CashAdjustment[];
+}
+
+export interface CashClosureResult {
+  cashShiftId: string;
+  status: string;
+  expectedCents: number;
+  countedCents: number;
+  differenceCents: number;
+  drawerInCents: number;
+  drawerOutCents: number;
+  breakdown: Array<{ method: string; amountCents: number }>;
+  reviewRequired: boolean;
+  differenceSeverity: "none" | "warning" | "critical";
+  tenderBreakdown: CashTenderCount[];
 }
 
 export interface Person {
@@ -1049,6 +1255,76 @@ export interface Person {
   updatedAt?: string;
   statusReason?: string | null;
   statusChangedAt?: string | null;
+  access: PersonAccess;
+}
+
+export type PersonAccessStatus = "none" | "pending" | "expired" | "active" | "suspended";
+
+export interface PersonAccess {
+  status: PersonAccessStatus;
+  email: string | null;
+  role: string | null;
+  invitationId: string | null;
+  expiresAt: string | null;
+  membershipId: string | null;
+}
+
+export interface ManagedTerminalSession {
+  id: string;
+  deviceId: string | null;
+  openedBy: string;
+  activeOperator: string | null;
+  status: "waiting" | "active" | "locked";
+  createdAt: string;
+  lastActivityAt: string | null;
+  lockedUntil: string | null;
+  expiresAt: string;
+}
+
+export interface PeopleAccessCenterData {
+  terminals: ManagedTerminalSession[];
+}
+
+export interface PersonOffboardingPreflight {
+  canProceed: boolean;
+  counts: {
+    openTimeEntries: number;
+    futureSchedules: number;
+    unsettledCommissions: number;
+    openCashShifts: number;
+    activeTerminals: number;
+    accessAssignments: number;
+  };
+  checks: Array<{
+    code: string;
+    label: string;
+    count: number;
+    severity: "blocker" | "warning" | "info";
+  }>;
+}
+
+export interface PersonAccessOverviewData {
+  units: Array<{ id: string; name: string; active: boolean }>;
+  assignments: Array<{
+    unitId: string;
+    unitName: string;
+    primary: boolean;
+    access: PersonAccess;
+    delivery: null | {
+      status: "queued" | "sent" | "failed";
+      attempts: number;
+      processedAt: string | null;
+      lastError: string | null;
+    };
+  }>;
+  history: Array<{
+    id: string;
+    action: string;
+    actorName: string;
+    metadata: Record<string, unknown>;
+    occurredAt: string;
+  }>;
+  offboarding: PersonOffboardingPreflight;
 }
 
 export interface Schedule {
@@ -1405,6 +1681,69 @@ export class InvalidManagementPayloadError extends Error {
     super("A API retornou dados gerenciais em formato inesperado.");
     this.name = "InvalidManagementPayloadError";
   }
+}
+
+type ManagementRemoteLoader = (organizationId: string, unitId: string) => Promise<unknown>;
+type ManagementRemoteParser<T> = (value: unknown) => T;
+type ManagementRemoteCacheEntry<T> =
+  | { status: "loading"; promise: Promise<T> }
+  | { status: "ready"; data: T; expiresAt: number };
+
+const managementRemoteCache = new WeakMap<
+  ManagementRemoteLoader,
+  WeakMap<ManagementRemoteParser<unknown>, Map<string, ManagementRemoteCacheEntry<unknown>>>
+>();
+const managementRemoteCacheTtlMs = 5_000;
+
+export function loadManagementRemote<T>(
+  loader: ManagementRemoteLoader,
+  parser: ManagementRemoteParser<T>,
+  organizationId: string,
+  unitId: string,
+  bypassReadyCache = false,
+): Promise<T> {
+  let loaderCache = managementRemoteCache.get(loader);
+  if (!loaderCache) {
+    loaderCache = new WeakMap();
+    managementRemoteCache.set(loader, loaderCache);
+  }
+
+  const cacheParser = parser as ManagementRemoteParser<unknown>;
+  let parserCache = loaderCache.get(cacheParser);
+  if (!parserCache) {
+    parserCache = new Map();
+    loaderCache.set(cacheParser, parserCache);
+  }
+
+  const scopeKey = `${organizationId}:${unitId}`;
+  const cached = parserCache.get(scopeKey) as ManagementRemoteCacheEntry<T> | undefined;
+  if (cached?.status === "loading") return cached.promise;
+  if (!bypassReadyCache && cached?.status === "ready" && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.data);
+  }
+
+  const promise = Promise.resolve()
+    .then(() => loader(organizationId, unitId))
+    .then(parser);
+  parserCache.set(scopeKey, { status: "loading", promise });
+  void promise.then(
+    (data) => {
+      const current = parserCache.get(scopeKey);
+      if (current?.status === "loading" && current.promise === promise) {
+        parserCache.set(scopeKey, {
+          status: "ready",
+          data,
+          expiresAt: Date.now() + managementRemoteCacheTtlMs,
+        });
+      }
+    },
+    () => {
+      const current = parserCache.get(scopeKey);
+      if (current?.status === "loading" && current.promise === promise)
+        parserCache.delete(scopeKey);
+    },
+  );
+  return promise;
 }
 
 export function record(value: unknown): Row {
@@ -2237,6 +2576,7 @@ export function parseReports(value: unknown): ReportData {
     entry === "previous_year" || entry === "none" ? entry : "previous_period";
   const metaSourceCounts = meta ? record(meta.sourceCounts) : {};
   const metaCoverage = meta ? record(meta.coverage) : {};
+  const metaIndicators = meta?.indicators === undefined ? {} : record(meta.indicators);
   const budgetTargets = budget ? record(budget.targets) : {};
   const reportFamilies =
     payload.reportFamilies === undefined || payload.reportFamilies === null
@@ -2262,6 +2602,12 @@ export function parseReports(value: unknown): ReportData {
     : {};
   const reconciliationExternal = reconciliationFamily.external
     ? record(reconciliationFamily.external)
+    : {};
+  const reconciliationClosure = reconciliationFamily.closure
+    ? record(reconciliationFamily.closure)
+    : {};
+  const reconciliationChecklist = reconciliationClosure.checklist
+    ? record(reconciliationClosure.checklist)
     : {};
   const forecastRevenue = forecastFamily.revenue ? record(forecastFamily.revenue) : {};
   const forecastCash = forecastFamily.cash ? record(forecastFamily.cash) : {};
@@ -2294,8 +2640,8 @@ export function parseReports(value: unknown): ReportData {
       ? {
           mode: comparisonMode(comparison.mode),
           revenueCents: numeric(comparison.revenueCents) ?? 0,
-          previousRevenueCents: numeric(comparison.previousRevenueCents) ?? 0,
-          changeCents: numeric(comparison.changeCents) ?? 0,
+          previousRevenueCents: numeric(comparison.previousRevenueCents, true),
+          changeCents: numeric(comparison.changeCents, true),
           changePercent: numeric(comparison.changePercent, true),
         }
       : null,
@@ -2350,6 +2696,23 @@ export function parseReports(value: unknown): ReportData {
             reconciliation: reportCoverage(metaCoverage.reconciliation),
             forecast: reportCoverage(metaCoverage.forecast),
           },
+          indicators: Object.fromEntries(
+            Object.entries(metaIndicators).map(([key, value]) => {
+              const indicator = record(value);
+              return [
+                key,
+                {
+                  coverage: reportCoverage(indicator.coverage),
+                  dataThrough: optionalString(indicator.dataThrough),
+                  sources: Array.isArray(indicator.sources)
+                    ? indicator.sources.filter(
+                        (source): source is string => typeof source === "string",
+                      )
+                    : [],
+                },
+              ];
+            }),
+          ),
         }
       : null,
     capabilities: {
@@ -2517,6 +2880,14 @@ export function parseReports(value: unknown): ReportData {
           revenuePerOperatingDayCents: numeric(entry.revenuePerOperatingDayCents, true),
           organizationRevenueSharePercent: numeric(entry.organizationRevenueSharePercent, true),
           sameStoreChangePercent: numeric(entry.sameStoreChangePercent, true),
+          minimumComparableOperatingDays: integer(entry.minimumComparableOperatingDays ?? 7),
+          comparableStoreEligible: entry.comparableStoreEligible === true,
+          seatCount: integer(entry.seatCount ?? 0),
+          activeEmployees: integer(entry.activeEmployees ?? 0),
+          openHours: numeric(entry.openHours, true),
+          revenuePerSeatCents: numeric(entry.revenuePerSeatCents, true),
+          revenuePerOpenHourCents: numeric(entry.revenuePerOpenHourCents, true),
+          revenuePerEmployeeCents: numeric(entry.revenuePerEmployeeCents, true),
         })),
       },
       quality: {
@@ -2576,9 +2947,27 @@ export function parseReports(value: unknown): ReportData {
           unmatchedCents: numeric(reconciliationExternal.unmatchedCents ?? 0) ?? 0,
           divergentCents: numeric(reconciliationExternal.divergentCents ?? 0) ?? 0,
         },
+        closure: {
+          status: reconciliationClosure.status === "closed" ? "closed" : "open",
+          closedAt: optionalString(reconciliationClosure.closedAt),
+          closedByIdentityId: optionalString(reconciliationClosure.closedByIdentityId),
+          note: typeof reconciliationClosure.note === "string" ? reconciliationClosure.note : "",
+          evidence: Array.isArray(reconciliationClosure.evidence)
+            ? reconciliationClosure.evidence.filter(
+                (item): item is string => typeof item === "string",
+              )
+            : [],
+          checklist: {
+            payments: reconciliationChecklist.payments === true,
+            fiscal: reconciliationChecklist.fiscal === true,
+            external: reconciliationChecklist.external === true,
+          },
+        },
       },
       forecast: {
-        method: "historical_daily_average_v1",
+        method: "weekday_seasonality_v2",
+        available: forecastFamily.available === true,
+        minimumSampleDays: integer(forecastFamily.minimumSampleDays ?? 14),
         horizonDays: integer(forecastFamily.horizonDays ?? 7),
         sampleDays: integer(forecastFamily.sampleDays ?? 0),
         confidence:
@@ -2599,6 +2988,13 @@ export function parseReports(value: unknown): ReportData {
           outflowsCents: numeric(forecastCash.outflowsCents ?? 0) ?? 0,
           netCents: numeric(forecastCash.netCents ?? 0) ?? 0,
         },
+        calendarSignals: optionalRows(forecastFamily, "calendarSignals").map((entry) => ({
+          date: requiredString(entry.date),
+          reservations: integer(entry.reservations ?? 0),
+          guests: integer(entry.guests ?? 0),
+          demandFloorCents: numeric(entry.demandFloorCents ?? 0) ?? 0,
+          applied: entry.applied === true,
+        })),
         purchases: optionalRows(forecastFamily, "purchases").map((entry) => ({
           key: requiredString(entry.key),
           label: requiredString(entry.label),
@@ -2768,11 +3164,102 @@ export function parseReportSchedules(value: unknown): ReportScheduleData[] {
   }));
 }
 
+function cashDifferenceSeverity(value: unknown): CashShift["differenceSeverity"] {
+  return value === "critical" ? "critical" : value === "warning" ? "warning" : "none";
+}
+
+function parseCashTenderCounts(value: unknown): CashTenderCount[] {
+  if (!Array.isArray(value)) throw new InvalidManagementPayloadError();
+  return value.map((candidate) => {
+    const entry = record(candidate);
+    return {
+      method: requiredString(entry.method),
+      expectedCents: numeric(entry.expectedCents) ?? 0,
+      observedCents: numeric(entry.observedCents) ?? 0,
+      differenceCents: numeric(entry.differenceCents) ?? 0,
+      source: entry.source === "smartpos" ? "smartpos" : "manual",
+    };
+  });
+}
+
 export function parseCash(value: unknown): CashData {
   const payload = record(value);
+  const capabilities = record(payload.capabilities);
+  const settings = record(payload.settings);
   return {
+    settings: {
+      movementApprovalThresholdCents: numeric(settings.movementApprovalThresholdCents) ?? 0,
+      discrepancyCriticalThresholdCents: numeric(settings.discrepancyCriticalThresholdCents) ?? 0,
+      maxShiftMinutes: numeric(settings.maxShiftMinutes) ?? 0,
+    },
+    alerts: rows(payload, "alerts").map((alert) => ({
+      code: requiredString(alert.code),
+      severity: alert.severity === "critical" ? "critical" : "warning",
+      message: requiredString(alert.message),
+      cashShiftId: optionalString(alert.cashShiftId),
+      cashRegisterId: optionalString(alert.cashRegisterId),
+      installationId: optionalString(alert.installationId),
+    })),
+    operators: rows(payload, "operators").map((operator) => ({
+      identityId: requiredString(operator.identityId),
+      name: requiredString(operator.name),
+    })),
+    approvals: rows(payload, "approvals").map((approval) => ({
+      id: requiredString(approval.id),
+      kind:
+        approval.kind === "supply"
+          ? "supply"
+          : approval.kind === "transfer"
+            ? "transfer"
+            : "withdrawal",
+      fromCashShiftId: requiredString(approval.fromCashShiftId),
+      toCashShiftId: optionalString(approval.toCashShiftId),
+      amountCents: numeric(approval.amountCents) ?? 0,
+      reason: requiredString(approval.reason),
+      requestedByName: requiredString(approval.requestedByName),
+      status:
+        approval.status === "approved"
+          ? "approved"
+          : approval.status === "rejected"
+            ? "rejected"
+            : "pending",
+      requestedAt: optionalString(approval.requestedAt),
+    })),
+    adjustments: rows(payload, "adjustments").map((adjustment) => ({
+      id: requiredString(adjustment.id),
+      cashRegisterId: optionalString(adjustment.cashRegisterId),
+      originalCashShiftId: optionalString(adjustment.originalCashShiftId),
+      direction: adjustment.direction === "out" ? "out" : "in",
+      entryType: requiredString(adjustment.entryType),
+      paymentMethod: optionalString(adjustment.paymentMethod),
+      affectsDrawer: boolean(adjustment.affectsDrawer),
+      amountCents: numeric(adjustment.amountCents) ?? 0,
+      description: optionalString(adjustment.description),
+      actorName: optionalString(adjustment.actorName),
+      occurredAt: optionalString(adjustment.occurredAt),
+    })),
+    registers: rows(payload, "registers").map((cashRegister) => ({
+      id: requiredString(cashRegister.id),
+      name: requiredString(cashRegister.name),
+      active: boolean(cashRegister.active),
+      openShiftId: optionalString(cashRegister.openShiftId),
+    })),
+    availableTerminals: rows(payload, "availableTerminals").map((terminal) => ({
+      installationId: requiredString(terminal.installationId),
+      label: requiredString(terminal.label),
+      cashRegisterId: optionalString(terminal.cashRegisterId),
+      status:
+        terminal.status === "online"
+          ? "online"
+          : terminal.status === "offline"
+            ? "offline"
+            : "unpaired",
+      lastSeenAt: optionalString(terminal.lastSeenAt),
+    })),
     shifts: rows(payload, "shifts").map((shift) => ({
       id: requiredString(shift.id),
+      cashRegisterId: requiredString(shift.cashRegisterId),
+      cashRegisterName: requiredString(shift.cashRegisterName),
       status: requiredString(shift.status),
       openingCents: numeric(shift.openingCents) ?? 0,
       expectedCents: numeric(shift.expectedCents, true),
@@ -2780,12 +3267,161 @@ export function parseCash(value: unknown): CashData {
       differenceCents: numeric(shift.differenceCents, true),
       openedAt: optionalString(shift.openedAt),
       closedAt: optionalString(shift.closedAt),
+      operatorName: optionalString(shift.operatorName),
+      closedByName: optionalString(shift.closedByName),
+      reviewedByName: optionalString(shift.reviewedByName),
+      reviewedAt: optionalString(shift.reviewedAt),
+      reviewNote: optionalString(shift.reviewNote),
+      currentResponsibleIdentityId: optionalString(shift.currentResponsibleIdentityId),
+      responsibleName: optionalString(shift.responsibleName),
+      tenderBreakdown: parseCashTenderCounts(shift.tenderBreakdown),
+      differenceSeverity: cashDifferenceSeverity(shift.differenceSeverity),
     })),
-    movements: rows(payload, "movements"),
+    entries: rows(payload, "entries").map((entry) => ({
+      id: requiredString(entry.id),
+      cashShiftId: requiredString(entry.cashShiftId),
+      direction: entry.direction === "out" ? "out" : "in",
+      entryType: requiredString(entry.entryType),
+      paymentMethod: optionalString(entry.paymentMethod),
+      affectsDrawer: boolean(entry.affectsDrawer),
+      amountCents: numeric(entry.amountCents) ?? 0,
+      description: optionalString(entry.description),
+      actorName: optionalString(entry.actorName),
+      occurredAt: optionalString(entry.occurredAt),
+    })),
+    pendingTabs: rows(payload, "pendingTabs").map((tab) => ({
+      id: requiredString(tab.id),
+      label: requiredString(tab.label),
+      totalCents: numeric(tab.totalCents) ?? 0,
+      paidCents: numeric(tab.paidCents) ?? 0,
+      remainingCents: numeric(tab.remainingCents) ?? 0,
+    })),
+    capabilities: {
+      canOpen: boolean(capabilities.canOpen),
+      canMove: boolean(capabilities.canMove),
+      canClose: boolean(capabilities.canClose),
+      canReview: boolean(capabilities.canReview),
+      canViewExpected: boolean(capabilities.canViewExpected),
+      canManageRegisters: boolean(capabilities.canManageRegisters),
+      canTransfer: boolean(capabilities.canTransfer),
+      canManageCashSettings: boolean(capabilities.canManageCashSettings),
+      canManageTerminals: boolean(capabilities.canManageTerminals),
+      canApproveCashRequests: boolean(capabilities.canApproveCashRequests),
+      canHandover: boolean(capabilities.canHandover),
+    },
+  };
+}
+
+function parseCashHistoryItem(value: unknown): CashHistoryItem {
+  const shift = record(value);
+  return {
+    id: requiredString(shift.id),
+    cashRegisterId: requiredString(shift.cashRegisterId),
+    cashRegisterName: requiredString(shift.cashRegisterName),
+    status: requiredString(shift.status),
+    openingCents: numeric(shift.openingCents) ?? 0,
+    expectedCents: numeric(shift.expectedCents, true),
+    countedCents: numeric(shift.countedCents, true),
+    differenceCents: numeric(shift.differenceCents, true),
+    differenceSeverity: cashDifferenceSeverity(shift.differenceSeverity),
+    openedAt: optionalString(shift.openedAt),
+    closedAt: optionalString(shift.closedAt),
+    operatorName: optionalString(shift.operatorName),
+    responsibleName: optionalString(shift.responsibleName),
+    closedByName: optionalString(shift.closedByName),
+  };
+}
+
+function parseCashEntry(value: unknown): CashEntry {
+  const entry = record(value);
+  return {
+    id: requiredString(entry.id),
+    cashShiftId: requiredString(entry.cashShiftId),
+    direction: entry.direction === "out" ? "out" : "in",
+    entryType: requiredString(entry.entryType),
+    paymentMethod: optionalString(entry.paymentMethod),
+    affectsDrawer: boolean(entry.affectsDrawer),
+    amountCents: numeric(entry.amountCents) ?? 0,
+    description: optionalString(entry.description),
+    actorName: optionalString(entry.actorName),
+    occurredAt: optionalString(entry.occurredAt),
+  };
+}
+
+function parseCashAdjustment(value: unknown): CashAdjustment {
+  const adjustment = record(value);
+  return {
+    id: requiredString(adjustment.id),
+    cashRegisterId: optionalString(adjustment.cashRegisterId),
+    originalCashShiftId: optionalString(adjustment.originalCashShiftId),
+    direction: adjustment.direction === "out" ? "out" : "in",
+    entryType: requiredString(adjustment.entryType),
+    paymentMethod: optionalString(adjustment.paymentMethod),
+    affectsDrawer: boolean(adjustment.affectsDrawer),
+    amountCents: numeric(adjustment.amountCents) ?? 0,
+    description: optionalString(adjustment.description),
+    actorName: optionalString(adjustment.actorName),
+    occurredAt: optionalString(adjustment.occurredAt),
+  };
+}
+
+export function parseCashHistory(value: unknown): CashHistoryPage {
+  const payload = record(value);
+  return {
+    items: rows(payload, "items").map(parseCashHistoryItem),
+    nextCursor: optionalString(payload.nextCursor),
+  };
+}
+
+export function parseCashShiftDetail(value: unknown): CashShiftDetail {
+  const payload = record(value);
+  return {
+    shift: parseCashHistoryItem(payload.shift),
+    entries: rows(payload, "entries").map(parseCashEntry),
+    tenderCounts: parseCashTenderCounts(payload.tenderCounts),
+    responsibilities: rows(payload, "responsibilities").map((candidate) => ({
+      id: requiredString(candidate.id),
+      fromName: requiredString(candidate.fromName),
+      toName: requiredString(candidate.toName),
+      transferredByName: requiredString(candidate.transferredByName),
+      reason: requiredString(candidate.reason),
+      occurredAt: optionalString(candidate.occurredAt),
+    })),
+    adjustments: rows(payload, "adjustments").map(parseCashAdjustment),
+  };
+}
+
+export function parseCashClosure(value: unknown): CashClosureResult {
+  const payload = record(value);
+  return {
+    cashShiftId: requiredString(payload.cashShiftId),
+    status: requiredString(payload.status),
+    expectedCents: numeric(payload.expectedCents) ?? 0,
+    countedCents: numeric(payload.countedCents) ?? 0,
+    differenceCents: numeric(payload.differenceCents) ?? 0,
+    drawerInCents: numeric(payload.drawerInCents) ?? 0,
+    drawerOutCents: numeric(payload.drawerOutCents) ?? 0,
+    breakdown: rows(payload, "breakdown").map((entry) => ({
+      method: requiredString(entry.method),
+      amountCents: numeric(entry.amountCents) ?? 0,
+    })),
+    reviewRequired: boolean(payload.reviewRequired),
+    differenceSeverity: cashDifferenceSeverity(payload.differenceSeverity),
+    tenderBreakdown: parseCashTenderCounts(payload.tenderBreakdown),
   };
 }
 
 function parsePerson(person: Row): Person {
+  const rawAccess =
+    person.access === undefined || person.access === null ? null : record(person.access);
+  const accessStatus = rawAccess
+    ? requiredString(rawAccess.status)
+    : person.identityId
+      ? "active"
+      : "none";
+  if (!["none", "pending", "expired", "active", "suspended"].includes(accessStatus)) {
+    throw new InvalidManagementPayloadError();
+  }
   return {
     id: requiredString(person.id),
     identityId: optionalString(person.identityId),
@@ -2797,6 +3433,121 @@ function parsePerson(person: Row): Person {
     updatedAt: optionalString(person.updatedAt) ?? undefined,
     statusReason: optionalString(person.statusChangeReason ?? person.statusReason),
     statusChangedAt: optionalString(person.statusChangedAt),
+    access: {
+      status: accessStatus as PersonAccessStatus,
+      email: rawAccess ? optionalString(rawAccess.email) : null,
+      role: rawAccess ? optionalString(rawAccess.role) : null,
+      invitationId: rawAccess ? optionalString(rawAccess.invitationId) : null,
+      expiresAt: rawAccess ? optionalString(rawAccess.expiresAt) : null,
+      membershipId: rawAccess ? optionalString(rawAccess.membershipId) : null,
+    },
+  };
+}
+
+function parsePersonAccessValue(value: unknown): PersonAccess {
+  const access = record(value);
+  const status = requiredString(access.status);
+  if (!["none", "pending", "expired", "active", "suspended"].includes(status)) {
+    throw new InvalidManagementPayloadError();
+  }
+  return {
+    status: status as PersonAccessStatus,
+    email: optionalString(access.email),
+    role: optionalString(access.role),
+    invitationId: optionalString(access.invitationId),
+    expiresAt: optionalString(access.expiresAt),
+    membershipId: optionalString(access.membershipId),
+  };
+}
+
+export function parsePeopleAccessCenter(value: unknown): PeopleAccessCenterData {
+  const payload = record(value);
+  return {
+    terminals: rows(payload, "terminals").map((terminal) => {
+      const status = requiredString(terminal.status);
+      if (!["waiting", "active", "locked"].includes(status)) {
+        throw new InvalidManagementPayloadError();
+      }
+      return {
+        id: requiredString(terminal.id),
+        deviceId: optionalString(terminal.deviceId),
+        openedBy: requiredString(terminal.openedBy),
+        activeOperator: optionalString(terminal.activeOperator),
+        status: status as ManagedTerminalSession["status"],
+        createdAt: requiredString(terminal.createdAt),
+        lastActivityAt: optionalString(terminal.lastActivityAt),
+        lockedUntil: optionalString(terminal.lockedUntil),
+        expiresAt: requiredString(terminal.expiresAt),
+      };
+    }),
+  };
+}
+
+export function parsePersonOffboardingPreflight(value: unknown): PersonOffboardingPreflight {
+  const payload = record(value);
+  const counts = record(payload.counts);
+  return {
+    canProceed: boolean(payload.canProceed),
+    counts: {
+      openTimeEntries: integer(counts.openTimeEntries),
+      futureSchedules: integer(counts.futureSchedules),
+      unsettledCommissions: integer(counts.unsettledCommissions),
+      openCashShifts: integer(counts.openCashShifts),
+      activeTerminals: integer(counts.activeTerminals),
+      accessAssignments: integer(counts.accessAssignments),
+    },
+    checks: rows(payload, "checks").map((check) => {
+      const severity = requiredString(check.severity);
+      if (!["blocker", "warning", "info"].includes(severity)) {
+        throw new InvalidManagementPayloadError();
+      }
+      return {
+        code: requiredString(check.code),
+        label: requiredString(check.label),
+        count: integer(check.count),
+        severity: severity as "blocker" | "warning" | "info",
+      };
+    }),
+  };
+}
+
+export function parsePersonAccessOverview(value: unknown): PersonAccessOverviewData {
+  const payload = record(value);
+  return {
+    units: rows(payload, "units").map((unit) => ({
+      id: requiredString(unit.id),
+      name: requiredString(unit.name),
+      active: boolean(unit.active),
+    })),
+    assignments: rows(payload, "assignments").map((assignment) => {
+      const rawDelivery = assignment.delivery ? record(assignment.delivery) : null;
+      const deliveryStatus = rawDelivery ? requiredString(rawDelivery.status) : null;
+      if (deliveryStatus && !["queued", "sent", "failed"].includes(deliveryStatus)) {
+        throw new InvalidManagementPayloadError();
+      }
+      return {
+        unitId: requiredString(assignment.unitId),
+        unitName: requiredString(assignment.unitName),
+        primary: boolean(assignment.primary),
+        access: parsePersonAccessValue(assignment.access),
+        delivery: rawDelivery
+          ? {
+              status: deliveryStatus as "queued" | "sent" | "failed",
+              attempts: integer(rawDelivery.attempts),
+              processedAt: optionalString(rawDelivery.processedAt),
+              lastError: optionalString(rawDelivery.lastError),
+            }
+          : null,
+      };
+    }),
+    history: rows(payload, "history").map((event) => ({
+      id: requiredString(event.id),
+      action: requiredString(event.action),
+      actorName: requiredString(event.actorName),
+      metadata: record(event.metadata),
+      occurredAt: requiredString(event.occurredAt),
+    })),
+    offboarding: parsePersonOffboardingPreflight(payload.offboarding),
   };
 }
 
@@ -3080,17 +3831,6 @@ export function parseSelfTimeTracking(value: unknown): SelfTimeTrackingData {
   const payload = record(value);
   const personValue =
     payload.person === null || payload.person === undefined ? null : record(payload.person);
-  const parsePerson = (person: Record<string, unknown> | null): Person | null =>
-    person
-      ? {
-          id: requiredString(person.id),
-          identityId: optionalString(person.identityId),
-          name: requiredString(person.name),
-          roleLabel: requiredString(person.roleLabel),
-          active: boolean(person.active),
-          hourlyRateCents: numeric(person.hourlyRateCents, true),
-        }
-      : null;
   const parseEntry = (entry: Record<string, unknown>): TimeEntry => ({
     id: requiredString(entry.id),
     personId: requiredString(entry.personId),
@@ -3104,7 +3844,7 @@ export function parseSelfTimeTracking(value: unknown): SelfTimeTrackingData {
       : parseEntry(record(payload.current));
   return {
     enabled: payload.enabled === true,
-    person: parsePerson(personValue),
+    person: personValue ? parsePerson(personValue) : null,
     settings: parseTimeTrackingSettings(payload.settings),
     current,
     entries: rows(payload, "entries").map(parseEntry),
@@ -3178,42 +3918,65 @@ export function useRemote<T>(
 ) {
   const [refresh, setRefresh] = useState(0);
   const [state, setState] = useState<RemoteState<T>>({ status: "loading" });
+  const [updating, setUpdating] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const loaderRef = useRef(loader);
   const parserRef = useRef(parser);
+  const readyRef = useRef(false);
   const scopeKey = `${scope.organizationId}:${scope.unitId}`;
   const scopeKeyRef = useRef(scopeKey);
+  const requestIdRef = useRef(0);
+  const hasRequestedRef = useRef(false);
   loaderRef.current = loader;
   parserRef.current = parser;
   useEffect(() => {
     void refresh;
     void scope.refreshToken;
     let active = true;
+    const requestId = ++requestIdRef.current;
     const scopeChanged = scopeKeyRef.current !== scopeKey;
     scopeKeyRef.current = scopeKey;
+    if (scopeChanged) readyRef.current = false;
+    setUpdating(readyRef.current);
+    setRefreshError(null);
     setState((prev) => (scopeChanged || prev.status !== "ready" ? { status: "loading" } : prev));
-    loaderRef
-      .current(scope.organizationId, scope.unitId)
-      .then(parserRef.current)
-      .then((data) => active && setState({ status: "ready", data }))
-      .catch(
-        (error: unknown) =>
-          active &&
-          setState((prev) =>
-            prev.status === "ready"
-              ? prev
-              : {
-                  status: "error",
-                  message:
-                    error instanceof Error ? error.message : "Não foi possível carregar os dados.",
-                  ...(error instanceof ApiClientError
-                    ? { httpStatus: error.status, requestId: error.requestId }
-                    : {}),
-                  ...(error instanceof ApiClientError && error.status === 429
-                    ? { retryAfterSeconds: retryDelay(error.message) }
-                    : {}),
-                },
-          ),
-      );
+    const bypassReadyCache = hasRequestedRef.current;
+    hasRequestedRef.current = true;
+    loadManagementRemote(
+      loaderRef.current,
+      parserRef.current,
+      scope.organizationId,
+      scope.unitId,
+      bypassReadyCache,
+    )
+      .then((data) => {
+        if (active && requestIdRef.current === requestId) {
+          readyRef.current = true;
+          setState({ status: "ready", data });
+          setUpdating(false);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active || requestIdRef.current !== requestId) return;
+        const message =
+          error instanceof Error ? error.message : "Não foi possível carregar os dados.";
+        if (readyRef.current) setRefreshError(message);
+        setState((prev) =>
+          prev.status === "ready"
+            ? prev
+            : {
+                status: "error",
+                message,
+                ...(error instanceof ApiClientError
+                  ? { httpStatus: error.status, requestId: error.requestId }
+                  : {}),
+                ...(error instanceof ApiClientError && error.status === 429
+                  ? { retryAfterSeconds: retryDelay(error.message) }
+                  : {}),
+              },
+        );
+        setUpdating(false);
+      });
     return () => {
       active = false;
     };
@@ -3230,6 +3993,9 @@ export function useRemote<T>(
     state,
     retry,
     update,
+    updating,
+    refreshError,
+    stale: refreshError !== null,
   };
 }
 

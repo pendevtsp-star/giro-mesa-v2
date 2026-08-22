@@ -1,3 +1,21 @@
+import {
+  integratedPaymentMethodSchema,
+  paymentAttemptCreateSchema,
+  paymentAttemptStatusSchema,
+  paymentDeviceCredentialRotateSchema,
+  paymentDeviceDiagnosticsSchema,
+  paymentDevicePairingCreateSchema,
+  paymentDevicePairingRedeemSchema,
+  paymentDeviceResultSchema,
+  paymentHomologationRunSchema,
+  paymentReconciliationInputSchema,
+  paymentReconciliationStatusSchema,
+  paymentReversalCreateSchema,
+  paymentTerminalCertificationSchema,
+  paymentTerminalConfigurationSchema,
+  paymentTerminalProviderSchema,
+  paymentTerminalStatusSchema,
+} from "@giromesa/contracts";
 import { z } from "zod";
 import { MAX_STORED_CENTS } from "./pilot-rules.js";
 
@@ -705,6 +723,8 @@ export const paymentSchema = z.object({
   method: z.enum(["cash", "credit_card", "debit_card", "pix", "other"]),
   amountCents: cents.positive(),
   reference: z.string().trim().max(120).optional(),
+  cashRegisterId: id.optional(),
+  installationId: id.optional(),
 });
 
 const printTargetSchema = z.object({
@@ -968,6 +988,7 @@ export const terminalProfileSchema = z
     defaultRoute: terminalProfileRouteSchema,
     printerId: z.string().trim().min(1).max(120).nullable(),
     stationId: id.nullable(),
+    cashRegisterId: id.nullable().optional(),
     compact: z.boolean(),
     quickActions: z
       .array(z.enum(["open_tab", "new_order", "receive", "waitlist", "print", "search"]))
@@ -1522,14 +1543,235 @@ export const terminalProfileResponseSchema = z.object({
   defaultRoute: terminalProfileRouteSchema,
   printerId: z.string().nullable(),
   stationId: id.nullable(),
+  cashRegisterId: id.nullable(),
   compact: z.boolean(),
   quickActions: z.array(z.string()),
+  paymentProvider: paymentTerminalProviderSchema.nullable(),
+  paymentStatus: paymentTerminalStatusSchema,
+  paymentMethods: z.array(integratedPaymentMethodSchema),
+  maxPaymentInstallments: z.number().int(),
+  paymentSupportsCancel: z.boolean(),
+  paymentSupportsRecover: z.boolean(),
+  paymentSupportsReversal: z.boolean(),
   createdAt: responseDateTime,
   updatedAt: responseDateTime,
   updatedByIdentityId: id,
   idempotentReplay: z.boolean().optional(),
 });
 export const terminalProfileLookupResponseSchema = terminalProfileResponseSchema.nullable();
+
+export {
+  paymentAttemptCreateSchema,
+  paymentDeviceCredentialRotateSchema,
+  paymentDeviceDiagnosticsSchema,
+  paymentDevicePairingCreateSchema,
+  paymentDevicePairingRedeemSchema,
+  paymentDeviceResultSchema,
+  paymentHomologationRunSchema,
+  paymentReconciliationInputSchema,
+  paymentReversalCreateSchema,
+  paymentTerminalCertificationSchema,
+  paymentTerminalConfigurationSchema,
+};
+
+export const paymentReconciliationQuerySchema = z.object({
+  status: paymentReconciliationStatusSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+
+export const paymentTerminalCapabilityResponseSchema = z.object({
+  installationId: id,
+  available: z.boolean(),
+  status: paymentTerminalStatusSchema,
+  provider: paymentTerminalProviderSchema.nullable(),
+  methods: z.array(integratedPaymentMethodSchema),
+  maxInstallments: z.number().int().min(1).max(24),
+  supports: z.object({
+    cancel: z.boolean(),
+    recover: z.boolean(),
+    reversal: z.boolean(),
+  }),
+  reason: z.string().nullable(),
+  certificationId: id.nullable(),
+  diagnosticsMatch: z.boolean(),
+  killSwitch: z.object({ enabled: z.boolean(), reason: z.string().nullable() }),
+});
+
+export const paymentDevicePairingResponseSchema = z.object({
+  pairingId: id,
+  code: z.string(),
+  qrPayload: z.string(),
+  expiresAt: responseDateTime,
+});
+
+export const paymentDeviceCredentialResponseSchema = z.object({
+  installationId: id.optional(),
+  credentialId: id,
+  credentialExpiresAt: responseDateTime,
+  rotateAfter: responseDateTime,
+  previousCredentialValidUntil: responseDateTime.optional(),
+  capabilities: paymentTerminalCapabilityResponseSchema.optional(),
+});
+
+const paymentDeviceReportedDiagnosticsResponseSchema = paymentDeviceDiagnosticsSchema.extend({
+  lastSeenAt: responseDateTime,
+});
+const paymentCertificationSummaryResponseSchema = z.object({
+  id,
+  provider: paymentTerminalProviderSchema,
+  status: z.enum(["approved", "suspended"]),
+  killSwitchEnabled: z.boolean(),
+  killSwitchReason: z.string().nullable(),
+});
+export const paymentDeviceListResponseSchema = z.object({
+  devices: z.array(
+    z.object({
+      installationId: id,
+      label: z.string(),
+      enrolledAt: responseDateTime,
+      revokedAt: responseDateTime.nullable(),
+      lastSeenAt: responseDateTime.nullable(),
+      reportedDiagnostics: paymentDeviceReportedDiagnosticsResponseSchema.nullable(),
+      capabilities: paymentTerminalCapabilityResponseSchema,
+      certification: paymentCertificationSummaryResponseSchema.nullable(),
+    }),
+  ),
+});
+
+export const paymentOperationsHealthResponseSchema = z.object({
+  generatedAt: responseDateTime,
+  summary: z.object({
+    unknownAttempts: z.number().int().nonnegative(),
+    staleProcessingAttempts: z.number().int().nonnegative(),
+    offlineDevices: z.number().int().nonnegative(),
+    reconciliationDivergences: z.number().int().nonnegative(),
+  }),
+  incidents: z.array(
+    z.object({
+      kind: z.enum([
+        "unknown_attempt",
+        "stale_processing",
+        "offline_device",
+        "reconciliation_divergence",
+      ]),
+      severity: z.enum(["warning", "critical"]),
+      entityId: id,
+      label: z.string(),
+      occurredAt: responseDateTime,
+    }),
+  ),
+});
+
+const paymentReconciliationEntryResponseSchema = z.object({
+  id,
+  paymentId: id,
+  provider: paymentTerminalProviderSchema,
+  providerSettlementId: z.string(),
+  providerReference: z.string(),
+  grossCents: z.number().int().positive(),
+  feeCents: z.number().int().nonnegative(),
+  netCents: z.number().int().nonnegative(),
+  expectedSettlementAt: responseDateTime,
+  settledAt: responseDateTime.nullable(),
+  status: paymentReconciliationStatusSchema,
+  source: z.enum(["api", "webhook", "import"]),
+  createdAt: responseDateTime,
+  updatedAt: responseDateTime,
+});
+export const paymentReconciliationListResponseSchema = z.object({
+  entries: z.array(paymentReconciliationEntryResponseSchema),
+  summary: z.object({
+    grossCents: z.number().int().nonnegative(),
+    feeCents: z.number().int().nonnegative(),
+    netCents: z.number().int().nonnegative(),
+    divergences: z.number().int().nonnegative(),
+  }),
+});
+
+const paymentHomologationRunResponseSchema = paymentHomologationRunSchema.extend({
+  id,
+  passed: z.boolean(),
+  recordedByIdentityId: id,
+  createdAt: responseDateTime,
+});
+export const paymentHomologationRunMutationResponseSchema = z.object({
+  run: paymentHomologationRunResponseSchema,
+});
+export const paymentHomologationRunListResponseSchema = z.object({
+  runs: z.array(paymentHomologationRunResponseSchema),
+});
+
+export const paymentAttemptResponseSchema = z.object({
+  id,
+  tabId: id,
+  installationId: id,
+  provider: paymentTerminalProviderSchema,
+  method: integratedPaymentMethodSchema,
+  amountCents: z.number().int().positive(),
+  installments: z.number().int().min(1).max(24),
+  status: paymentAttemptStatusSchema,
+  providerReference: z.string().nullable(),
+  failureCode: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+  expiresAt: responseDateTime,
+  processingAt: responseDateTime.nullable(),
+  resolvedAt: responseDateTime.nullable(),
+  createdAt: responseDateTime,
+  updatedAt: responseDateTime,
+});
+
+export const paymentAttemptActionSchema = z.object({
+  type: z.enum(["start", "recover", "cancel"]),
+  attemptId: id,
+  provider: paymentTerminalProviderSchema,
+});
+
+export const paymentAttemptMutationResponseSchema = z.object({
+  attempt: paymentAttemptResponseSchema,
+  action: paymentAttemptActionSchema.nullable(),
+  idempotentReplay: z.boolean().optional(),
+});
+
+export const paymentAttemptLookupResponseSchema = z.object({
+  attempt: paymentAttemptResponseSchema,
+});
+export const paymentDeviceResultResponseSchema = z.object({
+  attempt: paymentAttemptResponseSchema,
+  paymentId: id.nullable().optional(),
+  idempotentReplay: z.boolean(),
+});
+export const paymentDeviceClaimResponseSchema = z.object({
+  attempt: paymentAttemptResponseSchema,
+  action: z.enum(["start", "recover", "cancel"]),
+  capabilities: paymentTerminalCapabilityResponseSchema,
+  certification: paymentCertificationSummaryResponseSchema,
+});
+export const paymentReversalResponseSchema = z.object({
+  reversal: z.object({
+    id,
+    paymentId: id,
+    installationId: id,
+    amountCents: z.number().int().positive(),
+    reason: z.string(),
+    status: z.enum(["pending", "processing", "approved", "declined", "canceled", "unknown"]),
+    providerReference: z.string().nullable(),
+    failureCode: z.string().nullable(),
+    resolvedAt: responseDateTime.nullable(),
+    createdAt: responseDateTime,
+    updatedAt: responseDateTime,
+  }),
+  action: z.object({
+    type: z.enum(["reverse", "recover"]),
+    reversalId: id,
+    paymentAttemptId: id,
+    provider: paymentTerminalProviderSchema,
+  }),
+  idempotentReplay: z.boolean().optional(),
+});
+export const paymentDeviceReversalResultResponseSchema = z.object({
+  reversal: paymentReversalResponseSchema.shape.reversal,
+  idempotentReplay: z.boolean(),
+});
 
 export const kdsConflictResponseSchema = z.object({
   statusCode: z.number().int().optional(),
@@ -1615,6 +1857,20 @@ export type CloseOperationalShiftInput = z.infer<typeof closeOperationalShiftSch
 export type ClaimTabInput = z.infer<typeof claimTabSchema>;
 export type ServiceCallInput = z.infer<typeof serviceCallSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
+export type PaymentAttemptCreateInput = z.infer<typeof paymentAttemptCreateSchema>;
+export type PaymentDeviceCredentialRotateInput = z.infer<
+  typeof paymentDeviceCredentialRotateSchema
+>;
+export type PaymentDeviceDiagnosticsInput = z.infer<typeof paymentDeviceDiagnosticsSchema>;
+export type PaymentDevicePairingCreateInput = z.infer<typeof paymentDevicePairingCreateSchema>;
+export type PaymentDevicePairingRedeemInput = z.infer<typeof paymentDevicePairingRedeemSchema>;
+export type PaymentDeviceResultInput = z.infer<typeof paymentDeviceResultSchema>;
+export type PaymentHomologationRunInput = z.infer<typeof paymentHomologationRunSchema>;
+export type PaymentReconciliationInput = z.infer<typeof paymentReconciliationInputSchema>;
+export type PaymentReconciliationQueryInput = z.infer<typeof paymentReconciliationQuerySchema>;
+export type PaymentReversalCreateInput = z.infer<typeof paymentReversalCreateSchema>;
+export type PaymentTerminalCertificationInput = z.infer<typeof paymentTerminalCertificationSchema>;
+export type PaymentTerminalConfigurationInput = z.infer<typeof paymentTerminalConfigurationSchema>;
 export type PrintJobInput = z.infer<typeof printJobSchema>;
 export type PrintJobQueryInput = z.infer<typeof printJobQuerySchema>;
 export type PrintJobStatusInput = z.infer<typeof printJobStatusSchema>;

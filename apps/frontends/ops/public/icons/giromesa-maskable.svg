@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">GiroMesa</title>
+  <rect width="512" height="512" fill="#146b4c" />
+  <path
+    fill="#fff"
+    d="M259 151c43 0 76 14 100 39l-35 35c-16-16-37-25-64-25-45 0-78 29-78 73 0 45 33 74 79 74 21 0 38-5 50-14v-35h-58v-46h109v104c-26 28-60 47-103 47-77 0-134-52-134-129 0-73 58-123 134-123Z"
+  />
+</svg>

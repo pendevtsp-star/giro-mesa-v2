@@ -16,6 +16,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The amountCents property</summary>
         public int? AmountCents { get; set; }
+        /// <summary>The cashRegisterId property</summary>
+        public Guid? CashRegisterId { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The method property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method? Method { get; set; }
         /// <summary>The reference property</summary>
@@ -52,6 +56,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
+                { "cashRegisterId", n => { CashRegisterId = n.GetGuidValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "method", n => { Method = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method>(); } },
                 { "reference", n => { Reference = n.GetStringValue(); } },
             };
@@ -64,6 +70,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
+            writer.WriteGuidValue("cashRegisterId", CashRegisterId);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method>("method", Method);
             writer.WriteStringValue("reference", Reference);
             writer.WriteAdditionalData(AdditionalData);

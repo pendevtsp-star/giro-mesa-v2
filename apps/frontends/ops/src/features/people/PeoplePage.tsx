@@ -21,11 +21,17 @@ import {
   type ManagementScope,
   operationalKey,
   type Person,
+  type PersonAccessOverviewData,
+  type PersonAccessStatus,
+  type PersonOffboardingPreflight,
   type PersonTimelineData,
   parsePeople,
+  parsePeopleAccessCenter,
   parsePeopleCapabilities,
   parsePeopleDirectory,
   parsePeopleIndicators,
+  parsePersonAccessOverview,
+  parsePersonOffboardingPreflight,
   parsePersonTimeline,
   parseTimeTrackingReport,
   RemoteGate,
@@ -108,13 +114,139 @@ function timelineExceptions(timeline: PersonTimelineData) {
   return { absences, earlyDepartures };
 }
 
-type PeopleSection = "today" | "team" | "schedules" | "time" | "settings";
+type PeopleSection = "today" | "team" | "access" | "schedules" | "time" | "settings";
 type PeopleFilter = "all" | "active" | "inactive" | "unlinked" | "on_shift";
+type AccessRole =
+  | "owner"
+  | "manager"
+  | "waiter"
+  | "cashier"
+  | "receptionist"
+  | "busser"
+  | "kds"
+  | "delivery"
+  | "inventory"
+  | "finance"
+  | "accountant";
+type AccessAction =
+  | { kind: "invite"; personId: string }
+  | { kind: "change-role"; personId: string }
+  | { kind: "cancel"; personId: string }
+  | { kind: "suspend"; personId: string }
+  | { kind: "reactivate"; personId: string };
+type UnitAccessAction = { kind: "assign" } | { kind: "remove"; unitId: string; role: AccessRole };
+
+const accessRoles: Array<{ value: AccessRole; label: string; description: string }> = [
+  { value: "manager", label: "Gerente", description: "Equipe, turno e aprovações" },
+  { value: "waiter", label: "Garçom", description: "Salão, balcão e reservas" },
+  { value: "cashier", label: "Caixa", description: "Recebimentos e fechamento" },
+  { value: "receptionist", label: "Recepcionista", description: "Reservas e acomodação" },
+  { value: "busser", label: "Cumim / apoio", description: "Chamados e giro de mesas" },
+  { value: "kds", label: "Cozinha / KDS", description: "Produção e disponibilidade" },
+  { value: "delivery", label: "Delivery", description: "Pedidos e despacho" },
+  { value: "inventory", label: "Estoque e compras", description: "Suprimentos e perdas" },
+  { value: "finance", label: "Financeiro", description: "Contas, conciliação e margem" },
+  { value: "accountant", label: "Contador", description: "Pacotes e solicitações contábeis" },
+];
+const managerGrantableAccessRoles = new Set<AccessRole>([
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+]);
+const sensitiveAccessRoles = new Set<AccessRole>(["manager", "finance", "accountant"]);
+const accessRoleHighlights: Record<AccessRole, string[]> = {
+  owner: ["Todos os módulos", "Configurações e acessos", "Visão multiunidade"],
+  manager: ["Operação e equipe", "Aprovações", "Relatórios gerenciais"],
+  waiter: ["Mesas e comandas", "Pedidos", "Chamados do salão"],
+  cashier: ["Balcão", "Recebimentos", "Fechamento de caixa"],
+  receptionist: ["Reservas", "Fila de espera", "Acomodação"],
+  busser: ["Chamados", "Limpeza", "Giro de mesas"],
+  kds: ["Produção KDS", "Disponibilidade", "Pedidos"],
+  delivery: ["Pedidos delivery", "Despacho", "Prazos"],
+  inventory: ["Estoque", "Compras", "Perdas"],
+  finance: ["Financeiro", "Conciliação", "Margens e relatórios"],
+  accountant: ["Documentos fiscais", "Pacotes contábeis", "Solicitações"],
+};
+
+function auditActionLabel(action: string) {
+  return (
+    {
+      "management.person.created": "Cadastro criado",
+      "management.person.updated": "Cadastro atualizado",
+      "management.person.inactivated": "Pessoa inativada",
+      "management.person.reactivated": "Pessoa reativada",
+      "management.person.access.invited": "Convite enviado",
+      "management.person.access.resent": "Convite reenviado",
+      "management.person.access.canceled": "Convite cancelado",
+      "management.person.access.role-changed": "Perfil alterado",
+      "management.person.access.suspended": "Acesso suspenso",
+      "management.person.access.reactivated": "Acesso reativado",
+      "management.person.access.accepted": "Convite aceito",
+      "management.person.access.unit-assigned": "Unidade liberada",
+      "management.person.access.unit-removed": "Unidade removida",
+    }[action] ?? action
+  );
+}
+
+const accessStatusMeta: Record<
+  PersonAccessStatus,
+  { label: string; tone: "neutral" | "info" | "warning" | "success" }
+> = {
+  none: { label: "Sem acesso", tone: "neutral" },
+  pending: { label: "Convite pendente", tone: "info" },
+  expired: { label: "Convite expirado", tone: "warning" },
+  active: { label: "Acesso ativo", tone: "success" },
+  suspended: { label: "Acesso suspenso", tone: "warning" },
+};
+
+function accessRoleLabel(role: string | null) {
+  return accessRoles.find((item) => item.value === role)?.label ?? role ?? "Sem perfil";
+}
+
+function accessActionTitle(action: AccessAction | null) {
+  if (action?.kind === "invite") return "Conceder acesso";
+  if (action?.kind === "change-role") return "Alterar perfil";
+  if (action?.kind === "cancel") return "Cancelar convite";
+  if (action?.kind === "suspend") return "Suspender acesso";
+  return "Reativar acesso";
+}
+
+function accessActionCopy(action: AccessAction | null) {
+  if (action?.kind === "cancel")
+    return "O convite deixará de ser válido, sem alterar o cadastro do funcionário.";
+  if (action?.kind === "suspend")
+    return "O login será bloqueado imediatamente. O cadastro, escalas e registros serão preservados.";
+  if (action?.kind === "reactivate")
+    return "O funcionário voltará a acessar esta unidade com o perfil selecionado.";
+  if (action?.kind === "change-role")
+    return "A nova permissão passa a valer nas próximas requisições do usuário.";
+  return "Enviaremos um convite para o e-mail informado com o perfil selecionado.";
+}
+
+function useOnlineStatus() {
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
+}
 type Confirmation =
   | { kind: "close-period" }
   | { kind: "reopen-period"; closureId: string }
   | { kind: "reject-correction"; correctionId: string }
   | { kind: "person-status"; personId: string; active: boolean }
+  | { kind: "revoke-terminal"; terminalSessionId: string }
   | { kind: "cancel-schedule"; scheduleId: string }
   | {
       kind: "commission";
@@ -129,6 +261,7 @@ function confirmationTitle(confirmation: Confirmation | null) {
   if (confirmation.kind === "reject-correction") return "Rejeitar correção";
   if (confirmation.kind === "person-status")
     return confirmation.active ? "Reativar pessoa" : "Inativar pessoa";
+  if (confirmation.kind === "revoke-terminal") return "Encerrar terminal remotamente";
   if (confirmation.kind === "cancel-schedule") return "Cancelar escala";
   return "Atualizar comissão";
 }
@@ -142,8 +275,10 @@ function confirmationCopy(confirmation: Confirmation | null) {
     return "Informe por que a correção não pode ser aprovada.";
   if (confirmation?.kind === "person-status")
     return confirmation.active
-      ? "Informe o motivo da reativação."
-      : "A inativação será bloqueada se existir turno aberto. Informe o motivo.";
+      ? "Informe o motivo da reativação. O acesso ao sistema permanece suspenso até ser reativado separadamente."
+      : "O desligamento revoga o acesso ao sistema e será bloqueado se existir turno aberto. Escalas, ponto, comissões e auditoria serão preservados.";
+  if (confirmation?.kind === "revoke-terminal")
+    return "O terminal perderá o operador atual e precisará ser ativado novamente por um responsável.";
   if (confirmation?.kind === "cancel-schedule") return "Informe o motivo do cancelamento.";
   return "Informe uma nota para a trilha de auditoria da comissão.";
 }
@@ -162,6 +297,17 @@ function permissionReason(reason: string | null) {
 export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const remote = useRemote(scope, api.management.people, parsePeople);
   const capabilities = useRemote(scope, api.management.peopleCapabilities, parsePeopleCapabilities);
+  const [accessCenterRevision, setAccessCenterRevision] = useState(0);
+  const accessCenter = useRemote(
+    { ...scope, refreshToken: accessCenterRevision },
+    api.management.peopleAccessCenter,
+    parsePeopleAccessCenter,
+  );
+  const online = useOnlineStatus();
+  const grantableAccessRoles =
+    scope.profileId === "owner"
+      ? accessRoles
+      : accessRoles.filter((role) => managerGrantableAccessRoles.has(role.value));
   const canConfigureTracking =
     capabilities.state.status === "ready"
       ? capabilities.state.data.canConfigure
@@ -194,15 +340,27 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     parsePeopleDirectory,
   );
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [isCreatePersonOpen, setIsCreatePersonOpen] = useState(false);
+  const [accessAction, setAccessAction] = useState<AccessAction | null>(null);
+  const [accessEmail, setAccessEmail] = useState("");
+  const [accessRole, setAccessRole] = useState<AccessRole>("waiter");
+  const [accessReason, setAccessReason] = useState("");
+  const [reauthMethod, setReauthMethod] = useState<"password" | "mfa">("password");
+  const [reauthValue, setReauthValue] = useState("");
+  const [unitAccessAction, setUnitAccessAction] = useState<UnitAccessAction | null>(null);
+  const [unitAccessUnitId, setUnitAccessUnitId] = useState("");
+  const [unitAccessRole, setUnitAccessRole] = useState<AccessRole>("waiter");
+  const [unitAccessReason, setUnitAccessReason] = useState("");
   const [editPersonName, setEditPersonName] = useState("");
   const [editPersonRole, setEditPersonRole] = useState("");
   const [editPersonCode, setEditPersonCode] = useState("");
-  const [editPersonIdentityId, setEditPersonIdentityId] = useState("");
   const [editPersonHourlyRate, setEditPersonHourlyRate] = useState("");
   const [personName, setPersonName] = useState("");
   const [roleLabel, setRoleLabel] = useState("");
   const [employmentCode, setEmploymentCode] = useState("");
-  const [personIdentityId, setPersonIdentityId] = useState("");
+  const [personAccessEnabled, setPersonAccessEnabled] = useState(false);
+  const [personEmail, setPersonEmail] = useState("");
+  const [personAccessRole, setPersonAccessRole] = useState<AccessRole>("waiter");
   const [schedulePersonId, setSchedulePersonId] = useState("");
   const [scheduleStart, setScheduleStart] = useState("");
   const [scheduleEnd, setScheduleEnd] = useState("");
@@ -273,7 +431,15 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     | { status: "ready"; data: PersonTimelineData }
     | { status: "error"; message: string }
   >({ status: "idle" });
+  const [accessOverview, setAccessOverview] = useState<
+    | { status: "idle" | "loading" }
+    | { status: "ready"; data: PersonAccessOverviewData }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+  const [offboardingPreflight, setOffboardingPreflight] =
+    useState<PersonOffboardingPreflight | null>(null);
   const timelineRequest = useRef(0);
+  const accessOverviewRequest = useRef(0);
   useEffect(() => {
     if (remote.state.status !== "ready") return;
     const settings = remote.state.data.settings;
@@ -338,10 +504,92 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const visiblePeople = useMemo(() => {
     return directory.state.status === "ready" ? directory.state.data.items : [];
   }, [directory.state]);
+  const selectedPerson = selectedPersonId ? personById.get(selectedPersonId) : undefined;
+  const canManageSelectedAccess =
+    !selectedPerson?.access.role ||
+    scope.profileId === "owner" ||
+    managerGrantableAccessRoles.has(selectedPerson.access.role as AccessRole);
   function failAction(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     setActionError(message);
     setFeedback({ message, tone: "danger" });
+  }
+  function stepUpFor(role: AccessRole) {
+    if (!sensitiveAccessRoles.has(role)) return undefined;
+    return reauthMethod === "mfa"
+      ? { mfaCode: reauthValue.trim() }
+      : { currentPassword: reauthValue };
+  }
+  function accessActionStepUpRole() {
+    const currentRole = accessAction
+      ? personById.get(accessAction.personId)?.access.role
+      : undefined;
+    return accessAction?.kind === "change-role" &&
+      currentRole &&
+      sensitiveAccessRoles.has(currentRole as AccessRole)
+      ? (currentRole as AccessRole)
+      : accessRole;
+  }
+  function stepUpFields(role: AccessRole) {
+    if (!sensitiveAccessRoles.has(role)) return null;
+    return (
+      <fieldset>
+        <legend>Confirmação de segurança</legend>
+        <p className="form-hint">
+          Este perfil acessa dados ou ações sensíveis. Confirme sua identidade para continuar.
+        </p>
+        <div className="gm-form-grid">
+          <label className="gm-field">
+            Confirmar com
+            <NativeSelect
+              onChange={(event) => {
+                setReauthMethod(event.target.value as "password" | "mfa");
+                setReauthValue("");
+              }}
+              value={reauthMethod}
+            >
+              <option value="password">Senha atual</option>
+              <option value="mfa">Código MFA</option>
+            </NativeSelect>
+          </label>
+          <label className="gm-field">
+            {reauthMethod === "mfa" ? "Código de 6 dígitos" : "Senha atual"}
+            <Input
+              autoComplete={reauthMethod === "mfa" ? "one-time-code" : "current-password"}
+              inputMode={reauthMethod === "mfa" ? "numeric" : undefined}
+              maxLength={reauthMethod === "mfa" ? 6 : 200}
+              onChange={(event) => setReauthValue(event.target.value)}
+              pattern={reauthMethod === "mfa" ? "[0-9]{6}" : undefined}
+              required
+              type={reauthMethod === "mfa" ? "text" : "password"}
+              value={reauthValue}
+            />
+          </label>
+        </div>
+      </fieldset>
+    );
+  }
+  function loadAccessOverview(personId: string) {
+    const request = ++accessOverviewRequest.current;
+    setAccessOverview({ status: "loading" });
+    void api.management
+      .personAccessOverview(scope.organizationId, scope.unitId, personId)
+      .then(parsePersonAccessOverview)
+      .then((data) => {
+        if (accessOverviewRequest.current === request) {
+          setAccessOverview({ status: "ready", data });
+        }
+      })
+      .catch((error: unknown) => {
+        if (accessOverviewRequest.current !== request) return;
+        setAccessOverview({
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Não foi possível carregar acessos e auditoria.",
+        });
+      });
   }
   async function clockOut(entryId: string) {
     setActionId(entryId);
@@ -363,6 +611,10 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   }
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!online) {
+      failAction(null, "Conecte-se para cadastrar ou convidar um funcionário.");
+      return;
+    }
     setActionId("new-person");
     setActionError("");
     try {
@@ -370,14 +622,30 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
         name: personName.trim(),
         roleLabel: roleLabel.trim(),
         employmentCode: employmentCode.trim() || undefined,
-        identityId: personIdentityId || undefined,
+        access: personAccessEnabled
+          ? {
+              email: personEmail.trim().toLowerCase(),
+              role: personAccessRole,
+              reauth: stepUpFor(personAccessRole),
+            }
+          : undefined,
       });
       setPersonName("");
       setRoleLabel("");
       setEmploymentCode("");
-      setPersonIdentityId("");
-      setFeedback({ message: "Pessoa cadastrada na unidade.", tone: "success" });
+      setPersonAccessEnabled(false);
+      setPersonEmail("");
+      setPersonAccessRole("waiter");
+      setReauthValue("");
+      setIsCreatePersonOpen(false);
+      setFeedback({
+        message: personAccessEnabled
+          ? "Funcionário cadastrado e convite enviado."
+          : "Funcionário cadastrado sem acesso ao sistema.",
+        tone: "success",
+      });
       remote.retry();
+      directory.retry();
     } catch (error) {
       failAction(error, "Não foi possível cadastrar a pessoa.");
     } finally {
@@ -390,11 +658,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     setEditPersonName(person.name);
     setEditPersonRole(person.roleLabel);
     setEditPersonCode(person.employmentCode ?? "");
-    setEditPersonIdentityId(person.identityId ?? "");
     setEditPersonHourlyRate(
       person.hourlyRateCents === null ? "" : String(person.hourlyRateCents / 100),
     );
     setTimeline({ status: "loading" });
+    loadAccessOverview(person.id);
     void api.management
       .personTimeline(scope.organizationId, scope.unitId, person.id, {
         from: reportFrom,
@@ -423,7 +691,6 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
         name: editPersonName.trim(),
         roleLabel: editPersonRole.trim(),
         employmentCode: editPersonCode.trim() || null,
-        identityId: editPersonIdentityId || null,
         hourlyRateCents: editPersonHourlyRate
           ? Math.round(Number(editPersonHourlyRate) * 100)
           : null,
@@ -434,6 +701,192 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       directory.retry();
     } catch (error) {
       failAction(error, "Não foi possível atualizar o cadastro.");
+    } finally {
+      setActionId("");
+    }
+  }
+  function openAccessAction(kind: AccessAction["kind"], person: Person) {
+    setAccessAction({ kind, personId: person.id } as AccessAction);
+    setAccessEmail(person.access.email ?? "");
+    setAccessRole(
+      grantableAccessRoles.some((item) => item.value === person.access.role)
+        ? (person.access.role as AccessRole)
+        : "waiter",
+    );
+    setAccessReason("");
+    setReauthMethod("password");
+    setReauthValue("");
+    setActionError("");
+  }
+  async function submitAccessAction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accessAction) return;
+    if (!online) {
+      failAction(null, "Conecte-se para alterar o acesso deste funcionário.");
+      return;
+    }
+    const person = personById.get(accessAction.personId);
+    if (!person) return;
+    const actionKey = `access-${accessAction.kind}-${person.id}`;
+    setActionId(actionKey);
+    setActionError("");
+    try {
+      if (accessAction.kind === "invite") {
+        await api.management.invitePersonAccess(scope.organizationId, scope.unitId, person.id, {
+          email: accessEmail.trim().toLowerCase(),
+          role: accessRole,
+          reauth: stepUpFor(accessRole),
+        });
+      } else if (accessAction.kind === "change-role") {
+        await api.management.updatePersonAccess(scope.organizationId, scope.unitId, person.id, {
+          role: accessRole,
+          reason: accessReason.trim(),
+          reauth: stepUpFor(accessActionStepUpRole()),
+        });
+      } else if (accessAction.kind === "cancel") {
+        await api.management.cancelPersonAccess(
+          scope.organizationId,
+          scope.unitId,
+          person.id,
+          accessReason.trim(),
+        );
+      } else if (accessAction.kind === "suspend") {
+        await api.management.suspendPersonAccess(
+          scope.organizationId,
+          scope.unitId,
+          person.id,
+          accessReason.trim(),
+        );
+      } else {
+        await api.management.reactivatePersonAccess(scope.organizationId, scope.unitId, person.id, {
+          role: accessRole,
+          reason: accessReason.trim(),
+          reauth: stepUpFor(accessRole),
+        });
+      }
+      const messages: Record<AccessAction["kind"], string> = {
+        invite: "Convite de acesso enviado.",
+        "change-role": "Perfil de acesso atualizado.",
+        cancel: "Convite cancelado.",
+        suspend: "Acesso suspenso.",
+        reactivate: "Acesso reativado.",
+      };
+      setFeedback({ message: messages[accessAction.kind], tone: "success" });
+      setAccessAction(null);
+      setAccessReason("");
+      setReauthValue("");
+      remote.retry();
+      directory.retry();
+      if (selectedPersonId === person.id) loadAccessOverview(person.id);
+    } catch (error) {
+      failAction(error, "Não foi possível atualizar o acesso.");
+    } finally {
+      setActionId("");
+    }
+  }
+  async function resendAccess(person: Person) {
+    if (!online) {
+      failAction(null, "Conecte-se para reenviar o convite.");
+      return;
+    }
+    setActionId(`access-resend-${person.id}`);
+    setActionError("");
+    try {
+      await api.management.resendPersonAccess(scope.organizationId, scope.unitId, person.id);
+      setFeedback({ message: "Convite reenviado.", tone: "success" });
+      remote.retry();
+      directory.retry();
+      if (selectedPersonId === person.id) loadAccessOverview(person.id);
+    } catch (error) {
+      failAction(error, "Não foi possível reenviar o convite.");
+    } finally {
+      setActionId("");
+    }
+  }
+  async function preparePersonStatus(person: Person) {
+    setActionError("");
+    setOffboardingPreflight(null);
+    if (!person.active) {
+      setConfirmation({ kind: "person-status", personId: person.id, active: true });
+      setConfirmationNote("");
+      return;
+    }
+    setActionId(`person-preflight-${person.id}`);
+    try {
+      const preflight = parsePersonOffboardingPreflight(
+        await api.management.personOffboardingPreflight(
+          scope.organizationId,
+          scope.unitId,
+          person.id,
+        ),
+      );
+      setOffboardingPreflight(preflight);
+      setConfirmation({ kind: "person-status", personId: person.id, active: false });
+      setConfirmationNote("");
+    } catch (error) {
+      failAction(error, "Não foi possível verificar as pendências do desligamento.");
+    } finally {
+      setActionId("");
+    }
+  }
+  async function submitUnitAccess(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!unitAccessAction || !selectedPersonId) return;
+    const role = unitAccessAction.kind === "remove" ? unitAccessAction.role : unitAccessRole;
+    setActionId("unit-access");
+    setActionError("");
+    try {
+      if (unitAccessAction.kind === "assign") {
+        await api.management.assignPersonUnitAccess(
+          scope.organizationId,
+          scope.unitId,
+          selectedPersonId,
+          {
+            unitId: unitAccessUnitId,
+            role,
+            reason: unitAccessReason.trim(),
+            reauth: stepUpFor(role),
+          },
+        );
+        setFeedback({ message: "Acesso liberado na nova unidade.", tone: "success" });
+      } else {
+        await api.management.removePersonUnitAccess(
+          scope.organizationId,
+          scope.unitId,
+          selectedPersonId,
+          unitAccessAction.unitId,
+          { reason: unitAccessReason.trim(), reauth: stepUpFor(role) },
+        );
+        setFeedback({ message: "Acesso da unidade removido.", tone: "success" });
+      }
+      setUnitAccessAction(null);
+      setUnitAccessReason("");
+      setReauthValue("");
+      loadAccessOverview(selectedPersonId);
+      remote.retry();
+      directory.retry();
+    } catch (error) {
+      failAction(error, "Não foi possível atualizar o acesso multiunidade.");
+    } finally {
+      setActionId("");
+    }
+  }
+  async function revokeTerminal(terminalSessionId: string, reason: string) {
+    setActionId(`terminal-${terminalSessionId}`);
+    setActionError("");
+    try {
+      await api.management.revokeManagedTerminal(
+        scope.organizationId,
+        scope.unitId,
+        terminalSessionId,
+        reason,
+      );
+      setFeedback({ message: "Terminal encerrado remotamente.", tone: "success" });
+      setAccessCenterRevision((value) => value + 1);
+      return true;
+    } catch (error) {
+      failAction(error, "Não foi possível encerrar o terminal.");
+      return false;
     } finally {
       setActionId("");
     }
@@ -976,11 +1429,16 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     }
     if (confirmation.kind === "person-status") {
       if (!confirmationNote.trim()) return;
+      if (!confirmation.active && offboardingPreflight && !offboardingPreflight.canProceed) return;
       succeeded = await changePersonStatus(
         confirmation.personId,
         confirmation.active,
         confirmationNote.trim(),
       );
+    }
+    if (confirmation.kind === "revoke-terminal") {
+      if (!confirmationNote.trim()) return;
+      succeeded = await revokeTerminal(confirmation.terminalSessionId, confirmationNote.trim());
     }
     if (confirmation.kind === "cancel-schedule") {
       if (!confirmationNote.trim()) return;
@@ -997,6 +1455,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     if (!succeeded) return;
     setConfirmation(null);
     setConfirmationNote("");
+    setOffboardingPreflight(null);
   }
   if (remote.state.status === "error" && remote.state.httpStatus === 403) {
     return (
@@ -1061,7 +1520,10 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               <div>
                 <span>Sem acesso</span>
                 <strong>
-                  {data.people.filter((person) => person.active && !person.identityId).length}
+                  {
+                    data.people.filter((person) => person.active && person.access.status === "none")
+                      .length
+                  }
                 </strong>
                 <small>pessoas ativas sem conta</small>
               </div>
@@ -1141,6 +1603,14 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   tone: data.alerts.length + data.anomalies.length ? "warning" : undefined,
                 },
                 { id: "team", label: "Equipe", count: data.people.length },
+                {
+                  id: "access",
+                  label: "Acessos",
+                  count:
+                    accessCenter.state.status === "ready"
+                      ? accessCenter.state.data.terminals.length
+                      : undefined,
+                },
                 { id: "schedules", label: "Escalas", count: data.schedules.length },
                 {
                   id: "time",
@@ -1160,6 +1630,99 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
             <p className="people-page__error" role="alert">
               {actionError}
             </p>
+          )}
+          {!online && (
+            <p className="people-page__offline" role="status">
+              Você está offline. A consulta continua disponível, mas cadastro, convites e alterações
+              de acesso exigem conexão.
+            </p>
+          )}
+          {section === "access" && (
+            <div className="people-grid">
+              <Card className="people-list-card">
+                <div className="card-header">
+                  <div>
+                    <p className="eyebrow">Perfis fixos</p>
+                    <h2>O que cada perfil libera</h2>
+                  </div>
+                  <Badge tone="info">Sem permissões avulsas</Badge>
+                </div>
+                <div className="management-list">
+                  {grantableAccessRoles.map((role) => (
+                    <div className="management-row" key={role.value}>
+                      <span>
+                        <strong>{role.label}</strong>
+                        <small>{accessRoleHighlights[role.value].join(" · ")}</small>
+                      </span>
+                      {sensitiveAccessRoles.has(role.value) && (
+                        <Badge tone="warning">Exige confirmação</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              <Card className="people-list-card">
+                <div className="card-header">
+                  <div>
+                    <p className="eyebrow">Terminais compartilhados</p>
+                    <h2>Sessões ativas nesta unidade</h2>
+                  </div>
+                  <Button
+                    onClick={() => setAccessCenterRevision((value) => value + 1)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Atualizar
+                  </Button>
+                </div>
+                <RemoteGate remote={accessCenter}>
+                  {(center) => (
+                    <div className="management-list">
+                      {center.terminals.map((terminal) => (
+                        <div className="management-row" key={terminal.id}>
+                          <span>
+                            <strong>{terminal.activeOperator ?? "Aguardando colaborador"}</strong>
+                            <small>
+                              Ativado por {terminal.openedBy} · dispositivo{" "}
+                              {(terminal.deviceId ?? terminal.id).slice(0, 8)} · expira{" "}
+                              {dateLabel(terminal.expiresAt)}
+                            </small>
+                          </span>
+                          <Badge tone={terminal.status === "active" ? "success" : "warning"}>
+                            {terminal.status === "active"
+                              ? "Em uso"
+                              : terminal.status === "locked"
+                                ? "Bloqueado"
+                                : "Aguardando"}
+                          </Badge>
+                          <Button
+                            disabled={!online || actionId !== ""}
+                            onClick={() => {
+                              setConfirmation({
+                                kind: "revoke-terminal",
+                                terminalSessionId: terminal.id,
+                              });
+                              setConfirmationNote("");
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            Encerrar
+                          </Button>
+                        </div>
+                      ))}
+                      {!center.terminals.length && (
+                        <EmptyState
+                          description="Ative um terminal compartilhado na seleção da unidade."
+                          icon="▣"
+                          title="Nenhum terminal ativo"
+                        />
+                      )}
+                    </div>
+                  )}
+                </RemoteGate>
+              </Card>
+            </div>
           )}
           {section === "settings" && canConfigureTracking && (
             <details className="action-panel people-policy-panel">
@@ -1496,72 +2059,24 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
             </Card>
           )}
           {section === "team" && data.canManage && (
-            <details className="action-panel">
-              <summary>
-                <span>
-                  <strong>Nova pessoa</strong>
-                  <small>Cadastre função e identificação interna.</small>
-                </span>
-                <Icon name="plus" size={18} />
-              </summary>
-              <form className="action-form" onSubmit={(event) => void createPerson(event)}>
-                <label>
-                  Nome
-                  <Input
-                    minLength={2}
-                    onChange={(event) => setPersonName(event.target.value)}
-                    required
-                    value={personName}
-                  />
-                </label>
-                <label>
-                  Função
-                  <Input
-                    minLength={1}
-                    onChange={(event) => setRoleLabel(event.target.value)}
-                    placeholder="Ex.: Garçom"
-                    required
-                    value={roleLabel}
-                  />
-                </label>
-                <label>
-                  Código interno
-                  <Input
-                    onChange={(event) => setEmploymentCode(event.target.value)}
-                    value={employmentCode}
-                  />
-                </label>
-                <label>
-                  Conta de acesso
-                  <NativeSelect
-                    onChange={(event) => setPersonIdentityId(event.target.value)}
-                    value={personIdentityId}
-                  >
-                    <option value="">Sem conta vinculada</option>
-                    {data.accounts
-                      .filter(
-                        (account) =>
-                          !data.people.some((person) => person.identityId === account.id),
-                      )
-                      .map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.displayName} · {account.email}
-                        </option>
-                      ))}
-                  </NativeSelect>
-                </label>
-                <Button
-                  disabled={
-                    actionId === "new-person" ||
-                    personName.trim().length < 2 ||
-                    roleLabel.trim().length < 1
-                  }
-                  type="submit"
-                >
-                  {actionId === "new-person" ? "Salvando…" : "Cadastrar pessoa"}
-                </Button>
-              </form>
-            </details>
+            <Card className="people-create-card">
+              <div>
+                <strong>Novo funcionário</strong>
+                <small>Cadastre o vínculo e, se necessário, envie o acesso em uma etapa.</small>
+              </div>
+              <Button
+                disabled={!online}
+                onClick={() => {
+                  setReauthValue("");
+                  setReauthMethod("password");
+                  setActionError("");
+                  setIsCreatePersonOpen(true);
+                }}
+              >
+                <Icon name="plus" size={16} />
+                Novo funcionário
+              </Button>
+            </Card>
           )}
           {data.canManage && (section === "schedules" || section === "time") && (
             <div className="quick-actions-grid">
@@ -2187,12 +2702,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       <span>
                         <strong>{person.name}</strong>
                         <small>
-                          {person.roleLabel} · {person.identityId ? "Conta vinculada" : "Sem conta"}
+                          {person.roleLabel}
+                          {person.access.email ? ` · ${person.access.email}` : ""}
                         </small>
                       </span>
-                      <Badge tone={person.active ? "success" : "neutral"}>
-                        {person.active ? "Ativa" : "Inativa"}
-                      </Badge>
+                      <span className="people-row__statuses">
+                        <Badge tone={person.active ? "success" : "neutral"}>
+                          {person.active ? "Ativo" : "Desligado"}
+                        </Badge>
+                        <Badge tone={accessStatusMeta[person.access.status].tone}>
+                          {accessStatusMeta[person.access.status].label}
+                        </Badge>
+                      </span>
                       <Button onClick={() => openPerson(person)} size="sm" variant="ghost">
                         Ver detalhes
                       </Button>
@@ -2722,6 +3243,375 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
           )}
 
           <Modal
+            isOpen={isCreatePersonOpen}
+            onClose={() => {
+              if (actionId === "new-person") return;
+              setIsCreatePersonOpen(false);
+              setActionError("");
+            }}
+            size="md"
+            title="Novo funcionário"
+          >
+            <form className="people-access-form" onSubmit={(event) => void createPerson(event)}>
+              <fieldset>
+                <legend>Dados profissionais</legend>
+                <div className="gm-form-grid">
+                  <label className="gm-field">
+                    Nome
+                    <Input
+                      autoComplete="name"
+                      minLength={2}
+                      onChange={(event) => setPersonName(event.target.value)}
+                      required
+                      value={personName}
+                    />
+                  </label>
+                  <label className="gm-field">
+                    Função
+                    <Input
+                      minLength={1}
+                      onChange={(event) => setRoleLabel(event.target.value)}
+                      placeholder="Ex.: Garçom"
+                      required
+                      value={roleLabel}
+                    />
+                  </label>
+                  <label className="gm-field">
+                    Código interno
+                    <Input
+                      maxLength={80}
+                      onChange={(event) => setEmploymentCode(event.target.value)}
+                      value={employmentCode}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>Acesso ao GiroMesa</legend>
+                <label className="people-access-toggle">
+                  <input
+                    checked={personAccessEnabled}
+                    onChange={(event) => {
+                      setPersonAccessEnabled(event.target.checked);
+                      setReauthValue("");
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>Também terá acesso ao sistema</strong>
+                    <small>O convite será enviado somente após o cadastro confirmado.</small>
+                  </span>
+                </label>
+                {personAccessEnabled && (
+                  <div className="gm-form-grid people-access-form__fields">
+                    <label className="gm-field">
+                      E-mail de acesso
+                      <Input
+                        autoComplete="email"
+                        inputMode="email"
+                        onChange={(event) => setPersonEmail(event.target.value)}
+                        required
+                        type="email"
+                        value={personEmail}
+                      />
+                    </label>
+                    <label className="gm-field">
+                      Perfil de acesso
+                      <NativeSelect
+                        onChange={(event) => {
+                          setPersonAccessRole(event.target.value as AccessRole);
+                          setReauthValue("");
+                        }}
+                        value={personAccessRole}
+                      >
+                        {grantableAccessRoles.map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                      <small className="form-hint">
+                        {accessRoles.find((role) => role.value === personAccessRole)?.description ??
+                          "Acesso completo da organização"}
+                      </small>
+                    </label>
+                  </div>
+                )}
+                {personAccessEnabled && stepUpFields(personAccessRole)}
+              </fieldset>
+              {actionError && (
+                <p className="people-page__error" role="alert">
+                  {actionError}
+                </p>
+              )}
+              {!online && (
+                <p className="people-page__offline" role="status">
+                  Conecte-se para concluir o cadastro.
+                </p>
+              )}
+              <div className="people-modal-actions">
+                <Button
+                  disabled={actionId === "new-person"}
+                  onClick={() => setIsCreatePersonOpen(false)}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={
+                    !online ||
+                    actionId === "new-person" ||
+                    personName.trim().length < 2 ||
+                    roleLabel.trim().length < 1 ||
+                    (personAccessEnabled && !personEmail.trim()) ||
+                    (personAccessEnabled &&
+                      sensitiveAccessRoles.has(personAccessRole) &&
+                      !reauthValue.trim())
+                  }
+                  type="submit"
+                >
+                  {actionId === "new-person"
+                    ? "Salvando…"
+                    : personAccessEnabled
+                      ? "Cadastrar e convidar"
+                      : "Cadastrar funcionário"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          <Modal
+            isOpen={accessAction !== null}
+            onClose={() => {
+              if (actionId.startsWith("access-")) return;
+              setAccessAction(null);
+              setActionError("");
+            }}
+            size="sm"
+            title={accessActionTitle(accessAction)}
+          >
+            <form
+              className="people-access-form"
+              onSubmit={(event) => void submitAccessAction(event)}
+            >
+              <p id="people-access-action-copy">{accessActionCopy(accessAction)}</p>
+              {accessAction?.kind === "invite" && (
+                <label className="gm-field">
+                  E-mail de acesso
+                  <Input
+                    autoComplete="email"
+                    inputMode="email"
+                    onChange={(event) => setAccessEmail(event.target.value)}
+                    required
+                    type="email"
+                    value={accessEmail}
+                  />
+                </label>
+              )}
+              {(accessAction?.kind === "invite" ||
+                accessAction?.kind === "change-role" ||
+                accessAction?.kind === "reactivate") && (
+                <label className="gm-field">
+                  Perfil de acesso
+                  <NativeSelect
+                    onChange={(event) => {
+                      setAccessRole(event.target.value as AccessRole);
+                      setReauthValue("");
+                    }}
+                    value={accessRole}
+                  >
+                    {grantableAccessRoles.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <small className="form-hint">
+                    {accessRoles.find((role) => role.value === accessRole)?.description ??
+                      "Acesso completo da organização"}
+                  </small>
+                  <ul className="people-permission-preview">
+                    {accessRoleHighlights[accessRole].map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </label>
+              )}
+              {(accessAction?.kind === "invite" ||
+                accessAction?.kind === "change-role" ||
+                accessAction?.kind === "reactivate") &&
+                stepUpFields(accessActionStepUpRole())}
+              {accessAction?.kind !== "invite" && (
+                <label className="gm-field">
+                  Motivo
+                  <Textarea
+                    maxLength={1000}
+                    minLength={5}
+                    onChange={(event) => setAccessReason(event.target.value)}
+                    required
+                    value={accessReason}
+                  />
+                </label>
+              )}
+              {actionError && (
+                <p className="people-page__error" role="alert">
+                  {actionError}
+                </p>
+              )}
+              <div className="people-modal-actions">
+                <Button
+                  disabled={actionId.startsWith("access-")}
+                  onClick={() => setAccessAction(null)}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={
+                    !online ||
+                    actionId.startsWith("access-") ||
+                    (accessAction?.kind === "invite" && !accessEmail.trim()) ||
+                    (accessAction?.kind !== "invite" && accessReason.trim().length < 5) ||
+                    ((accessAction?.kind === "invite" ||
+                      accessAction?.kind === "change-role" ||
+                      accessAction?.kind === "reactivate") &&
+                      sensitiveAccessRoles.has(accessActionStepUpRole()) &&
+                      !reauthValue.trim())
+                  }
+                  type="submit"
+                  variant={
+                    accessAction?.kind === "cancel" || accessAction?.kind === "suspend"
+                      ? "danger"
+                      : "primary"
+                  }
+                >
+                  {actionId.startsWith("access-") ? "Salvando…" : "Confirmar"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          <Modal
+            isOpen={unitAccessAction !== null}
+            onClose={() => {
+              if (actionId === "unit-access") return;
+              setUnitAccessAction(null);
+              setActionError("");
+              setReauthValue("");
+            }}
+            size="sm"
+            title={
+              unitAccessAction?.kind === "remove"
+                ? "Remover acesso da unidade"
+                : "Liberar outra unidade"
+            }
+          >
+            <form className="people-access-form" onSubmit={(event) => void submitUnitAccess(event)}>
+              {unitAccessAction?.kind === "assign" && accessOverview.status === "ready" && (
+                <>
+                  <label className="gm-field">
+                    Unidade
+                    <NativeSelect
+                      onChange={(event) => setUnitAccessUnitId(event.target.value)}
+                      required
+                      value={unitAccessUnitId}
+                    >
+                      {accessOverview.data.units
+                        .filter(
+                          (unit) =>
+                            unit.active &&
+                            !accessOverview.data.assignments.some(
+                              (assignment) =>
+                                assignment.unitId === unit.id &&
+                                assignment.access.status !== "none",
+                            ),
+                        )
+                        .map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </option>
+                        ))}
+                    </NativeSelect>
+                  </label>
+                  <label className="gm-field">
+                    Perfil nesta unidade
+                    <NativeSelect
+                      onChange={(event) => {
+                        setUnitAccessRole(event.target.value as AccessRole);
+                        setReauthValue("");
+                      }}
+                      value={unitAccessRole}
+                    >
+                      {grantableAccessRoles.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <ul className="people-permission-preview">
+                      {accessRoleHighlights[unitAccessRole].map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </label>
+                </>
+              )}
+              {unitAccessAction?.kind === "remove" && (
+                <p>
+                  O usuário perderá imediatamente o acesso a esta unidade. O histórico será
+                  preservado.
+                </p>
+              )}
+              <label className="gm-field">
+                Motivo
+                <Textarea
+                  maxLength={1000}
+                  minLength={5}
+                  onChange={(event) => setUnitAccessReason(event.target.value)}
+                  required
+                  value={unitAccessReason}
+                />
+              </label>
+              {stepUpFields(
+                unitAccessAction?.kind === "remove" ? unitAccessAction.role : unitAccessRole,
+              )}
+              {actionError && (
+                <p className="people-page__error" role="alert">
+                  {actionError}
+                </p>
+              )}
+              <div className="people-modal-actions">
+                <Button
+                  disabled={actionId === "unit-access"}
+                  onClick={() => setUnitAccessAction(null)}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={
+                    !online ||
+                    actionId === "unit-access" ||
+                    unitAccessReason.trim().length < 5 ||
+                    (unitAccessAction?.kind === "assign" && !unitAccessUnitId) ||
+                    (sensitiveAccessRoles.has(
+                      unitAccessAction?.kind === "remove" ? unitAccessAction.role : unitAccessRole,
+                    ) &&
+                      !reauthValue.trim())
+                  }
+                  type="submit"
+                  variant={unitAccessAction?.kind === "remove" ? "danger" : "primary"}
+                >
+                  {actionId === "unit-access" ? "Salvando…" : "Confirmar"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          <Modal
             isOpen={editingScheduleId !== null}
             onClose={() => setEditingScheduleId(null)}
             size="sm"
@@ -2784,8 +3674,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
             isOpen={selectedPersonId !== null}
             onClose={() => {
               timelineRequest.current += 1;
+              accessOverviewRequest.current += 1;
+              setUnitAccessAction(null);
               setSelectedPersonId(null);
               setTimeline({ status: "idle" });
+              setAccessOverview({ status: "idle" });
             }}
             size="lg"
             title={personById.get(selectedPersonId ?? "")?.name ?? "Detalhes da pessoa"}
@@ -2794,13 +3687,19 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               <div className="people-person-detail">
                 <div className="gm-observability-row">
                   <Badge tone={personById.get(selectedPersonId)?.active ? "success" : "neutral"}>
-                    {personById.get(selectedPersonId)?.active ? "Ativa" : "Inativa"}
+                    {personById.get(selectedPersonId)?.active ? "Ativo" : "Desligado"}
                   </Badge>
-                  <span className="gm-pill">
-                    {personById.get(selectedPersonId)?.identityId
-                      ? "Conta vinculada"
-                      : "Sem conta vinculada"}
-                  </span>
+                  <Badge
+                    tone={
+                      accessStatusMeta[personById.get(selectedPersonId)?.access.status ?? "none"]
+                        .tone
+                    }
+                  >
+                    {
+                      accessStatusMeta[personById.get(selectedPersonId)?.access.status ?? "none"]
+                        .label
+                    }
+                  </Badge>
                   <span className="gm-pill">{personById.get(selectedPersonId)?.roleLabel}</span>
                 </div>
                 {personById.get(selectedPersonId)?.hourlyRateCents !== null && (
@@ -2851,26 +3750,6 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         value={editPersonHourlyRate}
                       />
                     </label>
-                    <label className="action-form__wide">
-                      Conta de acesso
-                      <NativeSelect
-                        onChange={(event) => setEditPersonIdentityId(event.target.value)}
-                        value={editPersonIdentityId}
-                      >
-                        <option value="">Sem conta vinculada</option>
-                        {data.accounts
-                          .filter(
-                            (account) =>
-                              account.id === editPersonIdentityId ||
-                              !data.people.some((person) => person.identityId === account.id),
-                          )
-                          .map((account) => (
-                            <option key={account.id} value={account.id}>
-                              {account.displayName} · {account.email}
-                            </option>
-                          ))}
-                      </NativeSelect>
-                    </label>
                     <div className="people-person-edit__actions action-form__wide">
                       <Button disabled={actionId === `person-${selectedPersonId}`} type="submit">
                         Salvar alterações
@@ -2880,12 +3759,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         onClick={() => {
                           const person = personById.get(selectedPersonId);
                           if (!person) return;
-                          setConfirmation({
-                            kind: "person-status",
-                            personId: person.id,
-                            active: !person.active,
-                          });
-                          setConfirmationNote("");
+                          void preparePersonStatus(person);
                         }}
                         type="button"
                         variant={personById.get(selectedPersonId)?.active ? "danger" : "secondary"}
@@ -2895,6 +3769,228 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     </div>
                   </form>
                 )}
+                <section className="people-access-card" aria-labelledby="person-access-title">
+                  <div className="people-access-card__header">
+                    <div>
+                      <h3 id="person-access-title">Acesso ao GiroMesa</h3>
+                      <p>
+                        {selectedPerson?.access.email ??
+                          "Este funcionário ainda não possui acesso."}
+                      </p>
+                    </div>
+                    <Badge tone={accessStatusMeta[selectedPerson?.access.status ?? "none"].tone}>
+                      {accessStatusMeta[selectedPerson?.access.status ?? "none"].label}
+                    </Badge>
+                  </div>
+                  {selectedPerson?.access.role && (
+                    <p className="people-access-card__meta">
+                      Perfil: <strong>{accessRoleLabel(selectedPerson.access.role)}</strong>
+                      {selectedPerson.access.expiresAt
+                        ? ` · Expira em ${dateLabel(selectedPerson.access.expiresAt)}`
+                        : ""}
+                    </p>
+                  )}
+                  {data.canManage && selectedPerson && canManageSelectedAccess && (
+                    <div className="people-access-card__actions">
+                      {selectedPerson.access.status === "none" && selectedPerson.active && (
+                        <Button
+                          disabled={!online || actionId !== ""}
+                          onClick={() => openAccessAction("invite", selectedPerson)}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Conceder acesso
+                        </Button>
+                      )}
+                      {(selectedPerson.access.status === "pending" ||
+                        selectedPerson.access.status === "expired") && (
+                        <>
+                          <Button
+                            disabled={!online || actionId !== ""}
+                            onClick={() => void resendAccess(selectedPerson)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            {actionId === `access-resend-${selectedPerson.id}`
+                              ? "Reenviando…"
+                              : "Reenviar convite"}
+                          </Button>
+                          <Button
+                            disabled={!online || actionId !== ""}
+                            onClick={() => openAccessAction("cancel", selectedPerson)}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            Cancelar convite
+                          </Button>
+                        </>
+                      )}
+                      {selectedPerson.access.status === "active" && (
+                        <>
+                          <Button
+                            disabled={!online || actionId !== ""}
+                            onClick={() => openAccessAction("change-role", selectedPerson)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Alterar perfil
+                          </Button>
+                          <Button
+                            disabled={!online || actionId !== ""}
+                            onClick={() => openAccessAction("suspend", selectedPerson)}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            Suspender acesso
+                          </Button>
+                        </>
+                      )}
+                      {selectedPerson.access.status === "suspended" && selectedPerson.active && (
+                        <Button
+                          disabled={!online || actionId !== ""}
+                          onClick={() => openAccessAction("reactivate", selectedPerson)}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Reativar acesso
+                        </Button>
+                      )}
+                      {!selectedPerson.active && (
+                        <small>Reative o funcionário antes de conceder ou restaurar acesso.</small>
+                      )}
+                    </div>
+                  )}
+                  {accessOverview.status === "loading" && (
+                    <p className="people-person-detail__empty" role="status">
+                      Carregando unidades e histórico…
+                    </p>
+                  )}
+                  {accessOverview.status === "error" && (
+                    <p className="people-page__error" role="alert">
+                      {accessOverview.message}
+                    </p>
+                  )}
+                  {accessOverview.status === "ready" && (
+                    <>
+                      <div className="people-access-card__header">
+                        <div>
+                          <h4>Unidades liberadas</h4>
+                          <p>Uma identidade, com perfil independente em cada unidade.</p>
+                        </div>
+                        {data.canManage &&
+                          selectedPerson?.access.status === "active" &&
+                          accessOverview.data.units.some(
+                            (unit) =>
+                              unit.active &&
+                              !accessOverview.data.assignments.some(
+                                (assignment) =>
+                                  assignment.unitId === unit.id &&
+                                  assignment.access.status !== "none",
+                              ),
+                          ) && (
+                            <Button
+                              onClick={() => {
+                                const target = accessOverview.data.units.find(
+                                  (unit) =>
+                                    unit.active &&
+                                    !accessOverview.data.assignments.some(
+                                      (assignment) =>
+                                        assignment.unitId === unit.id &&
+                                        assignment.access.status !== "none",
+                                    ),
+                                );
+                                if (!target) return;
+                                setUnitAccessUnitId(target.id);
+                                setUnitAccessRole("waiter");
+                                setUnitAccessReason("");
+                                setReauthMethod("password");
+                                setReauthValue("");
+                                setUnitAccessAction({ kind: "assign" });
+                              }}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Liberar outra unidade
+                            </Button>
+                          )}
+                      </div>
+                      <div className="management-list">
+                        {accessOverview.data.assignments
+                          .filter((assignment) => assignment.access.status !== "none")
+                          .map((assignment) => (
+                            <div className="management-row" key={assignment.unitId}>
+                              <span>
+                                <strong>{assignment.unitName}</strong>
+                                <small>
+                                  {accessRoleLabel(assignment.access.role)}
+                                  {assignment.primary ? " · unidade principal" : ""}
+                                  {assignment.delivery
+                                    ? ` · convite ${
+                                        assignment.delivery.status === "sent"
+                                          ? "enviado"
+                                          : assignment.delivery.status === "failed"
+                                            ? "com falha"
+                                            : "na fila"
+                                      }`
+                                    : ""}
+                                </small>
+                                {assignment.delivery?.lastError && (
+                                  <small className="people-page__error">
+                                    Último erro: {assignment.delivery.lastError}
+                                  </small>
+                                )}
+                              </span>
+                              <Badge tone={accessStatusMeta[assignment.access.status].tone}>
+                                {accessStatusMeta[assignment.access.status].label}
+                              </Badge>
+                              {!assignment.primary && data.canManage && (
+                                <Button
+                                  disabled={!online || actionId !== ""}
+                                  onClick={() => {
+                                    setUnitAccessReason("");
+                                    setReauthMethod("password");
+                                    setReauthValue("");
+                                    setUnitAccessAction({
+                                      kind: "remove",
+                                      unitId: assignment.unitId,
+                                      role: (assignment.access.role ?? "waiter") as AccessRole,
+                                    });
+                                  }}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  Remover
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                      <div className="people-access-card__header">
+                        <div>
+                          <h4>Histórico de acesso</h4>
+                          <p>Convites, perfis e desligamentos com responsável identificado.</p>
+                        </div>
+                      </div>
+                      <div className="management-list">
+                        {accessOverview.data.history.slice(0, 12).map((event) => (
+                          <div className="management-row" key={event.id}>
+                            <span>
+                              <strong>{auditActionLabel(event.action)}</strong>
+                              <small>
+                                {event.actorName} · {dateLabel(event.occurredAt)}
+                              </small>
+                            </span>
+                          </div>
+                        ))}
+                        {!accessOverview.data.history.length && (
+                          <p className="people-person-detail__empty">
+                            Nenhuma alteração de acesso registrada.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </section>
                 <section>
                   <h3>Espelho operacional</h3>
                   <p className="people-person-detail__empty">
@@ -3080,6 +4176,37 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
           >
             <form className="gm-form-stack" onSubmit={(event) => void confirmPendingAction(event)}>
               <p className="people-confirmation-copy">{confirmationCopy(confirmation)}</p>
+              {confirmation?.kind === "person-status" &&
+                !confirmation.active &&
+                offboardingPreflight && (
+                  <div className="management-list">
+                    {offboardingPreflight.checks.map((check) => (
+                      <div className="management-row" key={check.code}>
+                        <span>
+                          <strong>{check.label}</strong>
+                          <small>
+                            {check.count ? `${check.count} registro(s)` : "Sem pendências"}
+                          </small>
+                        </span>
+                        <Badge
+                          tone={
+                            check.severity === "blocker"
+                              ? "danger"
+                              : check.severity === "warning"
+                                ? "warning"
+                                : "neutral"
+                          }
+                        >
+                          {check.severity === "blocker"
+                            ? "Bloqueia"
+                            : check.severity === "warning"
+                              ? "Será preservado"
+                              : "Informativo"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
               {actionError && (
                 <p className="people-page__error" role="alert">
                   {actionError}
@@ -3102,6 +4229,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   onClick={() => {
                     setConfirmation(null);
                     setConfirmationNote("");
+                    setOffboardingPreflight(null);
                     setActionError("");
                   }}
                   type="button"
@@ -3110,7 +4238,12 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   Cancelar
                 </Button>
                 <Button
-                  disabled={actionId !== ""}
+                  disabled={
+                    actionId !== "" ||
+                    (confirmation?.kind === "person-status" &&
+                      !confirmation.active &&
+                      offboardingPreflight?.canProceed === false)
+                  }
                   type="submit"
                   variant={confirmation?.kind === "close-period" ? "danger" : "primary"}
                 >

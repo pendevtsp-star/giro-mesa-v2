@@ -387,10 +387,11 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       idempotencyKey: "scheduled-pickup-0001",
     });
     assert.equal(scheduledPickup.order.promisedAt?.toISOString(), scheduledFor.toISOString());
+    const publicProtocol = `BUSCA-${organizationA.id.slice(0, 8)}`;
     await database.db
       .update(deliveryOrders)
       .set({
-        publicProtocol: "BUSCA-2042",
+        publicProtocol,
         customerName: "Maria Busca",
         customerPhone: "+5511988880000",
       })
@@ -433,7 +434,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       deliveryIdentity.id,
       organizationA.id,
       unitA.id,
-      { query: "busca-2042", scheduled: true, limit: 1 },
+      { query: publicProtocol.toLowerCase(), scheduled: true, limit: 1 },
     );
     assert.equal(scheduledSearch.length, 1);
     assert.equal(scheduledSearch[0]?.id, scheduledPickup.order.id);

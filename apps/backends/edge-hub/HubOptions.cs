@@ -27,6 +27,10 @@ public sealed class FocusOptions
     public string Environment { get; init; } = "homologation";
     public string? Token { get; init; }
     public int RequestTimeoutSeconds { get; init; } = 20;
+    public int RetryBaseSeconds { get; init; } = 5;
+    public int RetryMaxSeconds { get; init; } = 300;
+    public int RetryMaxAttempts { get; init; } = 288;
+    public int RetryLeaseSeconds { get; init; } = 90;
 }
 
 public sealed class PrinterOptions

@@ -6,6 +6,7 @@ import {
   RemoteGate,
   type ReportData,
 } from "../../management.shared";
+import { ReportFamilyView } from "./families/StandardReportFamilies";
 import { EnhancedReportFamilyView } from "./ReportEnhancements";
 import {
   csvCell,
@@ -58,6 +59,7 @@ const emptyReport: ReportData = {
       reconciliation: "unavailable",
       forecast: "unavailable",
     },
+    indicators: {},
   },
   capabilities: {
     viewCosts: true,
@@ -167,9 +169,19 @@ const emptyReport: ReportData = {
         unmatchedCents: 0,
         divergentCents: 0,
       },
+      closure: {
+        status: "open",
+        closedAt: null,
+        closedByIdentityId: null,
+        note: "",
+        evidence: [],
+        checklist: { payments: false, fiscal: false, external: false },
+      },
     },
     forecast: {
-      method: "historical_daily_average_v1",
+      method: "weekday_seasonality_v2",
+      available: false,
+      minimumSampleDays: 14,
       horizonDays: 7,
       sampleDays: 0,
       confidence: "low",
@@ -181,6 +193,7 @@ const emptyReport: ReportData = {
         upperBoundCents: 0,
       },
       cash: { inflowsCents: 0, outflowsCents: 0, netCents: 0 },
+      calendarSignals: [],
       purchases: [],
     },
   },
@@ -215,7 +228,7 @@ describe("relatórios operacionais", () => {
     );
     expect(labor).toContain("Indisponível");
     expect(reconciliation).toContain("Fiscal e pagamentos");
-    expect(forecast).toContain("Confiança baixa");
+    expect(forecast).toContain("Histórico insuficiente para prever");
   });
 
   it("persiste filtros e escopo antes do hash e restaura apenas o escopo correspondente", () => {
@@ -229,6 +242,19 @@ describe("relatórios operacionais", () => {
     );
     expect(reportFiltersFromUrl(url, scope)?.comparisonMode).toBe("previous_year");
     expect(reportFiltersFromUrl(url, { ...scope, unitId: "unit-2" })).toBeNull();
+
+    const detailed = reportUrl(new URL("https://ops.test/#/reports"), scope, {
+      period: { from: "2026-08-01", to: "2026-08-16" },
+      comparisonMode: "none",
+      family: "sales",
+      analysis: "sales-products",
+      order: "quantity_asc",
+    });
+    expect(reportFiltersFromUrl(detailed, scope)).toMatchObject({
+      family: "sales",
+      analysis: "sales-products",
+      order: "quantity_asc",
+    });
   });
 
   it("ignora favoritos locais inválidos", () => {
@@ -250,6 +276,50 @@ describe("relatórios operacionais", () => {
         comparisonMode: "previous_year",
       },
     ]);
+  });
+
+  it("restaura tipo e ordenação dos filtros salvos", () => {
+    expect(
+      parseSavedReportFilters(
+        JSON.stringify([
+          {
+            period: { from: "2026-08-01", to: "2026-08-16" },
+            comparisonMode: "none",
+            family: "sales",
+            analysis: "sales-products",
+            order: "quantity_asc",
+          },
+        ]),
+      ),
+    ).toEqual([
+      {
+        id: "2026-08-01:2026-08-16:none:sales:sales-products:quantity_asc",
+        period: { from: "2026-08-01", to: "2026-08-16" },
+        comparisonMode: "none",
+        family: "sales",
+        analysis: "sales-products",
+        order: "quantity_asc",
+      },
+    ]);
+  });
+
+  it("ordena vendas por produto sem criar relatórios duplicados", () => {
+    const data = structuredClone(emptyReport);
+    data.breakdowns.products = [
+      { key: "a", label: "Arroz", quantity: 2, revenueCents: 2_000 },
+      { key: "b", label: "Bife", quantity: 8, revenueCents: 1_000 },
+    ];
+    const html = renderToStaticMarkup(
+      <ReportFamilyView
+        analysis="sales-products"
+        breakdownOrder="quantity_desc"
+        data={data}
+        family="sales"
+        onDrillDown={() => undefined}
+      />,
+    );
+    expect(html.indexOf("Bife")).toBeLessThan(html.indexOf("Arroz"));
+    expect(html).not.toContain("Vendas por hora");
   });
 
   it("mostra delta confiável, ação de correção e agrupamento secundário", () => {
@@ -312,6 +382,19 @@ describe("relatórios operacionais", () => {
     };
     delete legacy.reportFamilies.quality;
     expect(parseReports(legacy).reportFamilies.quality).toEqual({ scorePercent: 100, issues: [] });
+  });
+
+  it("aceita comparação desativada sem inventar uma base anterior", () => {
+    const payload = structuredClone(emptyReport);
+    payload.comparison = {
+      mode: "none",
+      revenueCents: 0,
+      previousRevenueCents: null,
+      changeCents: null,
+      changePercent: null,
+    };
+
+    expect(parseReports(payload).comparison).toEqual(payload.comparison);
   });
 
   it("não transforma custo restrito em zero", () => {

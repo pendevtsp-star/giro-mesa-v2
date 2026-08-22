@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Models
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The closure property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_closure? Closure { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_closure Closure { get; set; }
+#endif
         /// <summary>The coverage property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_coverage? Coverage { get; set; }
         /// <summary>The documents property</summary>
@@ -69,6 +77,7 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "closure", n => { Closure = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_closure>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_closure.CreateFromDiscriminatorValue); } },
                 { "coverage", n => { Coverage = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_coverage>(); } },
                 { "documents", n => { Documents = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_documents>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_documents.CreateFromDiscriminatorValue); } },
                 { "external", n => { External = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_external>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_external.CreateFromDiscriminatorValue); } },
@@ -87,6 +96,7 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_closure>("closure", Closure);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_coverage>("coverage", Coverage);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_documents>("documents", Documents);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_reconciliation_external>("external", External);

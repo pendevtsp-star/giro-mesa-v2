@@ -5,6 +5,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Costs;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.DrillDown;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Reconciliation;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Views;
 using GiroMesa.ApiClient.Models;
@@ -19,7 +20,7 @@ using System;
 namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports
 {
     /// <summary>
-    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{unitId}\management\reports
+    /// Builds and executes requests for operations under \api\v1\organizations\{organizationId}\units\{sourceUnit-id}\management\reports
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class ReportsRequestBuilder : BaseRequestBuilder
@@ -49,6 +50,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Exports.ExportsRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The reconciliation property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Reconciliation.ReconciliationRequestBuilder Reconciliation
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Reconciliation.ReconciliationRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The schedules property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.Schedules.SchedulesRequestBuilder Schedules
         {
@@ -64,7 +70,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ReportsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/reports?from={from}&to={to}{&comparisonMode*}", pathParameters)
+        public ReportsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/reports?from={from}&to={to}{&comparisonMode*,family*,minimumComparableOperatingDays*}", pathParameters)
         {
         }
         /// <summary>
@@ -72,7 +78,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public ReportsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{unitId}/management/reports?from={from}&to={to}{&comparisonMode*}", rawUrl)
+        public ReportsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/management/reports?from={from}&to={to}{&comparisonMode*,family*,minimumComparableOperatingDays*}", rawUrl)
         {
         }
         /// <returns>A <see cref="global::GiroMesa.ApiClient.Models.ManagementReportsResponse"/></returns>
@@ -132,8 +138,22 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Rep
 #endif
             [QueryParameter("comparisonMode")]
             public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.GetComparisonModeQueryParameterType? ComparisonModeAsGetComparisonModeQueryParameterType { get; set; }
+            [Obsolete("This property is deprecated, use FamilyAsGetFamilyQueryParameterType instead")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("family")]
+            public string? Family { get; set; }
+#nullable restore
+#else
+            [QueryParameter("family")]
+            public string Family { get; set; }
+#endif
+            [QueryParameter("family")]
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Reports.GetFamilyQueryParameterType? FamilyAsGetFamilyQueryParameterType { get; set; }
             [QueryParameter("from")]
             public Date? From { get; set; }
+            [QueryParameter("minimumComparableOperatingDays")]
+            public int? MinimumComparableOperatingDays { get; set; }
             [QueryParameter("to")]
             public Date? To { get; set; }
         }

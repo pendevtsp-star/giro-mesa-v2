@@ -1,4 +1,12 @@
-import type { ApiError, LoginInput, OperationalCommandInput } from "@giromesa/contracts";
+import type {
+  ApiError,
+  CopyUnitSettingsInput,
+  EstablishmentSettings,
+  LoginInput,
+  OperationalCommandInput,
+  UpdateOrganizationSettingsInput,
+  UpdateUnitSettingsInput,
+} from "@giromesa/contracts";
 
 export interface ApiHealth {
   status: "ok";
@@ -99,6 +107,7 @@ export interface TerminalProfile {
   defaultRoute: TerminalProfileRoute;
   printerId: string | null;
   stationId: string | null;
+  cashRegisterId: string | null;
   compact: boolean;
   quickActions: TerminalQuickAction[];
   createdAt: string;
@@ -107,7 +116,14 @@ export interface TerminalProfile {
 }
 export type TerminalProfileInput = Pick<
   TerminalProfile,
-  "label" | "mode" | "defaultRoute" | "printerId" | "stationId" | "compact" | "quickActions"
+  | "label"
+  | "mode"
+  | "defaultRoute"
+  | "printerId"
+  | "stationId"
+  | "cashRegisterId"
+  | "compact"
+  | "quickActions"
 >;
 
 export interface CatalogProductAggregateInput {
@@ -305,6 +321,10 @@ export class ApiClientError extends Error {
 
 const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replace(/\/$/, "");
 
+export function configuredApiBaseUrl() {
+  return baseUrl;
+}
+
 export function resolveSecurityUrl(
   rawSiteUrl = import.meta.env.VITE_SITE_URL ?? "http://localhost:3100",
 ): string | null {
@@ -364,6 +384,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     globalThis.clearTimeout(timeout);
   }
 }
+
+export const apiRequest = request;
 
 async function requestDownload(
   path: string,
@@ -491,6 +513,38 @@ export const api = {
   logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
+  settings: {
+    get: (organizationId: string, unitId: string) =>
+      request<EstablishmentSettings>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings`,
+      ),
+    updateOrganization: (organizationId: string, body: UpdateOrganizationSettingsInput) =>
+      request<EstablishmentSettings["organization"]>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/settings`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    updateUnit: (organizationId: string, unitId: string, body: UpdateUnitSettingsInput) =>
+      request<EstablishmentSettings>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings`,
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    copy: (
+      organizationId: string,
+      sourceUnitId: string,
+      body: CopyUnitSettingsInput,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{
+        sourceUnitId: string;
+        targetUnitIds: string[];
+        idempotentReplay: boolean;
+      }>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(sourceUnitId)}/settings/copy`,
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+  },
   fiscal: {
     profile: (organizationId: string, unitId: string) =>
       request<unknown>(fiscalPath(organizationId, unitId, "profile")),
@@ -546,6 +600,8 @@ export const api = {
           origin: number;
           csosn?: string;
           cstIcms?: string;
+          cstPis: string;
+          cstCofins: string;
         };
       },
     ) =>
@@ -566,10 +622,36 @@ export const api = {
           origin: number;
           csosn?: string;
           cstIcms?: string;
+          cstPis: string;
+          cstCofins: string;
         };
       },
     ) =>
       request<unknown>(fiscalPath(organizationId, unitId, "tax-revisions/bulk"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    importTaxRevisions: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        rows: Array<{
+          productId: string;
+          status: "active";
+          effectiveFrom: string;
+          classification: {
+            ncm: string;
+            cfop: string;
+            origin: number;
+            csosn?: string;
+            cstIcms?: string;
+            cstPis: string;
+            cstCofins: string;
+          };
+        }>;
+      },
+    ) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "tax-revisions/import"), {
         method: "POST",
         body: JSON.stringify(body),
       }),
@@ -601,6 +683,19 @@ export const api = {
     document: (organizationId: string, unitId: string, documentId: string) =>
       request<unknown>(
         fiscalPath(organizationId, unitId, `documents/${encodeURIComponent(documentId)}`),
+      ),
+    documentArtifact: (
+      organizationId: string,
+      unitId: string,
+      documentId: string,
+      kind: "authorization_xml" | "cancellation_xml" | "danfe_pdf",
+    ) =>
+      requestDownload(
+        fiscalPath(
+          organizationId,
+          unitId,
+          `documents/${encodeURIComponent(documentId)}/artifacts/${kind}`,
+        ),
       ),
     reconcileDocument: (organizationId: string, unitId: string, documentId: string) =>
       request<unknown>(
@@ -634,6 +729,35 @@ export const api = {
       const path = fiscalPath(organizationId, unitId, "accountant/package");
       return request<unknown>(`${path}?${new URLSearchParams({ competence })}`);
     },
+    accountingPackageContent: (organizationId: string, unitId: string, competence: string) => {
+      const path = fiscalPath(organizationId, unitId, "accountant/package/content");
+      return requestDownload(`${path}?${new URLSearchParams({ competence })}`);
+    },
+    numberInvalidations: (organizationId: string, unitId: string) =>
+      request<unknown>(fiscalPath(organizationId, unitId, "number-invalidations")),
+    invalidateNumbers: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        series: string;
+        initialNumber: number;
+        finalNumber: number;
+        justification: string;
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        fiscalPath(organizationId, unitId, "number-invalidations"),
+        "POST",
+        body,
+      ),
+    numberInvalidationArtifact: (organizationId: string, unitId: string, invalidationId: string) =>
+      requestDownload(
+        fiscalPath(
+          organizationId,
+          unitId,
+          `number-invalidations/${encodeURIComponent(invalidationId)}/artifact`,
+        ),
+      ),
     accountantRequests: (organizationId: string, unitId: string, competence?: string) => {
       const path = fiscalPath(organizationId, unitId, "accountant/requests");
       return request<unknown>(competence ? `${path}?${new URLSearchParams({ competence })}` : path);
@@ -1071,11 +1195,11 @@ export const api = {
         from: string;
         to: string;
         comparisonMode: "previous_period" | "previous_year" | "none";
+        family?: string;
+        minimumComparableOperatingDays?: number;
       },
-    ) =>
-      request<unknown>(
-        `${managementPath(organizationId, unitId, "reports")}?${new URLSearchParams(query)}`,
-      ),
+      signal?: AbortSignal,
+    ) => request<unknown>(managementListPath(organizationId, unitId, "reports", query), { signal }),
     reportDrillDown: (
       organizationId: string,
       unitId: string,
@@ -1202,10 +1326,8 @@ export const api = {
         undefined,
         idempotencyKey,
       ),
-    reportAlerts: (organizationId: string, unitId: string, status = "open") =>
-      request<unknown>(
-        `${managementPath(organizationId, unitId, "reports/alerts")}?${new URLSearchParams({ status })}`,
-      ),
+    reportAlerts: (organizationId: string, unitId: string, status?: string) =>
+      request<unknown>(managementListPath(organizationId, unitId, "reports/alerts", { status })),
     evaluateReportAlerts: (
       organizationId: string,
       unitId: string,
@@ -1244,6 +1366,31 @@ export const api = {
     ) =>
       idempotentRequest<unknown>(
         managementPath(organizationId, unitId, "reports/costs/backfill"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    previewReportCosts: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        from: string;
+        to: string;
+        comparisonMode: string;
+      },
+    ) =>
+      request<unknown>(managementPath(organizationId, unitId, "reports/costs/backfill/preview"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    closeReportReconciliation: (
+      organizationId: string,
+      unitId: string,
+      body: Record<string, unknown>,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "reports/reconciliation/closure"),
         "POST",
         body,
         idempotencyKey,
@@ -1298,6 +1445,39 @@ export const api = {
       ),
     cashShifts: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "cash-shifts")),
+    cashShiftHistory: (
+      organizationId: string,
+      unitId: string,
+      query: {
+        cursor?: string;
+        limit?: number;
+        from?: string;
+        to?: string;
+        cashRegisterId?: string;
+        operatorIdentityId?: string;
+        status?: string;
+      },
+    ) => request<unknown>(managementListPath(organizationId, unitId, "cash-shifts/history", query)),
+    cashShiftDetail: (organizationId: string, unitId: string, cashShiftId: string) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `cash-shifts/${encodeURIComponent(cashShiftId)}/detail`,
+        ),
+      ),
+    exportCashShiftHistory: (
+      organizationId: string,
+      unitId: string,
+      query: {
+        format: "csv" | "pdf";
+        from?: string;
+        to?: string;
+        cashRegisterId?: string;
+        operatorIdentityId?: string;
+        status?: string;
+      },
+    ) => requestDownload(managementListPath(organizationId, unitId, "cash-shifts/export", query)),
     waiterSettlements: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "waiter-settlements")),
     waiterSettlementLossCandidates: (organizationId: string, unitId: string, query: string) =>
@@ -2020,12 +2200,173 @@ export const api = {
         roleLabel: string;
         hiredAt?: string;
         identityId?: string;
+        access?: {
+          email: string;
+          role: string;
+          reauth?: { currentPassword?: string; mfaCode?: string };
+        };
       },
     ) =>
       request<unknown>(managementPath(organizationId, unitId, "people"), {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    invitePersonAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      body: {
+        email: string;
+        role: string;
+        reauth?: { currentPassword?: string; mfaCode?: string };
+      },
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/invite`,
+        ),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    resendPersonAccess: (organizationId: string, unitId: string, personId: string) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/resend`,
+        ),
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    cancelPersonAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      reason: string,
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/cancel`,
+        ),
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    updatePersonAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      body: {
+        role: string;
+        reason: string;
+        reauth?: { currentPassword?: string; mfaCode?: string };
+      },
+    ) =>
+      request<unknown>(
+        managementPath(organizationId, unitId, `people/${encodeURIComponent(personId)}/access`),
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    suspendPersonAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      reason: string,
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/suspend`,
+        ),
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    reactivatePersonAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      body: {
+        role?: string;
+        reason: string;
+        reauth?: { currentPassword?: string; mfaCode?: string };
+      },
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/reactivate`,
+        ),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    peopleAccessCenter: (organizationId: string, unitId: string) =>
+      request<unknown>(managementPath(organizationId, unitId, "people/access-center")),
+    revokeManagedTerminal: (
+      organizationId: string,
+      unitId: string,
+      terminalSessionId: string,
+      reason: string,
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/terminals/${encodeURIComponent(terminalSessionId)}/revoke`,
+        ),
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    personAccessOverview: (organizationId: string, unitId: string, personId: string) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access-overview`,
+        ),
+      ),
+    personOffboardingPreflight: (organizationId: string, unitId: string, personId: string) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/offboarding-preflight`,
+        ),
+      ),
+    assignPersonUnitAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      body: {
+        unitId: string;
+        role: string;
+        reason: string;
+        reauth?: { currentPassword?: string; mfaCode?: string };
+      },
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/units`,
+        ),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    removePersonUnitAccess: (
+      organizationId: string,
+      unitId: string,
+      personId: string,
+      targetUnitId: string,
+      body: {
+        reason: string;
+        reauth?: { currentPassword?: string; mfaCode?: string };
+      },
+    ) =>
+      request<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `people/${encodeURIComponent(personId)}/access/units/${encodeURIComponent(targetUnitId)}`,
+        ),
+        { method: "DELETE", body: JSON.stringify(body) },
+      ),
     updatePerson: (
       organizationId: string,
       unitId: string,
@@ -2361,7 +2702,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       payableId: string,
-      body: { amountCents: number; method: string; reference?: string },
+      body: { amountCents: number; method: string; reference?: string; cashRegisterId?: string },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -2388,7 +2729,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       receivableId: string,
-      body: { amountCents: number; method: string; reference?: string; cashShiftId?: string },
+      body: { amountCents: number; method: string; reference?: string; cashRegisterId?: string },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -2417,14 +2758,56 @@ export const api = {
       unitId: string,
       openingCents: number,
       idempotencyKey?: string,
+      cashRegisterId?: string,
     ) =>
       managementCommand<unknown>(
         organizationId,
         unitId,
         "cash-shifts",
-        { openingCents },
+        { openingCents, cashRegisterId },
         idempotencyKey,
       ),
+    createCashRegister: (
+      organizationId: string,
+      unitId: string,
+      name: string,
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "cash-registers",
+        { name },
+        idempotencyKey,
+      ),
+    updateCashRegister: (
+      organizationId: string,
+      unitId: string,
+      cashRegisterId: string,
+      body: { name?: string; active?: boolean },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `cash-registers/${encodeURIComponent(cashRegisterId)}`,
+        ),
+        "PATCH",
+        body,
+        idempotencyKey,
+      ),
+    transferCash: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        fromCashShiftId: string;
+        toCashShiftId: string;
+        amountCents: number;
+        reason: string;
+      },
+      idempotencyKey?: string,
+    ) => managementCommand<unknown>(organizationId, unitId, "cash-transfers", body, idempotencyKey),
     addCashMovement: (
       organizationId: string,
       unitId: string,
@@ -2439,11 +2822,80 @@ export const api = {
         body,
         idempotencyKey,
       ),
+    updateCashSettings: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        movementApprovalThresholdCents: number;
+        discrepancyCriticalThresholdCents: number;
+        maxShiftMinutes: number;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "cash-settings"),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    bindCashTerminal: (
+      organizationId: string,
+      unitId: string,
+      installationId: string,
+      cashRegisterId: string | null,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `cash-terminals/${encodeURIComponent(installationId)}`,
+        ),
+        "PATCH",
+        { cashRegisterId },
+        idempotencyKey,
+      ),
+    decideCashApproval: (
+      organizationId: string,
+      unitId: string,
+      approvalId: string,
+      body: { decision: "approve" | "reject"; note?: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `cash-approvals/${encodeURIComponent(approvalId)}/decision`,
+        body,
+        idempotencyKey,
+      ),
+    handoverCashShift: (
+      organizationId: string,
+      unitId: string,
+      cashShiftId: string,
+      body: { toIdentityId: string; reason: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `cash-shifts/${encodeURIComponent(cashShiftId)}/handover`,
+        body,
+        idempotencyKey,
+      ),
     closeCashShift: (
       organizationId: string,
       unitId: string,
       cashShiftId: string,
-      body: { countedCents: number; closeReason?: string },
+      body: {
+        countedCents: number;
+        closeReason?: string;
+        tenderCounts?: Array<{
+          method: string;
+          observedCents: number;
+          source: "manual" | "smartpos";
+        }>;
+      },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -2451,6 +2903,20 @@ export const api = {
         unitId,
         `cash-shifts/${encodeURIComponent(cashShiftId)}/close`,
         body,
+        idempotencyKey,
+      ),
+    reviewCashShift: (
+      organizationId: string,
+      unitId: string,
+      cashShiftId: string,
+      note: string,
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `cash-shifts/${encodeURIComponent(cashShiftId)}/review`,
+        { note },
         idempotencyKey,
       ),
     clockOut: (
@@ -3244,6 +3710,8 @@ export const api = {
         method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
         amountCents: number;
         reference?: string;
+        cashRegisterId?: string;
+        installationId?: string;
       },
       idempotencyKey?: string,
     ) =>

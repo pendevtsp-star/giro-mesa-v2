@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { PaymentAttemptStatus } from "@giromesa/contracts";
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
 export type KdsState = "pending" | "preparing" | "ready" | "done" | "canceled";
@@ -27,6 +28,33 @@ const PRINT_JOB_TRANSITIONS: Record<PrintJobState, readonly PrintJobState[]> = {
 };
 
 export const APPROVAL_TTL_MS = 10 * 60 * 1_000;
+export const PAYMENT_ATTEMPT_TTL_MS = 15 * 60 * 1_000;
+
+const PAYMENT_DEVICE_TRANSITIONS: Record<PaymentAttemptStatus, readonly PaymentAttemptStatus[]> = {
+  created: ["processing"],
+  processing: ["processing", "approved", "declined", "canceled", "unknown"],
+  unknown: ["approved", "declined", "canceled", "unknown"],
+  approved: [],
+  declined: [],
+  canceled: [],
+  reversed: [],
+};
+
+export function paymentAttemptExpiresAt(createdAt: Date) {
+  return new Date(createdAt.getTime() + PAYMENT_ATTEMPT_TTL_MS);
+}
+
+export function assertPaymentDeviceTransition(
+  from: PaymentAttemptStatus,
+  to: "processing" | "approved" | "declined" | "canceled" | "unknown",
+) {
+  if (!PAYMENT_DEVICE_TRANSITIONS[from].includes(to)) {
+    throw new ConflictException({
+      code: "PAYMENT_ATTEMPT_ALREADY_RESOLVED",
+      message: `A tentativa ${from} não aceita resultado ${to}.`,
+    });
+  }
+}
 
 export function approvalExpiresAt(requestedAt: Date) {
   return new Date(requestedAt.getTime() + APPROVAL_TTL_MS);
@@ -372,17 +400,30 @@ function stableValue(value: unknown): unknown {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, entry]) => [key, stableValue(entry)]),
     );
   }
   return value;
 }
 
+export function stableJson(value: unknown) {
+  return value === undefined ? "" : JSON.stringify(stableValue(value));
+}
+
+export function smartPosCanonicalRequest(
+  method: string,
+  path: string,
+  timestamp: string,
+  nonce: string,
+  body?: unknown,
+) {
+  const bodyHash = createHash("sha256").update(stableJson(body), "utf8").digest("hex");
+  return `${method.toUpperCase()}\n${path}\n${timestamp}\n${nonce}\n${bodyHash}`;
+}
+
 export function requestHash(operation: string, value: unknown) {
-  return createHash("sha256")
-    .update(JSON.stringify({ operation, value: stableValue(value) }))
-    .digest("hex");
+  return createHash("sha256").update(stableJson({ operation, value })).digest("hex");
 }
 
 export function replayResult<T extends Record<string, unknown>>(

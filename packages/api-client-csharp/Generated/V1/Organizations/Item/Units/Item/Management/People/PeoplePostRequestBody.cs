@@ -12,6 +12,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People
     public partial class PeoplePostRequestBody : IAdditionalDataHolder, IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The access property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access? Access { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access Access { get; set; }
+#endif
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The employmentCode property</summary>
@@ -75,6 +83,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "access", n => { Access = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access.CreateFromDiscriminatorValue); } },
                 { "employmentCode", n => { EmploymentCode = n.GetStringValue(); } },
                 { "hiredAt", n => { HiredAt = n.GetStringValue(); } },
                 { "hourlyRateCents", n => { HourlyRateCents = n.GetIntValue(); } },
@@ -90,6 +99,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access>("access", Access);
             writer.WriteStringValue("employmentCode", EmploymentCode);
             writer.WriteStringValue("hiredAt", HiredAt);
             writer.WriteIntValue("hourlyRateCents", HourlyRateCents);

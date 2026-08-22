@@ -70,11 +70,39 @@ describe("management report rules", () => {
       ],
     });
     assert.equal(forecast.confidence, "low");
+    assert.equal(forecast.available, false);
     assert.equal(forecast.revenue.forecastCents, 77_000);
-    assert.deepEqual(
-      forecast.purchases.map((row) => row.key),
-      ["rice"],
-    );
+    assert.deepEqual(forecast.purchases, []);
+  });
+
+  it("uses weekday seasonality only after the minimum sample is available", () => {
+    const dailySeries = Array.from({ length: 14 }, (_, index) => {
+      const date = new Date("2026-08-03T00:00:00.000Z");
+      date.setUTCDate(date.getUTCDate() + index);
+      return {
+        date: date.toISOString().slice(0, 10),
+        revenueCents: date.getUTCDay() === 0 || date.getUTCDay() === 6 ? 20_000 : 10_000,
+        previousRevenueCents: null,
+      };
+    });
+    const forecast = buildReportForecast({
+      dailySeries,
+      cashFlow: { inflowsCents: 140_000, outflowsCents: 70_000 },
+      inventory: [],
+      futureDemand: [
+        {
+          date: "2026-08-17",
+          reservations: 4,
+          guests: 12,
+          demandFloorCents: 30_000,
+        },
+      ],
+    });
+    assert.equal(forecast.available, true);
+    assert.equal(forecast.method, "weekday_seasonality_v2");
+    assert.equal(forecast.minimumSampleDays, 14);
+    assert.equal(forecast.revenue.forecastCents, 110_000);
+    assert.equal(forecast.calendarSignals[0]?.applied, true);
   });
 
   it("calculates the next weekly run in the unit timezone", () => {

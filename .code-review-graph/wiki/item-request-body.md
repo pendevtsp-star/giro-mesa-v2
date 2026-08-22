@@ -63,7 +63,7 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 | CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 37-41 |
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 46-52 |
 
-*... and 848 more members.*
+*... and 835 more members.*
 
 ## Execution Flows
 
@@ -73,20 +73,20 @@ Directory-based community: packages/api-client-csharp/Generated/V1
 
 ### Outgoing
 
-- `ReferenceEquals` (290 edge(s))
-- `nameof` (290 edge(s))
-- `IParsable` (148 edge(s))
-- `GetStringValue` (129 edge(s))
-- `WriteStringValue` (128 edge(s))
-- `IAdditionalDataHolder` (117 edge(s))
-- `WriteAdditionalData` (116 edge(s))
+- `ReferenceEquals` (286 edge(s))
+- `nameof` (286 edge(s))
+- `IParsable` (146 edge(s))
+- `GetStringValue` (125 edge(s))
+- `WriteStringValue` (124 edge(s))
+- `IAdditionalDataHolder` (115 edge(s))
+- `WriteAdditionalData` (114 edge(s))
 - `writer` (106 edge(s))
 - `n` (76 edge(s))
-- `GetGuidValue` (50 edge(s))
-- `WriteGuidValue` (50 edge(s))
-- `WriteIntValue` (50 edge(s))
-- `GetIntValue` (49 edge(s))
-- `BaseRequestBuilder` (33 edge(s))
+- `GetGuidValue` (49 edge(s))
+- `WriteGuidValue` (49 edge(s))
+- `WriteIntValue` (48 edge(s))
+- `GetIntValue` (47 edge(s))
+- `BaseRequestBuilder` (32 edge(s))
 - `IComposedTypeWrapper` (31 edge(s))
 
 ### Incoming

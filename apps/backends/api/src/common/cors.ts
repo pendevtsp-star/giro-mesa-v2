@@ -1,12 +1,13 @@
 const LOCAL_ORIGINS = ["http://localhost:3100", "http://localhost:3101", "http://localhost:3102"];
+const API_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
 export function corsConfiguration(value = process.env.CORS_ORIGINS) {
   const origins = configuredOrigins(value);
   const exposedHeaders = ["x-request-id"];
   if (origins.includes("*")) {
-    return { origin: "*" as const, credentials: false, exposedHeaders };
+    return { origin: "*" as const, credentials: false, exposedHeaders, methods: API_METHODS };
   }
-  return { origin: origins, credentials: true, exposedHeaders };
+  return { origin: origins, credentials: true, exposedHeaders, methods: API_METHODS };
 }
 
 export function configuredOrigins(

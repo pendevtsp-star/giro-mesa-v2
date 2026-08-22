@@ -13,6 +13,12 @@ export function normalizeKdsBumpKey(key: string) {
   return key.length === 1 ? key.toLocaleLowerCase("pt-BR") : key;
 }
 
+export function kdsBumpKeyLabel(key: string) {
+  if (key === "ArrowLeft") return "← Esquerda";
+  if (key === "ArrowRight") return "→ Direita";
+  return key.length === 1 ? key.toLocaleUpperCase("pt-BR") : key;
+}
+
 export function readKdsBumpBarMap(storageKey: string): KdsBumpBarMap {
   try {
     const value = JSON.parse(localStorage.getItem(storageKey) ?? "null") as unknown;

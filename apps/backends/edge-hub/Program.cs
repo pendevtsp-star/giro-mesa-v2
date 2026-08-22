@@ -36,6 +36,8 @@ builder.Services.AddSingleton<IPrinterGateway>(services =>
 });
 builder.Services.AddHttpClient<CloudSyncWorker>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
+builder.Services.AddSingleton<FiscalRecoveryWorker>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<FiscalRecoveryWorker>());
 
 var app = builder.Build();
 var store = app.Services.GetRequiredService<HubStore>();
@@ -73,6 +75,17 @@ app.MapGet("/health/live", () => Results.Ok(new
 
 app.MapGet("/health", Health);
 app.MapGet("/health/ready", Health);
+app.MapGet("/health/fiscal-homologation", (
+    Microsoft.Extensions.Options.IOptions<HubOptions> options,
+    FocusCredentialStore credentials) =>
+{
+    var result = FiscalHomologationGate.Check(options.Value.Focus, credentials.Current);
+    return Results.Json(
+        result,
+        statusCode: result.Ready
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable);
+});
 
 app.MapPost("/v1/pair", async (PairDeviceRequest request, DeviceAuthenticator auth) =>
 {
@@ -212,7 +225,7 @@ app.MapPost("/v1/payments", async (PaymentRequest request, IPaymentGateway gatew
 
 app.MapPost("/v1/fiscal/documents", async (
     FiscalRequest request,
-    IFiscalGateway gateway,
+    FiscalRecoveryWorker recovery,
     HubStore hubStore,
     HttpContext context) =>
 {
@@ -223,11 +236,31 @@ app.MapPost("/v1/fiscal/documents", async (
     if (authorization is not null) return authorization;
     if (context.Items[AuthenticatedDeviceIdKey] is not string deviceId)
         return Results.Unauthorized();
-    var result = await gateway.IssueAsync(request);
-    var fiscalEvent = FiscalEventFactory.FromIssue(
-        snapshot!, deviceId, request, result, DateTimeOffset.UtcNow);
-    if (fiscalEvent is not null) await hubStore.AcceptCommandAsync(fiscalEvent);
-    return FiscalMutationResult(result);
+    try
+    {
+        var now = DateTimeOffset.UtcNow;
+        var operation = await hubStore.CreateOrGetFiscalOperationAsync(
+            snapshot!.OrganizationId,
+            snapshot.UnitId,
+            request.ActorIdentityId,
+            deviceId,
+            "issue",
+            request.IdempotencyKey,
+            JsonSerializer.Serialize(request),
+            now);
+        var result = await recovery.TryProcessAsync(operation.Operation.Id, now)
+            ?? operation.Operation.LastResult
+            ?? new FiscalResult(false, "processing", request.IdempotencyKey, "FISCAL_OPERATION_QUEUED");
+        return FiscalMutationResult(result);
+    }
+    catch (OperationalConflictException exception) when (exception.Code == "FISCAL_IDEMPOTENCY_CONFLICT")
+    {
+        return FiscalIdempotencyConflict(request.IdempotencyKey);
+    }
+    catch (ArgumentException)
+    {
+        return FiscalMutationResult(new(false, "rejected", null, "FOCUS_REQUEST_INVALID"));
+    }
 });
 
 app.MapGet("/v1/fiscal/documents/{documentReference}", async (
@@ -255,8 +288,8 @@ app.MapGet("/v1/fiscal/documents/{documentReference}", async (
 
 app.MapDelete("/v1/fiscal/documents/{documentReference}", async (
     string documentReference,
-    FiscalCancellationRequest request,
-    IFiscalGateway gateway,
+    [Microsoft.AspNetCore.Mvc.FromBody] FiscalCancellationRequest request,
+    FiscalRecoveryWorker recovery,
     HubStore hubStore,
     HttpContext context) =>
 {
@@ -268,16 +301,36 @@ app.MapDelete("/v1/fiscal/documents/{documentReference}", async (
     if (authorization is not null) return authorization;
     if (context.Items[AuthenticatedDeviceIdKey] is not string deviceId)
         return Results.Unauthorized();
-    var result = await gateway.CancelAsync(documentReference, request);
-    var fiscalEvent = FiscalEventFactory.FromCancellation(
-        snapshot!, deviceId, documentReference, request, result, DateTimeOffset.UtcNow);
-    if (fiscalEvent is not null) await hubStore.AcceptCommandAsync(fiscalEvent);
-    return FiscalMutationResult(result);
+    try
+    {
+        var now = DateTimeOffset.UtcNow;
+        var operation = await hubStore.CreateOrGetFiscalOperationAsync(
+            snapshot!.OrganizationId,
+            snapshot.UnitId,
+            request.ActorIdentityId,
+            deviceId,
+            "cancel",
+            documentReference,
+            JsonSerializer.Serialize(request),
+            now);
+        var result = await recovery.TryProcessAsync(operation.Operation.Id, now)
+            ?? operation.Operation.LastResult
+            ?? new FiscalResult(false, "processing", documentReference, "FISCAL_OPERATION_QUEUED");
+        return FiscalMutationResult(result);
+    }
+    catch (OperationalConflictException exception) when (exception.Code == "FISCAL_IDEMPOTENCY_CONFLICT")
+    {
+        return FiscalIdempotencyConflict(documentReference);
+    }
+    catch (ArgumentException)
+    {
+        return FiscalMutationResult(new(false, "rejected", documentReference, "FOCUS_REQUEST_INVALID"));
+    }
 });
 
 app.MapPost("/v1/fiscal/number-invalidations", async (
     FiscalNumberInvalidationRequest request,
-    IFiscalGateway gateway,
+    FiscalRecoveryWorker recovery,
     HubStore hubStore,
     HttpContext context) =>
 {
@@ -289,11 +342,31 @@ app.MapPost("/v1/fiscal/number-invalidations", async (
     if (authorization is not null) return authorization;
     if (context.Items[AuthenticatedDeviceIdKey] is not string deviceId)
         return Results.Unauthorized();
-    var result = await gateway.InvalidateNumbersAsync(request);
-    var fiscalEvent = FiscalEventFactory.FromInvalidation(
-        snapshot!, deviceId, request, result, DateTimeOffset.UtcNow);
-    if (fiscalEvent is not null) await hubStore.AcceptCommandAsync(fiscalEvent);
-    return FiscalMutationResult(result);
+    try
+    {
+        var now = DateTimeOffset.UtcNow;
+        var operation = await hubStore.CreateOrGetFiscalOperationAsync(
+            snapshot!.OrganizationId,
+            snapshot.UnitId,
+            request.ActorIdentityId,
+            deviceId,
+            "invalidate",
+            request.IdempotencyKey,
+            JsonSerializer.Serialize(request),
+            now);
+        var result = await recovery.TryProcessAsync(operation.Operation.Id, now)
+            ?? operation.Operation.LastResult
+            ?? new FiscalResult(false, "processing", request.IdempotencyKey, "FISCAL_OPERATION_QUEUED");
+        return FiscalMutationResult(result);
+    }
+    catch (OperationalConflictException exception) when (exception.Code == "FISCAL_IDEMPOTENCY_CONFLICT")
+    {
+        return FiscalIdempotencyConflict(request.IdempotencyKey);
+    }
+    catch (ArgumentException)
+    {
+        return FiscalMutationResult(new(false, "rejected", request.IdempotencyKey, "FOCUS_REQUEST_INVALID"));
+    }
 });
 
 app.MapPost("/v1/print-jobs", async (
@@ -412,6 +485,10 @@ static IResult FiscalConsultResult(FiscalResult result) => result.Status switch
     "not_found" => Results.NotFound(result),
     _ => Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable),
 };
+
+static IResult FiscalIdempotencyConflict(string? reference) => Results.Json(
+    new FiscalResult(false, "rejected", reference, "FISCAL_IDEMPOTENCY_CONFLICT"),
+    statusCode: StatusCodes.Status409Conflict);
 
 static IResult PrintMutationResult(PrintResult result) => result.Status switch
 {

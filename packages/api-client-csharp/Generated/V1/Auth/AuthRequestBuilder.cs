@@ -8,6 +8,8 @@ using GiroMesa.ApiClient.V1.Auth.Mfa;
 using GiroMesa.ApiClient.V1.Auth.Password;
 using GiroMesa.ApiClient.V1.Auth.PasswordReset;
 using GiroMesa.ApiClient.V1.Auth.Register;
+using GiroMesa.ApiClient.V1.Auth.TerminalPin;
+using GiroMesa.ApiClient.V1.Auth.TerminalSession;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -61,6 +63,16 @@ namespace GiroMesa.ApiClient.V1.Auth
         public global::GiroMesa.ApiClient.V1.Auth.Register.RegisterRequestBuilder Register
         {
             get => new global::GiroMesa.ApiClient.V1.Auth.Register.RegisterRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The terminalPin property</summary>
+        public global::GiroMesa.ApiClient.V1.Auth.TerminalPin.TerminalPinRequestBuilder TerminalPin
+        {
+            get => new global::GiroMesa.ApiClient.V1.Auth.TerminalPin.TerminalPinRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The terminalSession property</summary>
+        public global::GiroMesa.ApiClient.V1.Auth.TerminalSession.TerminalSessionRequestBuilder TerminalSession
+        {
+            get => new global::GiroMesa.ApiClient.V1.Auth.TerminalSession.TerminalSessionRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Auth.AuthRequestBuilder"/> and sets the default values.

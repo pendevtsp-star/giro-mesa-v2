@@ -5,6 +5,26 @@ import { expect, type Page, test } from "@playwright/test";
 const organizationId = "org-1";
 const unitId = "unit-1";
 
+async function expectNoHorizontalOverflow(page: Page) {
+  const dimensions = await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    return {
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      offenders: [...document.querySelectorAll<HTMLElement>("body *")]
+        .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+        .slice(0, 12)
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          const parent = element.parentElement;
+          const parentRect = parent?.getBoundingClientRect();
+          return `${element.tagName.toLowerCase()}.${element.className}:${Math.round(rect.left)}-${Math.round(rect.right)} parent=${parent?.tagName.toLowerCase()}.${parent?.className}:${Math.round(parentRect?.left ?? 0)}-${Math.round(parentRect?.right ?? 0)}`;
+        }),
+    };
+  });
+  expect(dimensions.document, JSON.stringify(dimensions)).toBe(dimensions.viewport);
+}
+
 function report(period: { from: string; to: string }, legacyEmpty = false) {
   const financials = {
     period,
@@ -149,6 +169,13 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
         reconciliation: "complete",
         forecast: "partial",
       },
+      indicators: {
+        revenue: {
+          coverage: "complete",
+          dataThrough: "2026-08-17T11:59:00.000Z",
+          sources: ["pos_tabs", "pos_tab_payments"],
+        },
+      },
     },
     capabilities: {
       viewCosts: true,
@@ -193,6 +220,10 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
   };
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url());
+    if (route.request().method() === "GET" && url.pathname.endsWith("/auth/terminal-session")) {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     if (url.pathname.endsWith("/management/reports/exports/export-1/content")) {
       await route.fulfill({
         json: { filename: exportRecord.filename, content: csvContent, sha256: csvSha256 },
@@ -274,6 +305,12 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
         severity: "critical",
         status: "open",
         dueAt: "2026-08-20T12:00:00.000Z",
+        source: {
+          period: { from: "2026-08-01", to: "2026-08-17" },
+          family: "reconciliation",
+          route: "finance",
+        },
+        history: [],
         version: 1,
       });
       await route.fulfill({ json: { candidates: 1, created: 1 } });
@@ -285,6 +322,20 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
     }
     if (url.pathname.endsWith("/management/reports/costs/backfill")) {
       await route.fulfill({ json: { estimatedCount: 2, unavailableCount: 0 } });
+      return;
+    }
+    if (url.pathname.endsWith("/management/reports/costs/backfill/preview")) {
+      await route.fulfill({
+        json: {
+          candidateCount: 2,
+          estimatedCount: 2,
+          unavailableCount: 0,
+          estimatedTotalCents: 12_000,
+          coverageBefore: 60,
+          coverageAfter: 100,
+          source: "current_catalog_cost",
+        },
+      });
       return;
     }
     if (url.pathname.endsWith("/management/reports")) {
@@ -356,12 +407,32 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Relatórios" })).toBeVisible();
+  await expect(page.locator(".reports-filter-card")).toHaveClass(/(?:^|\s)grid(?:\s|$)/);
+  await expect(page.locator(".reports-filter-card")).toHaveCSS("display", "grid");
+  await expect(page.getByRole("button", { name: "Copiar link" })).toHaveCount(0);
+  const requestsBeforeRefresh = requestedPeriods.length;
+  await page.getByRole("button", { name: "Atualizar dados" }).click();
+  await expect.poll(() => requestedPeriods.length).toBe(requestsBeforeRefresh + 1);
   await expect(page.getByText("R$ 1.200,00").first()).toBeVisible();
   await expect(page.getByText("Margem ainda não calculável")).toBeVisible();
   await expect(page.getByText("Fuso: America/Sao_Paulo")).toBeVisible();
+  await expect(page.locator(".reports-family-navigation")).toHaveCSS("display", "grid");
   await expect(
     page.getByRole("region", { name: "Atualização e cobertura dos dados" }),
   ).toContainText("Atualizado");
+  await expect(page.locator(".reports-freshness")).toHaveClass(/(?:^|\s)grid(?:\s|$)/);
+  await expect(page.locator(".reports-freshness")).toHaveCSS("display", "grid");
+  await expect(
+    page.locator(".reports-result-toolbar__context").getByRole("button", { name: "Recarregar" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".reports-result-toolbar__actions").getByRole("button", { name: "Recarregar" }),
+  ).toHaveCount(0);
+  expect(
+    await page
+      .locator(".reports-freshness .reports-indicator-health")
+      .evaluate((element) => getComputedStyle(element).gridColumnStart),
+  ).toBe("health");
   await expect(page.getByRole("heading", { name: "Metas rateadas para o período" })).toBeVisible();
   await expect(page).toHaveURL(/reportOrganization=org-1.*reportUnit=unit-1.*#\/reports/);
   await expect(page.getByText("+25,0% vs. período anterior").first()).toBeVisible();
@@ -374,40 +445,42 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
 
   await page.getByRole("button", { name: "Central de ações" }).click();
   await page.getByRole("button", { name: "Avaliar período atual" }).click();
-  await expect(page.getByRole("table", { name: "Alertas abertos dos relatórios" })).toContainText(
-    "Divergência fiscal",
-  );
+  await expect(
+    page.getByRole("table", { name: "Alertas abertos e em tratamento dos relatórios" }),
+  ).toContainText("Divergência fiscal");
   await page.getByRole("button", { name: "Fechar", exact: true }).click();
 
-  await page.getByLabel(/Entendo que custos históricos/).check();
-  await page.getByRole("button", { name: "Recompor custos estimados" }).click();
+  await page.getByRole("button", { name: "Ver impacto antes de alterar" }).click();
+  await page.getByLabel(/Confirmo a estimativa/).check();
+  await page.getByRole("button", { name: "Confirmar custos estimados" }).click();
   await expect(page.getByText(/2 item\(ns\) receberam custo estimado/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Vendas" }).click();
+  const family = page.getByLabel("Escolher família de relatórios");
+  await family.selectOption("sales");
   await expect(page.getByRole("heading", { name: "Desempenho comercial" })).toBeVisible();
-  await page.getByRole("button", { name: "Descontos e cancelamentos" }).click();
+  await family.selectOption("exceptions");
   await expect(page.getByRole("heading", { name: "Motivos de cancelamento" })).toBeVisible();
-  await page.getByRole("button", { name: "Estoque" }).click();
+  await family.selectOption("inventory");
   await expect(page.getByRole("heading", { name: "Perdas e cobertura atual" })).toBeVisible();
-  await page.getByRole("button", { name: "Compras" }).click();
+  await family.selectOption("purchasing");
   await expect(
     page.getByRole("heading", { name: "Pedidos, recebimentos e fornecedores" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Operação" }).click();
+  await family.selectOption("operations");
   await expect(page.getByRole("heading", { name: "Giro e atendimento das mesas" })).toBeVisible();
-  await page.getByRole("button", { name: "Rentabilidade" }).click();
+  await family.selectOption("profitability");
   await expect(page.getByRole("heading", { name: "Margem e resultado operacional" })).toBeVisible();
-  await page.getByRole("button", { name: "Multiunidade" }).click();
+  await family.selectOption("multiunit");
   await expect(page.getByRole("heading", { name: "Comparativo entre unidades" })).toBeVisible();
-  await page.getByRole("button", { name: "Mão de obra" }).click();
+  await family.selectOption("labor");
   await expect(page.getByRole("heading", { name: "Mão de obra" })).toBeVisible();
-  await page.getByRole("button", { name: "Fiscal e pagamentos", exact: true }).click();
+  await family.selectOption("reconciliation");
   await expect(page.getByRole("heading", { name: "Fiscal e pagamentos" })).toBeVisible();
-  await page.getByRole("button", { name: "Previsão" }).click();
+  await family.selectOption("forecast");
   await expect(page.getByRole("heading", { name: "Previsão operacional" })).toBeVisible();
-  await page.getByRole("button", { name: "Qualidade dos dados" }).click();
+  await family.selectOption("quality");
   await expect(page.getByRole("heading", { name: "Confiabilidade do relatório" })).toBeVisible();
-  await page.getByRole("button", { name: "Visão geral" }).click();
+  await family.selectOption("overview");
   await expect(page.getByRole("link", { name: "Revisar lançamentos financeiros" })).toHaveAttribute(
     "href",
     "#/finance",
@@ -459,20 +532,26 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await page.getByRole("button", { name: "Imprimir / PDF local" }).click();
   await expect(page.locator("body")).toHaveAttribute("data-print-called", "true");
 
-  const updateButton = page.getByRole("button", { name: "Atualizar relatório" });
-  await expect(updateButton).toBeDisabled();
+  const updateButton = page.getByRole("button", { name: "Atualizar dados" });
+  await expect(updateButton).toBeEnabled();
   expect((await updateButton.boundingBox())?.width).toBeLessThan(240);
+
+  for (const width of [1180, 1024]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expectNoHorizontalOverflow(page);
+  }
 
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(page.getByRole("button", { name: "Exportar CSV auditado" })).toBeHidden();
   await page.getByRole("button", { name: "Mais ações" }).click();
   await expect(page.getByRole("button", { name: "Exportar CSV auditado" })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
+  await expectNoHorizontalOverflow(page);
 
   await page.getByLabel("Data inicial").fill("2026-07-01");
   await page.getByLabel("Data final").fill("2026-07-31");
-  await expect(updateButton).toBeEnabled();
-  await updateButton.click();
+  const applyButton = page.getByRole("button", { name: "Aplicar filtros" });
+  await expect(applyButton).toBeEnabled();
+  await applyButton.click();
 
   await expect.poll(() => requestedPeriods.at(-1)).toBe("2026-07-01:2026-07-31:previous_period");
   await expect(page.getByText("Período sem movimentação")).toBeVisible();

@@ -235,6 +235,7 @@ type Priority = {
 };
 
 function sourceFor(id: string, route: OverviewRoute): OverviewSourceId {
+  if (["received", "tabs-to-receive"].includes(id)) return "operations";
   if (
     [
       "gross-margin",
@@ -292,8 +293,82 @@ function priority(
 function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapshot): Metric[] {
   const operation = snapshot.operations;
   if (!operation) {
-    const route = profile === "kitchen" ? "kds" : profile === "cashier" ? "cash" : "salon";
-    return [metric("operations-unavailable", "Operação", "—", unavailable, "warning", route)];
+    const missing = (id: string, label: string, route: OverviewRoute) =>
+      metric(id, label, "—", unavailable, "warning", route);
+    if (profile === "owner")
+      return [
+        missing("pending-approvals", "Aprovações pendentes", "counter"),
+        missing("sales", "Vendas do turno", "reports"),
+        metric(
+          "gross-margin",
+          "Margem bruta",
+          snapshot.finance?.grossMarginCents == null
+            ? "—"
+            : money(snapshot.finance.grossMarginCents),
+          snapshot.finance
+            ? snapshot.finance.grossMarginCents == null
+              ? "Sem cobertura completa de custo"
+              : "Receita menos CMV"
+            : unavailable,
+          "neutral",
+          "reports",
+        ),
+        metric(
+          "projected-balance",
+          "Saldo projetado",
+          snapshot.finance ? money(snapshot.finance.projectedBalanceCents) : "—",
+          snapshot.finance ? "A receber menos a pagar" : unavailable,
+          snapshot.finance ? "info" : "warning",
+          "finance",
+        ),
+      ];
+    if (profile === "manager")
+      return [
+        missing("pending-approvals", "Aprovações pendentes", "counter"),
+        missing("occupancy", "Ocupação", "salon"),
+        missing("open-tabs", "Comandas abertas", "counter"),
+        missing("late-kds", "Tickets atrasados", "kds"),
+      ];
+    if (profile === "waiter")
+      return [
+        missing("my-tables", "Minhas mesas", "salon"),
+        missing("open-calls", "Chamados", "salon"),
+        missing("ready-items", "Prontos para retirar", "salon"),
+        missing("open-tabs", "Comandas abertas", "counter"),
+      ];
+    if (profile === "cashier")
+      return [
+        metric(
+          "cash-status",
+          "Caixa",
+          snapshot.cashShift === undefined ? "—" : snapshot.cashShift ? "Aberto" : "Fechado",
+          snapshot.cashShift === undefined
+            ? unavailable
+            : snapshot.cashShift
+              ? "Turno de caixa em andamento"
+              : "Nenhum turno de caixa aberto",
+          snapshot.cashShift === undefined ? "warning" : snapshot.cashShift ? "success" : "warning",
+          "cash",
+        ),
+        missing("received", "Recebido no turno", "cash"),
+        missing("tabs-to-receive", "Comandas a receber", "counter"),
+        metric(
+          "cash-difference",
+          "Última diferença",
+          snapshot.cashShift?.lastDifferenceCents == null
+            ? "—"
+            : money(snapshot.cashShift.lastDifferenceCents),
+          snapshot.cashShift === undefined ? unavailable : "Último caixa encerrado",
+          snapshot.cashShift?.lastDifferenceCents ? "warning" : "neutral",
+          "cash",
+        ),
+      ];
+    return [
+      missing("kds-new", "Novos", "kds"),
+      missing("kds-preparing", "Em preparo", "kds"),
+      missing("kds-late", "Atrasados", "kds"),
+      missing("kds-ready", "Prontos", "kds"),
+    ];
   }
   const occupancy = operation.tables
     ? Math.round((operation.occupiedTables / operation.tables) * 100)

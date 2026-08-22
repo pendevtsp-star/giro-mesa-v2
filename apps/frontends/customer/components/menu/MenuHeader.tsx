@@ -1,15 +1,18 @@
 import { Button } from "@giromesa/ui";
+import Image from "next/image";
 
 type HubState = "checking" | "online" | "offline";
 
 export function MenuHeader({
   hub,
   branding,
+  open,
   tableAuthorized,
   onInfo,
 }: {
   hub: HubState;
   branding?: PublicMenuBranding;
+  open?: boolean;
   tableAuthorized: boolean;
   onInfo: () => void;
 }) {
@@ -17,12 +20,24 @@ export function MenuHeader({
     <>
       <header className="restaurant-header">
         <div className="restaurant-mark" aria-hidden="true">
-          {branding?.displayName[0] ?? "G"}
+          {branding?.logoUrl ? (
+            <Image alt="" height={58} src={branding.logoUrl} unoptimized width={58} />
+          ) : (
+            (branding?.displayName[0] ?? "G")
+          )}
         </div>
         <div>
           <p>Cardápio digital</p>
           <h1>{branding?.displayName ?? "Cardápio da unidade"}</h1>
           <span>{branding?.slogan ?? "Consulte os dados informados pela equipe"}</span>
+          {open !== undefined && (
+            <strong className={`business-status ${open ? "open" : "closed"}`}>
+              {open ? "Aberto agora" : "Fechado agora"}
+            </strong>
+          )}
+          {branding?.openingHours && (
+            <small className="business-hours">{branding.openingHours}</small>
+          )}
         </div>
         <Button
           type="button"

@@ -15,11 +15,7 @@ Directory-based community: packages/api-client-csharp/Generated/Api
 | ApiRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\ApiRequestBuilder.cs | 15-39 |
 | ApiRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\ApiRequestBuilder.cs | 36-38 |
 | CallbackRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\Callback\CallbackRequestBuilder.cs | 32-34 |
-| GoogleRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\GoogleRequestBuilder.cs | 18-57 |
-| GoogleRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\GoogleRequestBuilder.cs | 54-56 |
 | LoginRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\Login\LoginRequestBuilder.cs | 32-34 |
-| SignupRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\Signup\SignupRequestBuilder.cs | 32-34 |
-| StartRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Google\Start\StartRequestBuilder.cs | 32-34 |
 | LoginPostRequestBodyMember1 | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember1.cs | 10-78 |
 | LoginPostRequestBodyMember1 | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember1.cs | 38-42 |
 | CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember1.cs | 48-52 |
@@ -35,66 +31,69 @@ Directory-based community: packages/api-client-csharp/Generated/Api
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember2.cs | 122-125 |
 | Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember2.cs | 130-141 |
 | LoginRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginRequestBuilder.cs | 32-34 |
-| LogoutRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Logout\LogoutRequestBuilder.cs | 32-34 |
-| MeRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Me\MeRequestBuilder.cs | 32-34 |
 | ChallengeRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\ChallengeRequestBuilder.cs | 15-39 |
 | ChallengeRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\ChallengeRequestBuilder.cs | 36-38 |
-| VerifyPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyPostRequestBody.cs | 10-83 |
-| VerifyPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyPostRequestBody.cs | 44-47 |
-| CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyPostRequestBody.cs | 53-57 |
-| GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyPostRequestBody.cs | 62-70 |
-| Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyPostRequestBody.cs | 75-82 |
-| VerifyRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Challenge\Verify\VerifyRequestBuilder.cs | 32-34 |
 | DisablePostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisablePostRequestBody.cs | 10-73 |
 | DisablePostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisablePostRequestBody.cs | 36-39 |
 | CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisablePostRequestBody.cs | 45-49 |
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisablePostRequestBody.cs | 54-61 |
 | Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisablePostRequestBody.cs | 66-72 |
-| DisableRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Disable\DisableRequestBuilder.cs | 32-34 |
 | MfaRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\MfaRequestBuilder.cs | 56-58 |
-| OauthRequestBuilder | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\OauthRequestBuilder.cs | 15-39 |
-| OauthRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\OauthRequestBuilder.cs | 36-38 |
 | VerifyPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 10-73 |
 | VerifyPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 36-39 |
 | CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 45-49 |
 | GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 54-61 |
 | Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyPostRequestBody.cs | 66-72 |
-| VerifyRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Oauth\Verify\VerifyRequestBuilder.cs | 32-34 |
-| ConfirmPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 10-63 |
-| ConfirmPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Setup\Confirm\ConfirmPostRequestBody.cs | 28-31 |
+| ConfirmRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Setup\Confirm\ConfirmRequestBuilder.cs | 32-34 |
+| SetupRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Mfa\Setup\SetupRequestBuilder.cs | 38-40 |
+| ForgotPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Password\Forgot\ForgotPostRequestBody.cs | 10-63 |
+| ForgotPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Password\Forgot\ForgotPostRequestBody.cs | 28-31 |
+| CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Password\Forgot\ForgotPostRequestBody.cs | 37-41 |
+| GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Password\Forgot\ForgotPostRequestBody.cs | 46-52 |
+| Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Password\Forgot\ForgotPostRequestBody.cs | 57-62 |
+| ConfirmRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Confirm\ConfirmRequestBuilder.cs | 32-34 |
+| RequestPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestPostRequestBody.cs | 10-63 |
+| RequestPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestPostRequestBody.cs | 28-31 |
+| CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestPostRequestBody.cs | 37-41 |
+| GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestPostRequestBody.cs | 46-52 |
+| Serialize | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestPostRequestBody.cs | 57-62 |
+| RequestRequestBuilder | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\PasswordReset\Request\RequestRequestBuilder.cs | 32-34 |
+| RegisterPostRequestBody | Class | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Register\RegisterPostRequestBody.cs | 10-153 |
+| RegisterPostRequestBody | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Register\RegisterPostRequestBody.cs | 52-55 |
+| CreateFromDiscriminatorValue | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Register\RegisterPostRequestBody.cs | 61-65 |
+| GetFieldDeserializers | Function | C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Register\RegisterPostRequestBody.cs | 70-79 |
 
-*... and 949 more members.*
+*... and 624 more members.*
 
 ## Execution Flows
 
-- **GetFieldDeserializers** (criticality: 0.53, depth: 1)
+No execution flows pass through this community.
 
 ## Dependencies
 
 ### Outgoing
 
-- `ReferenceEquals` (316 edge(s))
-- `nameof` (316 edge(s))
-- `GetStringValue` (164 edge(s))
-- `WriteStringValue` (164 edge(s))
-- `IParsable` (160 edge(s))
-- `IAdditionalDataHolder` (121 edge(s))
-- `WriteAdditionalData` (121 edge(s))
-- `writer` (120 edge(s))
-- `n` (89 edge(s))
-- `WriteIntValue` (54 edge(s))
-- `GetIntValue` (53 edge(s))
-- `GetGuidValue` (51 edge(s))
-- `WriteGuidValue` (51 edge(s))
-- `BaseRequestBuilder` (41 edge(s))
-- `IComposedTypeWrapper` (32 edge(s))
+- `ReferenceEquals` (219 edge(s))
+- `nameof` (219 edge(s))
+- `GetStringValue` (116 edge(s))
+- `WriteStringValue` (116 edge(s))
+- `IParsable` (112 edge(s))
+- `writer` (86 edge(s))
+- `IAdditionalDataHolder` (83 edge(s))
+- `WriteAdditionalData` (83 edge(s))
+- `n` (64 edge(s))
+- `GetGuidValue` (37 edge(s))
+- `WriteGuidValue` (37 edge(s))
+- `WriteIntValue` (34 edge(s))
+- `GetIntValue` (33 edge(s))
+- `BaseRequestBuilder` (25 edge(s))
+- `IComposedTypeWrapper` (24 edge(s))
 
 ### Incoming
 
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\DeliveryOrders\DeliveryOrdersPostRequestBody.cs` (6 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs` (5 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs` (4 edge(s))
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Reservations\ReservationsPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Waitlist\WaitlistPostRequestBody.cs` (4 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Auth\Login\LoginPostRequestBodyMember2.cs::LoginPostRequestBodyMember2_trustedDevice` (3 edge(s))
@@ -103,6 +102,7 @@ Directory-based community: packages/api-client-csharp/Generated/Api
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs::CampaignsPostRequestBody_segmentId` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs::CampaignsPostRequestBody_subject` (3 edge(s))
 - `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Campaigns\CampaignsPostRequestBody.cs::CampaignsPostRequestBody_unitId` (3 edge(s))
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_maximumDiscountCents` (3 edge(s))
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_unitId` (3 edge(s))
-- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Coupons\CouponsPostRequestBody.cs::CouponsPostRequestBody_validUntil` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs::CustomersPostRequestBody_birthDate` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs::CustomersPostRequestBody_defaultUnitId` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs::CustomersPostRequestBody_email` (3 edge(s))
+- `C:\Users\maxue\projetos_programação\giro_mesa_v2\packages\api-client-csharp\Generated\Api\V1\Organizations\Item\Growth\Customers\CustomersPostRequestBody.cs::CustomersPostRequestBody_phone` (3 edge(s))

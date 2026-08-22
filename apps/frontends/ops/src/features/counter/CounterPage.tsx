@@ -1,5 +1,15 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
-import { Badge, Button, Card, EmptyState, Input, Label, NativeSelect, Toast } from "@giromesa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Label,
+  NativeSelect,
+  SearchField,
+  Toast,
+} from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 import { api } from "../../api";
 import { pilotMutation } from "../../operational-dispatch";
@@ -332,14 +342,12 @@ export function RealCounterPage({
                     {tabs.refreshing ? "Atualizando…" : "Atualizar"}
                   </Button>
                 </div>
-                <Label className="search-field">
-                  <span aria-hidden="true">⌕</span>
-                  <Input
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Buscar cliente, número ou telefone"
-                    value={query}
-                  />
-                </Label>
+                <SearchField
+                  aria-label="Buscar atendimento"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar cliente, número ou telefone"
+                  value={query}
+                />
                 <fieldset className="counter-stage-filter">
                   <legend className="gm-sr-only">Etapas do balcão</legend>
                   {(Object.keys(counterQueueLabels) as CounterQueueStage[]).map((stage) => (

@@ -6,6 +6,7 @@ import {
   memberships,
   organizations,
   outboxEvents,
+  posCatalogBranding,
   posCatalogCategories,
   posDiningRooms,
   posDiningTables,
@@ -73,6 +74,15 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       ])
       .returning();
     assert.ok(unitA && unitB);
+    await database.db.insert(posCatalogBranding).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      config: {
+        displayName: "Restaurante Pilot A",
+        primaryColor: "#10b981",
+        accentColor: "#10b981",
+      },
+    });
     const [identity] = await database.db
       .insert(identities)
       .values({ email: `pilot-owner+${runId}@example.test`, displayName: "Pilot Owner" })
@@ -1826,6 +1836,10 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       },
     );
     const printJobId = (queuedPrint.printJob as { id: string }).id;
+    assert.equal(
+      (queuedPrint.printJob as { payload: Record<string, unknown> }).payload.establishmentName,
+      "Restaurante Pilot A",
+    );
     const replayedPrint = await pos.createPrintJob(
       identity.id,
       organizationA.id,

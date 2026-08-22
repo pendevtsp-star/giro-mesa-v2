@@ -1094,7 +1094,11 @@ describe("integração operacional", () => {
     });
 
     expect(directory.pagination).toEqual({ page: 2, pageSize: 20, total: 31, pageCount: 2 });
-    expect(directory.items[0]).toMatchObject({ name: "Ana", employmentCode: "A-1" });
+    expect(directory.items[0]).toMatchObject({
+      name: "Ana",
+      employmentCode: "A-1",
+      access: { status: "none" },
+    });
     expect(indicators.coverage).toEqual({
       schedules: "complete",
       timeEntries: "complete",

@@ -1,6 +1,7 @@
 import { api } from "../../api";
 import { type PilotScope, parsePilotCatalog, RemoteGate, useRemote } from "../../operations.shared";
 import { CatalogExperience } from "./CatalogExperience";
+import "./catalog.entry.css";
 
 export function RealCatalogPage({ scope }: { scope: PilotScope }) {
   const remote = useRemote(

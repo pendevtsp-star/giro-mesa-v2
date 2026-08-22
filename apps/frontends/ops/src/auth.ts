@@ -97,6 +97,7 @@ export function parseAuthenticatedAccess(
           name: unitName,
           city: text(unit.city) ?? undefined,
           timezone: text(unit.timezone) ?? "America/Sao_Paulo",
+          branding: parseUnitBranding(unit.branding ?? unit.brandSummary),
         },
       ];
     });
@@ -137,6 +138,16 @@ export function parseAuthenticatedAccess(
   });
   if (!organizations.length && !platformAdmin) throw new InvalidSessionPayloadError();
   return { identity: { id: identityId, email, displayName }, organizations, platformAdmin };
+}
+
+function parseUnitBranding(value: unknown): Unit["branding"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const branding = value as Record<string, unknown>;
+  return {
+    displayName: text(branding.displayName) ?? undefined,
+    logoUrl: text(branding.logoUrl),
+    primaryColor: text(branding.primaryColor) ?? undefined,
+  };
 }
 
 export function profileIdForScope(access: AccessOrganization, unitId: string): ProfileId | null {

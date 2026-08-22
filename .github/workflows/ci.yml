@@ -46,7 +46,8 @@ jobs:
           docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_sync
           docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_worker
           docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_public
-          for database in giromesa_ci giromesa_management giromesa_growth giromesa_pilot giromesa_sync giromesa_worker giromesa_public; do
+          docker exec ${{ job.services.postgres.id }} createdb -U giromesa giromesa_fiscal
+          for database in giromesa_ci giromesa_management giromesa_growth giromesa_pilot giromesa_sync giromesa_worker giromesa_public giromesa_fiscal; do
             DATABASE_URL="postgresql://giromesa:giromesa@localhost:5432/$database" pnpm db:migrate
           done
       - name: Prove logical backup and restore
@@ -72,6 +73,7 @@ jobs:
           SYNC_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_sync
           WORKER_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_worker
           PUBLIC_ORDER_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_public
+          FISCAL_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_fiscal
           AUTH_DATABASE_URL: postgresql://giromesa:giromesa@localhost:5432/giromesa_ci
       - run: pnpm build
       - name: Verify generated OpenAPI and TypeScript client

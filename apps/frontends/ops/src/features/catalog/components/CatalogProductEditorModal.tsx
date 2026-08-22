@@ -51,10 +51,7 @@ export function CatalogProductEditorModal({
           title={`Editar Item: ${editingProduct.name}`}
           size="lg"
         >
-          <form
-            onSubmit={(event) => void updateProduct(event)}
-            className="gm-form-stack catalog-form-stack"
-          >
+          <form onSubmit={(event) => void updateProduct(event)} className="gm-form-stack">
             {/* Bloco de Foto do Prato */}
             <div className="catalog-editor-photo">
               <div className="catalog-editor-photo__preview">
@@ -170,7 +167,7 @@ export function CatalogProductEditorModal({
 
             {/* Dados Básicos */}
             <div className="gm-form-grid gm-form-grid--split">
-              <Label className="catalog-field catalog-field--standard">
+              <Label className="gm-field">
                 Nome do Prato *
                 <Input
                   minLength={2}
@@ -181,7 +178,7 @@ export function CatalogProductEditorModal({
                 />
               </Label>
 
-              <Label className="catalog-field catalog-field--standard">
+              <Label className="gm-field">
                 Categoria *
                 <NativeSelect
                   value={editingProduct.categoryId}
@@ -286,7 +283,7 @@ export function CatalogProductEditorModal({
 
             {/* Preços e Motivo de Auditoria */}
             <div className="gm-form-grid gm-form-grid--3">
-              <Label className="catalog-field catalog-field--standard">
+              <Label className="gm-field">
                 Preço Salão & Balcão (R$) *
                 <Input
                   value={editingProductPrice}
@@ -296,7 +293,7 @@ export function CatalogProductEditorModal({
                 />
               </Label>
 
-              <Label className="catalog-field catalog-field--standard">
+              <Label className="gm-field">
                 Preço Delivery (R$)
                 <Input
                   value={editingProductDeliveryPrice}
@@ -306,7 +303,7 @@ export function CatalogProductEditorModal({
                 />
               </Label>
 
-              <Label className="catalog-field catalog-field--standard">
+              <Label className="gm-field">
                 Motivo do Ajuste (Auditoria)
                 <Input
                   value={editingProductReason}
@@ -317,7 +314,7 @@ export function CatalogProductEditorModal({
               </Label>
             </div>
 
-            <Label className="catalog-field catalog-field--standard">
+            <Label className="gm-field">
               Descrição & Ingredientes do Prato
               <Textarea
                 rows={2}
@@ -391,7 +388,7 @@ export function CatalogProductEditorModal({
                   )}
                 </summary>
                 <div className="gm-disclosure__content catalog-sub-accordion__content">
-                  <Label className="catalog-field catalog-field--compact catalog-editor-pairing">
+                  <Label className="gm-field catalog-field--compact catalog-editor-pairing">
                     Harmonização Recomendada (Dica do Chef / Sommelier)
                     <Input
                       value={editingProduct.pairingSuggestion || ""}
@@ -407,7 +404,7 @@ export function CatalogProductEditorModal({
                   </Label>
 
                   <div className="catalog-grid-2 catalog-grid-2--compact">
-                    <Label className="catalog-field catalog-field--compact">
+                    <Label className="gm-field catalog-field--compact">
                       Nível de Picância
                       <NativeSelect
                         value={editingProduct.spiciness || "none"}
@@ -426,7 +423,7 @@ export function CatalogProductEditorModal({
                       </NativeSelect>
                     </Label>
 
-                    <Label className="catalog-field catalog-field--compact">
+                    <Label className="gm-field catalog-field--compact">
                       Tempo de Preparo Estimado (minutos)
                       <Input
                         type="number"
@@ -461,7 +458,7 @@ export function CatalogProductEditorModal({
                 </summary>
                 <div className="gm-disclosure__content catalog-sub-accordion__content">
                   <div className="catalog-grid-main">
-                    <Label className="catalog-field catalog-field--compact">
+                    <Label className="gm-field catalog-field--compact">
                       NCM
                       <Input
                         value={editingProduct.ncm || ""}
@@ -472,7 +469,7 @@ export function CatalogProductEditorModal({
                         className="catalog-control-34"
                       />
                     </Label>
-                    <Label className="catalog-field catalog-field--compact">
+                    <Label className="gm-field catalog-field--compact">
                       CFOP
                       <Input
                         value={editingProduct.cfop || "5.102"}

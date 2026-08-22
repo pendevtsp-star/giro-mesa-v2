@@ -9,9 +9,10 @@ public static class ThermalReceiptFormatter
     {
         width = Math.Clamp(width, 24, 64);
         if (documentType == "kds_ticket") return FormatKdsTicket(payload, width);
+        var establishmentName = Text(payload, "establishmentName") ?? "GIROMESA";
         var lines = new List<string>
         {
-            Center("GIROMESA", width),
+            Center(establishmentName.ToUpperInvariant(), width),
             Center(DocumentLabel(documentType), width),
             new('-', width),
         };

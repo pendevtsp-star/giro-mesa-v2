@@ -4,10 +4,17 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ApprovalRequests
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Calls;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Installations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Items;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Kds;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ManagerPin;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Orders;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentAttempts;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentDevices;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentHomologationRuns;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentReconciliation;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Payments;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Rooms;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ServiceSections;
@@ -25,7 +32,7 @@ using System;
 namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
 {
     /// <summary>
-    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{unitId}\pilot
+    /// Builds and executes requests for operations under \v1\organizations\{organizationId}\units\{sourceUnit-id}\pilot
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     public partial class PilotRequestBuilder : BaseRequestBuilder
@@ -50,6 +57,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.FloorRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The installations property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Installations.InstallationsRequestBuilder Installations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Installations.InstallationsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The items property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Items.ItemsRequestBuilder Items
         {
@@ -69,6 +81,36 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Orders.OrdersRequestBuilder Orders
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Orders.OrdersRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentAttempts property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentAttempts.PaymentAttemptsRequestBuilder PaymentAttempts
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentAttempts.PaymentAttemptsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentDevices property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentDevices.PaymentDevicesRequestBuilder PaymentDevices
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentDevices.PaymentDevicesRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentHomologationRuns property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentHomologationRuns.PaymentHomologationRunsRequestBuilder PaymentHomologationRuns
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentHomologationRuns.PaymentHomologationRunsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentOperations property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.PaymentOperationsRequestBuilder PaymentOperations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.PaymentOperationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The paymentReconciliation property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentReconciliation.PaymentReconciliationRequestBuilder PaymentReconciliation
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentReconciliation.PaymentReconciliationRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The payments property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Payments.PaymentsRequestBuilder Payments
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Payments.PaymentsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The printJobs property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.PrintJobsRequestBuilder PrintJobs
@@ -115,7 +157,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PilotRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot", pathParameters)
+        public PilotRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot", pathParameters)
         {
         }
         /// <summary>
@@ -123,7 +165,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PilotRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{unitId}/pilot", rawUrl)
+        public PilotRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/pilot", rawUrl)
         {
         }
     }

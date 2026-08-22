@@ -5,6 +5,7 @@ import {
   approvalExpiresAt,
   assertKdsOrderHandoff,
   assertKdsTransition,
+  assertPaymentDeviceTransition,
   assertPrintJobTransition,
   assertTabCanClose,
   assertTenantScope,
@@ -16,6 +17,7 @@ import {
   kdsCapacityRecommendation,
   kdsPartialState,
   normalizeKdsAttentionText,
+  paymentAttemptExpiresAt,
   projectKdsAvailability,
   replayResult,
   requestHash,
@@ -44,9 +46,44 @@ import {
   shiftSectionAssignmentSchema,
   shiftSectionCoverageSchema,
   temporaryTableTransferSchema,
+  terminalProfileSchema,
 } from "./pilot-schemas.js";
 
 describe("pilot POS rules", () => {
+  it("accepts device progress once and rejects terminal payment transitions", () => {
+    assert.doesNotThrow(() => assertPaymentDeviceTransition("created", "processing"));
+    assert.throws(() => assertPaymentDeviceTransition("created", "approved"), ConflictException);
+    assert.doesNotThrow(() => assertPaymentDeviceTransition("processing", "approved"));
+    assert.doesNotThrow(() => assertPaymentDeviceTransition("unknown", "declined"));
+    assert.throws(() => assertPaymentDeviceTransition("approved", "canceled"), ConflictException);
+    assert.equal(
+      paymentAttemptExpiresAt(new Date("2026-08-21T12:00:00.000Z")).toISOString(),
+      "2026-08-21T12:15:00.000Z",
+    );
+  });
+
+  it("keeps payment homologation out of the tenant terminal profile command", () => {
+    const profile = {
+      label: "Caixa",
+      mode: "cashier",
+      defaultRoute: "cash",
+      printerId: null,
+      stationId: null,
+      compact: true,
+      quickActions: [],
+    };
+    assert.equal(terminalProfileSchema.safeParse(profile).success, true);
+    assert.equal(
+      terminalProfileSchema.safeParse({
+        ...profile,
+        paymentProvider: "rede",
+        paymentStatus: "homologated",
+        paymentMethods: ["credit_card"],
+      }).success,
+      false,
+    );
+  });
+
   it("requires a paid balance before closing and validates approval requests", () => {
     assert.doesNotThrow(() => assertTabCanClose(4_000, 4_000));
     assert.throws(() => assertTabCanClose(4_000, 3_999), ConflictException);

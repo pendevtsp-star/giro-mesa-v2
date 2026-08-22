@@ -29,8 +29,12 @@ compose_file="$release_dir/deploy/vps/compose.pilot.yaml"
 images_file="$release_dir/deploy/vps/compose.images.yaml"
 observability_file="$release_dir/deploy/vps/compose.observability.yaml"
 backup_script="$release_dir/scripts/backup-production.sh"
+fiscal_storage_check="$release_dir/scripts/check-fiscal-storage.sh"
+fiscal_schema_check="$release_dir/scripts/fiscal-production-smoke.sql"
+fiscal_release_manifest="$release_dir/config/fiscal-release.json"
+release_package="$release_dir/package.json"
 provenance_script="$release_dir/deploy/vps/verify-image-provenance.sh"
-for file in "$compose_file" "$images_file" "$observability_file" "$backup_script" "$provenance_script"; do
+for file in "$compose_file" "$images_file" "$observability_file" "$backup_script" "$fiscal_storage_check" "$fiscal_schema_check" "$fiscal_release_manifest" "$release_package" "$provenance_script"; do
   if [[ ! -f $file ]]; then echo "DEPLOY_FILE_REQUIRED:$file" >&2; exit 1; fi
 done
 for tool in docker python3 tar sha256sum curl readlink; do
@@ -52,6 +56,94 @@ if "\n" in value or "\r" in value: raise SystemExit(1)
 print(value, end="")
 PY
 }
+
+python3 - "$fiscal_release_manifest" "$release_package" "$env_file" <<'PY'
+import base64, datetime, json, pathlib, re, sys
+
+manifest_path, package_path, env_path = map(pathlib.Path, sys.argv[1:])
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+package = json.loads(package_path.read_text(encoding="utf-8"))
+entries = {}
+for line in env_path.read_text(encoding="utf-8").splitlines():
+    match = re.fullmatch(r"([A-Z][A-Z0-9_]*)=(.*)", line)
+    if not match:
+        continue
+    key, raw = match.groups()
+    if key in entries:
+        raise SystemExit(f"FISCAL_RELEASE_ENV_DUPLICATE:{key}")
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] == '"':
+        try:
+            raw = json.loads(raw)
+        except Exception as error:
+            raise SystemExit(f"FISCAL_RELEASE_ENV_VALUE_INVALID:{key}") from error
+    entries[key] = raw
+
+mode = entries.get("FISCAL_RELEASE_ENV")
+if mode not in {"homologation", "production"}:
+    raise SystemExit("FISCAL_RELEASE_ENV_INVALID")
+base_valid = (
+    manifest.get("schemaVersion") == 1
+    and manifest.get("moduleVersion") == package.get("version")
+    and manifest.get("provider") == "focus"
+    and manifest.get("status") in {"blocked", "homologated"}
+)
+if not base_valid:
+    raise SystemExit("FISCAL_RELEASE_MANIFEST_INVALID")
+if mode == "homologation":
+    valid = (
+        manifest.get("status") == "blocked"
+        and manifest.get("environment") == "homologation"
+        and manifest.get("scope") is None
+        and manifest.get("evidence") is None
+        and manifest.get("homologatedAt") is None
+        and isinstance(manifest.get("blockers"), list)
+        and bool(manifest["blockers"])
+        and all(isinstance(item, str) and item.strip() for item in manifest["blockers"])
+    )
+    if not valid:
+        raise SystemExit("FISCAL_HOMOLOGATION_FAIL_CLOSED")
+    raise SystemExit(0)
+
+scope = manifest.get("scope")
+evidence = manifest.get("evidence")
+evidence_names = {
+    "focusApproval", "sefazAuthorization", "consultation", "cancellation",
+    "numberInvalidation", "artifactVerification", "rollbackRun",
+}
+immutable = re.compile(r"^(?:(?:git:)?[0-9a-f]{40}|(?:[\w./:-]+@)?sha256:[0-9a-f]{64})$", re.I)
+key = entries.get("FISCAL_CREDENTIALS_ENCRYPTION_KEY", "")
+try:
+    key_valid = len(base64.b64decode(key, validate=True)) == 32
+except Exception:
+    key_valid = False
+try:
+    datetime.datetime.fromisoformat(manifest.get("homologatedAt", "").replace("Z", "+00:00"))
+    homologated_at_valid = True
+except (AttributeError, TypeError, ValueError):
+    homologated_at_valid = False
+valid = (
+    manifest.get("status") == "homologated"
+    and manifest.get("environment") == "production"
+    and isinstance(scope, dict)
+    and isinstance(scope.get("uf"), str)
+    and re.fullmatch(r"[A-Z]{2}", scope["uf"])
+    and isinstance(scope.get("nfceSeries"), str)
+    and re.fullmatch(r"\d+", scope["nfceSeries"])
+    and isinstance(scope.get("issuerDocumentSha256"), str)
+    and re.fullmatch(r"[0-9a-f]{64}", scope["issuerDocumentSha256"], re.I)
+    and isinstance(evidence, dict)
+    and set(evidence) == evidence_names
+    and all(isinstance(value, str) and immutable.fullmatch(value) for value in evidence.values())
+    and homologated_at_valid
+    and manifest.get("blockers") == []
+    and bool(entries.get("FOCUS_NFE_PRIMARY_TOKEN", "").strip())
+    and key_valid
+    and entries.get("MEDIA_ROOT") == "/app/data/media"
+)
+if not valid:
+    raise SystemExit("FISCAL_PRODUCTION_HOMOLOGATION_REQUIRED")
+PY
 
 target_migration_id=$(python3 - "$release_dir/packages/db/drizzle/meta/_journal.json" <<'PY'
 import json, sys
@@ -181,6 +273,7 @@ export GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
 GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64=$(read_env_key GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64)
 
 mutators=()
+source_api_id=""
 source_artifact=""
 source_component_images=()
 for service in api worker; do
@@ -188,12 +281,14 @@ for service in api worker; do
     --filter "label=com.docker.compose.service=$service" --format '{{.ID}}' --no-trunc)
   if [[ ! $id =~ ^[0-9a-f]{64}$ ]]; then echo "RUNNING_MUTATOR_REQUIRED:$service" >&2; exit 1; fi
   mutators+=("$id")
+  if [[ $service == api ]]; then source_api_id=$id; fi
   image_id=$(docker inspect --format '{{.Image}}' "$id")
   running_image=$(docker image inspect "$image_id" --format '{{json .RepoDigests}}' | python3 -c "import json,sys; values=json.load(sys.stdin); matches=[v for v in values if v.startswith('ghcr.io/pendevtsp-star/giro-mesa-v2-$service@sha256:')]; print(matches[0] if len(matches)==1 else '',end='')")
   [[ $running_image =~ @sha256:[0-9a-f]{64}$ ]] || { echo "RUNNING_RELEASE_IMAGE_NOT_IMMUTABLE:$service" >&2; exit 1; }
   source_component_images+=("$running_image")
 done
 source_artifact=$(printf '%s\n' "${source_component_images[@]}" | python3 -c 'import hashlib,json,sys; values=sorted(line.rstrip("\n") for line in sys.stdin if line.rstrip("\n")); print("runtime-set:sha256:"+hashlib.sha256(json.dumps(values,separators=(",",":" )).encode()).hexdigest(),end="")')
+bash "$fiscal_storage_check" source "$GIROMESA_OBJECT_DIRECTORY" "$source_api_id"
 deployment_committed=0
 mutators_stopped=0
 recover_mutators() {
@@ -299,6 +394,8 @@ for _ in $(seq 1 30); do
 done
 [[ $postgres_status == healthy ]] || { echo "POSTGRES_UPDATE_UNHEALTHY" >&2; exit 1; }
 "${compose[@]}" --profile tools run --rm migrate
+docker exec -i "$postgres_id" psql --username "$postgres_user" --dbname "$postgres_database" \
+  --set ON_ERROR_STOP=1 --quiet < "$fiscal_schema_check"
 "${compose[@]}" up -d --remove-orphans
 
 for service in api worker site customer ops; do
@@ -310,6 +407,9 @@ for service in api worker site customer ops; do
   done
   [[ $status == healthy ]] || { echo "SERVICE_UNHEALTHY:$service" >&2; exit 1; }
 done
+
+bash "$fiscal_storage_check" shared "$GIROMESA_OBJECT_DIRECTORY" \
+  "$("${compose[@]}" ps -q api)" "$("${compose[@]}" ps -q worker)"
 
 stability_seconds=${GIROMESA_STABILITY_SECONDS:-15}
 if [[ ! $stability_seconds =~ ^[0-9]+$ ]] || ((stability_seconds < 5)); then

@@ -469,3 +469,96 @@
   border-top: 1px solid var(--line);
   font-size: 12px;
 }
+
+.install-page-content {
+  padding-top: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: var(--gm-space-6);
+  align-items: start;
+}
+
+.install-diagnostic,
+.install-expectations {
+  min-width: 0;
+  padding: var(--gm-space-6);
+  border: 1px solid var(--gm-border);
+  border-radius: 18px;
+  background: var(--gm-surface);
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.install-diagnostic-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gm-space-4);
+}
+
+.install-diagnostic h2,
+.install-expectations h2 {
+  margin: 4px 0 var(--gm-space-4);
+  font-family: var(--gm-display);
+  font-size: clamp(1.45rem, 4vw, 2rem);
+}
+
+.install-capability {
+  max-width: 240px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--gm-info-soft);
+  color: var(--gm-info);
+  font-size: var(--gm-font-xs);
+  font-weight: 750;
+}
+
+.install-form,
+.install-device-fields {
+  display: grid;
+  gap: var(--gm-space-4);
+}
+
+.install-device-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.install-field {
+  display: grid;
+  gap: var(--gm-space-2);
+  min-width: 0;
+}
+
+.install-result {
+  padding: var(--gm-space-4);
+  border: 1px solid var(--gm-border);
+  border-radius: 12px;
+  background: var(--gm-surface-soft);
+}
+
+.install-result p,
+.install-expectations p,
+.install-privacy-note {
+  color: var(--gm-muted);
+}
+
+.install-result-homologation {
+  border-color: color-mix(in srgb, var(--gm-warning) 38%, var(--gm-border));
+  background: var(--gm-warning-soft);
+}
+
+.install-primary-action {
+  min-height: 48px;
+}
+
+.install-privacy-note {
+  margin: var(--gm-space-4) 0 0;
+  font-size: var(--gm-font-xs);
+}
+
+.install-expectations ol {
+  padding-left: 1.25rem;
+}
+
+.install-expectations li + li {
+  margin-top: var(--gm-space-3);
+}

@@ -312,6 +312,8 @@ async function performPilotMutation(
           method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
           amountCents: number;
           reference?: string;
+          cashRegisterId?: string;
+          installationId?: string;
         },
         id,
       );

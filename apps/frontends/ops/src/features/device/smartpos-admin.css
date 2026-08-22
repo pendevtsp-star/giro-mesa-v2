@@ -1,0 +1,358 @@
+.smartpos-admin {
+  display: grid;
+  gap: var(--gm-space-4);
+  min-width: 0;
+}
+
+.smartpos-admin-intro,
+.smartpos-card-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.smartpos-admin-intro > div,
+.smartpos-card-heading > div,
+.smartpos-card-heading > span {
+  min-width: 0;
+}
+
+.smartpos-admin-intro h2,
+.smartpos-card-heading h2 {
+  font-family: var(--gm-display);
+  font-size: var(--gm-font-lg);
+  line-height: var(--gm-leading-snug);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.smartpos-admin-intro p:not(.eyebrow),
+.smartpos-card-heading p:not(.eyebrow) {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  margin: var(--gm-space-1) 0 0;
+}
+
+.smartpos-admin-card {
+  align-content: start;
+  display: grid;
+  gap: var(--gm-space-4);
+  min-width: 0;
+}
+
+.smartpos-pairing-form,
+.smartpos-homologation-form {
+  display: grid;
+  gap: var(--gm-space-3);
+}
+
+.smartpos-pairing-form {
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.smartpos-pairing-result {
+  align-items: center;
+  display: grid;
+  gap: var(--gm-space-4);
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+}
+
+.smartpos-pairing-result img,
+.smartpos-qr-placeholder {
+  aspect-ratio: 1;
+  background: white;
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  display: block;
+  height: auto;
+  max-width: 100%;
+  padding: var(--gm-space-2);
+  width: 100%;
+}
+
+.smartpos-qr-placeholder {
+  align-items: center;
+  color: var(--gm-muted);
+  display: flex;
+  font-size: var(--gm-font-sm);
+  justify-content: center;
+  text-align: center;
+}
+
+.smartpos-pairing-code {
+  display: grid;
+  gap: var(--gm-space-2);
+  min-width: 0;
+}
+
+.smartpos-pairing-code small,
+.smartpos-pairing-code span {
+  color: var(--gm-muted);
+}
+
+.smartpos-pairing-code strong {
+  font-family: var(--gm-display);
+  font-size: clamp(1.45rem, 7vw, 2rem);
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+.smartpos-admin :is(input, select, textarea, .gm-button) {
+  max-width: 100%;
+  min-height: 48px;
+}
+
+.smartpos-admin-error,
+.smartpos-admin-feedback,
+.smartpos-empty,
+.smartpos-loading {
+  font-size: var(--gm-font-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.smartpos-admin-error {
+  color: var(--gm-danger);
+}
+
+.smartpos-admin-feedback {
+  color: var(--gm-success);
+}
+
+.smartpos-empty,
+.smartpos-loading {
+  color: var(--gm-muted);
+}
+
+.smartpos-health-metrics,
+.smartpos-reconciliation-summary {
+  display: grid;
+  gap: var(--gm-space-2);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.smartpos-health-metrics > span,
+.smartpos-reconciliation-summary > span {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--gm-space-3);
+}
+
+.smartpos-health-metrics > span[data-alert="true"],
+.smartpos-reconciliation-summary > span[data-alert="true"] {
+  border-color: color-mix(in srgb, var(--gm-warning) 55%, var(--gm-border));
+}
+
+.smartpos-health-metrics strong,
+.smartpos-reconciliation-summary strong {
+  font-family: var(--gm-display);
+  font-size: var(--gm-font-lg);
+  overflow-wrap: anywhere;
+}
+
+.smartpos-health-metrics small,
+.smartpos-reconciliation-summary small {
+  color: var(--gm-muted);
+  line-height: var(--gm-leading-snug);
+}
+
+.smartpos-incident-list,
+.smartpos-device-list,
+.smartpos-reconciliation-list,
+.smartpos-run-list {
+  display: grid;
+  gap: var(--gm-space-2);
+  list-style: none;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.smartpos-incident-list > li,
+.smartpos-reconciliation-list > article,
+.smartpos-run-list > li,
+.smartpos-device-list > article > header {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.smartpos-incident-list > li,
+.smartpos-reconciliation-list > article,
+.smartpos-run-list > li {
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: var(--gm-space-3);
+}
+
+.smartpos-incident-list span,
+.smartpos-reconciliation-list span,
+.smartpos-run-list span,
+.smartpos-device-list header span {
+  display: grid;
+  min-width: 0;
+}
+
+.smartpos-incident-list strong,
+.smartpos-reconciliation-list strong,
+.smartpos-run-list strong,
+.smartpos-device-list strong {
+  overflow-wrap: anywhere;
+}
+
+.smartpos-incident-list small,
+.smartpos-reconciliation-list small,
+.smartpos-run-list small,
+.smartpos-device-list small {
+  color: var(--gm-muted);
+  overflow-wrap: anywhere;
+}
+
+.smartpos-device-list > article {
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  display: grid;
+  gap: var(--gm-space-3);
+  min-width: 0;
+  padding: var(--gm-space-3);
+}
+
+.smartpos-device-list dl {
+  display: grid;
+  gap: var(--gm-space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.smartpos-device-list dl > div {
+  background: var(--gm-surface-soft);
+  border-radius: var(--gm-radius-sm);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--gm-space-2);
+}
+
+.smartpos-device-list dt {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+
+.smartpos-device-list dd {
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.smartpos-reconciliation .smartpos-card-heading > label {
+  flex: 0 0 180px;
+}
+
+.smartpos-form-grid {
+  display: grid;
+  gap: var(--gm-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.smartpos-checklist {
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  margin: 0;
+  min-width: 0;
+  padding: var(--gm-space-3);
+}
+
+.smartpos-checklist legend {
+  font-size: var(--gm-font-sm);
+  font-weight: 750;
+  padding-inline: var(--gm-space-1);
+}
+
+.smartpos-checklist > div {
+  display: grid;
+  gap: var(--gm-space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.smartpos-check-item,
+.smartpos-execution-confirmation {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-2);
+  min-height: 48px;
+}
+
+.smartpos-check-item input,
+.smartpos-execution-confirmation input {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+@media (max-width: 760px) {
+  .smartpos-health-metrics,
+  .smartpos-reconciliation-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smartpos-device-list dl,
+  .smartpos-checklist > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .smartpos-admin-intro,
+  .smartpos-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .smartpos-admin-intro > .gm-button,
+  .smartpos-card-heading > .gm-badge {
+    align-self: flex-start;
+  }
+
+  .smartpos-pairing-form,
+  .smartpos-pairing-result,
+  .smartpos-form-grid,
+  .smartpos-device-list dl,
+  .smartpos-checklist > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .smartpos-pairing-result img,
+  .smartpos-qr-placeholder {
+    justify-self: center;
+    max-width: 220px;
+  }
+
+  .smartpos-pairing-code {
+    text-align: center;
+  }
+
+  .smartpos-reconciliation .smartpos-card-heading > label {
+    flex: auto;
+    width: 100%;
+  }
+
+  .smartpos-incident-list > li,
+  .smartpos-reconciliation-list > article,
+  .smartpos-run-list > li,
+  .smartpos-device-list > article > header {
+    align-items: flex-start;
+  }
+
+  .smartpos-admin-card {
+    padding: var(--gm-space-4);
+  }
+}

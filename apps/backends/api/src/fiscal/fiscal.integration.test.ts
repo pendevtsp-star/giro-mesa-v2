@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { randomInt, randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { it } from "node:test";
 import {
   auditEvents,
+  fiscalDocumentArtifacts,
   fiscalDocuments,
   identities,
   memberships,
@@ -10,6 +14,7 @@ import {
   outboxEvents,
   roleBindings,
   units,
+  writeFiscalArtifact,
 } from "@giromesa/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
@@ -35,7 +40,10 @@ it("blocks rejected documents and closes a fiscal period exactly once", async (c
     return;
   }
   const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousMediaRoot = process.env.MEDIA_ROOT;
+  const mediaRoot = await mkdtemp(join(tmpdir(), "giromesa-fiscal-integration-"));
   process.env.DATABASE_URL = databaseUrl;
+  process.env.MEDIA_ROOT = mediaRoot;
   const database = new DatabaseService();
   let organizationId: string | undefined;
   const identityIds: string[] = [];
@@ -104,6 +112,26 @@ it("blocks rejected documents and closes a fiscal period exactly once", async (c
       .update(fiscalDocuments)
       .set({ status: "authorized", authorizedAt: new Date() })
       .where(eq(fiscalDocuments.id, document.id));
+    const xml = await writeFiscalArtifact({
+      root: mediaRoot,
+      organizationId: organization.id,
+      unitId: unit.id,
+      namespace: "documents",
+      entityId: document.id,
+      name: "authorization_xml",
+      extension: "xml",
+      content: Buffer.from("<nfeProc><protNFe /></nfeProc>"),
+    });
+    await database.db.insert(fiscalDocumentArtifacts).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      documentId: document.id,
+      kind: "authorization_xml",
+      storageKey: xml.storageKey,
+      sha256: xml.sha256,
+      bytes: xml.bytes,
+      contentType: "application/xml",
+    });
 
     const closed = await fiscal.closePeriod(owner.id, organizationId, unit.id, "2026-08");
     const replay = await fiscal.closePeriod(owner.id, organizationId, unit.id, "2026-08");
@@ -116,6 +144,16 @@ it("blocks rejected documents and closes a fiscal period exactly once", async (c
     assert.equal(packagePayload?.totals?.totalCents, 5_000);
     const periodId = closed.period?.id;
     assert.ok(periodId);
+    const download = await fiscal.accountantPackageContent(
+      owner.id,
+      organizationId,
+      unit.id,
+      "2026-08",
+    );
+    assert.equal(download.mimeType, "application/zip");
+    assert.ok(Buffer.from(download.content, "base64").includes(Buffer.from("manifesto.json")));
+    const available = await fiscal.accountantPackage(owner.id, organizationId, unit.id, "2026-08");
+    assert.equal(available.status, "available");
     const [auditRows, outboxRows] = await Promise.all([
       database.db
         .select({ id: auditEvents.id })
@@ -149,5 +187,8 @@ it("blocks rejected documents and closes a fiscal period exactly once", async (c
     await database.onModuleDestroy();
     if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousDatabaseUrl;
+    if (previousMediaRoot === undefined) delete process.env.MEDIA_ROOT;
+    else process.env.MEDIA_ROOT = previousMediaRoot;
+    await rm(mediaRoot, { recursive: true, force: true });
   }
 });

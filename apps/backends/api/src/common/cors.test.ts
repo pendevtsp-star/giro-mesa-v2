@@ -13,11 +13,13 @@ describe("CORS configuration", () => {
       origin: ["https://site.example", "https://ops.example"],
       credentials: true,
       exposedHeaders: ["x-request-id"],
+      methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     });
     assert.deepEqual(corsConfiguration("*"), {
       origin: "*",
       credentials: false,
       exposedHeaders: ["x-request-id"],
+      methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     });
   });
 

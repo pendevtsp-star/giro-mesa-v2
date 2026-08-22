@@ -78,6 +78,14 @@ test("aceita branding e versão opcionais sem confiar em metadata desconhecida",
           displayName: "  Casa Giro  ",
           slogan: "  Feito na hora ",
           logoUrl: "javascript:alert(1)",
+          primaryColor: "#123abc",
+          accentColor: "#fedcba",
+          timezone: "America/Sao_Paulo",
+          businessHours: {
+            weekly: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, mode: "open24h" })),
+            exceptions: [],
+          },
+          wifi: { password: "segredo" },
         },
         internal: { organizationId: "não deve vazar" },
       },
@@ -85,7 +93,17 @@ test("aceita branding e versão opcionais sem confiar em metadata desconhecida",
     {
       items: menuItems.slice(0, 1),
       version: 4,
-      branding: { displayName: "Casa Giro", slogan: "Feito na hora" },
+      branding: {
+        displayName: "Casa Giro",
+        slogan: "Feito na hora",
+        primaryColor: "#123abc",
+        accentColor: "#fedcba",
+        timezone: "America/Sao_Paulo",
+        businessHours: {
+          weekly: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, mode: "open24h" })),
+          exceptions: [],
+        },
+      },
     },
   );
 });

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);ANDROID</DefineConstants>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="GiroMesa.SmartPos.ApiBaseUrl" Value="https://api.giromesa.test" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AndroidStubs.cs" />
+    <Compile Include="DiagnosticsStubs.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="MauiStorageStubs.cs" />
+    <Compile Include="..\..\SmartPosPaymentContracts.cs" Link="SmartPosPaymentContracts.cs" />
+    <Compile Include="..\..\SmartPosPayments.cs" Link="SmartPosPayments.cs" />
+    <Compile Include="..\..\SmartPosDeviceApiClient.cs" Link="SmartPosDeviceApiClient.cs" />
+    <Compile Include="..\..\SmartPosDeviceSecurity.cs" Link="SmartPosDeviceSecurity.cs" />
+    <Compile Include="..\..\SmartPosResultOutbox.cs" Link="SmartPosResultOutbox.cs" />
+    <Compile Include="..\..\SmartPosPairingDeepLink.cs" Link="SmartPosPairingDeepLink.cs" />
+    <Compile Include="..\..\Platforms\Android\AndroidSmartPosPaymentProvider.cs" Link="AndroidSmartPosPaymentProvider.cs" />
+  </ItemGroup>
+</Project>

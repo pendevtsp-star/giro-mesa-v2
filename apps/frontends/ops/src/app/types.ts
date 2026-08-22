@@ -10,7 +10,10 @@ export type Session = {
   organizationId: string;
   unitId: string;
   terminalMode: boolean;
+  terminalSessionId?: string;
+  actorEpoch?: number;
   platformAdmin: boolean;
+  settingsManageUnitIds?: string[];
 };
 
 export type ScopeSource = {

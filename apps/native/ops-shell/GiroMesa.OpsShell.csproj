@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(GiroMesaAndroidTarget)' == 'true'">net10.0-android;net10.0-windows10.0.19041.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(GiroMesaMobileTargets)' == 'true'">net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>GiroMesa.OpsShell</RootNamespace>
@@ -18,9 +19,35 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+    <SmartPosProvider Condition="'$(SmartPosProvider)' == ''">disabled</SmartPosProvider>
+    <SmartPosEnvironment Condition="'$(SmartPosEnvironment)' == ''">disabled</SmartPosEnvironment>
+    <SmartPosPackage Condition="'$(SmartPosPackage)' == ''"></SmartPosPackage>
+    <SmartPosAllowedPackages Condition="'$(SmartPosAllowedPackages)' == ''"></SmartPosAllowedPackages>
+    <SmartPosAllowedSchemes Condition="'$(SmartPosAllowedSchemes)' == ''"></SmartPosAllowedSchemes>
+    <SmartPosMethods Condition="'$(SmartPosMethods)' == ''"></SmartPosMethods>
+    <SmartPosStartUriTemplate Condition="'$(SmartPosStartUriTemplate)' == ''"></SmartPosStartUriTemplate>
+    <SmartPosRecoverUriTemplate Condition="'$(SmartPosRecoverUriTemplate)' == ''"></SmartPosRecoverUriTemplate>
+    <SmartPosCancelUriTemplate Condition="'$(SmartPosCancelUriTemplate)' == ''"></SmartPosCancelUriTemplate>
+    <SmartPosTimeoutSeconds Condition="'$(SmartPosTimeoutSeconds)' == ''">180</SmartPosTimeoutSeconds>
+    <SmartPosApiBaseUrl Condition="'$(SmartPosApiBaseUrl)' == ''">https://api.giromesa.com.br</SmartPosApiBaseUrl>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyMetadata Include="GiroMesa.SmartPos.Provider" Value="$(SmartPosProvider)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.Environment" Value="$(SmartPosEnvironment)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.Package" Value="$(SmartPosPackage)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.AllowedPackages" Value="$(SmartPosAllowedPackages)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.AllowedSchemes" Value="$(SmartPosAllowedSchemes)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.Methods" Value="$(SmartPosMethods)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.StartUriTemplate" Value="$(SmartPosStartUriTemplate)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.RecoverUriTemplate" Value="$(SmartPosRecoverUriTemplate)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.CancelUriTemplate" Value="$(SmartPosCancelUriTemplate)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.TimeoutSeconds" Value="$(SmartPosTimeoutSeconds)" />
+    <AssemblyMetadata Include="GiroMesa.SmartPos.ApiBaseUrl" Value="$(SmartPosApiBaseUrl)" />
+  </ItemGroup>
+  <ItemGroup>
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="checks\**\*.cs" />
+    <None Remove="checks\**\*" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />

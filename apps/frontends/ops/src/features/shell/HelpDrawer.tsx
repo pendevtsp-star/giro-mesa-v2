@@ -10,6 +10,15 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Dados reais são atualizados por evento ou pela atualização periódica de segurança.",
     ],
   },
+  device: {
+    title: "Administrar SmartPOS e instalar a PWA",
+    steps: [
+      "Gerentes pareiam o APK por código temporário e acompanham saúde e certificação.",
+      "O financeiro consulta conciliação; aprovação e kill switch permanecem no servidor.",
+      "No navegador comum, instale a PWA somente para disponibilizar o atendimento.",
+    ],
+    warning: "A PWA isolada não acessa o SDK de pagamento da maquininha.",
+  },
   salon: {
     title: "Atender uma mesa",
     steps: [
@@ -123,6 +132,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Use conciliação financeira para números contábeis.",
     ],
   },
+  settings: {
+    title: "Configurar o estabelecimento",
+    steps: [
+      "Salve organização, unidade, marca e funcionamento nas respectivas seções.",
+      "Publique o cardápio para levar alterações de marca e horários aos canais públicos.",
+    ],
+    warning: "O status aberto ou fechado é informativo e não bloqueia pedidos.",
+  },
   platform: {
     title: "Administração da plataforma",
     steps: ["Use apenas ferramentas autenticadas e auditadas."],
@@ -142,7 +159,7 @@ export function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => 
   }, [onClose]);
   return (
     <div className="help-layer">
-      <Button aria-label="Fechar ajuda" className="help-backdrop" onClick={onClose} type="button" />
+      <button aria-label="Fechar ajuda" className="help-backdrop" onClick={onClose} type="button" />
       <aside aria-labelledby="help-title" aria-modal="true" className="help-drawer" role="dialog">
         <div className="dialog-header">
           <div>

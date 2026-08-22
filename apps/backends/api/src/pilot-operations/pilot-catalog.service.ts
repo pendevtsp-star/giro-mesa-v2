@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   auditEvents,
   type Database,
+  organizations,
   outboxEvents,
   posAllergens,
   posCatalogBranding,
@@ -39,6 +40,10 @@ import {
 } from "@nestjs/common";
 import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import {
+  EstablishmentSettingsService,
+  projectPublicBranding,
+} from "../organizations/establishment-settings.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { createTableAccessToken, tableAccessSecret } from "../public-menu/table-access-token.js";
 import { MAX_STORED_CENTS, replayResult, requestHash } from "./pilot-rules.js";
@@ -79,6 +84,10 @@ export class PilotCatalogService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    private readonly establishmentSettings: EstablishmentSettingsService = new EstablishmentSettingsService(
+      database,
+      scope,
+    ),
   ) {}
 
   private async requireAccess(identityId: string, organizationId: string, unitId: string) {
@@ -2010,18 +2019,7 @@ export class PilotCatalogService {
   }
 
   async getBranding(identityId: string, organizationId: string, unitId: string) {
-    await this.requireAccess(identityId, organizationId, unitId);
-    const [row] = await this.database.db
-      .select()
-      .from(posCatalogBranding)
-      .where(
-        and(
-          eq(posCatalogBranding.organizationId, organizationId),
-          eq(posCatalogBranding.unitId, unitId),
-        ),
-      )
-      .limit(1);
-    return row?.config ?? null;
+    return this.establishmentSettings.getLegacyBranding(identityId, organizationId, unitId);
   }
 
   async updateBranding(
@@ -2030,28 +2028,12 @@ export class PilotCatalogService {
     unitId: string,
     input: BrandingInput,
   ) {
-    await this.requireManager(identityId, organizationId, unitId);
-    return this.database.db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(posCatalogBranding)
-        .values({ organizationId, unitId, config: input })
-        .onConflictDoUpdate({
-          target: [posCatalogBranding.organizationId, posCatalogBranding.unitId],
-          set: { config: input, updatedAt: new Date() },
-        })
-        .returning();
-      await this.recordChange(
-        tx,
-        identityId,
-        organizationId,
-        unitId,
-        "pos.branding.updated",
-        "catalog_branding",
-        unitId,
-        {},
-      );
-      return row?.config ?? input;
-    });
+    return this.establishmentSettings.updateLegacyBranding(
+      identityId,
+      organizationId,
+      unitId,
+      input,
+    );
   }
 
   async importCatalog(
@@ -2371,6 +2353,7 @@ export class PilotCatalogService {
           productModifierGroups,
           branding,
           promotions,
+          unitSettings,
         ] = await Promise.all([
           tx
             .select()
@@ -2452,6 +2435,16 @@ export class PilotCatalogService {
                 eq(posCatalogPromotions.active, true),
               ),
             ),
+          tx
+            .select({
+              timezone: units.timezone,
+              unitName: units.name,
+              tradeName: organizations.tradeName,
+            })
+            .from(units)
+            .innerJoin(organizations, eq(organizations.id, units.organizationId))
+            .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+            .limit(1),
         ]);
         const now = new Date();
         const items = products.map((product) => ({
@@ -2466,7 +2459,11 @@ export class PilotCatalogService {
             .map((row) => row.groupId),
         }));
         const metadata = {
-          branding: branding[0]?.config ?? null,
+          branding: projectPublicBranding(
+            branding[0]?.config,
+            unitSettings[0]?.tradeName ?? unitSettings[0]?.unitName ?? "Estabelecimento",
+            unitSettings[0]?.timezone ?? "America/Sao_Paulo",
+          ),
           categories,
           modifierGroups: modifierGroups.map((group) => ({
             ...group,

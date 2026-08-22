@@ -122,6 +122,7 @@ elif active not in keyring:
     raise SystemExit(1)
 
 for name, exact in (
+    ("FISCAL_CREDENTIALS_ENCRYPTION_KEY", True),
     ("PRIVACY_EXPORT_ENCRYPTION_KEY", True),
     ("PUBLIC_TABLE_SESSION_SIGNING_KEY", False),
     ("GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64", False),
@@ -133,6 +134,21 @@ for name, exact in (
     elif not valid_key(value, exact=exact):
         print(f"{name}_INVALID", file=sys.stderr)
         raise SystemExit(1)
+
+if "FOCUS_NFE_PRIMARY_TOKEN" not in values:
+    additions["FOCUS_NFE_PRIMARY_TOKEN"] = ""
+release_environment = values.get("FISCAL_RELEASE_ENV")
+if release_environment is None:
+    additions["FISCAL_RELEASE_ENV"] = "homologation"
+elif release_environment not in {"homologation", "production"}:
+    print("FISCAL_RELEASE_ENV_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+timeout = values.get("FOCUS_NFE_TIMEOUT_MS")
+if timeout is None:
+    additions["FOCUS_NFE_TIMEOUT_MS"] = "15000"
+elif not timeout.isascii() or not timeout.isdigit() or not 1000 <= int(timeout) <= 30000:
+    print("FOCUS_NFE_TIMEOUT_MS_INVALID", file=sys.stderr)
+    raise SystemExit(1)
 
 if not additions:
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)

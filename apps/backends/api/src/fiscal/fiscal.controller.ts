@@ -22,17 +22,21 @@ import {
   cancelFiscalDocumentSchema,
   competenceSchema,
   type FiscalDocumentListQuery,
+  type FiscalNumberInvalidationInput,
   type FiscalPackageQuery,
   type FiscalProfileInput,
   type FocusCompanyOnboardingInput,
   fiscalDocumentListQuerySchema,
+  fiscalNumberInvalidationSchema,
   fiscalPackageQuerySchema,
   fiscalProfileSchema,
   focusCompanyOnboardingSchema,
   type ProductTaxRevisionBulkInput,
+  type ProductTaxRevisionImportInput,
   type ProductTaxRevisionInput,
   type ProductTaxRevisionListQuery,
   productTaxRevisionBulkSchema,
+  productTaxRevisionImportSchema,
   productTaxRevisionListQuerySchema,
   productTaxRevisionSchema,
   type ReopenFiscalPeriodInput,
@@ -149,6 +153,16 @@ export class FiscalController {
     );
   }
 
+  @Post("tax-revisions/import")
+  importTaxRevisions(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(productTaxRevisionImportSchema)) body: ProductTaxRevisionImportInput,
+  ) {
+    return this.fiscal.importTaxRevisions(request.auth.identityId, organizationId, unitId, body);
+  }
+
   @Get("dashboard")
   dashboard(
     @Req() request: AuthenticatedRequest,
@@ -190,6 +204,23 @@ export class FiscalController {
       organizationId,
       unitId,
       documentId,
+    );
+  }
+
+  @Get("documents/:documentId/artifacts/:kind")
+  documentArtifact(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Param("kind") kind: string,
+  ) {
+    return this.fiscal.documentArtifact(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      documentId,
+      kind,
     );
   }
 
@@ -258,6 +289,62 @@ export class FiscalController {
       organizationId,
       unitId,
       query.competence,
+    );
+  }
+
+  @Get("accountant/package/content")
+  accountantPackageContent(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(fiscalPackageQuerySchema)) query: FiscalPackageQuery,
+  ) {
+    return this.fiscal.accountantPackageContent(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      query.competence,
+    );
+  }
+
+  @Get("number-invalidations")
+  numberInvalidations(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.fiscal.numberInvalidations(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("number-invalidations")
+  invalidateNumbers(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(fiscalNumberInvalidationSchema)) body: FiscalNumberInvalidationInput,
+  ) {
+    return this.fiscal.invalidateNumbers(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("number-invalidations/:invalidationId/artifact")
+  numberInvalidationArtifact(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("invalidationId", ParseUUIDPipe) invalidationId: string,
+  ) {
+    return this.fiscal.numberInvalidationArtifact(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      invalidationId,
     );
   }
 

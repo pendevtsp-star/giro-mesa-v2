@@ -4,6 +4,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Billing;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth;
 using GiroMesa.ApiClient.V1.Organizations.Item.MembershipInvitations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Onboarding;
+using GiroMesa.ApiClient.V1.Organizations.Item.Settings;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
@@ -38,6 +39,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingRequestBuilder Onboarding
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Onboarding.OnboardingRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The settings property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Settings.SettingsRequestBuilder Settings
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Settings.SettingsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The units property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.UnitsRequestBuilder Units

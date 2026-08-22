@@ -57,6 +57,9 @@ export const managementReportViews = pgTable(
         to: string;
         comparisonMode: "previous_period" | "previous_year" | "none";
         family: string;
+        // ponytail: view preferences share the existing JSON document until migration ownership is free.
+        isDefault?: boolean;
+        sortOrder?: number;
       }>()
       .notNull(),
     version: integer("version").notNull().default(1),

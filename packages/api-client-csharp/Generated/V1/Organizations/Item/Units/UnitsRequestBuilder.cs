@@ -17,14 +17,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units
     {
         /// <summary>Gets an item from the GiroMesa.ApiClient.v1.organizations.item.units.item collection</summary>
         /// <param name="position">Unique identifier of the item</param>
-        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.WithUnitItemRequestBuilder"/></returns>
-        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.WithUnitItemRequestBuilder this[string position]
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.SourceUnitItemRequestBuilder"/></returns>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.SourceUnitItemRequestBuilder this[string position]
         {
             get
             {
                 var urlTplParams = new Dictionary<string, object>(PathParameters);
-                urlTplParams.Add("unitId", position);
-                return new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.WithUnitItemRequestBuilder(urlTplParams, RequestAdapter);
+                urlTplParams.Add("sourceUnit%2Did", position);
+                return new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.SourceUnitItemRequestBuilder(urlTplParams, RequestAdapter);
             }
         }
         /// <summary>

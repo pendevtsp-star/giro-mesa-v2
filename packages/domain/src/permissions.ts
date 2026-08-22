@@ -43,6 +43,7 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
   manager: [
     "operations:*",
     "catalog:write",
+    "settings.manage",
     "inventory:write",
     "inventory:nfe:import",
     "inventory:nfe:confirm",
@@ -59,7 +60,6 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "fiscal:dashboard:read",
     "fiscal:documents:read",
     "fiscal:periods:read",
-    "fiscal:configuration:write",
     "accounting:requests:read",
     "accounting:requests:write",
   ],
@@ -115,7 +115,6 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "fiscal:documents:read",
     "fiscal:periods:read",
     "fiscal:periods:write",
-    "fiscal:configuration:write",
     "accounting:exports:read",
     "accounting:exports:write",
     "accounting:requests:read",

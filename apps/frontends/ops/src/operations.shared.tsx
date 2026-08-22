@@ -10,6 +10,8 @@ export interface PilotScope {
   membershipId: string;
   profileId: ProfileId;
   refreshToken: number;
+  installationId?: string;
+  embedded?: boolean;
   dispatch: PilotDispatcher;
   load: PilotLoader;
 }
@@ -409,17 +411,24 @@ export interface PosItem {
   notes: string | null;
 }
 
+export type PaymentFinancialStatus = "posted" | "reversed";
+
+export interface TabPayment {
+  id: string;
+  method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
+  amountCents: number;
+  reversedCents: number;
+  netAmountCents: number;
+  financialStatus: PaymentFinancialStatus;
+  reference: string | null;
+  createdAt: string;
+}
+
 export interface TabDetail {
   tab: PosTab;
   orders: PosOrder[];
   items: PosItem[];
-  payments: Array<{
-    id: string;
-    method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
-    amountCents: number;
-    reference: string | null;
-    createdAt: string;
-  }>;
+  payments: TabPayment[];
   events: Array<{
     id: string;
     type: string;
@@ -1323,6 +1332,59 @@ export function parseTabs(value: unknown): PosTab[] {
   return records(value).map(parseTab);
 }
 
+function paymentCents(value: unknown): number {
+  const parsed = number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new InvalidPilotPayloadError();
+  return parsed;
+}
+
+function parseTabPayment(row: Row): TabPayment {
+  const method = text(row.method);
+  if (!["cash", "credit_card", "debit_card", "pix", "other"].includes(method)) {
+    throw new InvalidPilotPayloadError();
+  }
+  const amountCents = paymentCents(row.amountCents);
+  const providedNetAmountCents =
+    row.netAmountCents === undefined ? undefined : paymentCents(row.netAmountCents);
+  const reversedCents =
+    row.reversedCents === undefined
+      ? providedNetAmountCents === undefined
+        ? 0
+        : amountCents - providedNetAmountCents
+      : paymentCents(row.reversedCents);
+  const netAmountCents = providedNetAmountCents ?? amountCents - reversedCents;
+  const expectedFinancialStatus: PaymentFinancialStatus = reversedCents > 0 ? "reversed" : "posted";
+  const financialStatus = text(row.financialStatus ?? expectedFinancialStatus);
+  if (
+    reversedCents > amountCents ||
+    netAmountCents !== amountCents - reversedCents ||
+    financialStatus !== expectedFinancialStatus
+  ) {
+    throw new InvalidPilotPayloadError();
+  }
+  return {
+    id: text(row.id),
+    method: method as TabPayment["method"],
+    amountCents,
+    reversedCents,
+    netAmountCents,
+    financialStatus,
+    reference: optionalText(row.reference),
+    createdAt: text(row.createdAt),
+  };
+}
+
+export function summarizeTabPayments(payments: TabPayment[]) {
+  return payments.reduce(
+    (summary, payment) => ({
+      grossPaidCents: summary.grossPaidCents + payment.amountCents,
+      reversedCents: summary.reversedCents + payment.reversedCents,
+      paidCents: summary.paidCents + payment.netAmountCents,
+    }),
+    { grossPaidCents: 0, reversedCents: 0, paidCents: 0 },
+  );
+}
+
 export function parseTabDetail(value: unknown): TabDetail {
   const payload = record(value);
   return {
@@ -1334,19 +1396,7 @@ export function parseTabDetail(value: unknown): TabDetail {
       createdAt: optionalText(row.createdAt),
     })),
     items: records(payload.items).map(parseItem),
-    payments: records(payload.payments ?? []).map((row) => {
-      const method = text(row.method);
-      if (!["cash", "credit_card", "debit_card", "pix", "other"].includes(method)) {
-        throw new InvalidPilotPayloadError();
-      }
-      return {
-        id: text(row.id),
-        method: method as TabDetail["payments"][number]["method"],
-        amountCents: number(row.amountCents),
-        reference: optionalText(row.reference),
-        createdAt: text(row.createdAt),
-      };
-    }),
+    payments: records(payload.payments ?? []).map(parseTabPayment),
     events: records(payload.events ?? []).map((row) => ({
       id: text(row.id),
       type: text(row.type),

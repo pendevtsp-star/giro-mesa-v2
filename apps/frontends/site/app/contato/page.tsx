@@ -3,7 +3,24 @@ import { LeadForm } from "../../components/lead-form";
 
 export const metadata: Metadata = { title: "Contato" };
 
-export default function ContactPage() {
+function readQueryValue(value: string | string[] | undefined, maxLength: number) {
+  const selected = Array.isArray(value) ? value[0] : value;
+  return selected?.trim().slice(0, maxLength) ?? "";
+}
+
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const parameters = await searchParams;
+  const smartPosRequest = readQueryValue(parameters.assunto, 60) === "homologacao-smartpos";
+  const provider = readQueryValue(parameters.fornecedor, 40);
+  const model = readQueryValue(parameters.modelo, 120);
+  const firmware = readQueryValue(parameters.firmware, 120);
+  const initialMessage = smartPosRequest
+    ? `Quero homologar uma SmartPOS para o GiroMesa.\nFornecedor: ${provider || "não informado"}\nModelo: ${model || "não informado"}\nAndroid/firmware: ${firmware || "não informado"}`
+    : "";
   return (
     <main id="conteudo" className="inner-page">
       <section className="inner-hero container">
@@ -27,7 +44,7 @@ export default function ContactPage() {
         </div>
         <aside>
           <h2>Enviar mensagem</h2>
-          <LeadForm kind="contact" />
+          <LeadForm kind="contact" initialMessage={initialMessage} />
         </aside>
       </section>
     </main>

@@ -11,7 +11,9 @@ unset COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_FILE COMPOSE_ENV_FILES
 unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL SESSION_SECRET HOST PORT
 unset WORKER_HEARTBEAT_FILE WORKER_HEARTBEAT_MAX_AGE_MS WORKER_HEARTBEAT_CHECK_INTERVAL
 unset NEXT_PUBLIC_API_URL NEXT_PUBLIC_OPS_URL NEXT_PUBLIC_CUSTOMER_API_URL NEXT_PUBLIC_GOOGLE_AUTH_ENABLED
+unset NEXT_PUBLIC_REDE_STORE_URL NEXT_PUBLIC_PAYGO_STORE_URL NEXT_PUBLIC_STONE_STORE_URL
 unset NEXT_PUBLIC_CUSTOMER_API_ENABLED NEXT_PUBLIC_WHATSAPP_NUMBER
+unset FISCAL_RELEASE_ENV FOCUS_NFE_PRIMARY_TOKEN FISCAL_CREDENTIALS_ENCRYPTION_KEY FOCUS_NFE_TIMEOUT_MS MEDIA_ROOT
 unset WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN DEPLOYMENT_ENVIRONMENT GIROMESA_IMAGE_PREFIX GIROMESA_IMAGE_TAG
 unalias -a 2>/dev/null || true
 for function_name in awk basename chmod dirname docker flock id mktemp python3 readlink rm sha256sum stat; do unset -f "$function_name" 2>/dev/null || true; done
@@ -164,10 +166,11 @@ done
 python3 -I - "$stage/target.json" "$release" "$stage/recovery.json" "$recovery_release" "$stage/recovery-validation.json" "$recovery_evidence_hash" <<'PY'
 import hashlib, json, pathlib, re, sys
 fixed = {"deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"}
-def validate_files(manifest_path, root_raw):
+target_only = {"package.json","config/fiscal-release.json","scripts/check-fiscal-storage.sh","scripts/fiscal-production-smoke.sql"}
+def validate_files(manifest_path, root_raw, role):
     value = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
     root = pathlib.Path(root_raw).resolve()
-    expected = fixed | {str(path.relative_to(root)).replace("\\", "/") for path in (root / "packages/db/drizzle").glob("[0-9][0-9][0-9][0-9]_*.sql")}
+    expected = fixed | (target_only if role == "target" else set()) | {str(path.relative_to(root)).replace("\\", "/") for path in (root / "packages/db/drizzle").glob("[0-9][0-9][0-9][0-9]_*.sql")}
     files = value.get("releaseFiles", {})
     root_info = root.stat()
     if root_info.st_uid != __import__("os").geteuid() or root_info.st_mode & 0o022 or set(files) != expected or not expected - fixed:
@@ -204,7 +207,7 @@ evidence_valid = (
     and evidence.get("result") == "passed"
     and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":45,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
 )
-if not (validate_files(target_manifest, target_root) and validate_files(recovery_manifest, recovery_root) and evidence_valid):
+if not (validate_files(target_manifest, target_root, "target") and validate_files(recovery_manifest, recovery_root, "recovery") and evidence_valid):
     raise SystemExit("TRUST_RELEASE_FILES_INVALID")
 PY
 

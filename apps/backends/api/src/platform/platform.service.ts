@@ -1,5 +1,6 @@
 import {
   contactRequests,
+  fiscalProfiles,
   hubHeartbeats,
   legalEntities,
   organizations,
@@ -9,7 +10,7 @@ import {
   units,
 } from "@giromesa/db";
 import { Injectable } from "@nestjs/common";
-import { desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 
 @Injectable()
@@ -27,6 +28,7 @@ export class PlatformService {
       recentOrganizations,
       healthRows,
       fiscalRows,
+      fiscalIntegrationRows,
       jobRows,
       applicationRows,
       activationRows,
@@ -99,6 +101,30 @@ export class PlatformService {
         .groupBy(legalEntities.organizationId),
       this.database.db
         .select({
+          organizationId: organizations.id,
+          organizationName: organizations.tradeName,
+          unitId: units.id,
+          unitName: units.name,
+          document: legalEntities.document,
+          provider: fiscalProfiles.provider,
+          environment: fiscalProfiles.environment,
+          settings: fiscalProfiles.settings,
+          updatedAt: fiscalProfiles.updatedAt,
+        })
+        .from(units)
+        .innerJoin(organizations, eq(organizations.id, units.organizationId))
+        .leftJoin(
+          fiscalProfiles,
+          and(
+            eq(fiscalProfiles.organizationId, units.organizationId),
+            eq(fiscalProfiles.unitId, units.id),
+          ),
+        )
+        .leftJoin(legalEntities, eq(legalEntities.id, units.legalEntityId))
+        .where(eq(units.active, true))
+        .orderBy(asc(organizations.tradeName), asc(units.name)),
+      this.database.db
+        .select({
           pending: sql<number>`count(*) filter (where ${outboxEvents.processedAt} is null)`.mapWith(
             Number,
           ),
@@ -157,6 +183,51 @@ export class PlatformService {
       recentTrialApplications: recentTrials,
       recentContacts,
       recentOrganizations: tenantHealth,
+      fiscalIntegrations: fiscalIntegrationRows.map((row) => ({
+        organizationId: row.organizationId,
+        organizationName: row.organizationName,
+        unitId: row.unitId,
+        unitName: row.unitName,
+        document: row.document,
+        provider: row.provider,
+        environment: row.environment,
+        profileUpdatedAt: row.updatedAt,
+        ...fiscalIntegrationStatus(row.settings),
+      })),
     };
   }
+}
+
+export function fiscalIntegrationStatus(settings: unknown) {
+  const focus = objectValue(objectValue(settings).focus);
+  const lastError = objectValue(focus.lastError);
+  return {
+    companyId: stringValue(focus.companyId),
+    status: stringValue(focus.status),
+    certificateValidUntil: stringValue(focus.certificateValidUntil),
+    lastCheckedAt: stringValue(focus.lastCheckedAt),
+    hasHomologationCredential: secretEnvelopePresent(focus.tokenHomologation),
+    hasProductionCredential: secretEnvelopePresent(focus.tokenProduction),
+    lastErrorCode: stringValue(lastError.code),
+    lastErrorMessage: stringValue(lastError.message),
+  };
+}
+
+function secretEnvelopePresent(value: unknown) {
+  const envelope = objectValue(value);
+  return Boolean(
+    stringValue(envelope.encryptedSecret) &&
+      stringValue(envelope.iv) &&
+      stringValue(envelope.authTag),
+  );
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
 }

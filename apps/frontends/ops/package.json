@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@giromesa/contracts": "workspace:*",
+    "@giromesa/domain": "workspace:*",
     "@giromesa/ui": "workspace:*",
     "qrcode": "1.5.4",
     "react": "19.2.0",

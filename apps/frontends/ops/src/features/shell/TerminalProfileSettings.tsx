@@ -18,6 +18,7 @@ import {
   type TerminalQuickAction,
 } from "../../api";
 import { type DeviceContext, loadShellPrinters, testShellPrinter } from "../../bridge";
+import { type CashRegister, parseCash } from "../../management.shared";
 import { saveTerminalProfile } from "./terminal-profile";
 import "./terminal-profile.css";
 
@@ -61,6 +62,7 @@ const initialProfile = (runtime: DeviceContext): TerminalProfileInput => ({
   defaultRoute: "dashboard",
   printerId: null,
   stationId: null,
+  cashRegisterId: null,
   compact: true,
   quickActions: ["search"],
 });
@@ -114,6 +116,7 @@ export function TerminalProfileSettings({
 }) {
   const [form, setForm] = useState<TerminalProfileInput>(() => initialProfile(runtime));
   const [printers, setPrinters] = useState<PrinterStatus[]>([]);
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [notice, setNotice] = useState("");
@@ -122,12 +125,16 @@ export function TerminalProfileSettings({
     setBusy(true);
     setNotice("");
     try {
-      const [profile, printerResult] = await Promise.all([
+      const [profile, printerResult, cashResult] = await Promise.all([
         api.pilot.terminalProfile(organizationId, unitId, runtime.deviceId),
         loadShellPrinters(),
+        api.management.cashShifts(organizationId, unitId),
       ]);
       setForm(profile ?? initialProfile(runtime));
       setPrinters(printerResult?.success ? parsePrinters(printerResult.payload) : []);
+      setCashRegisters(
+        parseCash(cashResult).registers.filter((cashRegister) => cashRegister.active),
+      );
       if (profile) saveTerminalProfile(profile);
     } catch (error) {
       setNotice(
@@ -244,6 +251,25 @@ export function TerminalProfileSettings({
                 <option key={printer.id} value={printer.id}>
                   {printer.id} · {printer.paperWidthMm} mm ·{" "}
                   {printer.available ? "disponível" : "indisponível"}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          <FormField htmlFor="terminal-profile-cash-register" label="Gaveta de caixa">
+            <NativeSelect
+              id="terminal-profile-cash-register"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  cashRegisterId: event.target.value || null,
+                }))
+              }
+              value={form.cashRegisterId ?? ""}
+            >
+              <option value="">Sem vínculo</option>
+              {cashRegisters.map((cashRegister) => (
+                <option key={cashRegister.id} value={cashRegister.id}>
+                  {cashRegister.name}
                 </option>
               ))}
             </NativeSelect>

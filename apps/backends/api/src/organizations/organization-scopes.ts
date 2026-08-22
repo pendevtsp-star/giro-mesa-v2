@@ -23,6 +23,12 @@ export interface OrganizationUnitRow {
   name: string;
   timezone: string;
   active: boolean;
+  branding?: {
+    displayName: string;
+    logoUrl: string | null;
+    primaryColor: string;
+    accentColor: string;
+  };
 }
 
 export function shapeOrganizationScopes(

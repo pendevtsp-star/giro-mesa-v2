@@ -8,7 +8,8 @@
 .people-list-card,
 .people-attention-card,
 .people-commission-card,
-.people-permission-card {
+.people-permission-card,
+.people-create-card {
   min-width: 0;
   padding: var(--gm-space-4);
 }
@@ -26,6 +27,16 @@
   border: 1px solid color-mix(in srgb, var(--gm-danger) 42%, var(--gm-border));
   border-radius: var(--gm-radius-sm);
   color: var(--gm-danger);
+  font-size: var(--gm-font-sm);
+  margin: 0;
+  padding: var(--gm-space-3);
+}
+
+.people-page__offline {
+  background: var(--gm-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--gm-warning) 42%, var(--gm-border));
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-ink);
   font-size: var(--gm-font-sm);
   margin: 0;
   padding: var(--gm-space-3);
@@ -277,6 +288,23 @@
   min-width: 0;
 }
 
+.people-create-card {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.people-create-card > div {
+  display: grid;
+  gap: var(--gm-space-1);
+  min-width: 0;
+}
+
+.people-create-card small {
+  color: var(--gm-muted);
+}
+
 .people-batch-bar,
 .people-pagination,
 .people-person-edit__actions {
@@ -453,6 +481,14 @@
   width: 36px;
 }
 
+.people-row__statuses,
+.people-access-card__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-1);
+}
+
 .people-row > span:not(.people-row__icon) {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -469,6 +505,81 @@
   border-radius: var(--gm-radius-sm);
   margin: 0;
   padding: var(--gm-space-3);
+}
+
+.people-access-card {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: var(--gm-space-3);
+}
+
+.people-access-card__header {
+  align-items: start;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.people-access-card__header > div,
+.people-access-form,
+.people-access-form fieldset {
+  display: grid;
+  gap: var(--gm-space-3);
+  min-width: 0;
+}
+
+.people-access-card__header p,
+.people-access-card__meta,
+.people-access-form > p {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.people-access-form fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.people-access-form legend {
+  font-weight: 700;
+  margin-bottom: var(--gm-space-2);
+}
+
+.people-access-form__fields {
+  margin-top: var(--gm-space-3);
+}
+
+.people-access-toggle {
+  align-items: center;
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  cursor: pointer;
+  display: flex;
+  gap: var(--gm-space-3);
+  min-height: 48px;
+  padding: var(--gm-space-3);
+}
+
+.people-access-toggle input {
+  accent-color: var(--gm-brand);
+  block-size: 1.1rem;
+  flex: 0 0 auto;
+  inline-size: 1.1rem;
+}
+
+.people-access-toggle span {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.people-access-toggle small,
+.people-access-card__actions small {
+  color: var(--gm-muted);
 }
 
 .people-person-detail section {
@@ -521,7 +632,8 @@
   .people-list-card,
   .people-attention-card,
   .people-commission-card,
-  .people-permission-card {
+  .people-permission-card,
+  .people-create-card {
     padding: var(--gm-space-3);
   }
 
@@ -559,6 +671,7 @@
   }
 
   .people-row--selectable > .gm-badge,
+  .people-row--selectable > .people-row__statuses,
   .people-row--selectable > .gm-button {
     grid-column: 3;
   }
@@ -572,6 +685,7 @@
   }
 
   .people-row > .gm-badge,
+  .people-row > .people-row__statuses,
   .people-row > .gm-button {
     grid-column: 2;
     justify-self: start;
@@ -579,6 +693,17 @@
 
   .people-modal-actions .gm-button {
     flex: 1 1 8rem;
+  }
+
+  .people-create-card,
+  .people-access-card__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .people-create-card .gm-button,
+  .people-access-card__actions .gm-button {
+    width: 100%;
   }
 }
 
@@ -1635,10 +1760,14 @@
 }
 
 .kds-settings__grid {
-  align-items: start;
-  display: grid;
-  gap: var(--gm-space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-count: 2;
+  column-gap: var(--gm-space-3);
+}
+
+.kds-settings__grid > * {
+  break-inside: avoid;
+  margin-bottom: var(--gm-space-3);
+  width: 100%;
 }
 
 .kds-settings-card {
@@ -1666,8 +1795,37 @@
 }
 
 .kds-settings-terminal-controls {
+  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kds-settings-terminal-controls > fieldset {
+  border: 0;
+  display: grid;
+  gap: var(--gm-space-1);
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.kds-settings-terminal-controls > fieldset > legend {
+  font-size: 0.8rem;
+  font-weight: 750;
+  margin-bottom: 0.45rem;
+}
+
+.kds-settings-terminal-controls :where(.segmented) {
+  width: 100%;
+}
+
+.kds-printer-settings {
   align-items: end;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 5.5rem;
+}
+
+.kds-printer-settings > .gm-button,
+.kds-printer-settings > small {
+  grid-column: 1 / -1;
 }
 
 .kds-settings-lock {
@@ -1686,15 +1844,31 @@
   border-radius: var(--gm-radius-md);
   display: grid;
   gap: var(--gm-space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
   padding: var(--gm-space-3);
 }
 
 .kds-bump-map label {
   align-items: center;
+  background: var(--gm-surface-subtle);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
   display: grid;
   gap: var(--gm-space-2);
-  grid-template-columns: minmax(0, 1fr) 7rem;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  min-width: 0;
+  padding: var(--gm-space-2);
+}
+
+.kds-bump-map label > span {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.kds-bump-map > .gm-button,
+.kds-bump-map > small {
+  grid-column: 1 / -1;
 }
 
 .kds-bump-map input {
@@ -1775,6 +1949,9 @@
 
 .kds-settings-options > label {
   cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
 }
 
 .kds-settings-options > div > span,
@@ -1812,7 +1989,7 @@
 
 @media (max-width: 900px) {
   .kds-settings__grid {
-    grid-template-columns: 1fr;
+    column-count: 1;
   }
   .real-kds-board {
     display: flex;
@@ -1874,6 +2051,9 @@
   }
   .kds-settings-terminal-controls,
   .kds-settings-stations li {
+    grid-template-columns: 1fr;
+  }
+  .kds-bump-map {
     grid-template-columns: 1fr;
   }
   .kds-settings-card {
@@ -2874,7 +3054,7 @@
 }
 
 .kds-availability {
-  grid-column: 1 / -1;
+  column-span: all;
 }
 
 .kds-unavailable-list,

@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.Models
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The id property</summary>
         public Guid? Id { get; set; }
+        /// <summary>The isDefault property</summary>
+        public bool? IsDefault { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -34,6 +36,8 @@ namespace GiroMesa.ApiClient.Models
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportView_query Query { get; set; }
 #endif
+        /// <summary>The sortOrder property</summary>
+        public int? SortOrder { get; set; }
         /// <summary>The updatedAt property</summary>
         public DateTimeOffset? UpdatedAt { get; set; }
         /// <summary>The version property</summary>
@@ -66,9 +70,11 @@ namespace GiroMesa.ApiClient.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "id", n => { Id = n.GetGuidValue(); } },
+                { "isDefault", n => { IsDefault = n.GetBoolValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "ownerIdentityId", n => { OwnerIdentityId = n.GetGuidValue(); } },
                 { "query", n => { Query = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportView_query>(global::GiroMesa.ApiClient.Models.ManagementReportView_query.CreateFromDiscriminatorValue); } },
+                { "sortOrder", n => { SortOrder = n.GetIntValue(); } },
                 { "updatedAt", n => { UpdatedAt = n.GetDateTimeOffsetValue(); } },
                 { "version", n => { Version = n.GetIntValue(); } },
                 { "visibility", n => { Visibility = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportView_visibility>(); } },
@@ -82,9 +88,11 @@ namespace GiroMesa.ApiClient.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteGuidValue("id", Id);
+            writer.WriteBoolValue("isDefault", IsDefault);
             writer.WriteStringValue("name", Name);
             writer.WriteGuidValue("ownerIdentityId", OwnerIdentityId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportView_query>("query", Query);
+            writer.WriteIntValue("sortOrder", SortOrder);
             writer.WriteDateTimeOffsetValue("updatedAt", UpdatedAt);
             writer.WriteIntValue("version", Version);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportView_visibility>("visibility", Visibility);

@@ -4,9 +4,9 @@ import { Button, Input, Label, NativeSelect, Textarea } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
 
 type PlanSlug = "operacao" | "crescimento" | "rede";
-type LeadFormProps = { kind: "trial" | "contact"; initialPlan?: PlanSlug };
+type LeadFormProps = { kind: "trial" | "contact"; initialPlan?: PlanSlug; initialMessage?: string };
 
-export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
+export function LeadForm({ kind, initialPlan = "operacao", initialMessage = "" }: LeadFormProps) {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -103,7 +103,7 @@ export function LeadForm({ kind, initialPlan = "operacao" }: LeadFormProps) {
       ) : (
         <Label>
           Como podemos ajudar?
-          <Textarea name="message" rows={5} required />
+          <Textarea name="message" rows={5} required defaultValue={initialMessage} />
         </Label>
       )}
       <Label className="check-label">

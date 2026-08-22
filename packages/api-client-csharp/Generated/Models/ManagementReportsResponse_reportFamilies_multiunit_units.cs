@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.Models
     public partial class ManagementReportsResponse_reportFamilies_multiunit_units : IAdditionalDataHolder, IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The activeEmployees property</summary>
+        public int? ActiveEmployees { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The averageTicketCents property</summary>
@@ -20,6 +22,8 @@ namespace GiroMesa.ApiClient.Models
         public double? ChangePercent { get; set; }
         /// <summary>The closedTabs property</summary>
         public int? ClosedTabs { get; set; }
+        /// <summary>The comparableStoreEligible property</summary>
+        public bool? ComparableStoreEligible { get; set; }
         /// <summary>The key property</summary>
         public Guid? Key { get; set; }
         /// <summary>The label property</summary>
@@ -30,6 +34,10 @@ namespace GiroMesa.ApiClient.Models
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The minimumComparableOperatingDays property</summary>
+        public int? MinimumComparableOperatingDays { get; set; }
+        /// <summary>The openHours property</summary>
+        public double? OpenHours { get; set; }
         /// <summary>The operatingDays property</summary>
         public int? OperatingDays { get; set; }
         /// <summary>The organizationRevenueSharePercent property</summary>
@@ -38,10 +46,18 @@ namespace GiroMesa.ApiClient.Models
         public int? Rank { get; set; }
         /// <summary>The revenueCents property</summary>
         public long? RevenueCents { get; set; }
+        /// <summary>The revenuePerEmployeeCents property</summary>
+        public long? RevenuePerEmployeeCents { get; set; }
+        /// <summary>The revenuePerOpenHourCents property</summary>
+        public long? RevenuePerOpenHourCents { get; set; }
         /// <summary>The revenuePerOperatingDayCents property</summary>
         public long? RevenuePerOperatingDayCents { get; set; }
+        /// <summary>The revenuePerSeatCents property</summary>
+        public long? RevenuePerSeatCents { get; set; }
         /// <summary>The sameStoreChangePercent property</summary>
         public double? SameStoreChangePercent { get; set; }
+        /// <summary>The seatCount property</summary>
+        public int? SeatCount { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_multiunit_units"/> and sets the default values.
         /// </summary>
@@ -67,17 +83,25 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "activeEmployees", n => { ActiveEmployees = n.GetIntValue(); } },
                 { "averageTicketCents", n => { AverageTicketCents = n.GetLongValue(); } },
                 { "changePercent", n => { ChangePercent = n.GetDoubleValue(); } },
                 { "closedTabs", n => { ClosedTabs = n.GetIntValue(); } },
+                { "comparableStoreEligible", n => { ComparableStoreEligible = n.GetBoolValue(); } },
                 { "key", n => { Key = n.GetGuidValue(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "minimumComparableOperatingDays", n => { MinimumComparableOperatingDays = n.GetIntValue(); } },
+                { "openHours", n => { OpenHours = n.GetDoubleValue(); } },
                 { "operatingDays", n => { OperatingDays = n.GetIntValue(); } },
                 { "organizationRevenueSharePercent", n => { OrganizationRevenueSharePercent = n.GetDoubleValue(); } },
                 { "rank", n => { Rank = n.GetIntValue(); } },
                 { "revenueCents", n => { RevenueCents = n.GetLongValue(); } },
+                { "revenuePerEmployeeCents", n => { RevenuePerEmployeeCents = n.GetLongValue(); } },
+                { "revenuePerOpenHourCents", n => { RevenuePerOpenHourCents = n.GetLongValue(); } },
                 { "revenuePerOperatingDayCents", n => { RevenuePerOperatingDayCents = n.GetLongValue(); } },
+                { "revenuePerSeatCents", n => { RevenuePerSeatCents = n.GetLongValue(); } },
                 { "sameStoreChangePercent", n => { SameStoreChangePercent = n.GetDoubleValue(); } },
+                { "seatCount", n => { SeatCount = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -87,17 +111,25 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("activeEmployees", ActiveEmployees);
             writer.WriteLongValue("averageTicketCents", AverageTicketCents);
             writer.WriteDoubleValue("changePercent", ChangePercent);
             writer.WriteIntValue("closedTabs", ClosedTabs);
+            writer.WriteBoolValue("comparableStoreEligible", ComparableStoreEligible);
             writer.WriteGuidValue("key", Key);
             writer.WriteStringValue("label", Label);
+            writer.WriteIntValue("minimumComparableOperatingDays", MinimumComparableOperatingDays);
+            writer.WriteDoubleValue("openHours", OpenHours);
             writer.WriteIntValue("operatingDays", OperatingDays);
             writer.WriteDoubleValue("organizationRevenueSharePercent", OrganizationRevenueSharePercent);
             writer.WriteIntValue("rank", Rank);
             writer.WriteLongValue("revenueCents", RevenueCents);
+            writer.WriteLongValue("revenuePerEmployeeCents", RevenuePerEmployeeCents);
+            writer.WriteLongValue("revenuePerOpenHourCents", RevenuePerOpenHourCents);
             writer.WriteLongValue("revenuePerOperatingDayCents", RevenuePerOperatingDayCents);
+            writer.WriteLongValue("revenuePerSeatCents", RevenuePerSeatCents);
             writer.WriteDoubleValue("sameStoreChangePercent", SameStoreChangePercent);
+            writer.WriteIntValue("seatCount", SeatCount);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

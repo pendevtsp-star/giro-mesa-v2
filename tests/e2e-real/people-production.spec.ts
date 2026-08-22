@@ -33,6 +33,12 @@ const people = [
     active: true,
     hourlyRateCents: 3200,
     updatedAt: "2026-08-17T12:00:00.000Z",
+    access: {
+      status: "active",
+      email: "ana@giromesa.test",
+      role: "manager",
+      membershipId: "membership-people",
+    },
   },
   {
     id: "person-2",
@@ -42,6 +48,54 @@ const people = [
     active: true,
     hourlyRateCents: 2200,
     updatedAt: "2026-08-17T12:00:00.000Z",
+    access: { status: "none" },
+  },
+  {
+    id: "person-3",
+    identityId: "identity-pending",
+    name: "Carla Souza",
+    roleLabel: "Caixa",
+    active: true,
+    hourlyRateCents: 2400,
+    updatedAt: "2026-08-17T12:00:00.000Z",
+    access: {
+      status: "pending",
+      email: "carla@giromesa.test",
+      role: "cashier",
+      invitationId: "invitation-3",
+      expiresAt: "2026-08-25T12:00:00.000Z",
+    },
+  },
+  {
+    id: "person-4",
+    identityId: "identity-expired",
+    name: "Diego Santos",
+    roleLabel: "Cozinha",
+    active: true,
+    hourlyRateCents: 2300,
+    updatedAt: "2026-08-17T12:00:00.000Z",
+    access: {
+      status: "expired",
+      email: "diego@giromesa.test",
+      role: "kds",
+      invitationId: "invitation-4",
+      expiresAt: "2026-08-10T12:00:00.000Z",
+    },
+  },
+  {
+    id: "person-5",
+    identityId: "identity-suspended",
+    name: "Eva Rocha",
+    roleLabel: "Estoque",
+    active: true,
+    hourlyRateCents: 2500,
+    updatedAt: "2026-08-17T12:00:00.000Z",
+    access: {
+      status: "suspended",
+      email: "eva@giromesa.test",
+      role: "inventory",
+      membershipId: "membership-5",
+    },
   },
 ];
 
@@ -92,6 +146,17 @@ async function mockPeopleApi(
     directoryQueries: [] as Array<Record<string, string>>,
     peopleUpdates: [] as Array<Record<string, unknown>>,
     peopleStatus: [] as Array<Record<string, unknown>>,
+    peopleCreates: [] as Array<Record<string, unknown>>,
+    accessActions: [] as Array<{
+      action: string;
+      method: string;
+      body: Record<string, unknown>;
+    }>,
+    unitAccessActions: [] as Array<{
+      method: string;
+      body: Record<string, unknown>;
+    }>,
+    terminalRevocations: [] as Array<Record<string, unknown>>,
     scheduleUpdates: [] as Array<Record<string, unknown>>,
     scheduleCancellations: [] as Array<Record<string, unknown>>,
     scheduleBatchPreviews: [] as Array<Record<string, unknown>>,
@@ -105,6 +170,43 @@ async function mockPeopleApi(
     const path = url.pathname;
     const method = request.method();
 
+    if (method === "GET" && path.endsWith("/auth/terminal-session")) {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
+
+    if (method === "POST" && path.endsWith("/management/people")) {
+      captured.peopleCreates.push(request.postDataJSON() as Record<string, unknown>);
+      await route.fulfill({ json: { id: "person-new" } });
+      return;
+    }
+    const unitAccessMatch = path.match(
+      /\/management\/people\/([^/]+)\/access\/units(?:\/([^/]+))?$/,
+    );
+    if (unitAccessMatch && (method === "POST" || method === "DELETE")) {
+      captured.unitAccessActions.push({
+        method,
+        body: (request.postDataJSON() ?? {}) as Record<string, unknown>,
+      });
+      await route.fulfill({ json: { personId: unitAccessMatch[1], unitId: unitAccessMatch[2] } });
+      return;
+    }
+    if (method === "POST" && /\/management\/people\/terminals\/[^/]+\/revoke$/.test(path)) {
+      captured.terminalRevocations.push(request.postDataJSON() as Record<string, unknown>);
+      await route.fulfill({ json: { revoked: true } });
+      return;
+    }
+    const accessMatch = path.match(/\/management\/people\/([^/]+)\/access(?:\/([^/]+))?$/);
+    if (accessMatch && (method === "POST" || method === "PATCH")) {
+      captured.accessActions.push({
+        action: accessMatch[2] ?? "update",
+        method,
+        body: (request.postDataJSON() ?? {}) as Record<string, unknown>,
+      });
+      await route.fulfill({ json: { personId: accessMatch[1], ok: true } });
+      return;
+    }
+
     if (method === "PATCH" && path.endsWith("/management/people/person-2")) {
       captured.peopleUpdates.push(request.postDataJSON() as Record<string, unknown>);
       await route.fulfill({ json: { ...people[1], ...request.postDataJSON() } });
@@ -117,6 +219,101 @@ async function mockPeopleApi(
     ) {
       captured.peopleStatus.push(request.postDataJSON() as Record<string, unknown>);
       await route.fulfill({ json: { personId: "person-2", active: path.endsWith("reactivate") } });
+      return;
+    }
+
+    if (method === "GET" && path.endsWith("/management/people/access-center")) {
+      await route.fulfill({
+        json: {
+          terminals: [
+            {
+              id: "00000000-0000-4000-8000-000000000099",
+              deviceId: "caixa-centro-01",
+              openedBy: "Ana Martins",
+              activeOperator: "Bruno Lima",
+              status: "active",
+              createdAt: "2026-08-22T10:00:00.000Z",
+              lastActivityAt: "2026-08-22T10:10:00.000Z",
+              lockedUntil: null,
+              expiresAt: "2026-08-23T10:00:00.000Z",
+            },
+          ],
+        },
+      });
+      return;
+    }
+    const overviewMatch = path.match(/\/management\/people\/([^/]+)\/access-overview$/);
+    if (method === "GET" && overviewMatch) {
+      const person = people.find((item) => item.id === overviewMatch[1]) ?? people[1];
+      await route.fulfill({
+        json: {
+          units: [
+            { id: unitId, name: "Unidade Centro", active: true },
+            { id: "unit-north", name: "Unidade Norte", active: true },
+          ],
+          assignments:
+            person?.access.status === "none"
+              ? []
+              : [
+                  {
+                    unitId,
+                    unitName: "Unidade Centro",
+                    primary: true,
+                    access: person?.access,
+                    delivery:
+                      person?.id === "person-3"
+                        ? {
+                            status: "failed",
+                            attempts: 3,
+                            processedAt: null,
+                            lastError: "Servidor de e-mail indisponível",
+                          }
+                        : null,
+                  },
+                ],
+          history: [
+            {
+              id: `audit-${person?.id}`,
+              action: "management.person.access.invited",
+              actorName: "Ana Martins",
+              metadata: {},
+              occurredAt: "2026-08-22T10:00:00.000Z",
+            },
+          ],
+          offboarding: {
+            canProceed: true,
+            counts: {
+              openTimeEntries: 0,
+              futureSchedules: person?.id === "person-2" ? 1 : 0,
+              unsettledCommissions: 0,
+              openCashShifts: 0,
+              activeTerminals: 0,
+              accessAssignments: person?.access.status === "none" ? 0 : 1,
+            },
+            checks: [],
+          },
+        },
+      });
+      return;
+    }
+    if (method === "GET" && /\/management\/people\/[^/]+\/offboarding-preflight$/.test(path)) {
+      await route.fulfill({
+        json: {
+          canProceed: true,
+          counts: {
+            openTimeEntries: 0,
+            futureSchedules: 1,
+            unsettledCommissions: 0,
+            openCashShifts: 0,
+            activeTerminals: 0,
+            accessAssignments: 0,
+          },
+          checks: [
+            { code: "OPEN_TIME", label: "Turnos em aberto", count: 0, severity: "blocker" },
+            { code: "SCHEDULES", label: "Escalas futuras", count: 1, severity: "warning" },
+          ],
+        },
+      });
       return;
     }
     if (method === "PATCH" && path.endsWith("/management/people/schedules/schedule-1")) {
@@ -577,6 +774,8 @@ test("Pessoas opera cadastro, lote, escala, espelho e comissão com auditoria", 
 
   await personDialog.getByRole("button", { name: "Inativar" }).click();
   const personStatus = page.getByRole("dialog", { name: "Inativar pessoa" });
+  await expect(personStatus.getByText("Escalas futuras", { exact: true })).toBeVisible();
+  await expect(personStatus.getByText("Será preservado", { exact: true })).toBeVisible();
   await personStatus.getByLabel("Motivo").fill("Encerramento do vínculo operacional");
   await personStatus.getByRole("button", { name: "Confirmar" }).click();
   await expect.poll(() => captured.peopleStatus.length).toBe(1);
@@ -615,6 +814,147 @@ test("Pessoas opera cadastro, lote, escala, espelho e comissão com auditoria", 
   await expect.poll(() => captured.scheduleBatches.length).toBe(1);
   expect(captured.scheduleBatchPreviews).toHaveLength(1);
   expect(captured.scheduleBatches[0]?.idempotencyKey).toBeTruthy();
+});
+
+test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", async ({ page }) => {
+  const captured = await mockPeopleApi(page);
+  await openPeople(page);
+  await page.getByRole("button", { name: /Equipe/ }).click();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+
+  await page.getByRole("button", { name: "Novo funcionário", exact: true }).click();
+  const createDialog = page.getByRole("dialog", { name: "Novo funcionário" });
+  await createDialog.getByLabel("Nome").fill("Felipe Nunes");
+  await createDialog.getByLabel("Função").fill("Garçom");
+  await createDialog.getByLabel(/Também terá acesso/).check();
+  await createDialog.getByLabel("E-mail de acesso").fill("FELIPE@GIROMESA.TEST");
+  await createDialog.getByLabel("Perfil de acesso").selectOption("waiter");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await createDialog.getByRole("button", { name: "Cadastrar e convidar" }).click();
+  await expect.poll(() => captured.peopleCreates.length).toBe(1);
+  expect(captured.peopleCreates[0]).toMatchObject({
+    name: "Felipe Nunes",
+    roleLabel: "Garçom",
+    access: { email: "felipe@giromesa.test", role: "waiter" },
+  });
+
+  const teamCard = page
+    .locator(".people-list-card")
+    .filter({ has: page.getByRole("heading", { name: "Pessoas da unidade" }) });
+  const openDetails = async (name: string) => {
+    const row = teamCard.locator(".people-row").filter({ hasText: name });
+    await row.getByRole("button", { name: "Ver detalhes" }).click();
+    return page.getByRole("dialog", { name });
+  };
+
+  const bruno = await openDetails("Bruno Lima");
+  await bruno.getByRole("button", { name: "Conceder acesso" }).click();
+  const invite = page.getByRole("dialog", { name: "Conceder acesso" });
+  await invite.getByLabel("E-mail de acesso").fill("bruno@giromesa.test");
+  await invite.getByLabel("Perfil de acesso").selectOption("waiter");
+  await invite.getByRole("button", { name: "Confirmar" }).click();
+  await expect(invite).toBeHidden();
+  await bruno.getByRole("button", { name: "Fechar" }).click();
+
+  const carla = await openDetails("Carla Souza");
+  await expect(carla.getByText("Último erro: Servidor de e-mail indisponível")).toBeVisible();
+  await carla.getByRole("button", { name: "Reenviar convite" }).click();
+  await carla.getByRole("button", { name: "Cancelar convite" }).click();
+  const cancel = page.getByRole("dialog", { name: "Cancelar convite" });
+  await cancel.getByLabel("Motivo").fill("E-mail informado incorretamente");
+  await cancel.getByRole("button", { name: "Confirmar" }).click();
+  await expect(cancel).toBeHidden();
+  await carla.getByRole("button", { name: "Fechar" }).click();
+
+  const ana = await openDetails("Ana Martins");
+  await expect(ana.getByRole("heading", { name: "Unidades liberadas" })).toBeVisible();
+  await expect(ana.getByRole("heading", { name: "Histórico de acesso" })).toBeVisible();
+  await ana.getByRole("button", { name: "Liberar outra unidade" }).click();
+  const unitAccess = page.getByRole("dialog", { name: "Liberar outra unidade" });
+  await unitAccess.getByLabel("Perfil nesta unidade").selectOption("manager");
+  await unitAccess.getByLabel("Motivo").fill("Cobertura temporária da unidade");
+  await unitAccess.getByLabel("Confirmar com").selectOption("mfa");
+  await unitAccess.getByLabel("Código de 6 dígitos").fill("123456");
+  await unitAccess.getByRole("button", { name: "Confirmar" }).click();
+  await expect
+    .poll(() => captured.unitAccessActions)
+    .toEqual([
+      {
+        method: "POST",
+        body: {
+          unitId: "unit-north",
+          role: "manager",
+          reason: "Cobertura temporária da unidade",
+          reauth: { mfaCode: "123456" },
+        },
+      },
+    ]);
+  await ana.getByRole("button", { name: "Alterar perfil" }).click();
+  const profile = page.getByRole("dialog", { name: "Alterar perfil" });
+  await profile.getByLabel("Perfil de acesso").selectOption("cashier");
+  await profile.getByLabel("Motivo").fill("Transferência para o caixa");
+  await profile.getByLabel("Senha atual", { exact: true }).fill("senha-do-proprietário");
+  await profile.getByRole("button", { name: "Confirmar" }).click();
+  await expect(profile).toBeHidden();
+  await ana.getByRole("button", { name: "Suspender acesso" }).click();
+  const suspend = page.getByRole("dialog", { name: "Suspender acesso" });
+  await suspend.getByLabel("Motivo").fill("Afastamento temporário");
+  await suspend.getByRole("button", { name: "Confirmar" }).click();
+  await expect(suspend).toBeHidden();
+  await ana.getByRole("button", { name: "Fechar" }).click();
+
+  const eva = await openDetails("Eva Rocha");
+  await eva.getByRole("button", { name: "Reativar acesso" }).click();
+  const reactivate = page.getByRole("dialog", { name: "Reativar acesso" });
+  await reactivate.getByLabel("Motivo").fill("Retorno ao trabalho");
+  await reactivate.getByRole("button", { name: "Confirmar" }).click();
+  await expect(reactivate).toBeHidden();
+  await eva.getByRole("button", { name: "Fechar" }).click();
+
+  await expect(teamCard.getByText("Convite expirado", { exact: true })).toBeVisible();
+  expect(captured.accessActions).toEqual(
+    expect.arrayContaining([
+      { action: "invite", method: "POST", body: { email: "bruno@giromesa.test", role: "waiter" } },
+      { action: "resend", method: "POST", body: {} },
+      { action: "cancel", method: "POST", body: { reason: "E-mail informado incorretamente" } },
+      {
+        action: "update",
+        method: "PATCH",
+        body: {
+          role: "cashier",
+          reason: "Transferência para o caixa",
+          reauth: { currentPassword: "senha-do-proprietário" },
+        },
+      },
+      { action: "suspend", method: "POST", body: { reason: "Afastamento temporário" } },
+      {
+        action: "reactivate",
+        method: "POST",
+        body: { role: "inventory", reason: "Retorno ao trabalho" },
+      },
+    ]),
+  );
+
+  await page.getByRole("button", { name: /Acessos/ }).click();
+  const terminals = page
+    .locator(".people-list-card")
+    .filter({ has: page.getByRole("heading", { name: "Sessões ativas nesta unidade" }) });
+  await expect(terminals.getByText("Bruno Lima", { exact: true })).toBeVisible();
+  await terminals.getByRole("button", { name: "Encerrar" }).click();
+  const revokeTerminal = page.getByRole("dialog", { name: "Encerrar terminal remotamente" });
+  await revokeTerminal.getByLabel("Motivo").fill("Terminal fora da operação");
+  await revokeTerminal.getByRole("button", { name: "Confirmar" }).click();
+  await expect
+    .poll(() => captured.terminalRevocations)
+    .toEqual([{ reason: "Terminal fora da operação" }]);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test("Pessoas sai da navegação quando a política da unidade nega o perfil", async ({ page }) => {

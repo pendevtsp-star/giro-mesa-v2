@@ -21,6 +21,7 @@ export function Header() {
           <a href="/#solucoes">Soluções</a>
           <a href="/#planos">Planos</a>
           <a href="/#recursos">Recursos</a>
+          <Link href="/instalar">Instalar</Link>
         </nav>
         <div className="header-actions">
           <Link className="button button-ghost" href="/login">

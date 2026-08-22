@@ -16,13 +16,33 @@ import {
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import {
+  type CashApprovalDecisionInput,
   type CashMovementInput,
+  type CashRegisterCreateInput,
+  type CashRegisterUpdateInput,
+  type CashSettingsInput,
+  type CashShiftExportQuery,
+  type CashShiftHandoverInput,
+  type CashShiftHistoryQuery,
+  type CashShiftReviewInput,
+  type CashTerminalUpdateInput,
+  type CashTransferInput,
   type ClockOutInput,
   type CloseCashShiftInput,
   type CommissionInput,
   type CommissionRuleInput,
   type CommissionTransitionInput,
+  cashApprovalDecisionSchema,
   cashMovementSchema,
+  cashRegisterCreateSchema,
+  cashRegisterUpdateSchema,
+  cashSettingsSchema,
+  cashShiftExportQuerySchema,
+  cashShiftHandoverSchema,
+  cashShiftHistoryQuerySchema,
+  cashShiftReviewSchema,
+  cashTerminalUpdateSchema,
+  cashTransferSchema,
   clockOutSchema,
   closeCashShiftSchema,
   commissionRuleSchema,
@@ -84,8 +104,13 @@ import {
   type PeopleAssignmentBatchInput,
   type PeopleExportInput,
   type PeopleListQuery,
+  type PersonAccessInviteInput,
+  type PersonAccessReactivateInput,
+  type PersonAccessRoleUpdateInput,
   type PersonInput,
   type PersonStatusInput,
+  type PersonUnitAccessInput,
+  type PersonUnitAccessRemovalInput,
   type PersonUpdateInput,
   type ProductionBatchCancellationInput,
   type ProductionBatchCompletionInput,
@@ -104,8 +129,13 @@ import {
   peopleAssignmentBatchSchema,
   peopleExportSchema,
   peopleListQuerySchema,
+  personAccessInviteSchema,
+  personAccessReactivateSchema,
+  personAccessRoleUpdateSchema,
   personSchema,
   personStatusSchema,
+  personUnitAccessRemovalSchema,
+  personUnitAccessSchema,
   personUpdateSchema,
   productionBatchCancellationSchema,
   productionBatchCompletionSchema,
@@ -187,9 +217,12 @@ import {
   type ReportAlertListQuery,
   type ReportBudgetInput,
   type ReportCostBackfillInput,
+  type ReportCostPreviewInput,
   type ReportDrillDownQuery,
   type ReportExportInput,
   type ReportExportListQuery,
+  type ReportQueryInput,
+  type ReportReconciliationClosureInput,
   type ReportScheduleCreateInput,
   type ReportScheduleDeleteInput,
   type ReportScheduleUpdateInput,
@@ -202,9 +235,12 @@ import {
   reportBudgetInputSchema,
   reportBudgetMonthSchema,
   reportCostBackfillSchema,
+  reportCostPreviewSchema,
   reportDrillDownQuerySchema,
   reportExportInputSchema,
   reportExportListQuerySchema,
+  reportQuerySchema,
+  reportReconciliationClosureSchema,
   reportScheduleCreateSchema,
   reportScheduleDeleteSchema,
   reportScheduleUpdateSchema,
@@ -1351,6 +1387,167 @@ export class ManagementController {
     return this.management.listCashShifts(request.auth.identityId, organizationId, unitId);
   }
 
+  @Get("cash-settings")
+  cashSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.management.getCashSettings(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Put("cash-settings")
+  updateCashSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashSettingsSchema)) body: CashSettingsInput,
+  ) {
+    return this.management.updateCashSettings(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("cash-shifts/history")
+  cashShiftHistory(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(cashShiftHistoryQuerySchema)) query: CashShiftHistoryQuery,
+  ) {
+    return this.management.cashShiftHistory(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Get("cash-shifts/export")
+  exportCashShifts(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(cashShiftExportQuerySchema)) query: CashShiftExportQuery,
+  ) {
+    return this.management.exportCashShifts(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Get("cash-shifts/:cashShiftId/detail")
+  cashShiftDetail(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("cashShiftId", ParseUUIDPipe) cashShiftId: string,
+  ) {
+    return this.management.cashShiftDetail(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      cashShiftId,
+    );
+  }
+
+  @Patch("cash-terminals/:installationId")
+  updateCashTerminal(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashTerminalUpdateSchema)) body: CashTerminalUpdateInput,
+  ) {
+    return this.management.updateCashTerminal(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      installationId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("cash-approvals/:approvalId/decision")
+  decideCashApproval(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("approvalId", ParseUUIDPipe) approvalId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashApprovalDecisionSchema)) body: CashApprovalDecisionInput,
+  ) {
+    return this.management.decideCashApproval(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      approvalId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("cash-approvals")
+  cashApprovals(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.management.listCashApprovals(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("cash-registers")
+  createCashRegister(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashRegisterCreateSchema)) body: CashRegisterCreateInput,
+  ) {
+    return this.management.createCashRegister(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Patch("cash-registers/:cashRegisterId")
+  updateCashRegister(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("cashRegisterId", ParseUUIDPipe) cashRegisterId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashRegisterUpdateSchema)) body: CashRegisterUpdateInput,
+  ) {
+    return this.management.updateCashRegister(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      cashRegisterId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("cash-transfers")
+  transferCash(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashTransferSchema)) body: CashTransferInput,
+  ) {
+    return this.management.transferCash(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Post("cash-shifts")
   openCashShift(
     @Req() request: AuthenticatedRequest,
@@ -1387,6 +1584,25 @@ export class ManagementController {
     );
   }
 
+  @Post("cash-shifts/:cashShiftId/handover")
+  handoverCashShift(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("cashShiftId", ParseUUIDPipe) cashShiftId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashShiftHandoverSchema)) body: CashShiftHandoverInput,
+  ) {
+    return this.management.handoverCashShift(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      cashShiftId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Post("cash-shifts/:cashShiftId/close")
   closeCashShift(
     @Req() request: AuthenticatedRequest,
@@ -1397,6 +1613,25 @@ export class ManagementController {
     @Body(new ZodPipe(closeCashShiftSchema)) body: CloseCashShiftInput,
   ) {
     return this.management.closeCashShift(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      cashShiftId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("cash-shifts/:cashShiftId/review")
+  reviewCashShift(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("cashShiftId", ParseUUIDPipe) cashShiftId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashShiftReviewSchema)) body: CashShiftReviewInput,
+  ) {
+    return this.management.reviewCashShift(
       request.auth.identityId,
       organizationId,
       unitId,
@@ -1428,7 +1663,7 @@ export class ManagementController {
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Param("unitId", ParseUUIDPipe) unitId: string,
-    @Query(new ZodPipe(reportPeriodSchema)) query: ReportPeriodInput,
+    @Query(new ZodPipe(reportQuerySchema)) query: ReportQueryInput,
   ) {
     return this.reportsService.reports(request.auth.identityId, organizationId, unitId, query);
   }
@@ -1642,6 +1877,34 @@ export class ManagementController {
     @Body(new ZodPipe(reportCostBackfillSchema)) body: ReportCostBackfillInput,
   ) {
     return this.reportsService.backfillCosts(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("reports/costs/backfill/preview")
+  previewReportCosts(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(reportCostPreviewSchema)) body: ReportCostPreviewInput,
+  ) {
+    return this.reportsService.previewCosts(request.auth.identityId, organizationId, unitId, body);
+  }
+
+  @Post("reports/reconciliation/closure")
+  closeReportReconciliation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(reportReconciliationClosureSchema))
+    body: ReportReconciliationClosureInput,
+  ) {
+    return this.reportsService.closeReconciliation(
       request.auth.identityId,
       organizationId,
       unitId,
@@ -1970,6 +2233,198 @@ export class ManagementController {
     @Body(new ZodPipe(personSchema)) body: PersonInput,
   ) {
     return this.management.createPerson(request.auth.identityId, organizationId, unitId, body);
+  }
+
+  @Get("people/access-center")
+  peopleAccessCenter(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.management.peopleAccessCenter(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("people/terminals/:terminalSessionId/revoke")
+  revokeManagedTerminal(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("terminalSessionId", ParseUUIDPipe) terminalSessionId: string,
+    @Body(new ZodPipe(personStatusSchema)) body: PersonStatusInput,
+  ) {
+    return this.management.revokeManagedTerminal(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      terminalSessionId,
+      body.reason,
+    );
+  }
+
+  @Get("people/:personId/access-overview")
+  personAccessOverview(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+  ) {
+    return this.management.personAccessOverview(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+    );
+  }
+
+  @Get("people/:personId/offboarding-preflight")
+  personOffboardingPreflight(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+  ) {
+    return this.management.personOffboardingPreflight(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+    );
+  }
+
+  @Post("people/:personId/access/units")
+  assignPersonUnitAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personUnitAccessSchema)) body: PersonUnitAccessInput,
+  ) {
+    return this.management.assignPersonUnitAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
+  }
+
+  @Delete("people/:personId/access/units/:targetUnitId")
+  removePersonUnitAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Param("targetUnitId", ParseUUIDPipe) targetUnitId: string,
+    @Body(new ZodPipe(personUnitAccessRemovalSchema)) body: PersonUnitAccessRemovalInput,
+  ) {
+    return this.management.removePersonUnitAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      targetUnitId,
+      body,
+    );
+  }
+
+  @Post("people/:personId/access/invite")
+  invitePersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personAccessInviteSchema)) body: PersonAccessInviteInput,
+  ) {
+    return this.management.invitePersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
+  }
+
+  @Post("people/:personId/access/resend")
+  resendPersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+  ) {
+    return this.management.resendPersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+    );
+  }
+
+  @Post("people/:personId/access/cancel")
+  cancelPersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personStatusSchema)) body: PersonStatusInput,
+  ) {
+    return this.management.cancelPersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
+  }
+
+  @Patch("people/:personId/access")
+  updatePersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personAccessRoleUpdateSchema)) body: PersonAccessRoleUpdateInput,
+  ) {
+    return this.management.updatePersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
+  }
+
+  @Post("people/:personId/access/suspend")
+  suspendPersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personStatusSchema)) body: PersonStatusInput,
+  ) {
+    return this.management.suspendPersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
+  }
+
+  @Post("people/:personId/access/reactivate")
+  reactivatePersonAccess(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("personId", ParseUUIDPipe) personId: string,
+    @Body(new ZodPipe(personAccessReactivateSchema)) body: PersonAccessReactivateInput,
+  ) {
+    return this.management.reactivatePersonAccess(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      personId,
+      body,
+    );
   }
 
   @Patch("people/:personId")

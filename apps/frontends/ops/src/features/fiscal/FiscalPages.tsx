@@ -1,22 +1,62 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
-import { Badge, Button, Card, EmptyState, Icon, Input, NativeSelect, Textarea } from "@giromesa/ui";
-import { type FormEvent, useCallback, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  Input,
+  Modal,
+  NativeSelect,
+  SegmentedTabs,
+  Textarea,
+} from "@giromesa/ui";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiClientError, api, type FocusCompanyOnboardingBody } from "../../api";
 import { dateLabel, type ManagementScope, RemoteGate, useRemote } from "../../management.shared";
 import { formatMoney } from "../../rules";
 import {
   type FiscalDashboard,
+  type FiscalDocument,
+  type FiscalDocumentDetail,
   type FiscalPeriod,
   type FiscalProfile,
+  fiscalRejectionGuidance,
   fiscalTone,
   parseAccountantWorkspace,
+  parseFiscalDocumentDetail,
   parseFiscalWorkspace,
 } from "./fiscal";
+import { fiscalTaxCsvTemplate, parseFiscalTaxCsv } from "./fiscal-csv";
 import "./fiscal.css";
 
 const fiscalOrigins = ["0", "1", "2", "3", "4", "5", "6", "7", "8"] as const;
+type FiscalSection = "overview" | "setup" | "products" | "documents" | "closing";
 
-export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
+const fiscalSections: Array<{ id: FiscalSection; label: string }> = [
+  { id: "overview", label: "Resumo" },
+  { id: "setup", label: "Cadastro fiscal" },
+  { id: "products", label: "Produtos" },
+  { id: "documents", label: "Notas fiscais" },
+  { id: "closing", label: "Fechamento" },
+];
+
+export function RealFiscalPage({
+  canCancelDocuments,
+  canClosePeriods,
+  canConfigure,
+  canReopenPeriods,
+  companyDefaults,
+  scope,
+}: {
+  canCancelDocuments: boolean;
+  canClosePeriods: boolean;
+  canConfigure: boolean;
+  canReopenPeriods: boolean;
+  companyDefaults: { tradeName: string; city: string };
+  scope: ManagementScope;
+}) {
+  const [section, setSection] = useState<FiscalSection>(() => fiscalSectionFromHash());
   const [refresh, setRefresh] = useState(0);
   const [documentFilters, setDocumentFilters] = useState<{
     status?: string;
@@ -25,31 +65,85 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
     to?: string;
     search?: string;
   }>({});
-  const [artifacts, setArtifacts] = useState<
-    Record<string, { xmlUrl: string | null; pdfUrl: string | null }>
-  >({});
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; text: string } | null>(
     null,
   );
+  const [documentDetail, setDocumentDetail] = useState<
+    | { status: "loading"; id: string }
+    | { status: "ready"; data: FiscalDocumentDetail }
+    | { status: "error"; id: string; message: string }
+    | null
+  >(null);
   const loader = useCallback(async () => {
-    const [profile, provider, taxRevisions, catalog, dashboard, documents, periods] =
-      await Promise.all([
-        api.fiscal.profile(scope.organizationId, scope.unitId),
-        api.fiscal.provider(scope.organizationId, scope.unitId),
-        api.fiscal.taxRevisions(scope.organizationId, scope.unitId),
-        api.pilot.catalog(scope.organizationId, scope.unitId),
-        api.fiscal.dashboard(scope.organizationId, scope.unitId),
-        api.fiscal.documents(scope.organizationId, scope.unitId, documentFilters),
-        api.fiscal.periods(scope.organizationId, scope.unitId),
-      ]);
-    return { profile, provider, taxRevisions, catalog, dashboard, documents, periods };
+    const [
+      profile,
+      provider,
+      taxRevisions,
+      catalog,
+      dashboard,
+      documents,
+      periods,
+      numberInvalidations,
+    ] = await Promise.all([
+      api.fiscal.profile(scope.organizationId, scope.unitId),
+      api.fiscal.provider(scope.organizationId, scope.unitId),
+      api.fiscal.taxRevisions(scope.organizationId, scope.unitId),
+      api.pilot.catalog(scope.organizationId, scope.unitId),
+      api.fiscal.dashboard(scope.organizationId, scope.unitId),
+      api.fiscal.documents(scope.organizationId, scope.unitId, documentFilters),
+      api.fiscal.periods(scope.organizationId, scope.unitId),
+      api.fiscal.numberInvalidations(scope.organizationId, scope.unitId),
+    ]);
+    return {
+      profile,
+      provider,
+      taxRevisions,
+      catalog,
+      dashboard,
+      documents,
+      periods,
+      numberInvalidations,
+    };
   }, [documentFilters, scope.organizationId, scope.unitId]);
   const remote = useRemote(
     { ...scope, refreshToken: (scope.refreshToken ?? 0) + refresh },
     loader,
     parseFiscalWorkspace,
   );
+
+  useEffect(() => {
+    const syncSection = () => setSection(fiscalSectionFromHash());
+    window.addEventListener("hashchange", syncSection);
+    return () => window.removeEventListener("hashchange", syncSection);
+  }, []);
+
+  useEffect(() => {
+    if (canConfigure || section !== "setup") return;
+    setSection("overview");
+    window.history.replaceState(null, "", fiscalSectionHref("overview"));
+  }, [canConfigure, section]);
+
+  function navigateSection(nextSection: FiscalSection) {
+    if (nextSection === "setup" && !canConfigure) nextSection = "overview";
+    setSection(nextSection);
+    const href = fiscalSectionHref(nextSection);
+    if (window.location.hash !== href) window.location.hash = href;
+  }
+
+  async function openDocument(documentId: string) {
+    setDocumentDetail({ status: "loading", id: documentId });
+    try {
+      const response = await api.fiscal.document(scope.organizationId, scope.unitId, documentId);
+      setDocumentDetail({ status: "ready", data: parseFiscalDocumentDetail(response) });
+    } catch (error) {
+      setDocumentDetail({
+        status: "error",
+        id: documentId,
+        message: customerFiscalError(error, "Não foi possível carregar os detalhes da nota."),
+      });
+    }
+  }
 
   async function changePeriod(period: FiscalPeriod, action: "close" | "reopen") {
     if (action === "close" && period.blockers.length) return;
@@ -88,7 +182,7 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
     } catch (error) {
       setFeedback({
         tone: "danger",
-        text: error instanceof Error ? error.message : "Não foi possível atualizar a competência.",
+        text: customerFiscalError(error, "Não foi possível atualizar a competência."),
       });
     } finally {
       setBusy(null);
@@ -100,12 +194,12 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
     setFeedback(null);
     try {
       await api.fiscal.checkProvider(scope.organizationId, scope.unitId);
-      setFeedback({ tone: "success", text: "Conexão e tokens da Focus NFe sincronizados." });
+      setFeedback({ tone: "success", text: "Serviço de emissão atualizado." });
       setRefresh((value) => value + 1);
     } catch (error) {
       setFeedback({
         tone: "danger",
-        text: error instanceof Error ? error.message : "Não foi possível testar a Focus NFe.",
+        text: customerFiscalError(error, "Não foi possível verificar o serviço de emissão."),
       });
     } finally {
       setBusy(null);
@@ -128,29 +222,25 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
     setBusy(actionKey);
     setFeedback(null);
     try {
-      const response =
-        action === "reconcile"
-          ? await api.fiscal.reconcileDocument(scope.organizationId, scope.unitId, documentId)
-          : await api.fiscal.cancelDocument(
-              scope.organizationId,
-              scope.unitId,
-              documentId,
-              justification ?? "",
-            );
-      const nextArtifacts = fiscalArtifacts(response);
-      if (nextArtifacts.xmlUrl || nextArtifacts.pdfUrl) {
-        setArtifacts((current) => ({ ...current, [documentId]: nextArtifacts }));
+      if (action === "reconcile") {
+        await api.fiscal.reconcileDocument(scope.organizationId, scope.unitId, documentId);
+      } else {
+        await api.fiscal.cancelDocument(
+          scope.organizationId,
+          scope.unitId,
+          documentId,
+          justification ?? "",
+        );
       }
       setFeedback({
         tone: "success",
-        text:
-          action === "cancel" ? "Cancelamento conciliado." : "Documento atualizado na Focus NFe.",
+        text: action === "cancel" ? "Cancelamento confirmado." : "Situação da nota atualizada.",
       });
       setRefresh((value) => value + 1);
     } catch (error) {
       setFeedback({
         tone: "danger",
-        text: error instanceof Error ? error.message : "Não foi possível atualizar o documento.",
+        text: customerFiscalError(error, "Não foi possível atualizar a nota fiscal."),
       });
     } finally {
       setBusy(null);
@@ -161,82 +251,35 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
     <RemoteGate remote={remote}>
       {(data) => (
         <div className="fiscal-page fiscal-dashboard">
-          <nav aria-label="Seções do módulo fiscal" className="fiscal-subnav">
-            <a href="#fiscal-overview">Visão geral</a>
-            <a href="#fiscal-activation">Ativação</a>
-            <a href="#fiscal-configuration">Configuração</a>
-            <a href="#fiscal-classification">Classificação</a>
-            <a href="#fiscal-documents">Documentos</a>
-          </nav>
-
-          <section aria-label="Saúde fiscal" className="fiscal-health-grid" id="fiscal-overview">
-            <Card className="fiscal-provider-card" data-status={data.dashboard.provider.status}>
-              <div>
-                <p className="eyebrow">Emissão fiscal</p>
-                <h2>{data.dashboard.provider.name}</h2>
-                <p>
-                  {data.dashboard.provider.lastSyncAt
-                    ? `Última sincronização: ${dateLabel(data.dashboard.provider.lastSyncAt)}`
-                    : data.dashboard.provider.nextAction}
-                </p>
-              </div>
-              <div className="fiscal-provider-card__status">
-                <Badge tone={fiscalTone(data.dashboard.provider.status)}>
-                  {providerLabel(data.dashboard.provider.status)}
-                </Badge>
-                <small>
-                  {data.dashboard.provider.environment === "production"
-                    ? "Produção"
-                    : data.dashboard.provider.environment === "homologation"
-                      ? "Homologação"
-                      : "Ambiente não configurado"}
-                </small>
-                {data.dashboard.provider.companyId ? (
-                  <Button
-                    disabled={busy !== null}
-                    onClick={() => void checkProvider()}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    <Icon name="refresh" size={14} />
-                    {busy === "provider:check" ? "Testando…" : "Testar conexão"}
-                  </Button>
-                ) : (
-                  <a className="fiscal-inline-action" href="#fiscal-provider-onboarding">
-                    Configurar empresa
-                  </a>
-                )}
-              </div>
-            </Card>
-            <div className="fiscal-metrics">
-              <Metric
-                label="Autorizados"
-                value={data.dashboard.summary.authorizedCount}
-                tone="success"
-              />
-              <Metric
-                label="Pendentes"
-                value={data.dashboard.summary.pendingCount}
-                tone="warning"
-              />
-              <Metric
-                label="Rejeitados"
-                value={data.dashboard.summary.rejectedCount}
-                tone="danger"
-              />
-              <Metric
-                label="Total exibido"
-                value={formatMoney(data.dashboard.summary.totalCents)}
-                tone="info"
-              />
-            </div>
-          </section>
-
-          <FiscalActivationChecklist
-            profile={data.profile}
-            provider={data.dashboard.provider}
-            products={data.products}
-            taxRevisions={data.taxRevisions}
+          <SegmentedTabs
+            active={section === "setup" && !canConfigure ? "overview" : section}
+            className="fiscal-subnav"
+            items={fiscalSections
+              .filter((item) => item.id !== "setup" || canConfigure)
+              .map((item) => ({
+                ...item,
+                count:
+                  item.id === "overview"
+                    ? data.dashboard.pending.length
+                    : item.id === "setup"
+                      ? data.dashboard.provider.status === "ready"
+                        ? 0
+                        : 1
+                      : item.id === "products"
+                        ? data.products.filter(
+                            (product) =>
+                              !data.taxRevisions.some(
+                                (revision) =>
+                                  revision.productId === product.id && revision.status === "active",
+                              ),
+                          ).length
+                        : item.id === "documents"
+                          ? data.dashboard.summary.pendingCount +
+                            data.dashboard.summary.rejectedCount
+                          : data.periods.filter((period) => period.status !== "closed").length,
+              }))}
+            label="Seções do módulo fiscal"
+            onChange={navigateSection}
           />
 
           {feedback && (
@@ -245,263 +288,689 @@ export function RealFiscalPage({ scope }: { scope: ManagementScope }) {
             </div>
           )}
 
-          <div className="fiscal-columns">
-            <Card className="fiscal-section-card">
-              <SectionHeading
-                eyebrow="Próxima ação"
-                title="Pendências"
-                badge={`${data.dashboard.pending.length} aberta(s)`}
-                tone={data.dashboard.pending.length ? "warning" : "success"}
-              />
-              {data.dashboard.pending.length ? (
-                <div className="fiscal-list">
-                  {data.dashboard.pending.map((item) => (
-                    <article className="fiscal-list-row" key={item.id}>
-                      <Badge tone={fiscalTone(item.severity)}>{severityLabel(item.severity)}</Badge>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                      </div>
-                      <a className="fiscal-row-action" href={pendingActionHref(item.id)}>
-                        Resolver
-                      </a>
-                    </article>
-                  ))}
+          {section === "overview" && (
+            <section aria-label="Saúde fiscal" className="fiscal-health-grid" id="fiscal-overview">
+              <Card className="fiscal-provider-card" data-status={data.dashboard.provider.status}>
+                <div>
+                  <p className="eyebrow">Situação atual</p>
+                  <h2>Emissão fiscal</h2>
+                  <p>
+                    {data.dashboard.provider.lastSyncAt
+                      ? `Última verificação: ${dateLabel(data.dashboard.provider.lastSyncAt)}`
+                      : providerBusinessMessage(data.dashboard.provider.status)}
+                  </p>
                 </div>
-              ) : (
-                <EmptyState
-                  description="Nenhuma exceção fiscal exige ação nesta unidade."
-                  icon={<Icon name="check" />}
-                  title="Fiscal em dia"
+                <div className="fiscal-provider-card__status">
+                  <Badge tone={fiscalTone(data.dashboard.provider.status)}>
+                    {providerLabel(data.dashboard.provider.status)}
+                  </Badge>
+                  <small>
+                    {data.dashboard.provider.environment === "production"
+                      ? "Produção — validade fiscal"
+                      : data.dashboard.provider.environment === "homologation"
+                        ? "Ambiente de testes"
+                        : "Ambiente pendente"}
+                  </small>
+                  {data.dashboard.provider.registered && canConfigure ? (
+                    <Button
+                      disabled={busy !== null}
+                      onClick={() => void checkProvider()}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      <Icon name="refresh" size={14} />
+                      {busy === "provider:check" ? "Verificando…" : "Verificar emissão"}
+                    </Button>
+                  ) : canConfigure ? (
+                    <Button onClick={() => navigateSection("setup")} size="sm" variant="ghost">
+                      Completar cadastro
+                    </Button>
+                  ) : null}
+                </div>
+              </Card>
+              <div className="fiscal-metrics">
+                <Metric
+                  label="Autorizados"
+                  value={data.dashboard.summary.authorizedCount}
+                  tone="success"
                 />
-              )}
-            </Card>
+                <Metric
+                  label="Pendentes"
+                  value={data.dashboard.summary.pendingCount}
+                  tone="warning"
+                />
+                <Metric
+                  label="Rejeitados"
+                  value={data.dashboard.summary.rejectedCount}
+                  tone="danger"
+                />
+                <Metric
+                  label="Total exibido"
+                  value={formatMoney(data.dashboard.summary.totalCents)}
+                  tone="info"
+                />
+              </div>
+            </section>
+          )}
 
-            <Card className="fiscal-section-card">
-              <SectionHeading eyebrow="Competências" title="Fechamento" />
-              {data.periods.length ? (
-                <div className="fiscal-list">
-                  {data.periods.map((period) => {
-                    const action = period.status === "closed" ? "reopen" : "close";
-                    const actionKey = `${period.competence}:${action}`;
-                    return (
-                      <article className="fiscal-period-row" key={period.competence}>
-                        <div>
-                          <strong>{competenceLabel(period.competence)}</strong>
-                          <span>
-                            {formatMoney(period.grossTotalCents)} · {period.authorizedCount}{" "}
-                            documento(s)
-                          </span>
-                          {period.blockers.length > 0 && (
-                            <small>{period.blockers.join(" · ")}</small>
-                          )}
-                        </div>
-                        <div className="fiscal-period-row__action">
-                          <Badge tone={fiscalTone(period.status)}>
-                            {periodLabel(period.status)}
-                          </Badge>
-                          <Button
-                            disabled={
-                              busy !== null || (action === "close" && period.blockers.length > 0)
-                            }
-                            onClick={() => void changePeriod(period, action)}
-                            size="sm"
-                            variant={action === "reopen" ? "danger" : "secondary"}
-                          >
-                            {busy === actionKey
-                              ? "Salvando…"
-                              : action === "close"
-                                ? "Fechar"
-                                : "Reabrir"}
-                          </Button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  description="A API ainda não abriu competências para esta unidade."
-                  icon={<Icon name="clock" />}
-                  title="Sem competências"
+          {section === "overview" && (
+            <FiscalActivationChecklist
+              canConfigure={canConfigure}
+              onNavigate={navigateSection}
+              profile={data.profile}
+              provider={data.dashboard.provider}
+              products={data.products}
+              taxRevisions={data.taxRevisions}
+            />
+          )}
+
+          {section === "overview" && (
+            <FiscalPreventiveAlerts
+              canConfigure={canConfigure}
+              documents={data.documents}
+              onNavigate={navigateSection}
+              profile={data.profile}
+              provider={data.dashboard.provider}
+            />
+          )}
+
+          <div className="fiscal-columns fiscal-columns--single">
+            {section === "overview" && (
+              <Card className="fiscal-section-card">
+                <SectionHeading
+                  eyebrow="Próxima ação"
+                  title="Pendências"
+                  badge={`${data.dashboard.pending.length} aberta(s)`}
+                  tone={data.dashboard.pending.length ? "warning" : "success"}
                 />
-              )}
-            </Card>
+                {data.dashboard.pending.length ? (
+                  <div className="fiscal-list">
+                    {data.dashboard.pending.map((item) => {
+                      const target = pendingActionSection(item.id);
+                      return (
+                        <article className="fiscal-list-row" key={item.id}>
+                          <Badge tone={fiscalTone(item.severity)}>
+                            {severityLabel(item.severity)}
+                          </Badge>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <p>{item.detail}</p>
+                          </div>
+                          {target !== "setup" || canConfigure ? (
+                            <Button
+                              className="fiscal-row-action"
+                              onClick={() => navigateSection(target)}
+                              size="sm"
+                              variant="ghost"
+                            >
+                              Resolver
+                            </Button>
+                          ) : (
+                            <small>Proprietário</small>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    description="Nenhuma exceção fiscal exige ação nesta unidade."
+                    icon={<Icon name="check" />}
+                    title="Fiscal em dia"
+                  />
+                )}
+              </Card>
+            )}
+
+            {section === "closing" && (
+              <Card className="fiscal-section-card">
+                <SectionHeading eyebrow="Competências" title="Fechamento mensal" />
+                {data.periods.length ? (
+                  <div className="fiscal-list">
+                    {data.periods.map((period) => {
+                      const action = period.status === "closed" ? "reopen" : "close";
+                      const actionKey = `${period.competence}:${action}`;
+                      return (
+                        <article className="fiscal-period-row" key={period.competence}>
+                          <div>
+                            <strong>{competenceLabel(period.competence)}</strong>
+                            <span>
+                              {formatMoney(period.grossTotalCents)} · {period.authorizedCount}{" "}
+                              documento(s)
+                            </span>
+                            {period.blockers.length > 0 && (
+                              <small>{period.blockers.join(" · ")}</small>
+                            )}
+                          </div>
+                          <div className="fiscal-period-row__action">
+                            <Badge tone={fiscalTone(period.status)}>
+                              {periodLabel(period.status)}
+                            </Badge>
+                            {((action === "close" && canClosePeriods) ||
+                              (action === "reopen" && canReopenPeriods)) && (
+                              <Button
+                                disabled={
+                                  busy !== null ||
+                                  (action === "close" && period.blockers.length > 0)
+                                }
+                                onClick={() => void changePeriod(period, action)}
+                                size="sm"
+                                variant={action === "reopen" ? "danger" : "secondary"}
+                              >
+                                {busy === actionKey
+                                  ? "Salvando…"
+                                  : action === "close"
+                                    ? "Fechar"
+                                    : "Reabrir"}
+                              </Button>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    description="Nenhuma competência mensal está disponível para esta unidade."
+                    icon={<Icon name="clock" />}
+                    title="Sem competências"
+                  />
+                )}
+              </Card>
+            )}
           </div>
 
-          <FiscalConfiguration
-            key={`${scope.organizationId}:${scope.unitId}`}
-            onSaved={() => setRefresh((value) => value + 1)}
-            profile={data.profile}
-            scope={scope}
-          />
-
-          <FocusOnboarding
-            onActivated={() => setRefresh((value) => value + 1)}
-            profile={data.profile}
-            provider={data.dashboard.provider}
-            scope={scope}
-          />
-
-          <Card className="fiscal-section-card">
-            <TaxRevisionForm
-              activeProductIds={
-                new Set(
-                  data.taxRevisions
-                    .filter((revision) => revision.status === "active")
-                    .map((revision) => revision.productId),
-                )
-              }
-              enabled={Boolean(data.profile?.stateCode && data.profile.cityCode)}
+          {section === "setup" && canConfigure && (
+            <FiscalConfiguration
+              key={`${scope.organizationId}:${scope.unitId}`}
               onSaved={() => setRefresh((value) => value + 1)}
-              products={data.products}
+              profile={data.profile}
               scope={scope}
             />
-          </Card>
+          )}
 
-          <Card className="fiscal-section-card" id="fiscal-documents">
-            <SectionHeading
-              eyebrow="Livro fiscal"
-              title="Documentos fiscais"
-              badge={`${data.documents.length} exibido(s)`}
+          {section === "setup" && canConfigure && (
+            <FocusOnboarding
+              companyDefaults={companyDefaults}
+              onActivated={() => setRefresh((value) => value + 1)}
+              profile={data.profile}
+              provider={data.dashboard.provider}
+              scope={scope}
             />
-            <form
-              className="fiscal-document-filters"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                setDocumentFilters(
-                  Object.fromEntries(
-                    ["status", "model", "from", "to", "search"].flatMap((key) => {
-                      const value = String(form.get(key) ?? "").trim();
-                      return value ? [[key, value]] : [];
-                    }),
-                  ) as typeof documentFilters,
-                );
-              }}
-            >
-              <Input
-                aria-label="Buscar por chave ou destinatário"
-                name="search"
-                placeholder="Chave ou destinatário"
-                type="search"
+          )}
+
+          {section === "products" && (
+            <Card className="fiscal-section-card">
+              <TaxRevisionForm
+                activeProductIds={
+                  new Set(
+                    data.taxRevisions
+                      .filter((revision) => revision.status === "active")
+                      .map((revision) => revision.productId),
+                  )
+                }
+                enabled={Boolean(data.profile?.stateCode && data.profile.cityCode)}
+                canEdit={canConfigure}
+                onSaved={() => setRefresh((value) => value + 1)}
+                products={data.products}
+                scope={scope}
               />
-              <NativeSelect aria-label="Filtrar por modelo" name="model">
-                <option value="">Todos os modelos</option>
-                <option value="nfce">NFC-e</option>
-                <option value="nfe">NF-e</option>
-                <option value="nfse">NFS-e</option>
-              </NativeSelect>
-              <NativeSelect aria-label="Filtrar por status" name="status">
-                <option value="">Todos os status</option>
-                {["pending", "processing", "authorized", "rejected", "contingency", "canceled"].map(
-                  (status) => (
-                    <option key={status} value={status}>
-                      {documentLabel(status)}
-                    </option>
-                  ),
+            </Card>
+          )}
+
+          {section === "documents" && (
+            <>
+              <Card className="fiscal-section-card" id="fiscal-documents">
+                <SectionHeading
+                  eyebrow="Emissão fiscal"
+                  title="Notas fiscais"
+                  badge={`${data.documents.length} exibido(s)`}
+                />
+                <form
+                  className="fiscal-document-filters"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = new FormData(event.currentTarget);
+                    setDocumentFilters(
+                      Object.fromEntries(
+                        ["status", "model", "from", "to", "search"].flatMap((key) => {
+                          const value = String(form.get(key) ?? "").trim();
+                          return value ? [[key, value]] : [];
+                        }),
+                      ) as typeof documentFilters,
+                    );
+                  }}
+                >
+                  <Input
+                    aria-label="Buscar por chave ou destinatário"
+                    name="search"
+                    placeholder="Chave ou destinatário"
+                    type="search"
+                  />
+                  <NativeSelect aria-label="Filtrar por status" name="status">
+                    <option value="">Todos os status</option>
+                    {[
+                      "pending",
+                      "processing",
+                      "authorized",
+                      "rejected",
+                      "contingency",
+                      "canceled",
+                    ].map((status) => (
+                      <option key={status} value={status}>
+                        {documentLabel(status)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <Input aria-label="Emitidos a partir de" name="from" type="date" />
+                  <Input aria-label="Emitidos até" name="to" type="date" />
+                  <Button size="sm" type="submit" variant="secondary">
+                    <Icon name="search" size={14} /> Filtrar
+                  </Button>
+                  <Button
+                    onClick={(event) => {
+                      event.currentTarget.form?.reset();
+                      setDocumentFilters({});
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    Limpar
+                  </Button>
+                </form>
+                {data.documents.length ? (
+                  <div className="fiscal-document-list">
+                    {data.documents.map((document) => (
+                      <article className="fiscal-document-row" key={document.id}>
+                        <div className="fiscal-document-row__identity">
+                          <strong>
+                            {modelLabel(document.model)} {document.number}
+                          </strong>
+                          <span>
+                            Série {document.series} · {dateLabel(document.issuedAt)}
+                          </span>
+                        </div>
+                        <span>{document.recipientName ?? "Consumidor não identificado"}</span>
+                        <strong>{formatMoney(document.totalCents)}</strong>
+                        <Badge tone={fiscalTone(document.status)}>
+                          {documentLabel(document.status)}
+                        </Badge>
+                        <div className="fiscal-document-row__actions">
+                          <Button
+                            onClick={() => void openDocument(document.id)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Ver detalhes
+                          </Button>
+                          <Button
+                            disabled={busy !== null}
+                            onClick={() => void changeDocument(document.id, "reconcile")}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            {busy === `document:${document.id}:reconcile`
+                              ? "Atualizando…"
+                              : "Atualizar"}
+                          </Button>
+                          {document.status === "authorized" && canCancelDocuments && (
+                            <Button
+                              disabled={busy !== null}
+                              onClick={() => void changeDocument(document.id, "cancel")}
+                              size="sm"
+                              variant="danger"
+                            >
+                              Cancelar
+                            </Button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    description="Nenhuma nota fiscal foi encontrada com os filtros informados."
+                    icon={<Icon name="list" />}
+                    title="Sem notas fiscais"
+                  />
                 )}
-              </NativeSelect>
-              <Input aria-label="Emitidos a partir de" name="from" type="date" />
-              <Input aria-label="Emitidos até" name="to" type="date" />
-              <Button size="sm" type="submit" variant="secondary">
-                <Icon name="search" size={14} /> Filtrar
-              </Button>
-              <Button
-                onClick={(event) => {
-                  event.currentTarget.form?.reset();
-                  setDocumentFilters({});
-                }}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                Limpar
-              </Button>
-            </form>
-            {data.documents.length ? (
-              <div className="fiscal-document-list">
-                {data.documents.map((document) => (
-                  <article className="fiscal-document-row" key={document.id}>
-                    <div className="fiscal-document-row__identity">
-                      <strong>
-                        {modelLabel(document.model)} {document.number}
-                      </strong>
-                      <span>
-                        Série {document.series} · {dateLabel(document.issuedAt)}
-                      </span>
-                    </div>
-                    <span>{document.recipientName ?? "Consumidor não identificado"}</span>
-                    <strong>{formatMoney(document.totalCents)}</strong>
-                    <Badge tone={fiscalTone(document.status)}>
-                      {documentLabel(document.status)}
-                    </Badge>
-                    <div className="fiscal-document-row__actions">
-                      <Button
-                        disabled={busy !== null}
-                        onClick={() => void changeDocument(document.id, "reconcile")}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {busy === `document:${document.id}:reconcile`
-                          ? "Atualizando…"
-                          : "Atualizar"}
-                      </Button>
-                      {document.status === "authorized" && (
-                        <Button
-                          disabled={busy !== null}
-                          onClick={() => void changeDocument(document.id, "cancel")}
-                          size="sm"
-                          variant="danger"
-                        >
-                          Cancelar
-                        </Button>
-                      )}
-                      {artifacts[document.id]?.pdfUrl && (
-                        <a
-                          href={artifacts[document.id]?.pdfUrl ?? undefined}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          DANFE
-                        </a>
-                      )}
-                      {artifacts[document.id]?.xmlUrl && (
-                        <a
-                          href={artifacts[document.id]?.xmlUrl ?? undefined}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          XML
-                        </a>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                description="Nenhum documento retornado para esta unidade."
-                icon={<Icon name="list" />}
-                title="Sem documentos"
+              </Card>
+              <NumberInvalidationPanel
+                canCreate={canConfigure}
+                items={data.numberInvalidations}
+                onSaved={() => setRefresh((value) => value + 1)}
+                scope={scope}
               />
-            )}
-          </Card>
+            </>
+          )}
+          <FiscalDocumentDetailModal
+            onClose={() => setDocumentDetail(null)}
+            onRetry={(documentId) => void openDocument(documentId)}
+            scope={scope}
+            state={documentDetail}
+          />
         </div>
       )}
     </RemoteGate>
   );
 }
 
+function FiscalDocumentDetailModal({
+  onClose,
+  onRetry,
+  scope,
+  state,
+}: {
+  onClose: () => void;
+  onRetry: (documentId: string) => void;
+  scope: ManagementScope;
+  state:
+    | { status: "loading"; id: string }
+    | { status: "ready"; data: FiscalDocumentDetail }
+    | { status: "error"; id: string; message: string }
+    | null;
+}) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const document = state?.status === "ready" ? state.data : null;
+
+  async function downloadArtifact(
+    documentId: string,
+    kind: "authorization_xml" | "cancellation_xml" | "danfe_pdf",
+  ) {
+    setDownloading(kind);
+    try {
+      saveDownloadedFile(
+        await api.fiscal.documentArtifact(scope.organizationId, scope.unitId, documentId, kind),
+      );
+    } finally {
+      setDownloading(null);
+    }
+  }
+  return (
+    <Modal
+      description={
+        document ? `${modelLabel(document.model)} · ${documentLabel(document.status)}` : undefined
+      }
+      isOpen={state !== null}
+      onClose={onClose}
+      size="lg"
+      title={document ? `Nota fiscal ${document.number}` : "Detalhes da nota fiscal"}
+    >
+      {state?.status === "loading" && (
+        <div className="remote-state" role="status">
+          <span aria-hidden="true" className="spinner" />
+          <strong>Carregando detalhes…</strong>
+        </div>
+      )}
+      {state?.status === "error" && (
+        <div className="remote-state" role="alert">
+          <strong>Falha ao carregar a nota</strong>
+          <p>{state.message}</p>
+          <Button onClick={() => onRetry(state.id)} size="sm" variant="secondary">
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+      {document && (
+        <div className="fiscal-document-detail">
+          <dl className="fiscal-document-detail__summary">
+            <div>
+              <dt>Emissão</dt>
+              <dd>{dateLabel(document.issuedAt)}</dd>
+            </div>
+            <div>
+              <dt>Total</dt>
+              <dd>{formatMoney(document.totalCents)}</dd>
+            </div>
+            <div>
+              <dt>Tributos</dt>
+              <dd>{formatMoney(document.taxCents)}</dd>
+            </div>
+            <div>
+              <dt>Venda vinculada</dt>
+              <dd>{document.tabId || document.orderId ? "Sim" : "Não"}</dd>
+            </div>
+          </dl>
+          {document.accessKey && (
+            <div className="fiscal-document-detail__key">
+              <span>Chave de acesso</span>
+              <code>{document.accessKey}</code>
+            </div>
+          )}
+          {document.artifacts.length > 0 && (
+            <div className="fiscal-form-actions">
+              {document.artifacts.map((artifact) => (
+                <Button
+                  disabled={downloading !== null}
+                  key={artifact.kind}
+                  onClick={() => void downloadArtifact(document.id, artifact.kind)}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Icon name="download" size={14} />
+                  {artifact.kind === "danfe_pdf"
+                    ? "Baixar DANFE"
+                    : artifact.kind === "cancellation_xml"
+                      ? "Baixar XML de cancelamento"
+                      : "Baixar XML"}
+                </Button>
+              ))}
+            </div>
+          )}
+          {document.status === "rejected" && (
+            <div className="fiscal-preventive-alert" role="alert">
+              <Icon name="alert-circle" size={16} />
+              <div>
+                <strong>Como resolver</strong>
+                <p>{latestRejectionGuidance(document)}</p>
+              </div>
+            </div>
+          )}
+          <section aria-labelledby="fiscal-document-items-title">
+            <h3 id="fiscal-document-items-title">Itens da nota</h3>
+            {document.items.length ? (
+              <div className="fiscal-document-detail__items">
+                {document.items.map((item) => (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.description}</strong>
+                      <span>{formatFiscalQuantity(item.quantityMilli)}</span>
+                    </div>
+                    <strong>{formatMoney(item.totalCents)}</strong>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="fiscal-document-detail__empty">Nenhum item retornado para esta nota.</p>
+            )}
+          </section>
+          <section aria-labelledby="fiscal-document-events-title">
+            <h3 id="fiscal-document-events-title">Histórico</h3>
+            <ol className="fiscal-document-timeline">
+              {document.events.map((event) => (
+                <li key={event.id}>
+                  <span aria-hidden="true" />
+                  <div>
+                    <strong>{documentEventLabel(event.type, event.status)}</strong>
+                    <small>{dateLabel(event.occurredAt)}</small>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function NumberInvalidationPanel({
+  canCreate,
+  items,
+  onSaved,
+  scope,
+}: {
+  canCreate: boolean;
+  items: Array<{
+    id: string;
+    series: string;
+    initialNumber: number;
+    finalNumber: number;
+    justification: string;
+    status: "processing" | "invalidated" | "rejected";
+    errorMessage: string | null;
+    createdAt: string;
+  }>;
+  onSaved: () => void;
+  scope: ManagementScope;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const body = {
+      series: String(form.get("series") ?? "").trim(),
+      initialNumber: Number(form.get("initialNumber")),
+      finalNumber: Number(form.get("finalNumber")),
+      justification: String(form.get("justification") ?? "").trim(),
+    };
+    if (body.justification.length < 15) {
+      setFeedback("Informe uma justificativa com pelo menos 15 caracteres.");
+      return;
+    }
+    setBusy("create");
+    setFeedback(null);
+    try {
+      await api.fiscal.invalidateNumbers(scope.organizationId, scope.unitId, body);
+      event.currentTarget.reset();
+      setFeedback("Solicitação de inutilização registrada.");
+      onSaved();
+    } catch (error) {
+      setFeedback(customerFiscalError(error, "Não foi possível inutilizar a numeração."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function download(invalidationId: string) {
+    setBusy(invalidationId);
+    try {
+      saveDownloadedFile(
+        await api.fiscal.numberInvalidationArtifact(
+          scope.organizationId,
+          scope.unitId,
+          invalidationId,
+        ),
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="fiscal-section-card fiscal-number-invalidations">
+      <SectionHeading
+        badge={items.length ? `${items.length} registro(s)` : undefined}
+        eyebrow="Numeração fiscal"
+        title="Inutilizações"
+      />
+      <p className="fiscal-muted">
+        Use somente para faixas que não foram usadas. A solicitação é enviada à SEFAZ e não pode ser
+        desfeita.
+      </p>
+      {canCreate && (
+        <details className="gm-disclosure">
+          <summary>Inutilizar uma faixa</summary>
+          <form className="gm-disclosure__content gm-form-stack" onSubmit={submit}>
+            <div className="gm-form-grid fiscal-profile-grid">
+              <label className="gm-form-field">
+                <span>Série</span>
+                <Input inputMode="numeric" maxLength={3} name="series" pattern="\d{1,3}" required />
+              </label>
+              <label className="gm-form-field">
+                <span>Número inicial</span>
+                <Input min={1} name="initialNumber" required type="number" />
+              </label>
+              <label className="gm-form-field">
+                <span>Número final</span>
+                <Input min={1} name="finalNumber" required type="number" />
+              </label>
+              <label className="gm-form-field fiscal-field--wide">
+                <span>Justificativa</span>
+                <Textarea minLength={15} name="justification" required rows={3} />
+              </label>
+            </div>
+            <Button disabled={busy !== null} type="submit" variant="danger">
+              {busy === "create" ? "Enviando…" : "Confirmar inutilização"}
+            </Button>
+          </form>
+        </details>
+      )}
+      {feedback && (
+        <p aria-live="polite" className="fiscal-form-feedback">
+          {feedback}
+        </p>
+      )}
+      {items.length > 0 && (
+        <div className="fiscal-document-list">
+          {items.map((item) => (
+            <article className="fiscal-document-row" key={item.id}>
+              <div className="fiscal-document-row__identity">
+                <strong>
+                  Série {item.series} · {item.initialNumber}–{item.finalNumber}
+                </strong>
+                <span>{dateLabel(item.createdAt)}</span>
+              </div>
+              <span>{item.justification}</span>
+              <Badge
+                tone={
+                  item.status === "invalidated"
+                    ? "success"
+                    : item.status === "rejected"
+                      ? "danger"
+                      : "info"
+                }
+              >
+                {item.status === "invalidated"
+                  ? "Inutilizada"
+                  : item.status === "rejected"
+                    ? "Rejeitada"
+                    : "Processando"}
+              </Badge>
+              {item.status === "invalidated" && (
+                <Button
+                  disabled={busy !== null}
+                  onClick={() => void download(item.id)}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Icon name="download" size={14} /> XML
+                </Button>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function FiscalActivationChecklist({
+  canConfigure,
+  onNavigate,
   profile,
   provider,
   products,
   taxRevisions,
 }: {
+  canConfigure: boolean;
+  onNavigate: (section: FiscalSection) => void;
   profile: FiscalProfile | null;
   provider: FiscalDashboard["provider"];
-  products: Array<{ id: string; name: string }>;
+  products: Array<{ id: string; name: string; categoryId: string; categoryName: string }>;
   taxRevisions: Array<{ productId: string; status: "draft" | "active" | "revoked" }>;
 }) {
   const activeProducts = new Set(
@@ -512,42 +981,38 @@ function FiscalActivationChecklist({
   const selectedEnvironmentReady = profile ? provider.environments[profile.environment] : false;
   const steps = [
     {
-      label: "Conta Focus NFe do GiroMesa configurada no ambiente",
+      label: "Serviço de emissão disponível",
       done: provider.status !== "platform_not_configured",
-      href: "#fiscal-provider-onboarding",
+      section: "setup" as const,
     },
     {
-      label: "Perfil fiscal, UF e município confirmados",
+      label: "Dados tributários, UF e município confirmados",
       done: Boolean(profile?.stateCode && profile.cityCode && profile.provider === "focus"),
-      href: "#fiscal-configuration",
+      section: "setup" as const,
     },
     {
-      label: "Empresa emitente vinculada à conta GiroMesa",
-      done: Boolean(provider.companyId),
-      href: "#fiscal-provider-onboarding",
+      label: "Empresa habilitada para emissão",
+      done: provider.registered,
+      section: "setup" as const,
     },
     {
-      label: `Token de ${profile?.environment === "production" ? "produção" : "homologação"} sincronizado`,
+      label: `${profile?.environment === "production" ? "Produção" : "Ambiente de testes"} pronto para emitir`,
       done: selectedEnvironmentReady,
-      href: "#fiscal-provider-onboarding",
+      section: "setup" as const,
     },
     {
       label: "Todos os produtos ativos classificados",
       done: products.length > 0 && products.every((product) => activeProducts.has(product.id)),
-      href: "#fiscal-classification",
+      section: "products" as const,
     },
   ];
   const complete = steps.filter((step) => step.done).length;
-  const certificateDays = provider.certificateValidUntil
-    ? Math.ceil((new Date(provider.certificateValidUntil).getTime() - Date.now()) / 86_400_000)
-    : null;
-
   return (
     <Card className="fiscal-section-card fiscal-activation" id="fiscal-activation">
       <SectionHeading
         badge={`${complete}/${steps.length} concluídas`}
         eyebrow="Próxima ação"
-        title="Ativação fiscal"
+        title="Preparação para emitir"
         tone={complete === steps.length ? "success" : "warning"}
       />
       <ol className="fiscal-checklist">
@@ -555,18 +1020,95 @@ function FiscalActivationChecklist({
           <li className={step.done ? "is-complete" : ""} key={step.label}>
             <Icon name={step.done ? "check" : "clock"} size={16} />
             <span>{step.label}</span>
-            {!step.done && <a href={step.href}>Resolver</a>}
+            {!step.done && canConfigure && (
+              <Button onClick={() => onNavigate(step.section)} size="sm" variant="ghost">
+                Resolver
+              </Button>
+            )}
           </li>
         ))}
       </ol>
-      {certificateDays !== null && certificateDays <= 45 && (
-        <p className="fiscal-preventive-alert" role="alert">
-          <Icon name="alert-circle" size={16} />
-          {certificateDays < 0
-            ? "O certificado A1 está vencido. Atualize-o antes de emitir."
-            : `O certificado A1 vence em ${certificateDays} dia(s). Programe a renovação.`}
-        </p>
-      )}
+    </Card>
+  );
+}
+
+function FiscalPreventiveAlerts({
+  canConfigure,
+  documents,
+  onNavigate,
+  profile,
+  provider,
+}: {
+  canConfigure: boolean;
+  documents: FiscalDocument[];
+  onNavigate: (section: FiscalSection) => void;
+  profile: FiscalProfile | null;
+  provider: FiscalDashboard["provider"];
+}) {
+  const certificateDays = provider.certificateValidUntil
+    ? Math.ceil((new Date(provider.certificateValidUntil).getTime() - Date.now()) / 86_400_000)
+    : null;
+  const delayedDocuments = documents.filter(
+    (document) =>
+      ["pending", "processing", "contingency"].includes(document.status) &&
+      Date.now() - new Date(document.issuedAt).getTime() > 10 * 60_000,
+  ).length;
+  const alerts = [
+    ...(certificateDays !== null && certificateDays <= 60
+      ? [
+          {
+            id: "certificate",
+            text:
+              certificateDays < 0
+                ? "Certificado A1 vencido. A emissão pode ser interrompida."
+                : `Certificado A1 vence em ${certificateDays} dia(s). ${certificateDays <= 15 ? "Renove agora." : "Programe a renovação."}`,
+            section: "setup" as const,
+          },
+        ]
+      : []),
+    ...(profile?.environment === "production" && !provider.environments.production
+      ? [
+          {
+            id: "production",
+            text: "Produção selecionada, mas a empresa ainda não está pronta para emitir.",
+            section: "setup" as const,
+          },
+        ]
+      : []),
+    ...(delayedDocuments
+      ? [
+          {
+            id: "delayed",
+            text: `${delayedDocuments} nota(s) aguardam retorno há mais de 10 minutos.`,
+            section: "documents" as const,
+          },
+        ]
+      : []),
+  ];
+  if (!alerts.length) return null;
+  return (
+    <Card className="fiscal-section-card fiscal-preventive-alerts">
+      <SectionHeading
+        badge={`${alerts.length} alerta(s)`}
+        eyebrow="Prevenção"
+        title="Alertas fiscais"
+        tone="warning"
+      />
+      <div className="fiscal-list">
+        {alerts.map((alert) => (
+          <article className="fiscal-list-row" key={alert.id}>
+            <Icon name="alert-circle" size={16} />
+            <span>{alert.text}</span>
+            {alert.section !== "setup" || canConfigure ? (
+              <Button onClick={() => onNavigate(alert.section)} size="sm" variant="ghost">
+                Ver
+              </Button>
+            ) : (
+              <small>Avise o proprietário</small>
+            )}
+          </article>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -587,11 +1129,11 @@ function FiscalConfiguration({
   if (!draft) {
     return (
       <Card className="fiscal-section-card">
-        <SectionHeading eyebrow="Configuração" title="Perfil fiscal" tone="warning" />
+        <SectionHeading eyebrow="Cadastro fiscal" title="Dados tributários" tone="warning" />
         <EmptyState
-          description="A unidade ainda não possui perfil fiscal. Vincule primeiro a entidade legal no onboarding para liberar a configuração segura."
+          description="A unidade não possui uma empresa vinculada. Informe este cadastro ao suporte GiroMesa."
           icon={<Icon name="alert-circle" />}
-          title="Perfil fiscal pendente"
+          title="Vínculo empresarial pendente"
         />
       </Card>
     );
@@ -605,16 +1147,15 @@ function FiscalConfiguration({
     try {
       await api.fiscal.updateProfile(scope.organizationId, scope.unitId, {
         ...draft,
+        provider: "focus",
         municipalRegistration: draft.municipalRegistration || undefined,
         cnae: draft.cnae || undefined,
         series: Object.fromEntries(Object.entries(draft.series).filter(([, value]) => value)),
       });
-      setFeedback("Perfil fiscal atualizado.");
+      setFeedback("Dados tributários atualizados.");
       onSaved();
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : "Não foi possível salvar o perfil fiscal.",
-      );
+      setFeedback(customerFiscalError(error, "Não foi possível salvar os dados tributários."));
     } finally {
       setBusy(false);
     }
@@ -625,7 +1166,7 @@ function FiscalConfiguration({
 
   return (
     <Card className="fiscal-section-card fiscal-configuration" id="fiscal-configuration">
-      <SectionHeading eyebrow="Configuração" title="Perfil fiscal" />
+      <SectionHeading eyebrow="Cadastro fiscal" title="Dados tributários" />
       <form className="gm-form-stack" onSubmit={save}>
         <div className="gm-form-grid fiscal-profile-grid">
           <label className="gm-form-field">
@@ -681,32 +1222,36 @@ function FiscalConfiguration({
             />
           </label>
           <label className="gm-form-field">
-            <span>Ambiente</span>
+            <span>Tipo de emissão</span>
             <NativeSelect
               className="gm-control"
-              onChange={(event) =>
-                update("environment", event.target.value as FiscalProfile["environment"])
-              }
+              onChange={(event) => {
+                const environment = event.target.value as FiscalProfile["environment"];
+                if (
+                  environment === "production" &&
+                  !window.confirm(
+                    "Mudar para produção? As próximas notas emitidas terão validade fiscal.",
+                  )
+                ) {
+                  event.target.value = draft.environment;
+                  return;
+                }
+                update("environment", environment);
+              }}
               value={draft.environment}
             >
-              <option value="homologation">Homologação</option>
-              <option value="production">Produção</option>
-            </NativeSelect>
-          </label>
-          <label className="gm-form-field">
-            <span>Provedor</span>
-            <NativeSelect
-              className="gm-control"
-              onChange={(event) =>
-                update("provider", event.target.value === "focus" ? "focus" : null)
-              }
-              value={draft.provider ?? ""}
-            >
-              <option value="">Não configurado</option>
-              <option value="focus">Focus NFe</option>
+              <option value="homologation">Testes — sem validade fiscal</option>
+              <option value="production">Produção — com validade fiscal</option>
             </NativeSelect>
           </label>
         </div>
+        {draft.environment === "production" && (
+          <p className="fiscal-preventive-alert" role="status">
+            <Icon name="alert-circle" size={16} />
+            Em produção, as notas emitidas possuem validade fiscal. Confira os dados antes de
+            salvar.
+          </p>
+        )}
         <details className="gm-disclosure">
           <summary>Inscrições e séries</summary>
           <div className="gm-disclosure__content gm-form-grid fiscal-profile-grid">
@@ -730,23 +1275,21 @@ function FiscalConfiguration({
                 value={draft.cnae ?? ""}
               />
             </label>
-            {(["nfce", "nfe", "nfse"] as const).map((model) => (
-              <label className="gm-form-field" key={model}>
-                <span>Série {model.toUpperCase()}</span>
-                <Input
-                  className="gm-control"
-                  maxLength={20}
-                  onChange={(event) =>
-                    setDraft((current) =>
-                      current
-                        ? { ...current, series: { ...current.series, [model]: event.target.value } }
-                        : current,
-                    )
-                  }
-                  value={draft.series[model]}
-                />
-              </label>
-            ))}
+            <label className="gm-form-field">
+              <span>Série NFC-e</span>
+              <Input
+                className="gm-control"
+                maxLength={20}
+                onChange={(event) =>
+                  setDraft((current) =>
+                    current
+                      ? { ...current, series: { ...current.series, nfce: event.target.value } }
+                      : current,
+                  )
+                }
+                value={draft.series.nfce}
+              />
+            </label>
           </div>
         </details>
         {feedback && (
@@ -756,7 +1299,7 @@ function FiscalConfiguration({
         )}
         <Button disabled={busy} type="submit">
           {!busy && <Icon name="check" size={16} />}
-          {busy ? "Salvando…" : "Salvar perfil fiscal"}
+          {busy ? "Salvando…" : "Salvar dados fiscais"}
         </Button>
       </form>
     </Card>
@@ -764,11 +1307,13 @@ function FiscalConfiguration({
 }
 
 function FocusOnboarding({
+  companyDefaults,
   onActivated,
   profile,
   provider,
   scope,
 }: {
+  companyDefaults: { tradeName: string; city: string };
   onActivated: () => void;
   profile: FiscalProfile | null;
   provider: FiscalDashboard["provider"];
@@ -778,7 +1323,28 @@ function FocusOnboarding({
   const [certificateName, setCertificateName] = useState("");
   const [busy, setBusy] = useState<"validate" | "activate" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [editing, setEditing] = useState(!provider.companyId);
+  const [editing, setEditing] = useState(!provider.registered);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  function validateStep(form: HTMLFormElement | null, selector: string) {
+    const controls = Array.from(
+      form?.querySelectorAll<HTMLInputElement>(`${selector} input`) ?? [],
+    );
+    const invalid = controls.find((control) => !control.checkValidity());
+    if (!invalid) return true;
+    invalid.reportValidity();
+    return false;
+  }
+
+  function reviewRegistration(form: HTMLFormElement | null) {
+    if (!validateStep(form, '[data-onboarding-step="certificate"]')) return;
+    if (!certificateBase64) {
+      setFeedback("Selecione o certificado A1 em formato PFX ou P12.");
+      return;
+    }
+    setFeedback(null);
+    setStep(3);
+  }
 
   async function certificateChanged(file: File | undefined) {
     setFeedback(null);
@@ -805,6 +1371,7 @@ function FocusOnboarding({
     if (!profile) return;
     if (!certificateBase64) {
       setFeedback("Selecione o certificado A1 em formato PFX ou P12.");
+      setStep(2);
       return;
     }
     const form = new FormData(formElement);
@@ -823,9 +1390,9 @@ function FocusOnboarding({
       accountantDocument: optional("accountantDocument")?.replace(/\D/g, ""),
       certificateBase64,
       certificatePassword: String(form.get("certificatePassword") ?? ""),
-      enableNfce: form.has("enableNfce"),
-      enableNfe: form.has("enableNfe"),
-      enableNfse: form.has("enableNfse"),
+      enableNfce: true,
+      enableNfe: false,
+      enableNfse: false,
       cscProduction: optional("cscProduction"),
       cscProductionId: optional("cscProductionId"),
       cscHomologation: optional("cscHomologation"),
@@ -836,17 +1403,19 @@ function FocusOnboarding({
     try {
       if (action === "validate") {
         await api.fiscal.validateProvider(scope.organizationId, scope.unitId, body);
-        setFeedback("Dados e certificado validados pela Focus NFe sem criar a empresa.");
+        setFeedback("Dados e certificado verificados. A empresa está pronta para ser ativada.");
       } else {
         await api.fiscal.activateProvider(scope.organizationId, scope.unitId, body);
-        setFeedback("Empresa vinculada à conta GiroMesa e tokens sincronizados.");
+        setFeedback("Emissão fiscal ativada para esta empresa.");
         setCertificateBase64("");
         setCertificateName("");
+        setEditing(false);
+        setStep(1);
         formElement.reset();
         onActivated();
       }
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Não foi possível concluir o cadastro.");
+      setFeedback(customerFiscalError(error, "Não foi possível concluir o cadastro fiscal."));
     } finally {
       setBusy(null);
     }
@@ -856,173 +1425,226 @@ function FocusOnboarding({
     <Card className="fiscal-section-card fiscal-onboarding" id="fiscal-provider-onboarding">
       <SectionHeading
         badge={providerLabel(provider.status)}
-        eyebrow="Focus NFe"
-        title="Empresa emitente"
+        eyebrow="Cadastro fiscal"
+        title="Dados fiscais da empresa"
         tone={fiscalTone(provider.status)}
       />
       {!profile ? (
         <EmptyState
-          description="Salve o perfil fiscal antes de enviar o cadastro da empresa."
+          description="A unidade precisa estar vinculada a uma empresa antes da ativação fiscal."
           icon={<Icon name="alert-circle" />}
-          title="Perfil fiscal necessário"
+          title="Dados tributários necessários"
         />
-      ) : provider.companyId && !editing ? (
+      ) : provider.registered && !editing ? (
         <div className="fiscal-connected-provider">
           <div>
-            <strong>Empresa vinculada</strong>
+            <strong>Emissão fiscal ativada</strong>
             <span>
-              {provider.environments.homologation ? "Homologação ativa" : "Homologação pendente"}
+              {provider.environments.homologation
+                ? "Ambiente de testes pronto"
+                : "Ambiente de testes pendente"}
               {" · "}
-              {provider.environments.production ? "Produção ativa" : "Produção pendente"}
+              {provider.environments.production ? "Produção pronta" : "Produção pendente"}
             </span>
             {provider.certificateValidUntil && (
               <small>Certificado válido até {dateLabel(provider.certificateValidUntil)}</small>
             )}
           </div>
           <Button onClick={() => setEditing(true)} size="sm" variant="secondary">
-            Atualizar cadastro ou certificado
+            Atualizar dados ou certificado
           </Button>
         </div>
       ) : !provider.environments.homologation && provider.status === "platform_not_configured" ? (
         <EmptyState
-          description="A equipe GiroMesa deve configurar FOCUS_NFE_PRIMARY_TOKEN e FISCAL_CREDENTIALS_ENCRYPTION_KEY na API."
+          description="A ativação depende de uma configuração do GiroMesa. Entre em contato com o suporte para continuar."
           icon={<Icon name="alert-circle" />}
-          title="Conta principal ainda não conectada"
+          title="Serviço de emissão indisponível"
         />
       ) : (
         <form className="gm-form-stack" onSubmit={submit}>
           <p className="fiscal-security-note">
-            O certificado e a senha seguem diretamente para a Focus NFe e não são armazenados pelo
-            GiroMesa. Apenas os tokens da empresa retornados pelo provedor ficam cifrados por
-            unidade.
+            O certificado é utilizado para ativar a emissão desta empresa. A senha não é armazenada
+            pelo GiroMesa.
           </p>
-          <div className="gm-form-grid fiscal-onboarding-grid">
-            <label className="gm-form-field">
-              <span>Nome fantasia</span>
-              <Input maxLength={120} name="tradeName" required />
-            </label>
-            <label className="gm-form-field">
-              <span>Inscrição estadual</span>
-              <Input maxLength={30} name="stateRegistration" required />
-            </label>
-            <label className="gm-form-field">
-              <span>E-mail fiscal</span>
-              <Input maxLength={160} name="email" required type="email" />
-            </label>
-            <label className="gm-form-field">
-              <span>Telefone</span>
-              <Input inputMode="tel" maxLength={15} name="phone" required />
-            </label>
-            <label className="gm-form-field fiscal-field--wide">
-              <span>Logradouro</span>
-              <Input maxLength={160} name="street" required />
-            </label>
-            <label className="gm-form-field">
-              <span>Número</span>
-              <Input min={1} name="number" required type="number" />
-            </label>
-            <label className="gm-form-field">
-              <span>Complemento</span>
-              <Input maxLength={120} name="complement" />
-            </label>
-            <label className="gm-form-field">
-              <span>Bairro</span>
-              <Input maxLength={120} name="district" required />
-            </label>
-            <label className="gm-form-field">
-              <span>Município</span>
-              <Input maxLength={120} name="city" required />
-            </label>
-            <label className="gm-form-field">
-              <span>CEP</span>
-              <Input inputMode="numeric" maxLength={9} name="postalCode" required />
-            </label>
-            <label className="gm-form-field">
-              <span>CPF/CNPJ da contabilidade</span>
-              <Input inputMode="numeric" maxLength={18} name="accountantDocument" />
-            </label>
-            <label className="gm-form-field fiscal-field--wide">
-              <span>Certificado A1 (.pfx ou .p12)</span>
-              <Input
-                accept=".pfx,.p12,application/x-pkcs12"
-                onChange={(event) => void certificateChanged(event.target.files?.[0])}
-                required={!certificateBase64}
-                type="file"
-              />
-              {certificateName && <small>Arquivo pronto: {certificateName}</small>}
-            </label>
-            <label className="gm-form-field">
-              <span>Senha do certificado</span>
-              <Input
-                autoComplete="new-password"
-                maxLength={256}
-                name="certificatePassword"
-                required
-                type="password"
-              />
-            </label>
-          </div>
-          <fieldset className="fiscal-document-types">
-            <legend>Documentos habilitados</legend>
-            <label>
-              <input defaultChecked name="enableNfce" type="checkbox" /> NFC-e
-            </label>
-            <label>
-              <input name="enableNfe" type="checkbox" /> NF-e
-            </label>
-            <label>
-              <input name="enableNfse" type="checkbox" /> NFS-e
-            </label>
-          </fieldset>
-          <details className="gm-disclosure" open={!provider.companyId}>
-            <summary>CSC da NFC-e</summary>
-            <div className="gm-disclosure__content gm-form-grid fiscal-onboarding-grid">
+          <ol aria-label="Etapas da ativação fiscal" className="fiscal-onboarding-progress">
+            {(["Empresa", "Certificado", "Revisão"] as const).map((label, index) => {
+              const itemStep = (index + 1) as 1 | 2 | 3;
+              return (
+                <li aria-current={step === itemStep ? "step" : undefined} key={label}>
+                  <span>{itemStep}</span>
+                  {label}
+                </li>
+              );
+            })}
+          </ol>
+          <div data-onboarding-step="company" hidden={step !== 1}>
+            <div className="gm-form-grid fiscal-onboarding-grid">
               <label className="gm-form-field">
-                <span>CSC de homologação</span>
-                <Input maxLength={128} name="cscHomologation" />
+                <span>Nome fantasia</span>
+                <Input
+                  defaultValue={companyDefaults.tradeName}
+                  maxLength={120}
+                  name="tradeName"
+                  required
+                />
               </label>
               <label className="gm-form-field">
-                <span>ID do CSC de homologação</span>
-                <Input inputMode="numeric" maxLength={6} name="cscHomologationId" />
+                <span>Inscrição estadual</span>
+                <Input maxLength={30} name="stateRegistration" required />
               </label>
               <label className="gm-form-field">
-                <span>CSC de produção</span>
-                <Input maxLength={128} name="cscProduction" />
+                <span>E-mail fiscal</span>
+                <Input maxLength={160} name="email" required type="email" />
               </label>
               <label className="gm-form-field">
-                <span>ID do CSC de produção</span>
-                <Input inputMode="numeric" maxLength={6} name="cscProductionId" />
+                <span>Telefone</span>
+                <Input inputMode="tel" maxLength={15} name="phone" required />
+              </label>
+              <label className="gm-form-field fiscal-field--wide">
+                <span>Logradouro</span>
+                <Input maxLength={160} name="street" required />
+              </label>
+              <label className="gm-form-field">
+                <span>Número</span>
+                <Input min={1} name="number" required type="number" />
+              </label>
+              <label className="gm-form-field">
+                <span>Complemento</span>
+                <Input maxLength={120} name="complement" />
+              </label>
+              <label className="gm-form-field">
+                <span>Bairro</span>
+                <Input maxLength={120} name="district" required />
+              </label>
+              <label className="gm-form-field">
+                <span>Município</span>
+                <Input defaultValue={companyDefaults.city} maxLength={120} name="city" required />
+              </label>
+              <label className="gm-form-field">
+                <span>CEP</span>
+                <Input inputMode="numeric" maxLength={9} name="postalCode" required />
+              </label>
+              <label className="gm-form-field">
+                <span>CPF/CNPJ da contabilidade</span>
+                <Input inputMode="numeric" maxLength={18} name="accountantDocument" />
               </label>
             </div>
-          </details>
+            <div className="fiscal-form-actions">
+              <Button
+                onClick={(event) => {
+                  if (validateStep(event.currentTarget.form, '[data-onboarding-step="company"]')) {
+                    setStep(2);
+                  }
+                }}
+                type="button"
+              >
+                Continuar para certificado
+              </Button>
+            </div>
+          </div>
+          <div data-onboarding-step="certificate" hidden={step !== 2}>
+            <div className="gm-form-grid fiscal-onboarding-grid">
+              <label className="gm-form-field fiscal-field--wide">
+                <span>Certificado A1 (.pfx ou .p12)</span>
+                <Input
+                  accept=".pfx,.p12,application/x-pkcs12"
+                  onChange={(event) => void certificateChanged(event.target.files?.[0])}
+                  required={!certificateBase64}
+                  type="file"
+                />
+                {certificateName && <small>Arquivo pronto: {certificateName}</small>}
+              </label>
+              <label className="gm-form-field">
+                <span>Senha do certificado</span>
+                <Input
+                  autoComplete="new-password"
+                  maxLength={256}
+                  name="certificatePassword"
+                  required
+                  type="password"
+                />
+              </label>
+            </div>
+            <div className="fiscal-document-types" role="note">
+              <strong>Documento emitido: NFC-e (modelo 65)</strong>
+              <span>As vendas finalizadas no GiroMesa serão enviadas automaticamente.</span>
+            </div>
+            <details className="gm-disclosure" open={!provider.registered}>
+              <summary>CSC da NFC-e</summary>
+              <div className="gm-disclosure__content gm-form-grid fiscal-onboarding-grid">
+                <label className="gm-form-field">
+                  <span>CSC de homologação</span>
+                  <Input maxLength={128} name="cscHomologation" />
+                </label>
+                <label className="gm-form-field">
+                  <span>ID do CSC de homologação</span>
+                  <Input inputMode="numeric" maxLength={6} name="cscHomologationId" />
+                </label>
+                <label className="gm-form-field">
+                  <span>CSC de produção</span>
+                  <Input maxLength={128} name="cscProduction" />
+                </label>
+                <label className="gm-form-field">
+                  <span>ID do CSC de produção</span>
+                  <Input inputMode="numeric" maxLength={6} name="cscProductionId" />
+                </label>
+              </div>
+            </details>
+            <div className="fiscal-form-actions">
+              <Button onClick={() => setStep(1)} type="button" variant="ghost">
+                Voltar
+              </Button>
+              <Button
+                onClick={(event) => reviewRegistration(event.currentTarget.form)}
+                type="button"
+              >
+                Revisar ativação
+              </Button>
+            </div>
+          </div>
           {feedback && (
             <p aria-live="polite" className="fiscal-form-feedback">
               {feedback}
             </p>
           )}
-          <div className="fiscal-form-actions">
-            {provider.companyId && (
-              <Button onClick={() => setEditing(false)} type="button" variant="ghost">
-                Cancelar
+          <div className="fiscal-onboarding-review" hidden={step !== 3}>
+            <div>
+              <Icon name="check" size={18} />
+              <div>
+                <strong>Dados prontos para verificação</strong>
+                <p>
+                  Empresa preenchida · certificado {certificateName || "selecionado"} ·{" "}
+                  {profile.environment === "production" ? "produção" : "ambiente de testes"}
+                </p>
+              </div>
+            </div>
+            <div className="fiscal-form-actions">
+              <Button onClick={() => setStep(2)} type="button" variant="ghost">
+                Voltar
               </Button>
-            )}
-            <Button
-              disabled={busy !== null}
-              name="action"
-              type="submit"
-              value="validate"
-              variant="secondary"
-            >
-              {busy === "validate" ? "Validando…" : "Validar sem cadastrar"}
-            </Button>
-            <Button disabled={busy !== null} name="action" type="submit" value="activate">
-              <Icon name="check" size={16} />
-              {busy === "activate"
-                ? "Cadastrando…"
-                : provider.companyId
-                  ? "Atualizar empresa"
-                  : "Cadastrar na Focus NFe"}
-            </Button>
+              {provider.registered && (
+                <Button onClick={() => setEditing(false)} type="button" variant="ghost">
+                  Cancelar
+                </Button>
+              )}
+              <Button
+                disabled={busy !== null}
+                name="action"
+                type="submit"
+                value="validate"
+                variant="secondary"
+              >
+                {busy === "validate" ? "Verificando…" : "Verificar dados"}
+              </Button>
+              <Button disabled={busy !== null} name="action" type="submit" value="activate">
+                <Icon name="check" size={16} />
+                {busy === "activate"
+                  ? "Ativando…"
+                  : provider.registered
+                    ? "Atualizar dados fiscais"
+                    : "Ativar emissão fiscal"}
+              </Button>
+            </div>
           </div>
         </form>
       )}
@@ -1032,27 +1654,72 @@ function FocusOnboarding({
 
 function TaxRevisionForm({
   activeProductIds,
+  canEdit,
   enabled,
   onSaved,
   products,
   scope,
 }: {
   activeProductIds: Set<string>;
+  canEdit: boolean;
   enabled: boolean;
   onSaved: () => void;
-  products: Array<{ id: string; name: string }>;
+  products: Array<{ id: string; name: string; categoryId: string; categoryName: string }>;
   scope: ManagementScope;
 }) {
   const pendingProducts = products.filter((product) => !activeProductIds.has(product.id));
   const [productIds, setProductIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [ncm, setNcm] = useState("");
   const [cfop, setCfop] = useState("");
   const [origin, setOrigin] = useState("");
   const [csosn, setCsosn] = useState("");
   const [cstIcms, setCstIcms] = useState("");
+  const [cstPis, setCstPis] = useState("");
+  const [cstCofins, setCstCofins] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(todayInput);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const categories = Array.from(
+    new Map(pendingProducts.map((product) => [product.categoryId, product.categoryName])),
+  ).sort((left, right) => left[1].localeCompare(right[1], "pt-BR"));
+  const visibleProducts = pendingProducts.filter(
+    (product) =>
+      (!categoryId || product.categoryId === categoryId) &&
+      (!productSearch ||
+        product.name.toLocaleLowerCase("pt-BR").includes(productSearch.toLocaleLowerCase("pt-BR"))),
+  );
+
+  function exportTemplate() {
+    downloadTextFile(
+      "classificacao-fiscal.csv",
+      fiscalTaxCsvTemplate(pendingProducts, effectiveFrom),
+    );
+  }
+
+  async function importCsv(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setFeedback("O CSV deve ter no máximo 2 MB.");
+      return;
+    }
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const rows = parseFiscalTaxCsv(
+        await file.text(),
+        new Set(pendingProducts.map((item) => item.id)),
+      );
+      await api.fiscal.importTaxRevisions(scope.organizationId, scope.unitId, { rows });
+      setFeedback(`${rows.length} classificação(ões) importada(s).`);
+      onSaved();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Não foi possível importar o CSV.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1061,9 +1728,12 @@ function TaxRevisionForm({
       productIds.length === 0 ||
       !/^\d{8}$/.test(ncm) ||
       !/^\d{4}$/.test(cfop) ||
-      !/^[0-8]$/.test(origin)
+      !/^[0-8]$/.test(origin) ||
+      (!/^\d{3}$/.test(csosn) && !/^\d{2,3}$/.test(cstIcms)) ||
+      !/^\d{2}$/.test(cstPis) ||
+      !/^\d{2}$/.test(cstCofins)
     ) {
-      setFeedback("Preencha produto, NCM, CFOP e origem nos formatos indicados.");
+      setFeedback("Preencha NCM, CFOP, origem, ICMS, PIS e COFINS nos formatos indicados.");
       return;
     }
     setBusy(true);
@@ -1079,6 +1749,8 @@ function TaxRevisionForm({
           origin: Number(origin),
           ...(csosn ? { csosn } : {}),
           ...(cstIcms ? { cstIcms } : {}),
+          cstPis,
+          cstCofins,
         },
       });
       setProductIds([]);
@@ -1087,12 +1759,12 @@ function TaxRevisionForm({
       setOrigin("");
       setCsosn("");
       setCstIcms("");
+      setCstPis("");
+      setCstCofins("");
       setFeedback(`${productIds.length} classificação(ões) fiscal(is) ativada(s).`);
       onSaved();
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : "Não foi possível ativar a classificação.",
-      );
+      setFeedback(customerFiscalError(error, "Não foi possível salvar a classificação."));
     } finally {
       setBusy(false);
     }
@@ -1106,147 +1778,241 @@ function TaxRevisionForm({
     >
       <div>
         <p className="eyebrow">Produtos pendentes</p>
-        <h3 id="tax-revision-title">Nova classificação fiscal</h3>
+        <h3 id="tax-revision-title">Classificação dos produtos</h3>
         <p className="tax-revision-note">
           Confirme os códigos com o contador antes de ativar. O GiroMesa não sugere enquadramento
           tributário.
         </p>
+        <details className="gm-disclosure fiscal-tax-help">
+          <summary>Entenda os campos fiscais</summary>
+          <div className="gm-disclosure__content">
+            <p>
+              NCM identifica o produto, CFOP descreve a operação e a origem informa onde a
+              mercadoria foi produzida. CSOSN é usado no Simples Nacional; CST ICMS, nos demais
+              regimes.
+            </p>
+          </div>
+        </details>
       </div>
       {pendingProducts.length ? (
-        <form className="gm-form-stack" onSubmit={submit}>
-          <div className="fiscal-classification-toolbar">
-            <span>{productIds.length} produto(s) selecionado(s)</span>
-            <Button
-              disabled={!enabled}
-              onClick={() =>
-                setProductIds(
-                  productIds.length
-                    ? []
-                    : pendingProducts.slice(0, 100).map((product) => product.id),
-                )
-              }
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              {productIds.length ? "Limpar seleção" : "Selecionar pendentes"}
+        canEdit ? (
+          <form className="gm-form-stack" onSubmit={submit}>
+            <div className="fiscal-classification-toolbar">
+              <span>{productIds.length} produto(s) selecionado(s)</span>
+              <div>
+                <Button onClick={exportTemplate} size="sm" type="button" variant="secondary">
+                  Exportar modelo CSV
+                </Button>
+                <Button
+                  disabled={!enabled}
+                  onClick={() =>
+                    setProductIds(
+                      productIds.length
+                        ? []
+                        : visibleProducts.slice(0, 100).map((product) => product.id),
+                    )
+                  }
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  {productIds.length ? "Limpar seleção" : "Selecionar exibidos"}
+                </Button>
+              </div>
+            </div>
+            <div className="fiscal-product-filters">
+              <Input
+                aria-label="Buscar produto"
+                onChange={(event) => setProductSearch(event.target.value)}
+                placeholder="Buscar produto"
+                type="search"
+                value={productSearch}
+              />
+              <NativeSelect
+                aria-label="Filtrar produtos por categoria"
+                onChange={(event) => setCategoryId(event.target.value)}
+                value={categoryId}
+              >
+                <option value="">Todas as categorias</option>
+                {categories.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <label className="fiscal-csv-import">
+                <span>Importar CSV preenchido</span>
+                <Input
+                  accept=".csv,text/csv"
+                  disabled={!enabled || busy}
+                  onChange={(event) => {
+                    void importCsv(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                  type="file"
+                />
+              </label>
+            </div>
+            <div className="gm-form-grid fiscal-profile-grid">
+              <fieldset className="fiscal-product-picker" disabled={!enabled}>
+                <legend>Produtos</legend>
+                <div className="fiscal-product-picker__list">
+                  {visibleProducts.slice(0, 100).map((product) => (
+                    <label key={product.id}>
+                      <input
+                        checked={productIds.includes(product.id)}
+                        onChange={(event) =>
+                          setProductIds((current) =>
+                            event.target.checked
+                              ? [...current, product.id]
+                              : current.filter((id) => id !== product.id),
+                          )
+                        }
+                        type="checkbox"
+                      />
+                      <span>{product.name}</span>
+                      <small>{product.categoryName}</small>
+                    </label>
+                  ))}
+                  {!visibleProducts.length && <span>Nenhum produto encontrado.</span>}
+                </div>
+                {visibleProducts.length > 100 && (
+                  <small>
+                    Refine a busca para ver os demais {visibleProducts.length - 100} produtos.
+                  </small>
+                )}
+              </fieldset>
+              <label className="gm-form-field">
+                <span>NCM (8 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={8}
+                  onChange={(event) => setNcm(event.target.value)}
+                  pattern="\d{8}"
+                  required
+                  value={ncm}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>CFOP (4 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={4}
+                  onChange={(event) => setCfop(event.target.value)}
+                  pattern="\d{4}"
+                  required
+                  value={cfop}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>Origem</span>
+                <NativeSelect
+                  className="gm-control"
+                  disabled={!enabled}
+                  onChange={(event) => setOrigin(event.target.value)}
+                  required
+                  value={origin}
+                >
+                  <option value="">Selecione de 0 a 8</option>
+                  {fiscalOrigins.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <label className="gm-form-field">
+                <span>CSOSN (opcional)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={3}
+                  onChange={(event) => setCsosn(event.target.value)}
+                  pattern="\d{3}"
+                  value={csosn}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>CST ICMS (opcional)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  maxLength={3}
+                  minLength={2}
+                  onChange={(event) => setCstIcms(event.target.value)}
+                  value={cstIcms}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>CST PIS (2 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={2}
+                  onChange={(event) => setCstPis(event.target.value)}
+                  pattern="\d{2}"
+                  required
+                  value={cstPis}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>CST COFINS (2 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={2}
+                  onChange={(event) => setCstCofins(event.target.value)}
+                  pattern="\d{2}"
+                  required
+                  value={cstCofins}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>Vigência inicial</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  onChange={(event) => setEffectiveFrom(event.target.value)}
+                  required
+                  type="date"
+                  value={effectiveFrom}
+                />
+              </label>
+            </div>
+            {!enabled && (
+              <p className="fiscal-form-feedback">
+                Salve UF e código do município no perfil fiscal antes de classificar produtos.
+              </p>
+            )}
+            {feedback && (
+              <p aria-live="polite" className="fiscal-form-feedback">
+                {feedback}
+              </p>
+            )}
+            <Button disabled={!enabled || busy} type="submit">
+              {!busy && <Icon name="plus" size={16} />}
+              {busy ? "Salvando…" : "Salvar classificação"}
             </Button>
-          </div>
-          <div className="gm-form-grid fiscal-profile-grid">
-            <label className="gm-form-field">
-              <span>Produtos</span>
-              <NativeSelect
-                className="gm-control"
-                disabled={!enabled}
-                multiple
-                onChange={(event) =>
-                  setProductIds(Array.from(event.target.selectedOptions, (option) => option.value))
-                }
-                required
-                size={Math.min(6, Math.max(3, pendingProducts.length))}
-                value={productIds}
-              >
-                {pendingProducts.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </NativeSelect>
-              <small>Use Ctrl ou Shift para selecionar vários produtos com a mesma regra.</small>
-            </label>
-            <label className="gm-form-field">
-              <span>NCM (8 dígitos)</span>
-              <Input
-                className="gm-control"
-                disabled={!enabled}
-                inputMode="numeric"
-                maxLength={8}
-                onChange={(event) => setNcm(event.target.value)}
-                pattern="\d{8}"
-                required
-                value={ncm}
-              />
-            </label>
-            <label className="gm-form-field">
-              <span>CFOP (4 dígitos)</span>
-              <Input
-                className="gm-control"
-                disabled={!enabled}
-                inputMode="numeric"
-                maxLength={4}
-                onChange={(event) => setCfop(event.target.value)}
-                pattern="\d{4}"
-                required
-                value={cfop}
-              />
-            </label>
-            <label className="gm-form-field">
-              <span>Origem</span>
-              <NativeSelect
-                className="gm-control"
-                disabled={!enabled}
-                onChange={(event) => setOrigin(event.target.value)}
-                required
-                value={origin}
-              >
-                <option value="">Selecione de 0 a 8</option>
-                {fiscalOrigins.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </NativeSelect>
-            </label>
-            <label className="gm-form-field">
-              <span>CSOSN (opcional)</span>
-              <Input
-                className="gm-control"
-                disabled={!enabled}
-                inputMode="numeric"
-                maxLength={3}
-                onChange={(event) => setCsosn(event.target.value)}
-                pattern="\d{3}"
-                value={csosn}
-              />
-            </label>
-            <label className="gm-form-field">
-              <span>CST ICMS (opcional)</span>
-              <Input
-                className="gm-control"
-                disabled={!enabled}
-                maxLength={3}
-                minLength={2}
-                onChange={(event) => setCstIcms(event.target.value)}
-                value={cstIcms}
-              />
-            </label>
-            <label className="gm-form-field">
-              <span>Vigência inicial</span>
-              <Input
-                className="gm-control"
-                disabled={!enabled}
-                onChange={(event) => setEffectiveFrom(event.target.value)}
-                required
-                type="date"
-                value={effectiveFrom}
-              />
-            </label>
-          </div>
-          {!enabled && (
-            <p className="fiscal-form-feedback">
-              Salve UF e código do município no perfil fiscal antes de classificar produtos.
+          </form>
+        ) : (
+          <div className="fiscal-readonly-pending">
+            <p>
+              {pendingProducts.length} produto(s) aguardam classificação fiscal pelo proprietário.
             </p>
-          )}
-          {feedback && (
-            <p aria-live="polite" className="fiscal-form-feedback">
-              {feedback}
-            </p>
-          )}
-          <Button disabled={!enabled || busy} type="submit">
-            {!busy && <Icon name="plus" size={16} />}
-            {busy ? "Ativando…" : "Ativar classificação"}
-          </Button>
-        </form>
+            <div className="fiscal-product-picker__list">
+              {pendingProducts.slice(0, 20).map((product) => (
+                <span key={product.id}>{product.name}</span>
+              ))}
+            </div>
+          </div>
+        )
       ) : (
         <EmptyState
           description="Todos os produtos ativos possuem revisão fiscal ativa."
@@ -1306,9 +2072,21 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
       setFeedback("Solicitação registrada.");
       setRefresh((value) => value + 1);
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : "Não foi possível registrar a solicitação.",
+      setFeedback(customerFiscalError(error, "Não foi possível registrar a solicitação."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadPackage() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      saveDownloadedFile(
+        await api.fiscal.accountingPackageContent(scope.organizationId, scope.unitId, competence),
       );
+    } catch (error) {
+      setFeedback(customerFiscalError(error, "Não foi possível baixar o pacote contábil."));
     } finally {
       setBusy(false);
     }
@@ -1318,7 +2096,7 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
     <RemoteGate remote={remote}>
       {(data) => (
         <div className="fiscal-page accountant-page">
-          <Card className="accountant-toolbar">
+          <Card className="accountant-toolbar min-[481px]:flex-row">
             <div className="accountant-toolbar__copy">
               <p className="eyebrow">Escopo contábil</p>
               <h2>Competência</h2>
@@ -1369,14 +2147,14 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
                     {data.accountingPackage.files.map((file) => (
                       <li key={file.name}>
                         <span>{file.name}</span>
-                        <small>{fileSize(file.sizeBytes)}</small>
+                        <small>Manifesto, XMLs e DANFEs</small>
                       </li>
                     ))}
                   </ul>
                   {data.accountingPackage.status === "ready" ? (
-                    <Button onClick={() => downloadAccountingPackage(data.accountingPackage)}>
+                    <Button disabled={busy} onClick={() => void downloadPackage()}>
                       <Icon name="download" size={16} />
-                      Baixar pacote JSON
+                      {busy ? "Preparando…" : "Baixar pacote ZIP"}
                     </Button>
                   ) : (
                     <p className="fiscal-muted">
@@ -1524,51 +2302,93 @@ function providerLabel(value: string) {
   return (
     (
       {
-        platform_not_configured: "Conta pendente",
-        profile_required: "Perfil pendente",
-        company_required: "Empresa pendente",
-        credentials_missing: "Token pendente",
-        ready: "Pronto",
-        error: "Falha na conexão",
+        platform_not_configured: "Serviço indisponível",
+        profile_required: "Cadastro incompleto",
+        company_required: "Ativação pendente",
+        credentials_missing: "Atenção necessária",
+        ready: "Pronto para emitir",
+        error: "Atenção necessária",
       } as Record<string, string>
     )[value] ?? value
   );
 }
 
-function pendingActionHref(value: string) {
-  if (value.includes("classification")) return "#fiscal-classification";
-  if (value.includes("profile")) return "#fiscal-configuration";
-  if (value.includes("provider") || value.includes("company")) {
-    return "#fiscal-provider-onboarding";
-  }
-  if (value.includes("document")) return "#fiscal-documents";
-  return "#fiscal-activation";
+function providerBusinessMessage(value: FiscalDashboard["provider"]["status"]) {
+  return (
+    {
+      platform_not_configured: "A ativação depende do suporte GiroMesa.",
+      profile_required: "Complete os dados fiscais da empresa.",
+      company_required: "Verifique os dados e ative a emissão fiscal.",
+      credentials_missing: "Revise o certificado e o ambiente de emissão.",
+      ready: "A empresa está pronta para emitir notas fiscais.",
+      error: "A emissão precisa de atenção antes da próxima nota.",
+    } satisfies Record<FiscalDashboard["provider"]["status"], string>
+  )[value];
 }
 
-function fiscalArtifacts(value: unknown) {
-  if (!value || typeof value !== "object") return { xmlUrl: null, pdfUrl: null };
-  const payload = value as Record<string, unknown>;
-  const artifacts =
-    payload.artifacts && typeof payload.artifacts === "object" && !Array.isArray(payload.artifacts)
-      ? (payload.artifacts as Record<string, unknown>)
-      : payload;
-  return {
-    xmlUrl: safeFocusUrl(artifacts.xmlUrl ?? artifacts.caminho_xml_nota_fiscal),
-    pdfUrl: safeFocusUrl(artifacts.pdfUrl ?? artifacts.caminho_danfe),
-  };
+function fiscalSectionFromHash(hash = typeof window === "undefined" ? "" : window.location.hash) {
+  const query = hash.split("?")[1] ?? "";
+  const value = new URLSearchParams(query).get("secao");
+  return fiscalSections.some((section) => section.id === value)
+    ? (value as FiscalSection)
+    : "overview";
 }
 
-function safeFocusUrl(value: unknown) {
-  if (typeof value !== "string") return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" &&
-      (url.hostname === "focusnfe.com.br" || url.hostname.endsWith(".focusnfe.com.br"))
-      ? url.toString()
-      : null;
-  } catch {
-    return null;
+function fiscalSectionHref(section: FiscalSection) {
+  return `#/fiscal?secao=${section}`;
+}
+
+function pendingActionSection(value: string): FiscalSection {
+  if (value.includes("classification")) return "products";
+  if (value.includes("document")) return "documents";
+  if (value.includes("period") || value.includes("closing")) return "closing";
+  if (value.includes("profile") || value.includes("provider") || value.includes("company")) {
+    return "setup";
   }
+  return "overview";
+}
+
+function customerFiscalError(error: unknown, fallback: string) {
+  if (!(error instanceof ApiClientError) || !error.requestId) return fallback;
+  return `${fallback} Informe o código ${error.requestId} ao suporte.`;
+}
+
+function latestRejectionGuidance(document: FiscalDocumentDetail) {
+  const rejection = [...document.events]
+    .reverse()
+    .find((event) => event.status === "rejected" || event.type.includes("rejected"));
+  return fiscalRejectionGuidance(rejection?.code ?? null, rejection?.message ?? null);
+}
+
+function documentEventLabel(type: string, status: string | null) {
+  if (status === "authorized") return "Nota autorizada";
+  if (status === "rejected") return "Autorização rejeitada";
+  if (status === "canceled") return "Nota cancelada";
+  if (type.includes("cancel")) return "Cancelamento solicitado";
+  if (type.includes("reconcil")) return "Situação atualizada";
+  return "Nota enviada para autorização";
+}
+
+function formatFiscalQuantity(quantityMilli: number) {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 }).format(quantityMilli / 1_000);
+}
+
+function downloadTextFile(filename: string, contents: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function saveDownloadedFile(file: { blob: Blob; filename: string | null }) {
+  const url = URL.createObjectURL(file.blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.filename ?? "arquivo-fiscal";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function fileBase64(file: File) {
@@ -1635,30 +2455,7 @@ function requestLabel(value: string) {
   return ({ open: "Aberta", resolved: "Resolvida" } as Record<string, string>)[value] ?? value;
 }
 
-function fileSize(bytes: number) {
-  return bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
 function todayInput() {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-}
-
-function downloadAccountingPackage(
-  accountingPackage: {
-    competence: string;
-    payload: Record<string, unknown>;
-  } | null,
-) {
-  if (!accountingPackage) return;
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(accountingPackage.payload, null, 2)], { type: "application/json" }),
-  );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `pacote-contabil-${accountingPackage.competence}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
 }

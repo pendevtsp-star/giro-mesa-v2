@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
@@ -119,6 +121,32 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             );
             CREATE INDEX IF NOT EXISTS ix_print_jobs_created
                 ON print_jobs (created_at DESC);
+            CREATE TABLE IF NOT EXISTS fiscal_operations (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                actor_id TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL,
+                request_payload TEXT NOT NULL,
+                request_fingerprint TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                provider_reference TEXT NULL,
+                status TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                next_attempt_at TEXT NOT NULL,
+                lease_expires_at TEXT NULL,
+                lease_token TEXT NULL,
+                last_result TEXT NULL,
+                last_error_code TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT NULL,
+                UNIQUE (unit_id, operation, idempotency_key)
+            );
+            CREATE INDEX IF NOT EXISTS ix_fiscal_operations_due
+                ON fiscal_operations (status, next_attempt_at);
             """;
         await command.ExecuteNonQueryAsync();
         await EnsureColumnAsync(connection, "operational_events", "idempotency_key", "TEXT");
@@ -393,6 +421,281 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         }
 
         return events;
+    }
+
+    public async Task<(StoredFiscalOperation Operation, bool Inserted)> CreateOrGetFiscalOperationAsync(
+        string organizationId,
+        string unitId,
+        string actorId,
+        string deviceId,
+        string operation,
+        string idempotencyKey,
+        string requestPayload,
+        DateTimeOffset now)
+    {
+        if (operation is not ("issue" or "cancel" or "invalidate") ||
+            string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > 160 ||
+            Encoding.UTF8.GetByteCount(requestPayload) > 3 * 1024 * 1024)
+        {
+            throw new ArgumentException("Invalid fiscal operation.", nameof(operation));
+        }
+        using var payload = JsonDocument.Parse(requestPayload);
+        if (payload.RootElement.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("Fiscal request payload must be an object.", nameof(requestPayload));
+
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(requestPayload)));
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var id = Guid.NewGuid().ToString();
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT OR IGNORE INTO fiscal_operations
+                (id, organization_id, unit_id, actor_id, device_id, operation, idempotency_key,
+                 request_payload, request_fingerprint, phase, status, next_attempt_at, created_at, updated_at)
+                VALUES ($id, $organizationId, $unitId, $actorId, $deviceId, $operation, $idempotencyKey,
+                        $requestPayload, $requestFingerprint, 'submit', 'pending', $now, $now, $now);
+                """;
+            insert.Parameters.AddWithValue("$id", id);
+            insert.Parameters.AddWithValue("$organizationId", organizationId);
+            insert.Parameters.AddWithValue("$unitId", unitId);
+            insert.Parameters.AddWithValue("$actorId", actorId);
+            insert.Parameters.AddWithValue("$deviceId", deviceId);
+            insert.Parameters.AddWithValue("$operation", operation);
+            insert.Parameters.AddWithValue("$idempotencyKey", idempotencyKey);
+            insert.Parameters.AddWithValue("$requestPayload", requestPayload);
+            insert.Parameters.AddWithValue("$requestFingerprint", fingerprint);
+            insert.Parameters.AddWithValue("$now", now.ToString("O"));
+            var inserted = await insert.ExecuteNonQueryAsync() == 1;
+
+            var stored = await ReadFiscalOperationAsync(
+                connection, transaction, inserted ? id : null, unitId, operation, idempotencyKey)
+                ?? throw new InvalidOperationException("FISCAL_OPERATION_NOT_FOUND");
+            if (stored.OrganizationId != organizationId || stored.ActorId != actorId ||
+                stored.RequestFingerprint != fingerprint)
+            {
+                throw new OperationalConflictException("FISCAL_IDEMPOTENCY_CONFLICT");
+            }
+            if (!inserted && stored.Status == "dead_letter")
+            {
+                var revive = connection.CreateCommand();
+                revive.Transaction = transaction;
+                revive.CommandText = """
+                    UPDATE fiscal_operations
+                    SET status = 'pending', attempt_count = 0, next_attempt_at = $now,
+                        lease_expires_at = NULL, lease_token = NULL, completed_at = NULL,
+                        updated_at = $now
+                    WHERE id = $id AND status = 'dead_letter';
+                    """;
+                revive.Parameters.AddWithValue("$now", now.ToString("O"));
+                revive.Parameters.AddWithValue("$id", stored.Id);
+                await revive.ExecuteNonQueryAsync();
+                stored = (await ReadFiscalOperationAsync(
+                    connection, transaction, stored.Id, unitId, operation, idempotencyKey))!;
+            }
+            await transaction.CommitAsync();
+            return (stored, inserted);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<StoredFiscalOperation?> GetFiscalOperationAsync(string id)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        return await ReadFiscalOperationAsync(connection, null, id, null, null, null);
+    }
+
+    public async Task<StoredFiscalOperation?> ClaimFiscalOperationAsync(
+        string id,
+        DateTimeOffset now,
+        TimeSpan lease,
+        int maxAttempts)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var leaseToken = Guid.NewGuid().ToString();
+            var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                UPDATE fiscal_operations
+                SET status = 'running', attempt_count = attempt_count + 1,
+                    lease_expires_at = $leaseExpiresAt, lease_token = $leaseToken, updated_at = $now
+                WHERE id = $id AND attempt_count < $maxAttempts AND (
+                    (status IN ('pending', 'waiting') AND next_attempt_at <= $now) OR
+                    (status = 'running' AND lease_expires_at <= $now)
+                );
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            command.Parameters.AddWithValue("$maxAttempts", Math.Clamp(maxAttempts, 1, 10_000));
+            command.Parameters.AddWithValue("$now", now.ToString("O"));
+            command.Parameters.AddWithValue("$leaseExpiresAt", now.Add(lease).ToString("O"));
+            command.Parameters.AddWithValue("$leaseToken", leaseToken);
+            if (await command.ExecuteNonQueryAsync() != 1)
+            {
+                await transaction.CommitAsync();
+                return null;
+            }
+            var claimed = await ReadFiscalOperationAsync(connection, transaction, id, null, null, null);
+            await transaction.CommitAsync();
+            return claimed;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetDueFiscalOperationIdsAsync(
+        DateTimeOffset now,
+        int limit,
+        int maxAttempts)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var deadLetter = connection.CreateCommand();
+            deadLetter.Transaction = transaction;
+            deadLetter.CommandText = """
+                UPDATE fiscal_operations
+                SET status = 'dead_letter', completed_at = $now, updated_at = $now,
+                    lease_expires_at = NULL, lease_token = NULL
+                WHERE attempt_count >= $maxAttempts AND (
+                    (status IN ('pending', 'waiting') AND next_attempt_at <= $now) OR
+                    (status = 'running' AND lease_expires_at <= $now)
+                );
+                """;
+            deadLetter.Parameters.AddWithValue("$now", now.ToString("O"));
+            deadLetter.Parameters.AddWithValue("$maxAttempts", Math.Clamp(maxAttempts, 1, 10_000));
+            await deadLetter.ExecuteNonQueryAsync();
+
+            var select = connection.CreateCommand();
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT id FROM fiscal_operations
+                WHERE attempt_count < $maxAttempts AND (
+                    (status IN ('pending', 'waiting') AND next_attempt_at <= $now) OR
+                    (status = 'running' AND lease_expires_at <= $now)
+                )
+                ORDER BY next_attempt_at, created_at
+                LIMIT $limit;
+                """;
+            select.Parameters.AddWithValue("$now", now.ToString("O"));
+            select.Parameters.AddWithValue("$maxAttempts", Math.Clamp(maxAttempts, 1, 10_000));
+            select.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+            var ids = new List<string>();
+            await using (var reader = await select.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync()) ids.Add(reader.GetString(0));
+            }
+            await transaction.CommitAsync();
+            return ids;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> SaveFiscalOperationAttemptAsync(
+        string id,
+        string leaseToken,
+        string phase,
+        string? providerReference,
+        Adapters.FiscalResult result,
+        string status,
+        DateTimeOffset nextAttemptAt,
+        DateTimeOffset now)
+    {
+        if (phase is not ("submit" or "reconcile") ||
+            status is not ("waiting" or "completed" or "dead_letter"))
+            throw new ArgumentException("Invalid fiscal operation state.");
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE fiscal_operations
+            SET phase = $phase, provider_reference = $providerReference, status = $status,
+                next_attempt_at = $nextAttemptAt, lease_expires_at = NULL, lease_token = NULL,
+                last_result = $lastResult, last_error_code = $lastErrorCode, updated_at = $now,
+                completed_at = CASE WHEN $status IN ('completed', 'dead_letter') THEN $now ELSE NULL END
+            WHERE id = $id AND status = 'running' AND lease_token = $leaseToken;
+            """;
+        command.Parameters.AddWithValue("$phase", phase);
+        command.Parameters.AddWithValue(
+            "$providerReference", providerReference is null ? DBNull.Value : providerReference);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$nextAttemptAt", nextAttemptAt.ToString("O"));
+        command.Parameters.AddWithValue("$lastResult", JsonSerializer.Serialize(result));
+        command.Parameters.AddWithValue(
+            "$lastErrorCode", result.ErrorCode is null ? DBNull.Value : result.ErrorCode);
+        command.Parameters.AddWithValue("$now", now.ToString("O"));
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$leaseToken", leaseToken);
+        return await command.ExecuteNonQueryAsync() == 1;
+    }
+
+    private static async Task<StoredFiscalOperation?> ReadFiscalOperationAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string? id,
+        string? unitId,
+        string? operation,
+        string? idempotencyKey)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = id is not null
+            ? """
+                SELECT id, organization_id, unit_id, actor_id, device_id, operation, idempotency_key,
+                       request_payload, request_fingerprint, phase, provider_reference, status,
+                       attempt_count, next_attempt_at, lease_expires_at, lease_token, last_result,
+                       last_error_code, created_at, updated_at, completed_at
+                FROM fiscal_operations WHERE id = $id LIMIT 1;
+                """
+            : """
+                SELECT id, organization_id, unit_id, actor_id, device_id, operation, idempotency_key,
+                       request_payload, request_fingerprint, phase, provider_reference, status,
+                       attempt_count, next_attempt_at, lease_expires_at, lease_token, last_result,
+                       last_error_code, created_at, updated_at, completed_at
+                FROM fiscal_operations
+                WHERE unit_id = $unitId AND operation = $operation AND idempotency_key = $idempotencyKey
+                LIMIT 1;
+                """;
+        if (id is not null) command.Parameters.AddWithValue("$id", id);
+        else
+        {
+            command.Parameters.AddWithValue("$unitId", unitId!);
+            command.Parameters.AddWithValue("$operation", operation!);
+            command.Parameters.AddWithValue("$idempotencyKey", idempotencyKey!);
+        }
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return null;
+        return new StoredFiscalOperation(
+            reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+            reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7),
+            reader.GetString(8), reader.GetString(9), reader.IsDBNull(10) ? null : reader.GetString(10),
+            reader.GetString(11), reader.GetInt32(12), DateTimeOffset.Parse(reader.GetString(13)),
+            reader.IsDBNull(14) ? null : DateTimeOffset.Parse(reader.GetString(14)),
+            reader.IsDBNull(15) ? null : reader.GetString(15),
+            reader.IsDBNull(16) ? null : JsonSerializer.Deserialize<Adapters.FiscalResult>(reader.GetString(16)),
+            reader.IsDBNull(17) ? null : reader.GetString(17), DateTimeOffset.Parse(reader.GetString(18)),
+            DateTimeOffset.Parse(reader.GetString(19)),
+            reader.IsDBNull(20) ? null : DateTimeOffset.Parse(reader.GetString(20)));
     }
 
     public async Task<bool> AcknowledgeAsync(string eventId)
@@ -1292,4 +1595,27 @@ public sealed record StoredPrintJob(
     string? ErrorCode,
     int BytesWritten,
     DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt);
+
+public sealed record StoredFiscalOperation(
+    string Id,
+    string OrganizationId,
+    string UnitId,
+    string ActorId,
+    string DeviceId,
+    string Operation,
+    string IdempotencyKey,
+    string RequestPayload,
+    string RequestFingerprint,
+    string Phase,
+    string? ProviderReference,
+    string Status,
+    int AttemptCount,
+    DateTimeOffset NextAttemptAt,
+    DateTimeOffset? LeaseExpiresAt,
+    string? LeaseToken,
+    Adapters.FiscalResult? LastResult,
+    string? LastErrorCode,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
     DateTimeOffset? CompletedAt);

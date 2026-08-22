@@ -28,6 +28,14 @@ namespace GiroMesa.ApiClient.Models
 #endif
         /// <summary>The dueAt property</summary>
         public DateTimeOffset? DueAt { get; set; }
+        /// <summary>The history property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportAlert_history>? History { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportAlert_history> History { get; set; }
+#endif
         /// <summary>The id property</summary>
         public Guid? Id { get; set; }
         /// <summary>The kind property</summary>
@@ -42,6 +50,14 @@ namespace GiroMesa.ApiClient.Models
         public DateTimeOffset? ResolvedAt { get; set; }
         /// <summary>The severity property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportAlert_severity? Severity { get; set; }
+        /// <summary>The source property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportAlert_source? Source { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportAlert_source Source { get; set; }
+#endif
         /// <summary>The status property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportAlert_status? Status { get; set; }
         /// <summary>The targetCents property</summary>
@@ -87,10 +103,12 @@ namespace GiroMesa.ApiClient.Models
                 { "assignedToIdentityId", n => { AssignedToIdentityId = n.GetGuidValue(); } },
                 { "detail", n => { Detail = n.GetStringValue(); } },
                 { "dueAt", n => { DueAt = n.GetDateTimeOffsetValue(); } },
+                { "history", n => { History = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportAlert_history>(global::GiroMesa.ApiClient.Models.ManagementReportAlert_history.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
                 { "kind", n => { Kind = n.GetStringValue(); } },
                 { "resolvedAt", n => { ResolvedAt = n.GetDateTimeOffsetValue(); } },
                 { "severity", n => { Severity = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_severity>(); } },
+                { "source", n => { Source = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_source>(global::GiroMesa.ApiClient.Models.ManagementReportAlert_source.CreateFromDiscriminatorValue); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_status>(); } },
                 { "targetCents", n => { TargetCents = n.GetLongValue(); } },
                 { "title", n => { Title = n.GetStringValue(); } },
@@ -109,10 +127,12 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteGuidValue("assignedToIdentityId", AssignedToIdentityId);
             writer.WriteStringValue("detail", Detail);
             writer.WriteDateTimeOffsetValue("dueAt", DueAt);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportAlert_history>("history", History);
             writer.WriteGuidValue("id", Id);
             writer.WriteStringValue("kind", Kind);
             writer.WriteDateTimeOffsetValue("resolvedAt", ResolvedAt);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_severity>("severity", Severity);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_source>("source", Source);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportAlert_status>("status", Status);
             writer.WriteLongValue("targetCents", TargetCents);
             writer.WriteStringValue("title", Title);

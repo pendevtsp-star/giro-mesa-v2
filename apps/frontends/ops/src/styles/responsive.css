@@ -144,38 +144,50 @@
     margin-bottom: 1.5rem;
   }
   .topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    height: auto;
-    min-height: 64px;
-    padding: 8px 12px;
+    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) 36px auto;
+    height: 56px;
+    min-height: 56px;
+    padding: 6px 8px;
   }
   .topbar__left {
     min-width: 0;
   }
   .topbar__scope {
     flex: 1;
-    max-width: none;
+    max-width: min(28vw, 110px);
     padding: 2px 0;
   }
   .topbar__scope .org-label {
     display: none;
   }
   .topbar__center {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    width: 100%;
-  }
-  .topbar__command-bar {
-    max-width: none;
-    width: 100%;
-  }
-  .topbar__actions {
     grid-column: 2;
     grid-row: 1;
-    gap: 4px;
+    width: 36px;
+  }
+  .topbar__command-bar {
+    background: transparent;
+    border-color: transparent;
+    flex: none;
+    height: 36px;
+    justify-content: center;
+    max-width: 36px;
+    padding: 0;
+    width: 36px;
+  }
+  .topbar__command-bar > span,
+  .topbar__command-bar kbd {
+    display: none;
+  }
+  .topbar__actions {
+    grid-column: 3;
+    grid-row: 1;
+    gap: 2px;
   }
   .sync-pill {
     height: 36px;
+    min-width: 36px;
     justify-content: center;
     padding: 0;
     width: 36px;
@@ -184,9 +196,24 @@
     display: none;
   }
   .topbar-clock {
+    border-left: 0;
+    gap: 0;
+    justify-content: center;
+    min-width: 42px;
+    padding-left: 0;
+  }
+  .topbar-clock > svg,
+  .topbar-clock__date,
+  .topbar-clock__separator {
     display: none;
   }
-  .manager-inbox-trigger {
+  .topbar-clock__time {
+    font-size: 0.78rem;
+    min-width: 0;
+    text-align: center;
+  }
+  .manager-inbox-trigger,
+  .operational-attention-trigger {
     height: 36px;
     min-width: 36px;
     padding-inline: 0.45rem;

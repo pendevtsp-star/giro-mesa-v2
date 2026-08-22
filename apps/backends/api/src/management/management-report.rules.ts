@@ -69,6 +69,7 @@ export function reportBudgetCoverage(
 
 export function buildReportForecast(input: {
   dailySeries: readonly {
+    date?: string;
     revenueCents: number;
     previousRevenueCents: number | null;
   }[];
@@ -79,48 +80,93 @@ export function buildReportForecast(input: {
     consumedQuantity: number;
     currentQuantity: number;
   }[];
+  futureDemand?: readonly {
+    date: string;
+    reservations: number;
+    guests: number;
+    demandFloorCents: number;
+  }[];
   horizonDays?: number;
 }) {
+  const minimumSampleDays = 14;
   const horizonDays = Math.min(Math.max(input.horizonDays ?? 7, 1), 90);
-  const sampleDays = input.dailySeries.length;
+  const observedSeries = input.dailySeries.filter((row) => row.revenueCents > 0);
+  const sampleDays = observedSeries.length;
+  const available = sampleDays >= minimumSampleDays;
   const average = sampleDays
-    ? input.dailySeries.reduce((sum, row) => sum + row.revenueCents, 0) / sampleDays
+    ? observedSeries.reduce((sum, row) => sum + row.revenueCents, 0) / sampleDays
     : 0;
   const variance = sampleDays
-    ? input.dailySeries.reduce((sum, row) => sum + (row.revenueCents - average) ** 2, 0) /
-      sampleDays
+    ? observedSeries.reduce((sum, row) => sum + (row.revenueCents - average) ** 2, 0) / sampleDays
     : 0;
   const deviation = Math.sqrt(variance);
-  const comparable = input.dailySeries.filter(
+  const dated = observedSeries.filter(
+    (row): row is typeof row & { date: string } =>
+      typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.date),
+  );
+  const weekdayRevenue = new Map<number, number[]>();
+  for (const row of dated) {
+    const weekday = new Date(`${row.date}T00:00:00.000Z`).getUTCDay();
+    weekdayRevenue.set(weekday, [...(weekdayRevenue.get(weekday) ?? []), row.revenueCents]);
+  }
+  const weekdayAverage = (weekday: number) => {
+    const values = weekdayRevenue.get(weekday) ?? [];
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : average;
+  };
+  const observedErrors = dated.flatMap((row) => {
+    if (row.revenueCents <= 0) return [];
+    const weekday = new Date(`${row.date}T00:00:00.000Z`).getUTCDay();
+    const values = weekdayRevenue.get(weekday) ?? [];
+    if (values.length < 2) return [];
+    const expected =
+      (values.reduce((sum, value) => sum + value, 0) - row.revenueCents) / (values.length - 1);
+    return [Math.abs(row.revenueCents - expected) / row.revenueCents];
+  });
+  const comparable = observedSeries.filter(
     (row) => row.previousRevenueCents !== null && row.previousRevenueCents > 0,
   );
-  const errorPercent = comparable.length
+  const errorSamples = observedErrors.length
+    ? observedErrors
+    : comparable.map(
+        (row) =>
+          Math.abs(row.revenueCents - (row.previousRevenueCents as number)) /
+          (row.previousRevenueCents as number),
+      );
+  const errorPercent = errorSamples.length
     ? Number(
-        (
-          (comparable.reduce(
-            (sum, row) =>
-              sum +
-              Math.abs(row.revenueCents - (row.previousRevenueCents as number)) /
-                (row.previousRevenueCents as number),
-            0,
-          ) /
-            comparable.length) *
-          100
-        ).toFixed(1),
+        ((errorSamples.reduce((sum, value) => sum + value, 0) / errorSamples.length) * 100).toFixed(
+          1,
+        ),
       )
     : null;
   const confidence =
-    sampleDays >= 28 && errorPercent !== null && errorPercent <= 20
+    sampleDays >= 56 && errorPercent !== null && errorPercent <= 20
       ? ("high" as const)
-      : sampleDays >= 14 && (errorPercent === null || errorPercent <= 40)
+      : available && (errorPercent === null || errorPercent <= 35)
         ? ("medium" as const)
         : ("low" as const);
-  const total = Math.round(average * horizonDays);
+  const lastDate = dated
+    .map((row) => row.date)
+    .sort()
+    .at(-1);
+  const projectedRevenue = Array.from({ length: horizonDays }, (_, index) => {
+    if (!lastDate || !available) return { date: null, baseCents: average, forecastCents: average };
+    const date = new Date(`${lastDate}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + index + 1);
+    const dateKey = date.toISOString().slice(0, 10);
+    const baseCents = weekdayAverage(date.getUTCDay());
+    const demandFloorCents =
+      input.futureDemand?.find((entry) => entry.date === dateKey)?.demandFloorCents ?? 0;
+    return { date: dateKey, baseCents, forecastCents: Math.max(baseCents, demandFloorCents) };
+  });
+  const total = Math.round(projectedRevenue.reduce((sum, value) => sum + value.forecastCents, 0));
   const interval = Math.round(1.28 * deviation * Math.sqrt(horizonDays));
   const dailyInflows = sampleDays ? input.cashFlow.inflowsCents / sampleDays : 0;
   const dailyOutflows = sampleDays ? input.cashFlow.outflowsCents / sampleDays : 0;
   return {
-    method: "historical_daily_average_v1" as const,
+    method: "weekday_seasonality_v2" as const,
+    available,
+    minimumSampleDays,
     horizonDays,
     sampleDays,
     confidence,
@@ -136,7 +182,14 @@ export function buildReportForecast(input: {
       outflowsCents: Math.round(dailyOutflows * horizonDays),
       netCents: Math.round((dailyInflows - dailyOutflows) * horizonDays),
     },
-    purchases: input.inventory
+    calendarSignals: (input.futureDemand ?? []).map((entry) => {
+      const projection = projectedRevenue.find((row) => row.date === entry.date);
+      return {
+        ...entry,
+        applied: Boolean(projection && entry.demandFloorCents > projection.baseCents),
+      };
+    }),
+    purchases: (available ? input.inventory : [])
       .map((item) => {
         const dailyDemand = sampleDays > 0 ? item.consumedQuantity / sampleDays : 0;
         return {

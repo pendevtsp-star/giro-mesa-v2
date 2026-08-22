@@ -27,6 +27,14 @@ namespace GiroMesa.ApiClient.Models
         public Date? DataThrough { get; set; }
         /// <summary>The generatedAt property</summary>
         public DateTimeOffset? GeneratedAt { get; set; }
+        /// <summary>The indicators property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_indicators? Indicators { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_indicators Indicators { get; set; }
+#endif
         /// <summary>The sourceCounts property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -63,6 +71,7 @@ namespace GiroMesa.ApiClient.Models
                 { "coverage", n => { Coverage = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage.CreateFromDiscriminatorValue); } },
                 { "dataThrough", n => { DataThrough = n.GetDateValue(); } },
                 { "generatedAt", n => { GeneratedAt = n.GetDateTimeOffsetValue(); } },
+                { "indicators", n => { Indicators = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_indicators>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_indicators.CreateFromDiscriminatorValue); } },
                 { "sourceCounts", n => { SourceCounts = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_sourceCounts>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_sourceCounts.CreateFromDiscriminatorValue); } },
             };
         }
@@ -76,6 +85,7 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_coverage>("coverage", Coverage);
             writer.WriteDateValue("dataThrough", DataThrough);
             writer.WriteDateTimeOffsetValue("generatedAt", GeneratedAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_indicators>("indicators", Indicators);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_meta_sourceCounts>("sourceCounts", SourceCounts);
             writer.WriteAdditionalData(AdditionalData);
         }

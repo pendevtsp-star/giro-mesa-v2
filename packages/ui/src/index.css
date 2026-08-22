@@ -23,8 +23,8 @@
 @import "./components/Progress/Progress.css" layer(legacy);
 @import "./components/EmptyState/EmptyState.css" layer(legacy);
 @import "./components/Drawer/Drawer.css" layer(legacy);
-@import "./components/Modal/Modal.css" layer(legacy);
-@import "./components/SearchField/SearchField.css" layer(legacy);
+@import "./components/Modal/Modal.css" layer(components);
+@import "./components/SearchField/SearchField.css" layer(components);
 @import "./components/FormField/FormField.css" layer(legacy);
 @import "./components/Avatar/Avatar.css" layer(legacy);
 @import "./components/Callout/Callout.css" layer(legacy);

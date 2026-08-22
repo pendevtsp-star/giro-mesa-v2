@@ -3,9 +3,12 @@ import {
   accountantRequests,
   accountingExports,
   auditEvents,
+  buildZipArtifact,
+  fiscalDocumentArtifacts,
   fiscalDocumentEvents,
   fiscalDocumentItems,
   fiscalDocuments,
+  fiscalNumberInvalidations,
   fiscalPeriods,
   fiscalProfiles,
   fiscalWebhookReceipts,
@@ -15,7 +18,10 @@ import {
   posOrders,
   posProducts,
   productTaxRevisions,
+  readFiscalArtifact,
   units,
+  validateFiscalArtifact,
+  writeFiscalArtifact,
 } from "@giromesa/db";
 import {
   decryptSecret,
@@ -43,9 +49,11 @@ import type {
   AccountantRequestListQuery,
   CancelFiscalDocumentInput,
   FiscalDocumentListQuery,
+  FiscalNumberInvalidationInput,
   FiscalProfileInput,
   FocusCompanyOnboardingInput,
   ProductTaxRevisionBulkInput,
+  ProductTaxRevisionImportInput,
   ProductTaxRevisionInput,
   ProductTaxRevisionListQuery,
   ReopenFiscalPeriodInput,
@@ -222,17 +230,14 @@ function publicFocusConnection(settings: FiscalSettings) {
   const connection = settings.focus;
   if (!connection) return null;
   return {
-    companyId: connection.companyId,
-    cnpj: connection.cnpj,
+    registered: true,
     status: connection.status,
     certificateValidUntil: connection.certificateValidUntil,
-    enabled: connection.enabled,
     lastCheckedAt: connection.lastCheckedAt,
     environments: {
       homologation: Boolean(connection.tokenHomologation),
       production: Boolean(connection.tokenProduction),
     },
-    lastError: connection.lastError,
   };
 }
 
@@ -247,7 +252,7 @@ function sanitizedProfile<T extends { settings: unknown }>(profile: T) {
   };
 }
 
-function providerStatusPayload(
+export function providerStatusPayload(
   profile: { provider: string | null; environment: string; settings: unknown } | null,
   platformConfigured: boolean,
   encryptionConfigured: boolean,
@@ -273,25 +278,23 @@ function providerStatusPayload(
               ? "credentials_missing"
               : "ready";
   return {
-    provider: "focus" as const,
     status,
     environment:
       profile?.environment === "production" || profile?.environment === "homologation"
         ? profile.environment
         : null,
-    platformConfigured: platformConfigured && encryptionConfigured,
     connection,
     nextAction:
       status === "platform_not_configured"
-        ? "Configure as credenciais da conta GiroMesa no ambiente da API."
+        ? "Entre em contato com o suporte GiroMesa para ativar a emissão."
         : status === "profile_required"
           ? "Salve o perfil fiscal da unidade."
           : status === "company_required"
-            ? "Valide e cadastre a empresa emitente na Focus NFe."
+            ? "Conclua o cadastro fiscal da empresa."
             : status === "credentials_missing"
-              ? "Sincronize os tokens da empresa emitente."
+              ? "Atualize os dados e o certificado da empresa."
               : status === "error"
-                ? "Revise a última falha retornada pela Focus NFe."
+                ? "Revise os dados fiscais ou fale com o suporte GiroMesa."
                 : "Conexão pronta para o ambiente selecionado.",
   };
 }
@@ -933,8 +936,42 @@ export class FiscalService {
     unitId: string,
     input: ProductTaxRevisionBulkInput,
   ) {
+    return this.createTaxRevisionRows(
+      identityId,
+      organizationId,
+      unitId,
+      [...new Set(input.productIds)].map((productId) => ({
+        productId,
+        status: input.status,
+        effectiveFrom: input.effectiveFrom,
+        effectiveUntil: input.effectiveUntil,
+        classification: input.classification,
+      })),
+      "bulk_created",
+    );
+  }
+
+  async importTaxRevisions(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: ProductTaxRevisionImportInput,
+  ) {
+    return this.createTaxRevisionRows(identityId, organizationId, unitId, input.rows, "imported");
+  }
+
+  private async createTaxRevisionRows(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    inputRows: ProductTaxRevisionInput[],
+    action: "bulk_created" | "imported",
+  ) {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
-    const productIds = [...new Set(input.productIds)].sort();
+    const rows = [...inputRows].sort((left, right) =>
+      left.productId.localeCompare(right.productId),
+    );
+    const productIds = rows.map((row) => row.productId);
     return this.database.db.transaction(async (tx) => {
       const products = await tx
         .select({ id: posProducts.id })
@@ -950,7 +987,8 @@ export class FiscalService {
       }
       const now = new Date();
       const revisions = [];
-      for (const productId of productIds) {
+      for (const row of rows) {
+        const productId = row.productId;
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`tax:${organizationId}:${unitId}:${productId}`}, 0))`,
         );
@@ -966,7 +1004,7 @@ export class FiscalService {
               eq(productTaxRevisions.productId, productId),
             ),
           );
-        if (input.status === "active") {
+        if (row.status === "active") {
           await tx
             .update(productTaxRevisions)
             .set({ status: "revoked", updatedAt: now })
@@ -986,13 +1024,13 @@ export class FiscalService {
             unitId,
             productId,
             version: Number(versionRow?.version ?? 1),
-            status: input.status,
-            effectiveFrom: input.effectiveFrom,
-            effectiveUntil: input.effectiveUntil,
-            classification: input.classification,
+            status: row.status,
+            effectiveFrom: row.effectiveFrom,
+            effectiveUntil: row.effectiveUntil,
+            classification: row.classification,
             createdByIdentityId: identityId,
-            approvedByIdentityId: input.status === "active" ? identityId : undefined,
-            approvedAt: input.status === "active" ? now : undefined,
+            approvedByIdentityId: row.status === "active" ? identityId : undefined,
+            approvedAt: row.status === "active" ? now : undefined,
           })
           .returning();
         if (!revision) throw new ConflictException({ code: "FISCAL_REVISION_CREATE_FAILED" });
@@ -1002,13 +1040,13 @@ export class FiscalService {
         organizationId,
         unitId,
         actorIdentityId: identityId,
-        action: "fiscal.product_tax_revision.bulk_created",
+        action: `fiscal.product_tax_revision.${action}`,
         entityType: "product_tax_revision",
         entityId: revisions[0]?.id ?? unitId,
-        metadata: { productIds, status: input.status, count: revisions.length },
+        metadata: { productIds, count: revisions.length },
       });
       await tx.insert(outboxEvents).values({
-        topic: "fiscal.product_tax_revision.bulk_created",
+        topic: `fiscal.product_tax_revision.${action}`,
         aggregateType: "fiscal_profile",
         aggregateId: unitId,
         payload: {
@@ -1422,11 +1460,11 @@ export class FiscalService {
       this.database.db
         .select({
           id: fiscalDocuments.id,
+          tabId: fiscalDocuments.tabId,
           orderId: fiscalDocuments.orderId,
           model: fiscalDocuments.model,
           environment: fiscalDocuments.environment,
           status: fiscalDocuments.status,
-          providerReference: fiscalDocuments.providerReference,
           accessKey: fiscalDocuments.accessKey,
           series: fiscalDocuments.series,
           number: fiscalDocuments.number,
@@ -1476,9 +1514,16 @@ export class FiscalService {
         message: "Documento fiscal não encontrado.",
       });
     }
-    const [items, events] = await Promise.all([
+    const [items, events, artifacts] = await Promise.all([
       this.database.db
-        .select()
+        .select({
+          id: fiscalDocumentEvents.id,
+          type: fiscalDocumentEvents.type,
+          status: fiscalDocumentEvents.status,
+          code: fiscalDocumentEvents.code,
+          message: fiscalDocumentEvents.message,
+          occurredAt: fiscalDocumentEvents.occurredAt,
+        })
         .from(fiscalDocumentItems)
         .where(
           and(
@@ -1499,8 +1544,69 @@ export class FiscalService {
           ),
         )
         .orderBy(asc(fiscalDocumentEvents.occurredAt)),
+      this.database.db
+        .select({
+          kind: fiscalDocumentArtifacts.kind,
+          sha256: fiscalDocumentArtifacts.sha256,
+          bytes: fiscalDocumentArtifacts.bytes,
+          contentType: fiscalDocumentArtifacts.contentType,
+        })
+        .from(fiscalDocumentArtifacts)
+        .where(
+          and(
+            eq(fiscalDocumentArtifacts.organizationId, organizationId),
+            eq(fiscalDocumentArtifacts.unitId, unitId),
+            eq(fiscalDocumentArtifacts.documentId, documentId),
+          ),
+        )
+        .orderBy(asc(fiscalDocumentArtifacts.kind)),
     ]);
-    return { ...document, items, events };
+    const publicDocument = Object.fromEntries(
+      Object.entries(document).filter(
+        ([key]) =>
+          !["snapshot", "idempotencyKey", "providerReference", "xmlStorageKey"].includes(key),
+      ),
+    );
+    return { ...publicDocument, items, events, artifacts };
+  }
+
+  async documentArtifact(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    documentId: string,
+    kind: string,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:documents:read");
+    if (!["authorization_xml", "cancellation_xml", "danfe_pdf"].includes(kind)) {
+      throw new NotFoundException({ code: "FISCAL_ARTIFACT_NOT_FOUND" });
+    }
+    const [artifact] = await this.database.db
+      .select()
+      .from(fiscalDocumentArtifacts)
+      .where(
+        and(
+          eq(fiscalDocumentArtifacts.organizationId, organizationId),
+          eq(fiscalDocumentArtifacts.unitId, unitId),
+          eq(fiscalDocumentArtifacts.documentId, documentId),
+          eq(fiscalDocumentArtifacts.kind, kind),
+        ),
+      )
+      .limit(1);
+    if (!artifact) throw new NotFoundException({ code: "FISCAL_ARTIFACT_NOT_FOUND" });
+    const content = await readFiscalArtifact(process.env.MEDIA_ROOT, artifact.storageKey).catch(
+      () => {
+        throw new NotFoundException({ code: "FISCAL_ARTIFACT_NOT_FOUND" });
+      },
+    );
+    const extension = kind === "danfe_pdf" ? "pdf" : "xml";
+    return {
+      filename: `documento-${documentId}-${kind}.${extension}`,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      mimeType: artifact.contentType,
+      sha256: artifact.sha256,
+    };
   }
 
   async reconcileDocument(
@@ -1575,6 +1681,233 @@ export class FiscalService {
     } catch (error) {
       rethrowFocus(error);
     }
+  }
+
+  async numberInvalidations(identityId: string, organizationId: string, unitId: string) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:documents:read");
+    return this.database.db
+      .select({
+        id: fiscalNumberInvalidations.id,
+        environment: fiscalNumberInvalidations.environment,
+        series: fiscalNumberInvalidations.series,
+        initialNumber: fiscalNumberInvalidations.initialNumber,
+        finalNumber: fiscalNumberInvalidations.finalNumber,
+        justification: fiscalNumberInvalidations.justification,
+        status: fiscalNumberInvalidations.status,
+        errorMessage: fiscalNumberInvalidations.errorMessage,
+        processedAt: fiscalNumberInvalidations.processedAt,
+        createdAt: fiscalNumberInvalidations.createdAt,
+      })
+      .from(fiscalNumberInvalidations)
+      .where(
+        and(
+          eq(fiscalNumberInvalidations.organizationId, organizationId),
+          eq(fiscalNumberInvalidations.unitId, unitId),
+        ),
+      )
+      .orderBy(desc(fiscalNumberInvalidations.createdAt));
+  }
+
+  async invalidateNumbers(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: FiscalNumberInvalidationInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    const parsedKey = idempotencyKeySchema.parse(idempotencyKey);
+    const [context] = await this.database.db
+      .select({
+        environment: fiscalProfiles.environment,
+        settings: fiscalProfiles.settings,
+        provider: fiscalProfiles.provider,
+        cnpj: legalEntities.document,
+      })
+      .from(fiscalProfiles)
+      .innerJoin(
+        legalEntities,
+        and(
+          eq(legalEntities.organizationId, fiscalProfiles.organizationId),
+          eq(legalEntities.id, fiscalProfiles.legalEntityId),
+        ),
+      )
+      .where(
+        and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
+      )
+      .limit(1);
+    if (context?.provider !== "focus") {
+      throw new ConflictException({ code: "FOCUS_COMPANY_REQUIRED" });
+    }
+    const token = this.focusToken(context.settings, context.environment, organizationId, unitId);
+    const invalidation = await this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`fiscal-invalidation:${organizationId}:${unitId}:${input.series}`}, 0))`,
+      );
+      const [existing] = await tx
+        .select()
+        .from(fiscalNumberInvalidations)
+        .where(
+          and(
+            eq(fiscalNumberInvalidations.organizationId, organizationId),
+            eq(fiscalNumberInvalidations.unitId, unitId),
+            eq(fiscalNumberInvalidations.idempotencyKey, parsedKey),
+          ),
+        )
+        .limit(1);
+      if (existing) return existing;
+      const [overlap] = await tx
+        .select({ id: fiscalNumberInvalidations.id })
+        .from(fiscalNumberInvalidations)
+        .where(
+          and(
+            eq(fiscalNumberInvalidations.organizationId, organizationId),
+            eq(fiscalNumberInvalidations.unitId, unitId),
+            eq(fiscalNumberInvalidations.environment, context.environment),
+            eq(fiscalNumberInvalidations.series, input.series),
+            inArray(fiscalNumberInvalidations.status, ["processing", "invalidated"]),
+            sql`${fiscalNumberInvalidations.initialNumber} <= ${input.finalNumber}`,
+            sql`${fiscalNumberInvalidations.finalNumber} >= ${input.initialNumber}`,
+          ),
+        )
+        .limit(1);
+      if (overlap) {
+        throw new ConflictException({
+          code: "FISCAL_NUMBER_RANGE_ALREADY_REQUESTED",
+          message: "Essa faixa já possui uma solicitação de inutilização.",
+        });
+      }
+      const [created] = await tx
+        .insert(fiscalNumberInvalidations)
+        .values({
+          organizationId,
+          unitId,
+          environment: context.environment,
+          series: input.series,
+          initialNumber: input.initialNumber,
+          finalNumber: input.finalNumber,
+          justification: input.justification,
+          idempotencyKey: parsedKey,
+          requestedByIdentityId: identityId,
+        })
+        .returning();
+      if (!created) throw new ConflictException({ code: "FISCAL_INVALIDATION_CREATE_FAILED" });
+      return created;
+    });
+    const publicInvalidation = (row: typeof invalidation) => ({
+      id: row.id,
+      environment: row.environment,
+      series: row.series,
+      initialNumber: row.initialNumber,
+      finalNumber: row.finalNumber,
+      justification: row.justification,
+      status: row.status,
+      errorMessage: row.errorMessage,
+      processedAt: row.processedAt,
+      createdAt: row.createdAt,
+    });
+    if (invalidation.status !== "processing") {
+      return { invalidation: publicInvalidation(invalidation), replayed: true };
+    }
+    try {
+      const request = {
+        cnpj: context.cnpj,
+        series: input.series,
+        initialNumber: input.initialNumber,
+        finalNumber: input.finalNumber,
+      };
+      const reconciled = await this.focus.findNfceInvalidation(request, context.environment, token);
+      const result =
+        reconciled ??
+        (await this.focus.invalidateNfce(
+          { ...request, justification: input.justification },
+          context.environment,
+          token,
+        ));
+      let artifact: Awaited<ReturnType<typeof writeFiscalArtifact>> | null = null;
+      if (result.status === "invalidated" && result.xmlUrl) {
+        const content = await this.focus.artifact(result.xmlUrl, context.environment, token);
+        validateFiscalArtifact("cancellation_xml", content);
+        artifact = await writeFiscalArtifact({
+          root: process.env.MEDIA_ROOT,
+          organizationId,
+          unitId,
+          namespace: "invalidations",
+          entityId: invalidation.id,
+          name: "invalidation_xml",
+          extension: "xml",
+          content,
+        });
+      }
+      const [updated] = await this.database.db
+        .update(fiscalNumberInvalidations)
+        .set({
+          status: result.status,
+          providerReference: result.reference,
+          xmlStorageKey: artifact?.storageKey,
+          xmlSha256: artifact?.sha256,
+          errorCode: result.status === "rejected" ? result.code : null,
+          errorMessage: result.status === "rejected" ? result.message : null,
+          processedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(fiscalNumberInvalidations.id, invalidation.id))
+        .returning();
+      await this.database.db.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: `fiscal.number_invalidation.${result.status}`,
+        entityType: "fiscal_number_invalidation",
+        entityId: invalidation.id,
+        metadata: {
+          series: input.series,
+          initialNumber: input.initialNumber,
+          finalNumber: input.finalNumber,
+        },
+      });
+      return {
+        invalidation: updated ? publicInvalidation(updated) : null,
+        replayed: Boolean(reconciled),
+      };
+    } catch (error) {
+      rethrowFocus(error);
+    }
+  }
+
+  async numberInvalidationArtifact(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    invalidationId: string,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "fiscal:documents:read");
+    const [row] = await this.database.db
+      .select({
+        storageKey: fiscalNumberInvalidations.xmlStorageKey,
+        sha256: fiscalNumberInvalidations.xmlSha256,
+      })
+      .from(fiscalNumberInvalidations)
+      .where(
+        and(
+          eq(fiscalNumberInvalidations.organizationId, organizationId),
+          eq(fiscalNumberInvalidations.unitId, unitId),
+          eq(fiscalNumberInvalidations.id, invalidationId),
+          eq(fiscalNumberInvalidations.status, "invalidated"),
+        ),
+      )
+      .limit(1);
+    if (!row?.storageKey) throw new NotFoundException({ code: "FISCAL_ARTIFACT_NOT_FOUND" });
+    const content = await readFiscalArtifact(process.env.MEDIA_ROOT, row.storageKey).catch(() => {
+      throw new NotFoundException({ code: "FISCAL_ARTIFACT_NOT_FOUND" });
+    });
+    return {
+      filename: `inutilizacao-${invalidationId}.xml`,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      mimeType: "application/xml",
+      sha256: row.sha256,
+    };
   }
 
   private async focusDocumentContext(organizationId: string, unitId: string, documentId: string) {
@@ -1690,6 +2023,31 @@ export class FiscalService {
           occurredAt: now,
         })
         .onConflictDoNothing();
+      for (const [index, taxCents] of result.itemTaxCents.entries()) {
+        await tx
+          .update(fiscalDocumentItems)
+          .set({ taxCents })
+          .where(
+            and(
+              eq(fiscalDocumentItems.documentId, document.id),
+              eq(fiscalDocumentItems.lineNumber, index + 1),
+            ),
+          );
+      }
+      if ((result.status === "authorized" || result.status === "canceled") && result.xmlUrl) {
+        await tx.insert(outboxEvents).values({
+          topic: "fiscal.document.artifacts_requested",
+          aggregateType: "fiscal_document",
+          aggregateId: document.id,
+          payload: {
+            organizationId: document.organizationId,
+            unitId: document.unitId,
+            status: result.status,
+            xmlUrl: result.xmlUrl,
+            pdfUrl: result.pdfUrl,
+          },
+        });
+      }
       await tx.insert(auditEvents).values({
         organizationId: document.organizationId,
         unitId: document.unitId,
@@ -1851,6 +2209,46 @@ export class FiscalService {
           code: "FISCAL_PERIOD_HAS_PENDING_DOCUMENTS",
           message: "Resolva os documentos pendentes antes do fechamento.",
           pendingDocumentIds: unresolved.map((document) => document.id),
+        });
+      }
+      const artifactRows =
+        documents.length === 0
+          ? []
+          : await tx
+              .select({
+                documentId: fiscalDocumentArtifacts.documentId,
+                kind: fiscalDocumentArtifacts.kind,
+              })
+              .from(fiscalDocumentArtifacts)
+              .where(
+                and(
+                  eq(fiscalDocumentArtifacts.organizationId, organizationId),
+                  eq(fiscalDocumentArtifacts.unitId, unitId),
+                  inArray(
+                    fiscalDocumentArtifacts.documentId,
+                    documents.map((document) => document.id),
+                  ),
+                ),
+              );
+      const artifactKinds = new Map<string, Set<string>>();
+      for (const artifact of artifactRows) {
+        const kinds = artifactKinds.get(artifact.documentId) ?? new Set<string>();
+        kinds.add(artifact.kind);
+        artifactKinds.set(artifact.documentId, kinds);
+      }
+      const missingArtifacts = documents.filter((document) => {
+        if (!["authorized", "canceled"].includes(document.status)) return false;
+        const kinds = artifactKinds.get(document.id);
+        return (
+          !kinds?.has("authorization_xml") ||
+          (document.status === "canceled" && !kinds.has("cancellation_xml"))
+        );
+      });
+      if (missingArtifacts.length > 0) {
+        throw new ConflictException({
+          code: "FISCAL_PERIOD_HAS_MISSING_XML",
+          message: "Aguarde a recuperação dos XMLs antes do fechamento.",
+          documentIds: missingArtifacts.map((document) => document.id),
         });
       }
       const closedAt = new Date();
@@ -2032,6 +2430,164 @@ export class FiscalService {
       };
     }
     return { status: "available" as const, competence, ...result };
+  }
+
+  async accountantPackageContent(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    competence: string,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "accounting:exports:read");
+    const { competenceDate } = competenceBounds(competence);
+    const [context] = await this.database.db
+      .select({
+        period: fiscalPeriods,
+        accountingPackage: accountingExports,
+        timezone: units.timezone,
+      })
+      .from(fiscalPeriods)
+      .innerJoin(
+        accountingExports,
+        and(
+          eq(accountingExports.periodId, fiscalPeriods.id),
+          eq(accountingExports.format, "json"),
+          eq(accountingExports.status, "ready"),
+        ),
+      )
+      .innerJoin(
+        units,
+        and(
+          eq(units.organizationId, fiscalPeriods.organizationId),
+          eq(units.id, fiscalPeriods.unitId),
+        ),
+      )
+      .where(
+        and(
+          eq(fiscalPeriods.organizationId, organizationId),
+          eq(fiscalPeriods.unitId, unitId),
+          eq(fiscalPeriods.competence, competenceDate),
+          eq(fiscalPeriods.status, "closed"),
+        ),
+      )
+      .limit(1);
+    if (!context) {
+      throw new ConflictException({
+        code: "ACCOUNTING_PACKAGE_UNAVAILABLE",
+        message: "Feche a competência antes de baixar o pacote contábil.",
+      });
+    }
+    const documents = await this.database.db
+      .select({
+        id: fiscalDocuments.id,
+        status: fiscalDocuments.status,
+        accessKey: fiscalDocuments.accessKey,
+        series: fiscalDocuments.series,
+        number: fiscalDocuments.number,
+        totalCents: fiscalDocuments.totalCents,
+        taxCents: fiscalDocuments.taxCents,
+        issuedAt: fiscalDocuments.issuedAt,
+      })
+      .from(fiscalDocuments)
+      .where(
+        and(
+          eq(fiscalDocuments.organizationId, organizationId),
+          eq(fiscalDocuments.unitId, unitId),
+          sql`(${fiscalDocuments.issuedAt} AT TIME ZONE ${context.timezone}) >= ${competenceDate}::date`,
+          sql`(${fiscalDocuments.issuedAt} AT TIME ZONE ${context.timezone}) < (${competenceDate}::date + interval '1 month')`,
+        ),
+      )
+      .orderBy(asc(fiscalDocuments.issuedAt), asc(fiscalDocuments.id));
+    const artifacts =
+      documents.length === 0
+        ? []
+        : await this.database.db
+            .select()
+            .from(fiscalDocumentArtifacts)
+            .where(
+              and(
+                eq(fiscalDocumentArtifacts.organizationId, organizationId),
+                eq(fiscalDocumentArtifacts.unitId, unitId),
+                inArray(
+                  fiscalDocumentArtifacts.documentId,
+                  documents.map((document) => document.id),
+                ),
+              ),
+            );
+    const files: Array<{ name: string; content: string | Buffer }> = [
+      {
+        name: "manifesto.json",
+        content: JSON.stringify(context.accountingPackage.payload, null, 2),
+      },
+      {
+        name: "documentos.csv",
+        content: [
+          "id;status;chave;serie;numero;total_centavos;tributos_centavos;emissao",
+          ...documents.map((document) =>
+            [
+              document.id,
+              document.status,
+              document.accessKey ?? "",
+              document.series ?? "",
+              document.number ?? "",
+              document.totalCents,
+              document.taxCents,
+              document.issuedAt.toISOString(),
+            ].join(";"),
+          ),
+        ].join("\r\n"),
+      },
+    ];
+    for (const artifact of artifacts) {
+      const extension = artifact.kind === "danfe_pdf" ? "pdf" : "xml";
+      files.push({
+        name: `${extension === "xml" ? "xml" : "danfe"}/${artifact.documentId}-${artifact.kind}.${extension}`,
+        content: await readFiscalArtifact(process.env.MEDIA_ROOT, artifact.storageKey),
+      });
+    }
+    const content = buildZipArtifact(files);
+    const stored = await writeFiscalArtifact({
+      root: process.env.MEDIA_ROOT,
+      organizationId,
+      unitId,
+      namespace: "packages",
+      entityId: context.period.id,
+      name: "accounting_package",
+      extension: "zip",
+      content,
+    });
+    await this.database.db
+      .insert(accountingExports)
+      .values({
+        organizationId,
+        unitId,
+        periodId: context.period.id,
+        format: "zip",
+        status: "ready",
+        storageKey: stored.storageKey,
+        sha256: stored.sha256,
+        requestedByIdentityId: identityId,
+        generatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [accountingExports.periodId, accountingExports.format],
+        set: {
+          status: "ready",
+          storageKey: stored.storageKey,
+          sha256: stored.sha256,
+          requestedByIdentityId: identityId,
+          generatedAt: new Date(),
+          error: null,
+          updatedAt: new Date(),
+        },
+      });
+    return {
+      filename: `pacote-contabil-${competence}.zip`,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      mimeType: "application/zip",
+      sha256: stored.sha256,
+    };
   }
 
   async accountantRequests(

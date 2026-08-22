@@ -17,7 +17,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { identities, memberships, organizations, units } from "./schema.js";
+import { deviceEnrollments, identities, memberships, organizations, units } from "./schema.js";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -90,6 +90,34 @@ export const posPaymentMethod = pgEnum("pos_payment_method", [
   "debit_card",
   "pix",
   "other",
+]);
+export const posPaymentAttemptStatus = pgEnum("pos_payment_attempt_status", [
+  "created",
+  "processing",
+  "approved",
+  "declined",
+  "canceled",
+  "unknown",
+  "reversed",
+]);
+export const posPaymentReversalStatus = pgEnum("pos_payment_reversal_status", [
+  "pending",
+  "processing",
+  "approved",
+  "declined",
+  "canceled",
+  "unknown",
+]);
+export const posPaymentCertificationStatus = pgEnum("pos_payment_certification_status", [
+  "approved",
+  "suspended",
+]);
+export const posPaymentReconciliationStatus = pgEnum("pos_payment_reconciliation_status", [
+  "pending",
+  "matched",
+  "divergent",
+  "settled",
+  "reversed",
 ]);
 export const posServiceMode = pgEnum("pos_service_mode", [
   "full_service",
@@ -613,6 +641,56 @@ export const posKdsTerminalProfiles = pgTable(
   ],
 );
 
+export const posPaymentTerminalCertifications = pgTable(
+  "pos_payment_terminal_certifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    provider: varchar("provider", { length: 24 }).notNull(),
+    status: posPaymentCertificationStatus("status").notNull().default("suspended"),
+    manufacturer: varchar("manufacturer", { length: 120 }).notNull(),
+    model: varchar("model", { length: 120 }).notNull(),
+    androidVersion: varchar("android_version", { length: 64 }).notNull(),
+    firmwareVersion: varchar("firmware_version", { length: 120 }).notNull(),
+    appVersion: varchar("app_version", { length: 64 }).notNull(),
+    packageName: varchar("package_name", { length: 180 }).notNull(),
+    signingCertificateSha256: varchar("signing_certificate_sha256", { length: 64 }).notNull(),
+    methods: jsonb("methods").$type<string[]>().notNull().default([]),
+    maxInstallments: integer("max_installments").notNull().default(1),
+    supportsCancel: boolean("supports_cancel").notNull().default(false),
+    supportsRecover: boolean("supports_recover").notNull().default(false),
+    supportsReversal: boolean("supports_reversal").notNull().default(false),
+    killSwitchEnabled: boolean("kill_switch_enabled").notNull().default(false),
+    killSwitchReason: varchar("kill_switch_reason", { length: 500 }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_payment_terminal_certifications_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    foreignKey({
+      name: "pos_payment_terminal_certifications_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "pos_payment_terminal_certifications_provider_check",
+      sql`${table.provider} IN ('rede', 'paygo', 'stone', 'getnet', 'cielo', 'pagbank')`,
+    ),
+    check(
+      "pos_payment_terminal_certifications_installments_check",
+      sql`${table.maxInstallments} BETWEEN 1 AND 24`,
+    ),
+    check(
+      "pos_payment_terminal_certifications_kill_switch_reason_check",
+      sql`NOT ${table.killSwitchEnabled} OR ${table.killSwitchReason} IS NOT NULL`,
+    ),
+  ],
+);
+
 export const posTerminalProfiles = pgTable(
   "pos_terminal_profiles",
   {
@@ -626,6 +704,14 @@ export const posTerminalProfiles = pgTable(
     stationId: uuid("station_id"),
     compact: boolean("compact").notNull().default(true),
     quickActions: jsonb("quick_actions").$type<string[]>().notNull().default([]),
+    paymentProvider: varchar("payment_provider", { length: 24 }),
+    paymentStatus: varchar("payment_status", { length: 24 }).notNull().default("disabled"),
+    paymentCertificationId: uuid("payment_certification_id"),
+    paymentMethods: jsonb("payment_methods").$type<string[]>().notNull().default([]),
+    maxPaymentInstallments: integer("max_payment_installments").notNull().default(1),
+    paymentSupportsCancel: boolean("payment_supports_cancel").notNull().default(false),
+    paymentSupportsRecover: boolean("payment_supports_recover").notNull().default(false),
+    paymentSupportsReversal: boolean("payment_supports_reversal").notNull().default(false),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -651,6 +737,15 @@ export const posTerminalProfiles = pgTable(
         posProductionStations.id,
       ],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_terminal_profiles_payment_certification_fk",
+      columns: [table.organizationId, table.unitId, table.paymentCertificationId],
+      foreignColumns: [
+        posPaymentTerminalCertifications.organizationId,
+        posPaymentTerminalCertifications.unitId,
+        posPaymentTerminalCertifications.id,
+      ],
+    }).onDelete("restrict"),
     check(
       "pos_terminal_profiles_mode_check",
       sql`${table.mode} IN ('waiter_mobile', 'reception', 'cashier', 'kds', 'expedition', 'shared')`,
@@ -659,6 +754,154 @@ export const posTerminalProfiles = pgTable(
       "pos_terminal_profiles_route_check",
       sql`${table.defaultRoute} IN ('dashboard', 'reservations', 'salon', 'counter', 'cash', 'kds')`,
     ),
+    check(
+      "pos_terminal_profiles_payment_provider_check",
+      sql`${table.paymentProvider} IS NULL OR ${table.paymentProvider} IN ('rede', 'paygo', 'stone', 'getnet', 'cielo', 'pagbank')`,
+    ),
+    check(
+      "pos_terminal_profiles_payment_status_check",
+      sql`${table.paymentStatus} IN ('disabled', 'pending', 'homologated', 'suspended')`,
+    ),
+    check(
+      "pos_terminal_profiles_payment_installments_check",
+      sql`${table.maxPaymentInstallments} BETWEEN 1 AND 24`,
+    ),
+  ],
+);
+
+export const posPaymentDevicePairingCodes = pgTable(
+  "pos_payment_device_pairing_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    consumedByInstallationId: uuid("consumed_by_installation_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pos_payment_device_pairing_codes_hash_unique").on(table.codeHash),
+    index("pos_payment_device_pairing_codes_scope_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.expiresAt,
+    ),
+    foreignKey({
+      name: "pos_payment_device_pairing_codes_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_payment_device_pairing_codes_consumed_device_fk",
+      columns: [table.organizationId, table.unitId, table.consumedByInstallationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const posPaymentDeviceCredentials = pgTable(
+  "pos_payment_device_credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    publicKeySpki: varchar("public_key_spki", { length: 512 }).notNull(),
+    rotationId: uuid("rotation_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    rotateAfter: timestamp("rotate_after", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("pos_payment_device_credentials_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("pos_payment_device_credentials_rotation_unique")
+      .on(table.organizationId, table.unitId, table.installationId, table.rotationId)
+      .where(sql`${table.rotationId} IS NOT NULL`),
+    index("pos_payment_device_credentials_active_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.installationId,
+      table.expiresAt,
+    ),
+    foreignKey({
+      name: "pos_payment_device_credentials_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const posPaymentDeviceRequestNonces = pgTable(
+  "pos_payment_device_request_nonces",
+  {
+    credentialId: uuid("credential_id").notNull(),
+    nonce: varchar("nonce", { length: 96 }).notNull(),
+    requestTimestamp: timestamp("request_timestamp", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.credentialId, table.nonce] }),
+    index("pos_payment_device_request_nonces_created_idx").on(table.createdAt),
+    foreignKey({
+      name: "pos_payment_device_request_nonces_credential_fk",
+      columns: [table.credentialId],
+      foreignColumns: [posPaymentDeviceCredentials.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const posPaymentDeviceDiagnostics = pgTable(
+  "pos_payment_device_diagnostics",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    manufacturer: varchar("manufacturer", { length: 120 }).notNull(),
+    model: varchar("model", { length: 120 }).notNull(),
+    androidVersion: varchar("android_version", { length: 64 }).notNull(),
+    firmwareVersion: varchar("firmware_version", { length: 120 }).notNull(),
+    appVersion: varchar("app_version", { length: 64 }).notNull(),
+    packageName: varchar("package_name", { length: 180 }).notNull(),
+    signingCertificateSha256: varchar("signing_certificate_sha256", { length: 64 }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.installationId] }),
+    index("pos_payment_device_diagnostics_last_seen_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.lastSeenAt,
+    ),
+    foreignKey({
+      name: "pos_payment_device_diagnostics_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("cascade"),
   ],
 );
 
@@ -1219,6 +1462,146 @@ export const posServiceCalls = pgTable(
   ],
 );
 
+export const posPaymentAttempts = pgTable(
+  "pos_payment_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    tabId: uuid("tab_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    requestedByIdentityId: uuid("requested_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    provider: varchar("provider", { length: 24 }).notNull(),
+    method: posPaymentMethod("method").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    installments: integer("installments").notNull().default(1),
+    status: posPaymentAttemptStatus("status").notNull().default("created"),
+    providerReference: varchar("provider_reference", { length: 120 }),
+    authorizationCode: varchar("authorization_code", { length: 64 }),
+    failureCode: varchar("failure_code", { length: 80 }),
+    failureMessage: varchar("failure_message", { length: 500 }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    processingAt: timestamp("processing_at", { withTimezone: true }),
+    recoveryRequestedAt: timestamp("recovery_requested_at", { withTimezone: true }),
+    cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_payment_attempts_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    unique("pos_payment_attempts_device_scope_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+      table.installationId,
+    ),
+    unique("pos_payment_attempts_tab_scope_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+      table.tabId,
+    ),
+    index("pos_payment_attempts_tab_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.tabId,
+      table.status,
+    ),
+    index("pos_payment_attempts_installation_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.installationId,
+      table.createdAt,
+    ),
+    uniqueIndex("pos_payment_attempts_provider_reference_unique")
+      .on(table.organizationId, table.unitId, table.provider, table.providerReference)
+      .where(sql`${table.providerReference} IS NOT NULL`),
+    foreignKey({
+      name: "pos_payment_attempts_tab_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_attempts_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+    check("pos_payment_attempts_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "pos_payment_attempts_method_check",
+      sql`${table.method} IN ('credit_card', 'debit_card', 'pix')`,
+    ),
+    check("pos_payment_attempts_installments_check", sql`${table.installments} BETWEEN 1 AND 24`),
+    check(
+      "pos_payment_attempts_non_credit_installments_check",
+      sql`${table.method} = 'credit_card' OR ${table.installments} = 1`,
+    ),
+  ],
+);
+
+export const posPaymentAttemptResults = pgTable(
+  "pos_payment_attempt_results",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    attemptId: uuid("attempt_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    deviceResultId: varchar("device_result_id", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull(),
+    providerReference: varchar("provider_reference", { length: 120 }),
+    authorizationCode: varchar("authorization_code", { length: 64 }),
+    failureCode: varchar("failure_code", { length: 80 }),
+    failureMessage: varchar("failure_message", { length: 500 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pos_payment_attempt_results_device_result_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.installationId,
+      table.deviceResultId,
+    ),
+    index("pos_payment_attempt_results_attempt_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.attemptId,
+      table.receivedAt,
+    ),
+    foreignKey({
+      name: "pos_payment_attempt_results_attempt_fk",
+      columns: [table.organizationId, table.unitId, table.attemptId, table.installationId],
+      foreignColumns: [
+        posPaymentAttempts.organizationId,
+        posPaymentAttempts.unitId,
+        posPaymentAttempts.id,
+        posPaymentAttempts.installationId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_attempt_results_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "pos_payment_attempt_results_status_check",
+      sql`${table.status} IN ('processing', 'approved', 'declined', 'canceled', 'unknown')`,
+    ),
+  ],
+);
+
 export const posTabPayments = pgTable(
   "pos_tab_payments",
   {
@@ -1229,6 +1612,9 @@ export const posTabPayments = pgTable(
     method: posPaymentMethod("method").notNull(),
     amountCents: integer("amount_cents").notNull(),
     reference: varchar("reference", { length: 120 }),
+    paymentAttemptId: uuid("payment_attempt_id"),
+    source: varchar("source", { length: 24 }).notNull().default("manual"),
+    verified: boolean("verified").notNull().default(false),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -1236,13 +1622,266 @@ export const posTabPayments = pgTable(
   },
   (table) => [
     unique("pos_tab_payments_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    unique("pos_tab_payments_attempt_scope_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+      table.paymentAttemptId,
+    ),
     index("pos_tab_payments_tab_idx").on(table.organizationId, table.unitId, table.tabId),
+    uniqueIndex("pos_tab_payments_attempt_unique")
+      .on(table.organizationId, table.unitId, table.paymentAttemptId)
+      .where(sql`${table.paymentAttemptId} IS NOT NULL`),
     foreignKey({
       name: "pos_tab_payments_tab_fk",
       columns: [table.organizationId, table.unitId, table.tabId],
       foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_tab_payments_attempt_fk",
+      columns: [table.organizationId, table.unitId, table.paymentAttemptId, table.tabId],
+      foreignColumns: [
+        posPaymentAttempts.organizationId,
+        posPaymentAttempts.unitId,
+        posPaymentAttempts.id,
+        posPaymentAttempts.tabId,
+      ],
+    }).onDelete("restrict"),
     check("pos_tab_payments_amount_check", sql`${table.amountCents} > 0`),
+    check("pos_tab_payments_source_check", sql`${table.source} IN ('manual', 'terminal')`),
+  ],
+);
+
+export const posPaymentReversals = pgTable(
+  "pos_payment_reversals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    paymentId: uuid("payment_id").notNull(),
+    paymentAttemptId: uuid("payment_attempt_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    requestedByIdentityId: uuid("requested_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    amountCents: integer("amount_cents").notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    status: posPaymentReversalStatus("status").notNull().default("pending"),
+    providerReference: varchar("provider_reference", { length: 120 }),
+    failureCode: varchar("failure_code", { length: 80 }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_payment_reversals_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("pos_payment_reversals_device_scope_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+      table.installationId,
+    ),
+    index("pos_payment_reversals_payment_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.paymentId,
+      table.createdAt,
+    ),
+    uniqueIndex("pos_payment_reversals_one_active_unique")
+      .on(table.organizationId, table.unitId, table.paymentId)
+      .where(sql`${table.status} IN ('pending', 'processing', 'approved', 'unknown')`),
+    foreignKey({
+      name: "pos_payment_reversals_payment_fk",
+      columns: [table.organizationId, table.unitId, table.paymentId],
+      foreignColumns: [posTabPayments.organizationId, posTabPayments.unitId, posTabPayments.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_reversals_payment_attempt_fk",
+      columns: [table.organizationId, table.unitId, table.paymentId, table.paymentAttemptId],
+      foreignColumns: [
+        posTabPayments.organizationId,
+        posTabPayments.unitId,
+        posTabPayments.id,
+        posTabPayments.paymentAttemptId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_reversals_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_reversals_attempt_device_fk",
+      columns: [table.organizationId, table.unitId, table.paymentAttemptId, table.installationId],
+      foreignColumns: [
+        posPaymentAttempts.organizationId,
+        posPaymentAttempts.unitId,
+        posPaymentAttempts.id,
+        posPaymentAttempts.installationId,
+      ],
+    }).onDelete("restrict"),
+    check("pos_payment_reversals_amount_check", sql`${table.amountCents} > 0`),
+  ],
+);
+
+export const posPaymentReversalResults = pgTable(
+  "pos_payment_reversal_results",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    reversalId: uuid("reversal_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    deviceResultId: varchar("device_result_id", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull(),
+    providerReference: varchar("provider_reference", { length: 120 }),
+    failureCode: varchar("failure_code", { length: 80 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pos_payment_reversal_results_device_result_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.installationId,
+      table.deviceResultId,
+    ),
+    foreignKey({
+      name: "pos_payment_reversal_results_reversal_fk",
+      columns: [table.organizationId, table.unitId, table.reversalId, table.installationId],
+      foreignColumns: [
+        posPaymentReversals.organizationId,
+        posPaymentReversals.unitId,
+        posPaymentReversals.id,
+        posPaymentReversals.installationId,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "pos_payment_reversal_results_status_check",
+      sql`${table.status} IN ('processing', 'approved', 'declined', 'canceled', 'unknown')`,
+    ),
+  ],
+);
+
+export const posPaymentReconciliations = pgTable(
+  "pos_payment_reconciliations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    paymentId: uuid("payment_id").notNull(),
+    provider: varchar("provider", { length: 24 }).notNull(),
+    providerSettlementId: varchar("provider_settlement_id", { length: 160 }).notNull(),
+    providerReference: varchar("provider_reference", { length: 120 }).notNull(),
+    grossCents: integer("gross_cents").notNull(),
+    feeCents: integer("fee_cents").notNull(),
+    netCents: integer("net_cents").notNull(),
+    expectedSettlementAt: timestamp("expected_settlement_at", { withTimezone: true }).notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    status: posPaymentReconciliationStatus("status").notNull().default("pending"),
+    source: varchar("source", { length: 24 }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_payment_reconciliations_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("pos_payment_reconciliations_provider_item_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.provider,
+      table.providerSettlementId,
+      table.providerReference,
+    ),
+    index("pos_payment_reconciliations_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.expectedSettlementAt,
+    ),
+    foreignKey({
+      name: "pos_payment_reconciliations_payment_fk",
+      columns: [table.organizationId, table.unitId, table.paymentId],
+      foreignColumns: [posTabPayments.organizationId, posTabPayments.unitId, posTabPayments.id],
+    }).onDelete("restrict"),
+    check(
+      "pos_payment_reconciliations_amounts_check",
+      sql`${table.grossCents} > 0 AND ${table.feeCents} >= 0 AND ${table.netCents} = ${table.grossCents} - ${table.feeCents}`,
+    ),
+    check(
+      "pos_payment_reconciliations_source_check",
+      sql`${table.source} IN ('api', 'webhook', 'import')`,
+    ),
+    check(
+      "pos_payment_reconciliations_settled_at_check",
+      sql`${table.status} <> 'settled' OR ${table.settledAt} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const posPaymentHomologationRuns = pgTable(
+  "pos_payment_homologation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    certificationId: uuid("certification_id").notNull(),
+    installationId: uuid("installation_id").notNull(),
+    terminalSerialHash: varchar("terminal_serial_hash", { length: 64 }).notNull(),
+    environment: varchar("environment", { length: 24 }).notNull(),
+    checklist: jsonb("checklist").$type<Record<string, boolean>>().notNull(),
+    evidenceReference: varchar("evidence_reference", { length: 500 }).notNull(),
+    notes: text("notes"),
+    passed: boolean("passed").notNull(),
+    recordedByIdentityId: uuid("recorded_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("pos_payment_homologation_runs_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    index("pos_payment_homologation_runs_certification_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.certificationId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "pos_payment_homologation_runs_certification_fk",
+      columns: [table.organizationId, table.unitId, table.certificationId],
+      foreignColumns: [
+        posPaymentTerminalCertifications.organizationId,
+        posPaymentTerminalCertifications.unitId,
+        posPaymentTerminalCertifications.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_payment_homologation_runs_device_fk",
+      columns: [table.organizationId, table.unitId, table.installationId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "pos_payment_homologation_runs_environment_check",
+      sql`${table.environment} IN ('sandbox', 'homologation', 'production')`,
+    ),
   ],
 );
 

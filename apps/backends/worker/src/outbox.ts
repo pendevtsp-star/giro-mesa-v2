@@ -28,6 +28,7 @@ import {
   emailHtml,
   emailProviderConfiguration,
 } from "./email.js";
+import { FiscalDeliveryError, processFiscalEvent } from "./fiscal.js";
 import {
   consumeOrderSentInventory,
   InventoryConsumptionError,
@@ -289,8 +290,10 @@ export class OutboxWorker {
         return;
       }
       if (
-        (error instanceof EmailDeliveryError || error instanceof OrderReadyDeliveryError) &&
-        !error.retryable
+        (error instanceof EmailDeliveryError ||
+          error instanceof OrderReadyDeliveryError ||
+          error instanceof FiscalDeliveryError) &&
+        (!error.retryable || (error instanceof FiscalDeliveryError && event.attempts >= 12))
       ) {
         await this.connection.db.transaction(async (tx) => {
           await tx.execute(sql`
@@ -328,6 +331,14 @@ export class OutboxWorker {
     }
     if (event.topic === "pos.item.canceled") {
       await reverseCanceledOrderItemInventory(this.connection.db, event);
+      return;
+    }
+    if (
+      event.topic === "pos.tab.closed" ||
+      event.topic === "fiscal.document.reconcile_requested" ||
+      event.topic === "fiscal.document.artifacts_requested"
+    ) {
+      await processFiscalEvent(this.connection.db, event);
       return;
     }
     if (event.topic === "growth.webhook_delivery_requested") {

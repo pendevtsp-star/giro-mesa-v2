@@ -23,6 +23,16 @@ import {
   deliveryZones,
 } from "./growth-schema.js";
 import {
+  managementCashAdjustments,
+  managementCashApprovalRequests,
+  managementCashEntries,
+  managementCashRegisters,
+  managementCashRegisterTerminals,
+  managementCashSettings,
+  managementCashShiftResponsibilities,
+  managementCashShifts,
+  managementCashShiftTenderCounts,
+  managementCashTransfers,
   managementCommissions,
   managementInterunitTransferLines,
   managementInterunitTransferReceipts,
@@ -46,6 +56,7 @@ import {
   managementNfeImportLines,
   managementNfeImports,
   managementPeople,
+  managementPersonAccess,
   managementProductionBatches,
   managementProductionBatchInputs,
   managementProductReturnables,
@@ -79,6 +90,14 @@ import {
   posOperationalShifts,
   posOrderItems,
   posOrders,
+  posPaymentAttemptResults,
+  posPaymentAttempts,
+  posPaymentDeviceCredentials,
+  posPaymentDeviceDiagnostics,
+  posPaymentReconciliations,
+  posPaymentReversalResults,
+  posPaymentReversals,
+  posPaymentTerminalCertifications,
   posProductAvailability,
   posProductPrices,
   posProductStations,
@@ -90,7 +109,13 @@ import {
   posTabs,
   posTerminalProfiles,
 } from "./operations-schema.js";
-import { operationalCommands, organizations, units } from "./schema.js";
+import {
+  operationalCommands,
+  organizations,
+  terminalOperatorPins,
+  terminalSessions,
+  units,
+} from "./schema.js";
 
 describe("database schema", () => {
   it("keeps tenant scope in the operational core", () => {
@@ -117,6 +142,8 @@ describe("database schema", () => {
     assert.ok(posTerminalProfiles.installationId);
     assert.ok(posTerminalProfiles.printerId);
     assert.ok(posTerminalProfiles.quickActions);
+    assert.ok(posTerminalProfiles.paymentProvider);
+    assert.ok(posTerminalProfiles.paymentStatus);
 
     const migration = await readFile(
       new URL("../drizzle/0043_tricky_diamondback.sql", import.meta.url),
@@ -124,6 +151,39 @@ describe("database schema", () => {
     );
     assert.match(migration, /CREATE TABLE "pos_terminal_profiles"/);
     assert.match(migration, /pos_terminal_profiles_station_fk/);
+  });
+
+  it("persists trusted SmartPOS attempts separately from posted payments", async () => {
+    for (const table of [posPaymentAttempts, posPaymentAttemptResults, posPaymentReversals]) {
+      assert.ok(table.organizationId);
+      assert.ok(table.unitId);
+      assert.ok(table.installationId);
+    }
+    const migration = await readFile(
+      new URL("../drizzle/0046_milky_zarek.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /pos_payment_attempts_device_fk/);
+    assert.match(migration, /pos_tab_payments_attempt_unique/);
+    assert.match(migration, /pos_payment_attempt_results_device_result_unique/);
+    for (const table of [
+      posPaymentDeviceCredentials,
+      posPaymentDeviceDiagnostics,
+      posPaymentTerminalCertifications,
+      posPaymentReversalResults,
+      posPaymentReconciliations,
+    ]) {
+      assert.ok(table.organizationId);
+      assert.ok(table.unitId);
+    }
+    const hardeningMigration = await readFile(
+      new URL("../drizzle/0047_narrow_slyde.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(hardeningMigration, /pos_payment_attempt_results_attempt_fk/);
+    assert.match(hardeningMigration, /pos_tab_payments_attempt_fk/);
+    assert.match(hardeningMigration, /pos_payment_reversals_payment_attempt_fk/);
+    assert.match(hardeningMigration, /Cannot backfill payment_attempt_id/);
   });
 
   it("persists unit-scoped advanced catalog state", () => {
@@ -331,6 +391,111 @@ describe("database schema", () => {
     assert.ok(managementSupplierInvoices.model);
     assert.ok(managementSupplierInvoices.taxTotalCents);
   });
+
+  it("persists an immutable, tenant-scoped cash ledger", async () => {
+    assert.equal(getTableName(managementCashEntries), "management_cash_entries");
+    for (const table of [managementCashEntries, managementCashShifts]) {
+      assert.ok(table.organizationId);
+      assert.ok(table.unitId);
+    }
+    assert.ok(managementCashEntries.cashShiftId);
+    assert.ok(managementCashEntries.direction);
+    assert.ok(managementCashEntries.entryType);
+    assert.ok(managementCashEntries.paymentMethod);
+    assert.ok(managementCashEntries.affectsDrawer);
+    assert.ok(managementCashEntries.sourceType);
+    assert.ok(managementCashEntries.sourceId);
+    assert.ok(managementCashEntries.actorIdentityId);
+    assert.ok(managementCashShifts.closedByIdentityId);
+    assert.ok(managementCashShifts.reviewedByIdentityId);
+    assert.ok(managementCashShifts.reviewedAt);
+    assert.ok(managementCashShifts.reviewNote);
+    assert.ok(managementCashShifts.reviewIdempotencyKey);
+
+    const migration = await readFile(
+      new URL("../drizzle/0048_cash_ledger.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /management_cash_entries_source_unique/);
+    assert.match(migration, /management_cash_entries_shift_fk/);
+    assert.match(migration, /management_cash_entries_immutable/);
+    assert.match(migration, /management_cash_shifts_review_idempotency_unique/);
+  });
+
+  it("persists multiple cash registers, terminal assignments and transfers", async () => {
+    for (const table of [
+      managementCashRegisters,
+      managementCashRegisterTerminals,
+      managementCashTransfers,
+    ]) {
+      assert.ok(table.organizationId);
+      assert.ok(table.unitId);
+    }
+    assert.ok(managementCashRegisters.name);
+    assert.ok(managementCashRegisters.active);
+    assert.ok(managementCashRegisterTerminals.installationId);
+    assert.ok(managementCashRegisterTerminals.cashRegisterId);
+    assert.ok(managementCashTransfers.fromCashShiftId);
+    assert.ok(managementCashTransfers.toCashShiftId);
+    assert.ok(managementCashTransfers.amountCents);
+    assert.ok(managementCashTransfers.idempotencyKey);
+    assert.ok(managementCashShifts.cashRegisterId);
+
+    const migration = await readFile(
+      new URL("../drizzle/0049_cash_registers.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE "management_cash_registers"/);
+    assert.match(migration, /CREATE TABLE "management_cash_register_terminals"/);
+    assert.match(migration, /CREATE TABLE "management_cash_transfers"/);
+    assert.match(migration, /INSERT INTO "management_cash_registers"/);
+    assert.match(migration, /FROM "units"/);
+    assert.match(migration, /ALTER COLUMN "cash_register_id" SET NOT NULL/);
+    assert.match(migration, /management_cash_shifts_one_open_unique/);
+    assert.match(migration, /'transfer_in','transfer_out'/);
+  });
+
+  it("persists advanced cash controls and append-only adjustments", async () => {
+    for (const table of [
+      managementCashSettings,
+      managementCashShiftResponsibilities,
+      managementCashShiftTenderCounts,
+      managementCashApprovalRequests,
+      managementCashAdjustments,
+    ]) {
+      assert.ok(table.organizationId);
+      assert.ok(table.unitId);
+    }
+    assert.ok(managementCashSettings.movementApprovalThresholdCents);
+    assert.ok(managementCashSettings.discrepancyCriticalThresholdCents);
+    assert.ok(managementCashSettings.maxShiftMinutes);
+    assert.ok(managementCashShifts.currentResponsibleIdentityId);
+    assert.ok(managementCashShiftResponsibilities.fromIdentityId);
+    assert.ok(managementCashShiftResponsibilities.toIdentityId);
+    assert.ok(managementCashShiftTenderCounts.expectedCents);
+    assert.ok(managementCashShiftTenderCounts.observedCents);
+    assert.ok(managementCashShiftTenderCounts.differenceCents);
+    assert.ok(managementCashApprovalRequests.executedMovementId);
+    assert.ok(managementCashApprovalRequests.executedTransferId);
+    assert.ok(managementCashAdjustments.originalCashShiftId);
+    assert.ok(managementCashAdjustments.sourceId);
+
+    const migration = await readFile(
+      new URL("../drizzle/0052_cash_controls.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE "management_cash_settings"/);
+    assert.match(migration, /CREATE TABLE "management_cash_shift_responsibilities"/);
+    assert.match(migration, /CREATE TABLE "management_cash_shift_tender_counts"/);
+    assert.match(migration, /CREATE TABLE "management_cash_approval_requests"/);
+    assert.match(migration, /CREATE TABLE "management_cash_adjustments"/);
+    assert.match(migration, /SET "current_responsible_identity_id" = "operator_identity_id"/);
+    assert.match(migration, /ALTER COLUMN "current_responsible_identity_id" SET NOT NULL/);
+    assert.match(migration, /management_cash_approval_requests_movement_fk/);
+    assert.match(migration, /management_cash_approval_requests_transfer_fk/);
+    assert.match(migration, /management_cash_adjustments_immutable/);
+  });
+
   it("persists the tenant-scoped fiscal and accountant ledger", () => {
     for (const table of [
       fiscalProfiles,
@@ -383,5 +548,36 @@ describe("database schema", () => {
     assert.match(migration, /management_schedules_no_overlap_excl/);
     assert.match(migration, /management_time_tracking_closure_no_overlap_excl/);
     assert.match(migration, /CREATE EXTENSION IF NOT EXISTS btree_gist/);
+  });
+
+  it("persists person access ownership and scoped quick-switch sessions", async () => {
+    assert.ok(managementPersonAccess.invitationId);
+    assert.ok(managementPersonAccess.membershipId);
+    assert.ok(managementPersonAccess.roleBindingId);
+    assert.ok(terminalOperatorPins.pinHash);
+    assert.ok(terminalSessions.organizationId);
+    assert.ok(terminalSessions.unitId);
+    assert.ok(terminalSessions.activeActorMembershipId);
+    assert.ok(terminalSessions.actorEpoch);
+    assert.ok(terminalSessions.lockedUntil);
+    assert.ok(terminalSessions.deviceId);
+
+    const migration = await readFile(
+      new URL("../drizzle/0051_regular_prowler.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE "management_person_access"/);
+    assert.match(migration, /CREATE TABLE "terminal_operator_pins"/);
+    assert.match(migration, /CREATE TABLE "terminal_sessions"/);
+    assert.match(migration, /terminal_sessions_organization_unit_fk/);
+    assert.doesNotMatch(migration, /management_cash_adjustments/);
+
+    const multiunitMigration = await readFile(
+      new URL("../drizzle/0053_petite_trauma.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(multiunitMigration, /management_person_access_person_unit_pk/);
+    assert.match(multiunitMigration, /DROP CONSTRAINT "management_person_access_pkey"/);
+    assert.match(multiunitMigration, /ADD COLUMN "device_id"/);
   });
 });

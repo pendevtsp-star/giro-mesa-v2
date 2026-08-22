@@ -254,6 +254,52 @@ export const roleBindings = pgTable(
   ],
 );
 
+export const terminalOperatorPins = pgTable("terminal_operator_pins", {
+  membershipId: uuid("membership_id")
+    .primaryKey()
+    .references(() => memberships.id, { onDelete: "cascade" }),
+  pinHash: text("pin_hash").notNull(),
+  active: boolean("active").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const terminalSessions = pgTable(
+  "terminal_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull(),
+    openedByIdentityId: uuid("opened_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    deviceId: varchar("device_id", { length: 160 }),
+    activeActorMembershipId: uuid("active_actor_membership_id").references(() => memberships.id, {
+      onDelete: "set null",
+    }),
+    actorEpoch: integer("actor_epoch").notNull().default(0),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    failureWindowStartedAt: timestamp("failure_window_started_at", { withTimezone: true }),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("terminal_sessions_token_hash_unique").on(table.tokenHash),
+    index("terminal_sessions_scope_idx").on(table.organizationId, table.unitId),
+    index("terminal_sessions_actor_idx").on(table.activeActorMembershipId),
+    foreignKey({
+      name: "terminal_sessions_organization_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const membershipInvitations = pgTable(
   "membership_invitations",
   {

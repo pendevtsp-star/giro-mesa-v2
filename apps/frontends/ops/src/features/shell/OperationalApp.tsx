@@ -1,3 +1,4 @@
+import type { EstablishmentSettings } from "@giromesa/contracts";
 import { Button, Card, Icon, type IconName, Modal, SearchField } from "@giromesa/ui";
 import { type ChangeEvent, Suspense, useCallback, useEffect, useState } from "react";
 import { api, type TerminalProfile } from "../../api";
@@ -97,6 +98,7 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: string }
   },
   { route: "crm", label: "Clientes & CRM", icon: "crm", group: "Gestão" },
   { route: "multiunit", label: "Multiunidade", icon: "multiunit", group: "Sistema" },
+  { route: "settings", label: "Configurações", icon: "settings", group: "Sistema" },
   { route: "platform", label: "Plataforma", icon: "platform", group: "Sistema" },
   { route: "alerts", label: "Alertas", icon: "alerts", group: "Sistema" },
 ];
@@ -146,8 +148,24 @@ function OperationalClock({ timeZone }: { timeZone: string }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const interval = globalThis.setInterval(() => setNow(new Date()), 60_000);
-    return () => globalThis.clearInterval(interval);
+    let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const sync = () => {
+      setNow(new Date());
+      if (timeout !== undefined) globalThis.clearTimeout(timeout);
+      timeout = globalThis.setTimeout(sync, 60_000 - (Date.now() % 60_000));
+    };
+    const resume = () => {
+      if (!document.hidden) sync();
+    };
+
+    sync();
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      if (timeout !== undefined) globalThis.clearTimeout(timeout);
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, []);
 
   const date = formatClockPart(now, timeZone, {
@@ -169,13 +187,24 @@ function OperationalClock({ timeZone }: { timeZone: string }) {
     >
       <span className="sr-only">Data e hora da unidade: </span>
       <Icon name="clock" size={14} />
-      <span className="topbar-clock__date">{date}</span>
       <strong className="topbar-clock__time">{time}</strong>
+      <span aria-hidden="true" className="topbar-clock__separator">
+        ·
+      </span>
+      <span className="topbar-clock__date">{date}</span>
     </time>
   );
 }
 
-export function OperationalApp({ session, onLogout }: { session: Session; onLogout: () => void }) {
+export function OperationalApp({
+  session,
+  onLogout,
+  onSwitchUser,
+}: {
+  session: Session;
+  onLogout: () => void;
+  onSwitchUser?: () => void;
+}) {
   const lastRouteStorageKey = lastOperationalRouteStorageKey(session);
   const canManageKdsUnitSettings =
     ["owner", "manager"].includes(session.profile.id) &&
@@ -382,6 +411,25 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   const [terminalSettingsOpen, setTerminalSettingsOpen] = useState(false);
   const organization = session.organization;
   const unit = session.unit;
+  const [establishmentContext, setEstablishmentContext] = useState(() => ({
+    organizationName: organization.name,
+    unitName: unit.name,
+    timezone: unit.timezone,
+    displayName: unit.branding?.displayName,
+    logoUrl: unit.branding?.logoUrl,
+    primaryColor: unit.branding?.primaryColor,
+  }));
+
+  function applyEstablishmentSettings(value: EstablishmentSettings) {
+    setEstablishmentContext({
+      organizationName: value.organization.tradeName,
+      unitName: value.unit.name,
+      timezone: value.unit.timezone,
+      displayName: value.presentation.displayName,
+      logoUrl: value.presentation.logoUrl,
+      primaryColor: value.presentation.primaryColor,
+    });
+  }
 
   useEffect(() => {
     document.getElementById("main-content")?.focus({ preventScroll: true });
@@ -739,11 +787,9 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
   const networkTone =
     syncState === "offline"
       ? "offline"
-      : syncState === "syncing" || realtimeStatus === "connecting"
+      : syncState === "syncing" || queuedCommands > 0
         ? "syncing"
-        : realtimeStatus === "polling"
-          ? "polling"
-          : "online";
+        : "online";
   const networkLabel =
     syncState === "offline"
       ? "Offline"
@@ -756,14 +802,16 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             : realtimeStatus === "polling"
               ? "Atualização periódica"
               : "Online";
+  const networkTopbarLabel =
+    syncState === "offline"
+      ? "Offline"
+      : syncState === "syncing"
+        ? "Enviando"
+        : queuedCommands > 0
+          ? `${queuedCommands} na fila`
+          : "Em dia";
   const networkIcon: IconName =
-    networkTone === "offline"
-      ? "alert-circle"
-      : networkTone === "syncing"
-        ? "refresh"
-        : networkTone === "polling"
-          ? "clock"
-          : "check";
+    networkTone === "offline" ? "alert-circle" : networkTone === "syncing" ? "refresh" : "check";
   const normalizedCommandQuery = commandQuery.trim().toLocaleLowerCase("pt-BR");
   const commandResults = visibleNav.filter((item) => {
     if (!normalizedCommandQuery) return true;
@@ -900,8 +948,11 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
             aria-hidden="true"
             className={`unit-chip__signal unit-chip__signal--${networkTone}`}
           />
+          {establishmentContext.logoUrl && (
+            <img className="unit-chip__logo" src={establishmentContext.logoUrl} alt="" />
+          )}
           <span>
-            <strong>{unit?.name ?? "Unidade"}</strong>
+            <strong>{establishmentContext.unitName ?? "Unidade"}</strong>
             <small>Sessão operacional</small>
           </span>
         </div>
@@ -975,7 +1026,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
       </aside>
 
       {navOpen && (
-        <Button
+        <button
           aria-label="Fechar menu"
           className="nav-backdrop"
           onClick={() => setNavOpen(false)}
@@ -985,7 +1036,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
 
       <div className={`workspace ${sidebarIsCollapsed ? "workspace--collapsed" : ""}`}>
         {hasAnyPopoverOpen && (
-          <Button
+          <button
             aria-label="Fechar menu aberto"
             className="popover-backdrop"
             onClick={closeAllPopovers}
@@ -1007,13 +1058,19 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
               ☰
             </Button>
             <div className="topbar__scope">
-              <span className="org-label">{organization.name}</span>
-              <strong className="unit-label">{unit.name}</strong>
+              {establishmentContext.logoUrl && (
+                <img className="topbar__unit-logo" src={establishmentContext.logoUrl} alt="" />
+              )}
+              <span className="topbar__scope-copy">
+                <span className="org-label">{establishmentContext.organizationName}</span>
+                <strong className="unit-label">{establishmentContext.unitName}</strong>
+              </span>
             </div>
           </div>
 
           <div className="topbar__center">
             <Button
+              aria-label="Ir para módulo"
               className="topbar__command-bar"
               onClick={() => {
                 closeAllPopovers();
@@ -1049,7 +1106,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
               unitId={session.unitId}
             />
 
-            <OperationalClock timeZone={unit.timezone} />
+            <OperationalClock timeZone={establishmentContext.timezone} />
 
             <div className="topbar__popover-anchor">
               <Button
@@ -1065,7 +1122,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                 <span aria-hidden="true" className="sync-pill__icon">
                   <Icon name={networkIcon} size={13} />
                 </span>
-                <span className="sync-pill__text">{networkLabel}</span>
+                <span className="sync-pill__text">{networkTopbarLabel}</span>
               </Button>
 
               {networkPopoverOpen && (
@@ -1195,6 +1252,22 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                       </Button>
                     )}
                     <Button
+                      className="theme-toggle"
+                      onClick={() => {
+                        closeAllPopovers();
+                        window.location.hash = routeHref("device");
+                      }}
+                      variant="ghost"
+                    >
+                      <span aria-hidden="true">
+                        <Icon name="settings" size={14} />
+                      </span>
+                      <span>
+                        <strong>SmartPOS e dispositivos</strong>
+                        <small>Pareamento, saúde e instalação</small>
+                      </span>
+                    </Button>
+                    <Button
                       aria-pressed={theme === "dark"}
                       className="theme-toggle"
                       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -1228,6 +1301,12 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                   </div>
 
                   <div className="profile-popover__session-actions">
+                    {session.terminalMode && onSwitchUser && (
+                      <Button onClick={onSwitchUser} size="sm" variant="ghost">
+                        <Icon name="people" size={14} />
+                        Trocar colaborador
+                      </Button>
+                    )}
                     <Button
                       className="profile-popover__logout"
                       onClick={onLogout}
@@ -1235,7 +1314,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
                       variant="ghost"
                     >
                       <Icon name="logout" size={14} />
-                      Encerrar sessão
+                      {session.terminalMode ? "Encerrar terminal" : "Encerrar sessão"}
                     </Button>
                   </div>
                 </section>
@@ -1374,7 +1453,7 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
               profileId: session.profile.id,
               refreshToken: scopeRevision,
             }}
-            timeZone={unit.timezone}
+            timeZone={establishmentContext.timezone}
           />
           <Suspense
             fallback={
@@ -1391,6 +1470,8 @@ export function OperationalApp({ session, onLogout }: { session: Session; onLogo
               kdsArea={kdsArea}
               loadPilot={loadPilot}
               profile={session.profile}
+              runtime={runtime}
+              onEstablishmentSettingsSaved={applyEstablishmentSettings}
               route={safeRoute}
               refreshToken={scopeRevision}
               session={session}

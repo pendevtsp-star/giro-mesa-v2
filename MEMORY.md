@@ -31,6 +31,8 @@ Este arquivo registra fatos estáveis e decisões úteis para novas tarefas. Nã
 - Mutações recuperáveis/repetíveis usam idempotência e audit/outbox na mesma transação quando aplicável.
 - O frontend não deve manter como confirmado um valor rejeitado pelo backend.
 - Bundles gerados do Ops Shell são necessários ao pacote nativo; demais `dist/.next/.turbo/test-results/bin/obj` são regeneráveis.
+- SmartPOS usa PWA para atendimento e APK homologado para pagamento. O navegador nunca aprova; dispositivos usam pareamento P-256, requests assinados/antirreplay e matriz exata com kill switch. A bridge recebe somente IDs e fica fail-closed sem resolvedor, certificação e adaptador confiáveis.
+- Homologação de terminal é configuração interna, fora do perfil alterável pelo tenant. Cada resultado exige dispositivo pareado, idempotência, auditoria e outbox; integração externa só fica pronta com hardware e evidência real.
 
 ## Estado do Cardápio
 

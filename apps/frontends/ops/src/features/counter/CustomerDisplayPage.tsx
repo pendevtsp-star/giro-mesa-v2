@@ -1,7 +1,7 @@
 import { Badge, Button, Card, Separator } from "@giromesa/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { parseTabDetail, type TabDetail } from "../../operations.shared";
+import { parseTabDetail, summarizeTabPayments, type TabDetail } from "../../operations.shared";
 import { formatMoney } from "../../rules";
 import "./customer-display.css";
 
@@ -57,7 +57,8 @@ export function CustomerDisplayPage({
   }, [organizationId, refreshToken, tabId, unitId]);
 
   const activeItems = detail?.items.filter((item) => item.status !== "canceled") ?? [];
-  const paidCents = detail?.payments.reduce((sum, payment) => sum + payment.amountCents, 0) ?? 0;
+  const paymentSummary = summarizeTabPayments(detail?.payments ?? []);
+  const paidCents = paymentSummary.paidCents;
   const totalCents = detail?.tab.totalCents ?? 0;
   const balanceCents = Math.max(0, totalCents - paidCents);
 
@@ -119,9 +120,15 @@ export function CustomerDisplayPage({
                 <strong>{formatMoney(totalCents)}</strong>
               </span>
               <span>
-                <small>Pago</small>
+                <small>Pago líquido</small>
                 <strong>{formatMoney(paidCents)}</strong>
               </span>
+              {paymentSummary.reversedCents > 0 && (
+                <span>
+                  <small>Estornado</small>
+                  <strong>{formatMoney(paymentSummary.reversedCents)}</strong>
+                </span>
+              )}
               <Separator />
               <span className="customer-display__balance">
                 <small>Saldo</small>

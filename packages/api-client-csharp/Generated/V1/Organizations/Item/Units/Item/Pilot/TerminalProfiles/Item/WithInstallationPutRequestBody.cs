@@ -12,6 +12,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
     public partial class WithInstallationPutRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The cashRegisterId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId? CashRegisterId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId CashRegisterId { get; set; }
+#endif
         /// <summary>The compact property</summary>
         public bool? Compact { get; set; }
         /// <summary>The defaultRoute property</summary>
@@ -68,6 +76,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "cashRegisterId", n => { CashRegisterId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId.CreateFromDiscriminatorValue); } },
                 { "compact", n => { Compact = n.GetBoolValue(); } },
                 { "defaultRoute", n => { DefaultRoute = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_defaultRoute>(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
@@ -84,6 +93,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId>("cashRegisterId", CashRegisterId);
             writer.WriteBoolValue("compact", Compact);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_defaultRoute>("defaultRoute", DefaultRoute);
             writer.WriteStringValue("label", Label);
@@ -91,6 +101,68 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_printerId>("printerId", PrinterId);
             writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_quickActions>("quickActions", QuickActions);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_stationId>("stationId", StationId);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithInstallationPutRequestBody_cashRegisterId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1? WithInstallationPutRequestBodyCashRegisterIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1 WithInstallationPutRequestBodyCashRegisterIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_cashRegisterId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.WithInstallationPutRequestBodyCashRegisterIdMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithInstallationPutRequestBodyCashRegisterIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithInstallationPutRequestBodyCashRegisterIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_cashRegisterIdMember1>(null, WithInstallationPutRequestBodyCashRegisterIdMember1);
+                }
+            }
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_printerIdMember1"/>, <see cref="string"/>

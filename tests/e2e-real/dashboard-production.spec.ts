@@ -23,6 +23,10 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
       await route.fulfill({ json: { ok: true } });
       return;
     }
+    if (pathname === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     const payload =
       pathname === "/v1/auth/me"
         ? {
@@ -167,6 +171,10 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
 test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async ({ page }) => {
   await page.route("**/v1/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     const payload =
       pathname === "/v1/auth/me"
         ? {
@@ -183,6 +191,26 @@ test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async 
                 trialFunnel: { applications: 10, activations: 4, conversionPercent: 40 },
                 recentTrialApplications: [],
                 recentContacts: [],
+                fiscalIntegrations: [
+                  {
+                    organizationId: "org-risk",
+                    organizationName: "Restaurante em atenção",
+                    unitId: "unit-risk",
+                    unitName: "Centro",
+                    document: "05953016000132",
+                    provider: "focus",
+                    environment: "homologation",
+                    profileUpdatedAt: "2026-08-16T22:30:00.000Z",
+                    companyId: "42",
+                    status: "ready",
+                    certificateValidUntil: "2027-08-16",
+                    lastCheckedAt: "2026-08-16T22:30:00.000Z",
+                    hasHomologationCredential: true,
+                    hasProductionCredential: false,
+                    lastErrorCode: null,
+                    lastErrorMessage: null,
+                  },
+                ],
                 recentOrganizations: [
                   {
                     id: "org-risk",
@@ -208,8 +236,10 @@ test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async 
   await page.goto("/#/platform");
   await expect(page.getByRole("heading", { level: 1, name: "Plataforma" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Integrações e processamento" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Integrações por unidade" })).toBeVisible();
+  await expect(page.getByText("Homologação ok · Produção pendente")).toBeVisible();
   await expect(page.getByText("40%")).toBeVisible();
-  await expect(page.getByText("Restaurante em atenção")).toBeVisible();
+  await expect(page.getByText("Restaurante em atenção", { exact: true })).toBeVisible();
   await expect(page.getByText("2 alerta(s)")).toBeVisible();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -227,11 +257,9 @@ test("prioridades e preferências usam mutações auditáveis", async ({ page })
     (request) =>
       request.method() === "POST" && request.url().includes("/priorities/urgent/actions"),
   );
-  await page
-    .locator(".dashboard-priority")
-    .first()
-    .getByRole("button", { name: "Assumir" })
-    .click();
+  const firstPriority = page.locator(".dashboard-priority").first();
+  await firstPriority.locator("summary", { hasText: "Mais ações" }).click();
+  await firstPriority.getByRole("button", { name: "Assumir" }).click();
   const claim = await claimRequest;
   expect(claim.postDataJSON()).toMatchObject({ action: "claim", occurrenceKey: "b".repeat(64) });
   expect(claim.headers()["idempotency-key"]).toBeTruthy();
@@ -246,6 +274,24 @@ test("prioridades e preferências usam mutações auditáveis", async ({ page })
   expect(preferences.postDataJSON()).toMatchObject({ alertsEnabled: true, digestMinutes: 15 });
   expect(preferences.headers()["idempotency-key"]).toBeTruthy();
   await expect(page.getByRole("status").filter({ hasText: "Preferências salvas." })).toBeVisible();
+});
+
+test("topbar mantém o relógio alinhado à virada do minuto e à retomada da aba", async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date("2026-08-21T20:30:42.000Z") });
+  await mockDashboardApi(page, profiles[1]);
+  await page.goto("/#/dashboard");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+
+  const clock = page.locator(".topbar-clock__time");
+  await expect(clock).toHaveText("17:30");
+  await page.clock.runFor(18_100);
+  await expect(clock).toHaveText("17:31");
+
+  await page.clock.setSystemTime(new Date("2026-08-21T20:45:15.000Z"));
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(clock).toHaveText("17:45");
 });
 
 for (const profile of profiles) {
@@ -274,6 +320,9 @@ for (const profile of profiles) {
     await page.setViewportSize({ width: 375, height: 812 });
     await expect(page.locator(".mobile-bottom-nav")).toBeVisible();
     await expect(page.locator(".sidebar")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Ir para módulo" })).toBeVisible();
+    await expect(page.locator(".topbar-clock__time")).toBeVisible();
+    await expect(page.locator(".topbar-clock__date")).toBeHidden();
     await expect(page.locator(".sync-pill__text")).toBeHidden();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -286,6 +335,7 @@ for (const profile of profiles) {
 
 test("visão geral diferencia dados parciais de operação sem pendências", async ({ page }) => {
   const profile = profiles[1];
+  await page.setViewportSize({ width: 1440, height: 900 });
   await mockDashboardApi(page, profile);
   await page.route("**/management/overview", (route) =>
     route.fulfill({
@@ -293,9 +343,16 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
         profileId: "manager",
         generatedAt: "2026-08-16T22:30:00.000Z",
         activeShift: null,
-        unavailableSources: ["operations"],
+        unavailableSources: ["delivery", "inventory", "multiunit", "reservations"],
         sources: [
-          { id: "operations", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
+          { id: "delivery", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
+          { id: "inventory", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
+          { id: "multiunit", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
+          {
+            id: "reservations",
+            status: "unavailable",
+            checkedAt: "2026-08-16T22:30:00.000Z",
+          },
         ],
         activity: [],
         multiunit: [],
@@ -326,16 +383,41 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
   await page.goto("/#/dashboard");
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
-  await expect(page.getByText("Dados parcialmente atualizados")).toBeVisible();
+  const partialAlert = page
+    .getByRole("alert")
+    .filter({ hasText: "Dados parcialmente atualizados" });
+  await expect(partialAlert).toContainText("4 fontes indisponíveis");
+  expect((await partialAlert.boundingBox())?.height).toBeLessThanOrEqual(160);
+  const prioritiesHeading = page.getByRole("heading", { name: "Faça agora" });
+  await expect(prioritiesHeading).toBeVisible();
+  expect((await prioritiesHeading.boundingBox())?.y).toBeLessThan(700);
   await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
   await expect(page.getByText("Tudo em dia")).toHaveCount(0);
+
+  const refreshAll = page.getByRole("button", { name: "Atualizar dados", exact: true });
+  await expect(refreshAll).toHaveCount(1);
+  const refreshRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname.endsWith("/management/overview") && !url.searchParams.has("source");
+  });
+  await refreshAll.click();
+  await refreshRequest;
+
+  await expect(page.getByRole("button", { name: /^Tentar / })).toHaveCount(0);
+  await page.locator(".dashboard-source-details > summary").click();
+  await expect(page.getByRole("button", { name: /^Tentar / })).toHaveCount(4);
   const retry = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return (
       url.pathname.endsWith("/management/overview") &&
-      url.searchParams.get("source") === "operations"
+      url.searchParams.get("source") === "inventory"
     );
   });
-  await page.getByRole("button", { name: "Tentar novamente" }).click();
+  await page.getByRole("button", { name: "Tentar estoque" }).click();
   await retry;
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });

@@ -7,11 +7,39 @@ import {
   parseRecipeCatalog,
   parseRecipes,
   parseReports,
+  parseSelfTimeTracking,
   recipeLossToBasisPoints,
   recipeQuantityToMilli,
 } from "./management";
 
 describe("dados gerenciais reais", () => {
+  it("normaliza o acesso da pessoa no autoacompanhamento", () => {
+    expect(
+      parseSelfTimeTracking({
+        enabled: true,
+        person: {
+          id: "person-1",
+          identityId: null,
+          name: "Ana",
+          roleLabel: "Garçom",
+          active: true,
+          hourlyRateCents: null,
+        },
+        settings: { mode: "off" },
+        current: null,
+        entries: [],
+        breaks: [],
+      }).person?.access,
+    ).toEqual({
+      status: "none",
+      email: null,
+      role: null,
+      invitationId: null,
+      expiresAt: null,
+      membershipId: null,
+    });
+  });
+
   it("preserva estado vazio retornado pela API sem inserir fixtures", () => {
     expect(
       parseInventory({
@@ -49,7 +77,65 @@ describe("dados gerenciais reais", () => {
       automation: { pending: 0, failed: 0, lastProcessedAt: null },
       capabilities: null,
     });
-    expect(parseCash({ shifts: [], movements: [] })).toEqual({ shifts: [], movements: [] });
+    expect(
+      parseCash({
+        settings: {
+          movementApprovalThresholdCents: 50_000,
+          discrepancyCriticalThresholdCents: 1_000,
+          maxShiftMinutes: 720,
+        },
+        alerts: [],
+        operators: [],
+        approvals: [],
+        adjustments: [],
+        registers: [],
+        availableTerminals: [],
+        shifts: [],
+        entries: [],
+        pendingTabs: [],
+        capabilities: {
+          canOpen: true,
+          canMove: true,
+          canClose: true,
+          canReview: false,
+          canViewExpected: false,
+          canManageRegisters: true,
+          canTransfer: true,
+          canManageCashSettings: false,
+          canManageTerminals: false,
+          canApproveCashRequests: false,
+          canHandover: true,
+        },
+      }),
+    ).toEqual({
+      settings: {
+        movementApprovalThresholdCents: 50_000,
+        discrepancyCriticalThresholdCents: 1_000,
+        maxShiftMinutes: 720,
+      },
+      alerts: [],
+      operators: [],
+      approvals: [],
+      adjustments: [],
+      registers: [],
+      availableTerminals: [],
+      shifts: [],
+      entries: [],
+      pendingTabs: [],
+      capabilities: {
+        canOpen: true,
+        canMove: true,
+        canClose: true,
+        canReview: false,
+        canViewExpected: false,
+        canManageRegisters: true,
+        canTransfer: true,
+        canManageCashSettings: false,
+        canManageTerminals: false,
+        canApproveCashRequests: false,
+        canHandover: true,
+      },
+    });
   });
 
   it("recusa payload inválido em vez de criar dados locais", () => {
@@ -63,6 +149,65 @@ describe("dados gerenciais reais", () => {
         automation: { pending: 0, failed: 0, lastProcessedAt: null },
       }),
     ).toThrow(InvalidManagementPayloadError);
+  });
+
+  it("preserva a relação entre gaveta, turno e terminal", () => {
+    const parsed = parseCash({
+      settings: {
+        movementApprovalThresholdCents: 50_000,
+        discrepancyCriticalThresholdCents: 1_000,
+        maxShiftMinutes: 720,
+      },
+      alerts: [],
+      operators: [],
+      approvals: [],
+      adjustments: [],
+      registers: [{ id: "register-1", name: "Bar", active: true, openShiftId: "shift-1" }],
+      availableTerminals: [
+        {
+          installationId: "terminal-1",
+          label: "Tablet Bar",
+          cashRegisterId: "register-1",
+          status: "online",
+          lastSeenAt: "2026-08-21T18:00:00.000Z",
+        },
+      ],
+      shifts: [
+        {
+          id: "shift-1",
+          cashRegisterId: "register-1",
+          cashRegisterName: "Bar",
+          status: "open",
+          openingCents: 10_000,
+          currentResponsibleIdentityId: "identity-1",
+          responsibleName: "Ana",
+          tenderBreakdown: [],
+          differenceSeverity: "none",
+        },
+      ],
+      entries: [],
+      pendingTabs: [],
+      capabilities: {
+        canOpen: false,
+        canMove: false,
+        canClose: false,
+        canReview: false,
+        canViewExpected: false,
+        canManageRegisters: false,
+        canTransfer: false,
+        canManageCashSettings: false,
+        canManageTerminals: false,
+        canApproveCashRequests: false,
+        canHandover: false,
+      },
+    });
+
+    expect(parsed.registers[0]).toMatchObject({ name: "Bar", openShiftId: "shift-1" });
+    expect(parsed.shifts[0]).toMatchObject({
+      cashRegisterId: "register-1",
+      cashRegisterName: "Bar",
+    });
+    expect(parsed.availableTerminals[0]).toMatchObject({ cashRegisterId: "register-1" });
   });
 
   it("preserva localização, lote e rastreabilidade do estoque real", () => {

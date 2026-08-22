@@ -595,7 +595,7 @@ it("persists an atomic tenant-isolated purchase, stock and payable flow", async 
         ],
       },
     );
-    const issuerDocument = "11222333000144";
+    const issuerDocument = document();
     const nfeForUnit = nfeFixture({
       documentNumber: 2001,
       issuerDocument,

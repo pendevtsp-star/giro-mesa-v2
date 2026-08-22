@@ -4,6 +4,7 @@ import {
   loadAuthenticatedAccess,
   platformSession,
   sessionForScope,
+  terminalSessionForView,
   toScopeSource,
 } from "./app/access";
 import type { ScopeSource, Session } from "./app/types";
@@ -12,7 +13,13 @@ import {
   LoadingScreen,
   LoginScreen,
   ScopeScreen,
+  TerminalLockScreen,
 } from "./features/auth/AuthScreens";
+import {
+  type TerminalSessionView,
+  terminalApi,
+  terminalDeviceId,
+} from "./features/auth/terminal-api";
 import { OperationalApp } from "./features/shell/OperationalApp";
 
 const scopeStorageKey = "giromesa_operational_scope_v1";
@@ -73,6 +80,7 @@ function rememberScope(session: Session) {
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [scopeSource, setScopeSource] = useState<ScopeSource | null>(null);
+  const [terminalView, setTerminalView] = useState<TerminalSessionView | null>(null);
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState("");
 
@@ -80,6 +88,15 @@ export function App() {
     setBooting(true);
     setBootError("");
     try {
+      try {
+        const view = await terminalApi.status();
+        setTerminalView(view);
+        setSession(terminalSessionForView(view));
+        setScopeSource(null);
+        return;
+      } catch (error) {
+        if (!(error instanceof ApiClientError && error.status === 401)) throw error;
+      }
       const access = await loadAuthenticatedAccess();
       if (access.platformAdmin) setSession(platformSession(access));
       else {
@@ -148,25 +165,80 @@ export function App() {
 
   async function logout() {
     try {
-      await api.logout();
+      if (terminalView) await terminalApi.close();
+      else await api.logout();
     } finally {
       forgetScope();
       setSession(null);
       setScopeSource(null);
+      setTerminalView(null);
     }
   }
+
+  async function unlockTerminal(membershipId: string, pin: string) {
+    const view = await terminalApi.unlock({ membershipId, pin });
+    const nextSession = terminalSessionForView(view);
+    if (!nextSession) throw new Error("O operador não possui perfil operacional nesta unidade.");
+    setTerminalView(view);
+    setSession(nextSession);
+  }
+
+  const lockTerminal = useCallback(async () => {
+    setSession(null);
+    const view = await terminalApi.lock();
+    setTerminalView(view);
+  }, []);
+
+  useEffect(() => {
+    if (!session?.terminalMode || session.actorEpoch === undefined || !terminalView) return;
+    const actorEpoch = session.actorEpoch;
+    const idleMs = terminalView.idleTimeoutSeconds * 1_000;
+    let timeout = globalThis.setTimeout(() => void lockTerminal(), idleMs);
+    let lastPingAt = Date.now();
+    const registerActivity = () => {
+      globalThis.clearTimeout(timeout);
+      timeout = globalThis.setTimeout(() => void lockTerminal(), idleMs);
+      if (Date.now() - lastPingAt < 30_000) return;
+      lastPingAt = Date.now();
+      void terminalApi.activity(actorEpoch).catch(() => void lockTerminal());
+    };
+    const events = ["pointerdown", "keydown", "touchstart"] as const;
+    for (const event of events) window.addEventListener(event, registerActivity, { passive: true });
+    return () => {
+      globalThis.clearTimeout(timeout);
+      for (const event of events) window.removeEventListener(event, registerActivity);
+    };
+  }, [session, terminalView, lockTerminal]);
 
   if (booting) return <LoadingScreen />;
   if (bootError)
     return <BootstrapError message={bootError} onRetry={() => void restoreSession()} />;
 
   if (!session) {
+    if (terminalView) {
+      return <TerminalLockScreen onClose={logout} onUnlock={unlockTerminal} view={terminalView} />;
+    }
     if (scopeSource) {
       return (
         <ScopeScreen
           source={scopeSource}
           onBack={() => setScopeSource(null)}
-          onComplete={(nextSession) => {
+          onConfigurePin={async (input) => {
+            await terminalApi.configurePin(input);
+          }}
+          onComplete={async (nextSession) => {
+            if (nextSession.terminalMode) {
+              const view = await terminalApi.create({
+                organizationId: nextSession.organizationId,
+                unitId: nextSession.unitId,
+                deviceId: terminalDeviceId(),
+              });
+              forgetScope();
+              setScopeSource(null);
+              setTerminalView(view);
+              setSession(null);
+              return;
+            }
             rememberScope(nextSession);
             setSession(nextSession);
           }}
@@ -176,5 +248,11 @@ export function App() {
     return <LoginScreen onLogin={login} onVerifyMfa={verifyMfa} />;
   }
 
-  return <OperationalApp session={session} onLogout={() => void logout()} />;
+  return (
+    <OperationalApp
+      session={session}
+      onLogout={() => void logout()}
+      onSwitchUser={session.terminalMode ? () => void lockTerminal() : undefined}
+    />
+  );
 }

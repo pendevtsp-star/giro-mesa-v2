@@ -1,7 +1,8 @@
 "use client";
 
+import { getBusinessOpenState } from "@giromesa/domain/establishment-hours";
 import { Button } from "@giromesa/ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicMenuBranding } from "../lib/api";
 import {
   type CartItem,
@@ -76,6 +77,7 @@ export function MenuExperience({
   const [orderAttempt, setOrderAttempt] = useState<MutationAttempt | null>(null);
   const [orderReceipt, setOrderReceipt] = useState<PublicOrderReceipt | null>(null);
   const [tableAccessToken, setTableAccessToken] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const productDialog = useRef<HTMLDialogElement>(null);
   const cartDialog = useRef<HTMLDialogElement>(null);
 
@@ -88,6 +90,17 @@ export function MenuExperience({
     [initialItems, category, query],
   );
   const count = cart.reduce((total, line) => total + line.quantity, 0);
+  const openState = useMemo(
+    () =>
+      branding?.businessHours && branding.timezone
+        ? getBusinessOpenState(branding.businessHours, branding.timezone, now)
+        : undefined,
+    [branding?.businessHours, branding?.timezone, now],
+  );
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     const token = readTableAccessToken(window.location.search);
     setTableAccessToken(token);
@@ -363,13 +376,24 @@ export function MenuExperience({
     (fulfillment === "pickup" || Boolean(selectedZone && deliveryAddressComplete));
 
   return (
-    <main className="menu-app">
+    <main
+      className="menu-app"
+      style={
+        branding?.primaryColor || branding?.accentColor
+          ? ({
+              "--restaurant-brand": branding.primaryColor,
+              "--restaurant-accent": branding.accentColor,
+            } as CSSProperties)
+          : undefined
+      }
+    >
       <a className="skip-link" href="#cardapio">
         Pular para o cardápio
       </a>
       <MenuHeader
         hub={hub}
         branding={branding}
+        open={openState?.open}
         tableAuthorized={Boolean(tableAccessToken)}
         onInfo={() =>
           setNotice({

@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Input,
   Label,
@@ -23,12 +24,15 @@ import {
   RemoteGate,
   record,
   statusTone,
+  summarizeTabPayments,
   useRemote,
 } from "../../operations.shared";
 import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
-import { currentTerminalPrinterId } from "../shell/terminal-profile";
+import { currentTerminalPrinterId, readActiveTerminalProfile } from "../shell/terminal-profile";
+import type { PaymentAttempt } from "./pos-payments";
 import { promisedAtToIso, splitPromisedAt } from "./promisedAt";
+import { SmartPosPaymentModal } from "./SmartPosPaymentModal";
 import "./counter.css";
 
 type DraftCartItem = {
@@ -297,9 +301,7 @@ export function TabWorkspace({
   const [discountReais, setDiscountReais] = useState(0);
   const [moveTargetTabId, setMoveTargetTabId] = useState("");
   const [moveItemId, setMoveItemId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "credit_card" | "debit_card" | "pix" | "other"
-  >("pix");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "other">("cash");
   const [paymentReais, setPaymentReais] = useState(0);
   const [cashReceivedReais, setCashReceivedReais] = useState(0);
   const [paymentReference, setPaymentReference] = useState("");
@@ -316,14 +318,14 @@ export function TabWorkspace({
   const [responsibleIdentityId, setResponsibleIdentityId] = useState("");
   const [reopenReason, setReopenReason] = useState("");
   const [reopenPin, setReopenPin] = useState("");
+  const [smartPosOpen, setSmartPosOpen] = useState(false);
+  const [integratedAttempt, setIntegratedAttempt] = useState<PaymentAttempt | null>(null);
   const [undoResponsibility, setUndoResponsibility] = useState<{
     identityId: string | null;
     version: number;
   } | null>(null);
   const metadataVersionRef = useRef(0);
   const productSearchRef = useRef<HTMLInputElement>(null);
-  const paymentFormRef = useRef<HTMLFormElement>(null);
-  const paymentAmountRef = useRef<HTMLInputElement>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new tab must reset navigation even when the requested view is unchanged.
   useEffect(() => setView(initialView), [initialView, tabId]);
@@ -670,7 +672,8 @@ export function TabWorkspace({
               return count >= group.minimumSelections && count <= group.maximumSelections;
             });
             const activeItems = data.items.filter((item) => item.status !== "canceled");
-            const paidCents = data.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+            const paymentSummary = summarizeTabPayments(data.payments);
+            const paidCents = paymentSummary.paidCents;
             const remainingCents = Math.max(0, data.tab.totalCents - paidCents);
             const currentTable = floor?.tables.find((table) => table.id === data.tab.tableId);
             const currentRoom = floor?.rooms.find((room) => room.id === currentTable?.roomId);
@@ -856,14 +859,7 @@ export function TabWorkspace({
 
             function openReceive() {
               setView("account");
-              if (paymentReais <= 0 && remainingCents > 0) {
-                setPaymentReais(remainingCents / 100);
-              }
-              window.requestAnimationFrame(() => {
-                paymentFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                paymentAmountRef.current?.focus({ preventScroll: true });
-                paymentAmountRef.current?.select();
-              });
+              setSmartPosOpen(true);
             }
 
             async function submitCart(sendToProduction: boolean) {
@@ -1871,8 +1867,11 @@ export function TabWorkspace({
                         <strong>{formatMoney(data.tab.totalCents)}</strong>
                       </span>
                       <span>
-                        <small>Recebido</small>
+                        <small>Recebido líquido</small>
                         <strong>{formatMoney(paidCents)}</strong>
+                        {paymentSummary.reversedCents > 0 && (
+                          <small>{formatMoney(paymentSummary.reversedCents)} estornado</small>
+                        )}
                       </span>
                       <span data-balance={remainingCents > 0}>
                         <small>Saldo</small>
@@ -1881,9 +1880,18 @@ export function TabWorkspace({
                     </div>
                     <div className="account-overview__actions">
                       <Button
+                        className="smart-pos-trigger"
+                        disabled={!tabOpen || remainingCents <= 0}
+                        onClick={() => setSmartPosOpen(true)}
+                        size="sm"
+                      >
+                        Cobrar {formatMoney(remainingCents)} na maquininha
+                      </Button>
+                      <Button
                         disabled={busy || billRequestPending || !tabOpen}
                         onClick={() => void requestBillAndPrint()}
                         size="sm"
+                        variant="secondary"
                       >
                         {data.tab.tableId && billCall
                           ? "Reimprimir pré-conta"
@@ -1907,6 +1915,27 @@ export function TabWorkspace({
                         Extrato de pagamentos
                       </Button>
                     </div>
+                    {integratedAttempt &&
+                      ["created", "processing", "unknown"].includes(integratedAttempt.status) && (
+                        <Callout tone={integratedAttempt.status === "unknown" ? "warning" : "info"}>
+                          <strong>
+                            {integratedAttempt.status === "unknown"
+                              ? "Pagamento precisa de conferência"
+                              : "Pagamento em andamento"}
+                          </strong>
+                          <p>
+                            {formatMoney(integratedAttempt.amountCents)} · Não cobre novamente antes
+                            de confirmar o resultado.
+                          </p>
+                          <Button
+                            onClick={() => setSmartPosOpen(true)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Reabrir pagamento
+                          </Button>
+                        </Callout>
+                      )}
                     <small className="account-print-help">
                       A pré-conta mostra itens, total, valores pagos e saldo. Não fecha a comanda e
                       não registra pagamento.
@@ -1942,13 +1971,21 @@ export function TabWorkspace({
                                     other: "Outro",
                                   }[payment.method]
                                 }
+                                {payment.financialStatus === "reversed" && (
+                                  <Badge tone="danger">Estornado</Badge>
+                                )}
                               </b>
                               <small>
                                 {new Date(payment.createdAt).toLocaleString("pt-BR")}
                                 {payment.reference ? ` · ${payment.reference}` : ""}
                               </small>
                             </span>
-                            <strong>{formatMoney(payment.amountCents)}</strong>
+                            <span>
+                              <strong>{formatMoney(payment.amountCents)}</strong>
+                              {payment.financialStatus === "reversed" && (
+                                <small>Líquido {formatMoney(payment.netAmountCents)}</small>
+                              )}
+                            </span>
                           </span>
                         ))}
                       </section>
@@ -2379,7 +2416,6 @@ export function TabWorkspace({
                         </form>
                         <form
                           hidden={view !== "account"}
-                          ref={paymentFormRef}
                           onSubmit={(event) => {
                             event.preventDefault();
                             if (paymentReais <= 0) return;
@@ -2389,6 +2425,8 @@ export function TabWorkspace({
                               (paymentMethod === "cash" && cashReceivedReais > 0
                                 ? `Recebido ${formatMoney(Math.round(cashReceivedReais * 100))}; troco ${formatMoney(Math.round(changeReais * 100))}`
                                 : undefined);
+                            const installationId =
+                              readActiveTerminalProfile(scope.unitId)?.installationId ?? undefined;
                             void mutate(
                               () =>
                                 scope.dispatch(
@@ -2399,6 +2437,7 @@ export function TabWorkspace({
                                       method: paymentMethod,
                                       amountCents: Math.round(paymentReais * 100),
                                       reference,
+                                      installationId,
                                     },
                                   }),
                                   (key) =>
@@ -2410,6 +2449,7 @@ export function TabWorkspace({
                                         method: paymentMethod,
                                         amountCents: Math.round(paymentReais * 100),
                                         reference,
+                                        installationId,
                                       },
                                       key,
                                     ),
@@ -2475,11 +2515,8 @@ export function TabWorkspace({
                               }
                               value={paymentMethod}
                             >
-                              <option value="pix">Pix</option>
                               <option value="cash">Dinheiro</option>
-                              <option value="credit_card">Crédito</option>
-                              <option value="debit_card">Débito</option>
-                              <option value="other">Outro</option>
+                              <option value="other">Outro não eletrônico</option>
                             </NativeSelect>
                           </Label>
                           <Label>
@@ -2487,7 +2524,6 @@ export function TabWorkspace({
                             <Input
                               min={0.01}
                               onChange={(event) => setPaymentReais(Number(event.target.value))}
-                              ref={paymentAmountRef}
                               step="0.01"
                               type="number"
                               value={paymentReais}
@@ -2836,6 +2872,23 @@ export function TabWorkspace({
                     </Button>
                   </form>
                 )}
+                <SmartPosPaymentModal
+                  embedded={scope.embedded === true}
+                  installationId={scope.installationId ?? ""}
+                  isOpen={smartPosOpen}
+                  onApproved={() => {
+                    detail.retry();
+                    tabs.retry();
+                    onChanged();
+                    setFeedback("Pagamento aprovado na maquininha.");
+                  }}
+                  onAttemptChange={setIntegratedAttempt}
+                  onClose={() => setSmartPosOpen(false)}
+                  organizationId={scope.organizationId}
+                  remainingCents={remainingCents}
+                  tabId={tabId}
+                  unitId={scope.unitId}
+                />
                 {tabOpen && (
                   <footer
                     aria-label="Ações rápidas do atendimento"
@@ -2883,6 +2936,19 @@ export function TabWorkspace({
                   </footer>
                 )}
                 <article className="receipt-print-only">
+                  <header
+                    className="receipt-print-brand"
+                    style={{
+                      borderColor: /^#[0-9a-f]{6}$/i.test(menu.branding?.brandColor ?? "")
+                        ? menu.branding?.brandColor
+                        : "#111111",
+                    }}
+                  >
+                    {menu.branding?.headerBannerUrl && (
+                      <img alt="" src={menu.branding.headerBannerUrl} />
+                    )}
+                    <strong>{menu.branding?.restaurantName || "GiroMesa"}</strong>
+                  </header>
                   <h1>{displayLabel}</h1>
                   <p>
                     {printMode === "payments"
@@ -2927,6 +2993,9 @@ export function TabWorkspace({
                           }[payment.method]
                         }
                         <small>{new Date(payment.createdAt).toLocaleString("pt-BR")}</small>
+                        {payment.financialStatus === "reversed" && (
+                          <small>Estornado · líquido {formatMoney(payment.netAmountCents)}</small>
+                        )}
                       </span>
                       <strong>{formatMoney(payment.amountCents)}</strong>
                     </div>
@@ -2937,9 +3006,15 @@ export function TabWorkspace({
                     <strong>{formatMoney(data.tab.totalCents)}</strong>
                   </div>
                   <div>
-                    <span>Pago</span>
+                    <span>Pago líquido</span>
                     <strong>{formatMoney(paidCents)}</strong>
                   </div>
+                  {paymentSummary.reversedCents > 0 && (
+                    <div>
+                      <span>Estornado</span>
+                      <strong>{formatMoney(paymentSummary.reversedCents)}</strong>
+                    </div>
+                  )}
                   <div>
                     <span>Saldo</span>
                     <strong>{formatMoney(remainingCents)}</strong>

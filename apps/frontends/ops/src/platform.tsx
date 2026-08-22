@@ -1,4 +1,4 @@
-import { Badge, Button, Card, EmptyState } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Input } from "@giromesa/ui";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
@@ -41,6 +41,24 @@ interface PlatformOverview {
     issues: number;
     tone: "success" | "warning" | "danger";
   }>;
+  fiscalIntegrations: Array<{
+    organizationId: string;
+    organizationName: string;
+    unitId: string;
+    unitName: string;
+    document: string | null;
+    provider: string | null;
+    environment: "homologation" | "production" | null;
+    profileUpdatedAt: string | null;
+    companyId: string | null;
+    status: string | null;
+    certificateValidUntil: string | null;
+    lastCheckedAt: string | null;
+    hasHomologationCredential: boolean;
+    hasProductionCredential: boolean;
+    lastErrorCode: string | null;
+    lastErrorMessage: string | null;
+  }>;
 }
 
 export class InvalidPlatformPayloadError extends Error {
@@ -72,6 +90,11 @@ function optionalText(value: unknown): string | null {
 
 function number(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) throw new InvalidPlatformPayloadError();
+  return value;
+}
+
+function bool(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new InvalidPlatformPayloadError();
   return value;
 }
 
@@ -131,6 +154,31 @@ export function parsePlatformOverview(value: unknown): PlatformOverview {
       issues: number(row.issues),
       tone: healthTone(row.tone),
     })),
+    fiscalIntegrations: records(payload.fiscalIntegrations).map((row) => ({
+      organizationId: text(row.organizationId),
+      organizationName: text(row.organizationName),
+      unitId: text(row.unitId),
+      unitName: text(row.unitName),
+      document: optionalText(row.document),
+      provider: optionalText(row.provider),
+      environment:
+        row.environment === null
+          ? null
+          : row.environment === "homologation" || row.environment === "production"
+            ? row.environment
+            : (() => {
+                throw new InvalidPlatformPayloadError();
+              })(),
+      profileUpdatedAt: optionalText(row.profileUpdatedAt),
+      companyId: optionalText(row.companyId),
+      status: optionalText(row.status),
+      certificateValidUntil: optionalText(row.certificateValidUntil),
+      lastCheckedAt: optionalText(row.lastCheckedAt),
+      hasHomologationCredential: bool(row.hasHomologationCredential),
+      hasProductionCredential: bool(row.hasProductionCredential),
+      lastErrorCode: optionalText(row.lastErrorCode),
+      lastErrorMessage: optionalText(row.lastErrorMessage),
+    })),
   };
 }
 
@@ -143,6 +191,7 @@ function dateTime(value: string): string {
 
 export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   const [retryToken, setRetryToken] = useState(0);
+  const [fiscalSearch, setFiscalSearch] = useState("");
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
@@ -195,6 +244,11 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
       </Card>
     );
   const { data } = state;
+  const fiscalIntegrations = data.fiscalIntegrations.filter((integration) =>
+    `${integration.organizationName} ${integration.unitName} ${integration.document ?? ""}`
+      .toLocaleLowerCase("pt-BR")
+      .includes(fiscalSearch.toLocaleLowerCase("pt-BR")),
+  );
   return (
     <div className="growth-stack">
       <div className="metric-strip">
@@ -243,6 +297,74 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
             <strong>{data.health.failedIntegrations}</strong>
           </div>
         </div>
+      </Card>
+      <Card>
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">Fiscal interno</p>
+            <h2>Integrações por unidade</h2>
+          </div>
+          <Badge tone="info">{fiscalIntegrations.length}</Badge>
+        </div>
+        <Input
+          aria-label="Buscar integração fiscal"
+          onChange={(event) => setFiscalSearch(event.target.value)}
+          placeholder="Buscar organização, unidade ou CNPJ"
+          type="search"
+          value={fiscalSearch}
+        />
+        {fiscalIntegrations.length ? (
+          <div className="data-list">
+            {fiscalIntegrations.map((integration) => {
+              const tone = integration.lastErrorCode
+                ? "danger"
+                : integration.status === "ready"
+                  ? "success"
+                  : "warning";
+              return (
+                <article className="data-row" key={integration.unitId}>
+                  <div>
+                    <strong>
+                      {integration.organizationName} · {integration.unitName}
+                    </strong>
+                    <small>
+                      {integration.document ?? "CNPJ pendente"} ·{" "}
+                      {integration.provider ?? "Sem perfil"} ·{" "}
+                      {integration.environment ?? "ambiente pendente"}
+                    </small>
+                    <small>
+                      Homologação {integration.hasHomologationCredential ? "ok" : "pendente"} ·
+                      Produção {integration.hasProductionCredential ? "ok" : "pendente"}
+                    </small>
+                    {integration.certificateValidUntil && (
+                      <small>Certificado até {integration.certificateValidUntil}</small>
+                    )}
+                    {integration.lastErrorCode && (
+                      <small>
+                        {integration.lastErrorCode}
+                        {integration.lastErrorMessage ? ` · ${integration.lastErrorMessage}` : ""}
+                      </small>
+                    )}
+                  </div>
+                  <div className="data-row__end">
+                    <Badge tone={tone}>{integration.status ?? "não configurado"}</Badge>
+                    <small>
+                      {integration.lastCheckedAt
+                        ? `Verificado ${dateTime(integration.lastCheckedAt)}`
+                        : "Sem verificação"}
+                    </small>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            description="Nenhuma unidade corresponde à busca informada."
+            icon="◇"
+            title="Sem integrações fiscais"
+          />
+        )}
       </Card>
       <div className="ops-grid">
         <Card>

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const SENSITIVE_AUTH_ENDPOINTS = new Set([
   "login",
   "register",
@@ -9,6 +11,9 @@ const SENSITIVE_AUTH_ENDPOINTS = new Set([
   "password/forgot",
   "password-reset/request",
   "password-reset/confirm",
+  "terminal-pin",
+  "terminal-session",
+  "terminal-session/unlock",
 ]);
 
 export function isSensitiveAuthRequest(url: string) {
@@ -30,10 +35,20 @@ export function requestRateLimit(method: string, url: string) {
     return { bucket: "public-write", max: 20 } as const;
   if (
     method.toUpperCase() === "GET" &&
-    /^\/(?:api\/)?v1\/organizations\/[^/]+\/units\/[^/]+\/management\/reports(?:\/|$)/.test(path)
+    /^\/(?:api\/)?v1\/organizations\/[^/]+\/units\/[^/]+\/management\/reports(?:\/drill-down)?$/.test(
+      path,
+    )
   )
-    return { bucket: "reports-read", max: 60 } as const;
+    return { bucket: "reports-read", max: 120 } as const;
   if (["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase()))
     return { bucket: "api-read", max: 600 } as const;
   return { bucket: "api-write", max: 100 } as const;
+}
+
+export function requestRateLimitKey(bucket: string, ip: string, credential?: string) {
+  const subject =
+    bucket === "reports-read" && credential
+      ? createHash("sha256").update(credential).digest("base64url").slice(0, 22)
+      : ip;
+  return `${subject}:${bucket}`;
 }

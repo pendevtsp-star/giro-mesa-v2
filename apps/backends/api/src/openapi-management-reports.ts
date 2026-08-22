@@ -11,6 +11,20 @@ const coverage: SchemaObject = {
   type: "string",
   enum: ["complete", "partial", "unavailable"],
 };
+const reportFamilies = [
+  "overview",
+  "sales",
+  "exceptions",
+  "inventory",
+  "purchasing",
+  "operations",
+  "profitability",
+  "multiunit",
+  "quality",
+  "labor",
+  "reconciliation",
+  "forecast",
+];
 const familyComparison: SchemaObject = {
   type: "object",
   additionalProperties: {
@@ -468,6 +482,14 @@ export const managementReportsResponseSchema: SchemaObject = {
                   "revenuePerOperatingDayCents",
                   "organizationRevenueSharePercent",
                   "sameStoreChangePercent",
+                  "minimumComparableOperatingDays",
+                  "comparableStoreEligible",
+                  "seatCount",
+                  "activeEmployees",
+                  "openHours",
+                  "revenuePerSeatCents",
+                  "revenuePerOpenHourCents",
+                  "revenuePerEmployeeCents",
                 ],
                 properties: {
                   key: { type: "string", format: "uuid" },
@@ -481,6 +503,14 @@ export const managementReportsResponseSchema: SchemaObject = {
                   revenuePerOperatingDayCents: nullableCents,
                   organizationRevenueSharePercent: { type: "number", nullable: true },
                   sameStoreChangePercent: { type: "number", nullable: true },
+                  minimumComparableOperatingDays: { type: "integer" },
+                  comparableStoreEligible: { type: "boolean" },
+                  seatCount: { type: "integer" },
+                  activeEmployees: { type: "integer" },
+                  openHours: { type: "number", nullable: true },
+                  revenuePerSeatCents: nullableCents,
+                  revenuePerOpenHourCents: nullableCents,
+                  revenuePerEmployeeCents: nullableCents,
                 },
               },
             },
@@ -547,6 +577,7 @@ export const managementReportsResponseSchema: SchemaObject = {
             "taxCents",
             "documents",
             "external",
+            "closure",
           ],
           properties: {
             coverage,
@@ -558,28 +589,38 @@ export const managementReportsResponseSchema: SchemaObject = {
             taxCents: cents,
             documents: { type: "object", additionalProperties: { type: "integer" } },
             external: { type: "object", additionalProperties: { type: "integer" } },
+            closure: { type: "object", additionalProperties: true },
           },
         },
         forecast: {
           type: "object",
           required: [
             "method",
+            "available",
+            "minimumSampleDays",
             "horizonDays",
             "sampleDays",
             "confidence",
             "errorPercent",
             "revenue",
             "cash",
+            "calendarSignals",
             "purchases",
           ],
           properties: {
-            method: { type: "string", enum: ["historical_daily_average_v1"] },
+            method: { type: "string", enum: ["weekday_seasonality_v2"] },
+            available: { type: "boolean" },
+            minimumSampleDays: { type: "integer", minimum: 14 },
             horizonDays: { type: "integer" },
             sampleDays: { type: "integer" },
             confidence: { type: "string", enum: ["low", "medium", "high"] },
             errorPercent: { type: "number", nullable: true },
             revenue: { type: "object", additionalProperties: cents },
             cash: { type: "object", additionalProperties: cents },
+            calendarSignals: {
+              type: "array",
+              items: { type: "object", additionalProperties: true },
+            },
             purchases: { type: "array", items: { type: "object", additionalProperties: true } },
           },
         },
@@ -587,7 +628,7 @@ export const managementReportsResponseSchema: SchemaObject = {
     },
     meta: {
       type: "object",
-      required: ["generatedAt", "dataThrough", "sourceCounts", "coverage"],
+      required: ["generatedAt", "dataThrough", "sourceCounts", "coverage", "indicators"],
       properties: {
         generatedAt: { type: "string", format: "date-time" },
         dataThrough: { ...date, nullable: true },
@@ -620,6 +661,18 @@ export const managementReportsResponseSchema: SchemaObject = {
               (key) => [key, { type: "string", enum: ["complete", "partial", "unavailable"] }],
             ),
           ),
+        },
+        indicators: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            required: ["coverage", "dataThrough", "sources"],
+            properties: {
+              coverage,
+              dataThrough: { ...date, nullable: true },
+              sources: { type: "array", items: { type: "string" } },
+            },
+          },
         },
       },
     },
@@ -897,12 +950,24 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
   };
   document.components.schemas.ManagementReportView = {
     type: "object",
-    required: ["id", "name", "visibility", "query", "ownerIdentityId", "version", "updatedAt"],
+    required: [
+      "id",
+      "name",
+      "visibility",
+      "query",
+      "isDefault",
+      "sortOrder",
+      "ownerIdentityId",
+      "version",
+      "updatedAt",
+    ],
     properties: {
       id: { type: "string", format: "uuid" },
       name: { type: "string" },
       visibility: { type: "string", enum: ["private", "unit", "organization"] },
       query: { type: "object", additionalProperties: true },
+      isDefault: { type: "boolean" },
+      sortOrder: { type: "integer" },
       ownerIdentityId: { type: "string", format: "uuid" },
       version: { type: "integer" },
       updatedAt: { type: "string", format: "date-time" },
@@ -944,6 +1009,8 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
       name: { type: "string", maxLength: 80 },
       visibility: { type: "string", enum: ["private", "unit", "organization"] },
       query: { $ref: "#/components/schemas/ManagementReportViewQuery" },
+      isDefault: { type: "boolean" },
+      sortOrder: { type: "integer", minimum: -10_000, maximum: 10_000 },
       version: { type: "integer", minimum: 1 },
     },
   };
@@ -972,6 +1039,8 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
       assignedToIdentityId: { type: "string", format: "uuid", nullable: true },
       dueAt: { type: "string", format: "date-time", nullable: true },
       resolvedAt: { type: "string", format: "date-time", nullable: true },
+      source: { type: "object", additionalProperties: true },
+      history: { type: "array", items: { type: "object", additionalProperties: true } },
       version: { type: "integer" },
       updatedAt: { type: "string", format: "date-time" },
     },
@@ -995,7 +1064,10 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
     operation.parameters = [
       ...(operation.parameters ?? []).filter(
         (parameter) =>
-          "$ref" in parameter || !["from", "to", "comparisonMode"].includes(parameter.name),
+          "$ref" in parameter ||
+          !["from", "to", "comparisonMode", "family", "minimumComparableOperatingDays"].includes(
+            parameter.name,
+          ),
       ),
       { name: "from", in: "query", required: true, schema: date },
       { name: "to", in: "query", required: true, schema: date },
@@ -1008,6 +1080,18 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
           enum: ["previous_period", "previous_year", "none"],
           default: "previous_period",
         },
+      },
+      {
+        name: "family",
+        in: "query",
+        required: false,
+        schema: { type: "string", enum: reportFamilies, default: "overview" },
+      },
+      {
+        name: "minimumComparableOperatingDays",
+        in: "query",
+        required: false,
+        schema: { type: "integer", minimum: 1, maximum: 31, default: 7 },
       },
     ];
     operation.responses["200"] = {
@@ -1097,7 +1181,38 @@ export function addManagementReportsOpenApi(document: OpenAPIObject) {
         status: { type: "string", enum: ["open", "claimed", "resolved", "dismissed"] },
         assignedToIdentityId: { type: "string", format: "uuid", nullable: true },
         dueAt: { type: "string", format: "date-time", nullable: true },
+        comment: { type: "string", maxLength: 1_000 },
         version: { type: "integer", minimum: 1 },
+      },
+    });
+    attach("/costs/backfill/preview", "post", "201", { type: "object" });
+    body("/costs/backfill/preview", "post", {
+      type: "object",
+      required: ["from", "to"],
+      properties: {
+        from: date,
+        to: date,
+        comparisonMode: {
+          type: "string",
+          enum: ["previous_period", "previous_year", "none"],
+        },
+      },
+    });
+    attach("/reconciliation/closure", "post", "201", { type: "object" });
+    body("/reconciliation/closure", "post", {
+      type: "object",
+      required: ["from", "to", "status", "checklist", "note"],
+      properties: {
+        from: date,
+        to: date,
+        comparisonMode: {
+          type: "string",
+          enum: ["previous_period", "previous_year", "none"],
+        },
+        status: { type: "string", enum: ["open", "closed"] },
+        checklist: { type: "object", additionalProperties: { type: "boolean" } },
+        note: { type: "string", maxLength: 1_000 },
+        evidence: { type: "array", maxItems: 10, items: { type: "string", format: "uri" } },
       },
     });
     attach("/costs/backfill", "post", "201", { type: "object" });

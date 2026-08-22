@@ -14,7 +14,7 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, banco próprio e releases imutá
 ## Primeiro deploy
 
 1. Execute `bootstrap-env.sh` uma única vez com `PLATFORM_ADMIN_GRANTS_OVERRIDE` revisado. O script não sobrescreve um `.env` existente.
-2. Configure `GIROMESA_OBJECT_DIRECTORY` com o armazenamento real de objetos e preserve-o fora do diretório do release.
+2. Configure `GIROMESA_OBJECT_DIRECTORY` com o `Mountpoint` exato do volume persistente `giromesa-v2-pilot_media_data`, obtido por `docker volume inspect giromesa-v2-pilot_media_data --format '{{.Mountpoint}}'`. O caminho deve permanecer fora do diretório do release. O deploy recusa backup de outro diretório e, depois da troca, comprova escrita pela API e leitura pelo worker no mesmo volume.
 3. Antes da primeira promoção, derive o recovery R2 contendo schema 0029 e este hardening. Autorize seu SHA e evidência na matriz versionada da `main`. A branch de recovery não recebe permissão de pacote ou OIDC: o workflow privilegiado da `main` refaz os testes PG16/17 e runtime, constrói e assina as imagens recovery. Configure `GIROMESA_RECOVERY_RELEASE_SHA` e os arquivos `GIROMESA_RECOVERY_IMAGE_ATTESTATION_*`.
 4. Publique target e recovery pelo workflow `Publish pilot images`. Ele só aceita CI de `push` da `main`, assina cada digest com role/source/authorization e gera manifestos separados. Com a matriz recovery vazia, a promoção permanece bloqueada por desenho.
 5. Baixe juntos o JSON, o bundle Sigstore e o checksum de ambos os releases, além de `giromesa-recovery-validation-<sha>.json` no mesmo diretório do manifesto recovery. Configure `GIROMESA_IMAGE_ATTESTATION_FILE`; bundle e checksum são descobertos pelos sufixos `.bundle` e `.sha256`, ou definidos explicitamente.
@@ -25,6 +25,8 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, banco próprio e releases imutá
 Defina `GIROMESA_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<target-sha>` e `GIROMESA_RECOVERY_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<recovery-sha>`, juntamente com os dois pares manifesto/bundle, e inicie somente por `/opt/giromesa/shared/trust/deploy-entrypoint.sh deploy`. O script interno recusa execução direta.
 
 `ensure-runtime-env.sh` preserva valores existentes, adiciona atomicamente apenas segredos ausentes e rejeita chaves duplicadas. Sem grants explícitos, deriva apenas `platform.read` dos e-mails administrativos; não inventa permissão de mutação.
+
+O bootstrap cria `FISCAL_CREDENTIALS_ENCRYPTION_KEY` com 32 bytes aleatórios, mantém `FOCUS_NFE_PRIMARY_TOKEN` vazio e define `FISCAL_RELEASE_ENV=homologation` e `FOCUS_NFE_TIMEOUT_MS=15000`. O token integrador deve ser preenchido pelo cofre somente na homologação real. Não rotacione a chave de criptografia depois de cadastrar emitentes sem antes recriptografar todas as credenciais por unidade e testar a recuperação. Para promover `FISCAL_RELEASE_ENV=production`, `config/fiscal-release.json` deve estar assinado no manifesto da release com status `homologated`, escopo aprovado e evidência imutável da jornada fiscal completa; caso contrário o deploy encerra antes de qualquer mutação.
 
 O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64`, ambas com 32 bytes em base64. A configuração cifrada é produzida diretamente do `.env` atual e seu HMAC é vinculado ao manifesto assinado. Arquivo cifrado pré-construído é recusado.
 
@@ -40,4 +42,4 @@ O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CO
 - API: `https://api.giromesa.com.br`
 - Callback Google: `https://api.giromesa.com.br/api/v1/auth/google/callback`
 
-As credenciais Focus NFC-e pertencem ao Edge Hub no estabelecimento e não devem ser copiadas para containers cloud.
+O token principal da conta integradora Focus pertence apenas ao backend cloud. Os tokens de cada emitente ficam cifrados no PostgreSQL e são usados pelo worker/API no escopo da organização, unidade e ambiente; não chegam ao navegador. Credenciais eventualmente entregues ao Edge são restritas à unidade e permanecem somente em memória.

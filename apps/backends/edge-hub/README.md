@@ -41,3 +41,11 @@ Dispositivos pareados consultam `GET /v1/printers` para diagnóstico e usam `POS
 ## Estado atual das integrações
 
 PayGo falha de forma segura com `503` enquanto credenciais e hardware não forem homologados. A impressão ESC/POS TCP está implementada e permanece desabilitada até a configuração de um equipamento real. O adapter Focus NFC-e usa a API v2 oficial, Basic Auth com token por empresa, referência idempotente, consulta, cancelamento e inutilização reconciliáveis. Emissão exige proprietário, gerente ou caixa; consulta também aceita contador; cancelamento e inutilização exigem proprietário ou gerente no snapshot local vigente. Os resultados viram eventos `fiscal.*` duráveis sem token, XML ou resposta bruta do provedor. Para homologar, configure `Hub__Focus__Enabled=true`, `Hub__Focus__Environment=homologation` e `Hub__Focus__Token` no cofre do serviço Windows. Produção exige trocar explicitamente o ambiente para `production`; o token nunca deve ser salvo no JSON ou nos logs.
+
+### Gate local da homologação fiscal
+
+`GET /health/fiscal-homologation` faz somente um preflight local, sem chamar Focus NFe ou SEFAZ. Sem token ativo retorna `503` e `FOCUS_CREDENTIAL_MISSING`; com ambiente diferente de `homologation`, retorna `503` e `FOCUS_HOMOLOGATION_ENVIRONMENT_REQUIRED`. A resposta nunca contém token, certificado ou payload fiscal.
+
+Use `curl.exe --fail-with-body "$EdgeHubUrl/health/fiscal-homologation"`. Um `200` confirma apenas ambiente e presença da credencial no processo Edge; `sefazVerified` permanece `false`. Autorização, rejeição, cancelamento, inutilização, XML/DANFE e certificado continuam exigindo credencial empresarial real e execução contra a Focus/SEFAZ em homologação.
+
+O smoke seguro, sem segredos e sem rede externa, roda com `dotnet test apps/backends/edge-hub.tests/GiroMesa.EdgeHub.Tests.csproj --filter FullyQualifiedName~FiscalHomologationGateTests`.

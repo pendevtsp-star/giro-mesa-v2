@@ -64,7 +64,8 @@ it("executes every management report family against PostgreSQL", async (context)
     assert.equal(report.reportFamilies.profitability.productProfitabilityCoverage, "unavailable");
     assert.equal(report.reportFamilies.labor.workedMinutes, 0);
     assert.equal(report.reportFamilies.reconciliation.paymentDifferenceCents, 0);
-    assert.equal(report.reportFamilies.forecast.method, "historical_daily_average_v1");
+    assert.equal(report.reportFamilies.forecast.method, "weekday_seasonality_v2");
+    assert.equal(report.reportFamilies.forecast.available, false);
     assert.equal(report.reportFamilies.forecast.revenue.forecastCents, 0);
 
     const view = await reports.createView(
@@ -81,9 +82,14 @@ it("executes every management report family against PostgreSQL", async (context)
           comparisonMode: "previous_period",
           family: "reconciliation",
         },
+        isDefault: true,
+        sortOrder: 4,
       },
     );
-    assert.equal((await reports.views(identityId, organizationId, unit.id)).views[0]?.id, view.id);
+    const [savedView] = (await reports.views(identityId, organizationId, unit.id)).views;
+    assert.equal(savedView?.id, view.id);
+    assert.equal(savedView?.isDefault, true);
+    assert.equal(savedView?.sortOrder, 4);
 
     const artifact = await reports.createExport(
       identityId,
@@ -102,6 +108,39 @@ it("executes every management report family against PostgreSQL", async (context)
     assert.equal(content.contentEncoding, "base64");
     assert.equal(Buffer.from(content.content, "base64").subarray(0, 2).toString(), "PK");
 
+    const pdfArtifact = await reports.createExport(
+      identityId,
+      organizationId,
+      unit.id,
+      `export-${randomUUID()}`,
+      {
+        from: "2026-08-01",
+        to: "2026-08-17",
+        comparisonMode: "previous_period",
+        family: "sales",
+        format: "pdf",
+      },
+    );
+    const pdfContent = await reports.exportContent(
+      identityId,
+      organizationId,
+      unit.id,
+      pdfArtifact.id,
+    );
+    const pdf = Buffer.from(pdfContent.content, "base64").toString("latin1");
+    assert.match(pdf, /^%PDF-1\.4/);
+    assert.match(pdf, /Reports integration/);
+    assert.match(pdf, /Reports unit/);
+    assert.match(pdf, /Reports owner/);
+    assert.match(pdf, new RegExp(pdfArtifact.id));
+
+    const preview = await reports.previewCosts(identityId, organizationId, unit.id, {
+      from: "2026-08-01",
+      to: "2026-08-17",
+      comparisonMode: "previous_period",
+    });
+    assert.equal(preview.candidateCount, 0);
+
     const backfill = await reports.backfillCosts(
       identityId,
       organizationId,
@@ -115,6 +154,30 @@ it("executes every management report family against PostgreSQL", async (context)
       },
     );
     assert.equal(backfill.estimatedCount, 0);
+
+    const closure = await reports.closeReconciliation(
+      identityId,
+      organizationId,
+      unit.id,
+      `closure-${randomUUID()}`,
+      {
+        from: "2026-08-01",
+        to: "2026-08-17",
+        comparisonMode: "previous_period",
+        status: "closed",
+        checklist: { payments: true, fiscal: true, external: true },
+        note: "Fechamento conferido no teste de integraÃ§Ã£o.",
+        evidence: [],
+      },
+    );
+    assert.equal(closure.status, "closed");
+    const closedReport = await reports.reports(identityId, organizationId, unit.id, {
+      from: "2026-08-01",
+      to: "2026-08-17",
+      comparisonMode: "previous_period",
+      family: "reconciliation",
+    });
+    assert.equal(closedReport.reportFamilies.reconciliation.closure.status, "closed");
   } finally {
     if (organizationId)
       await database.db.delete(organizations).where(eq(organizations.id, organizationId));

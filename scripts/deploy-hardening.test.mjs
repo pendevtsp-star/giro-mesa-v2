@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +20,7 @@ const backupScript = join(root, "scripts", "backup-production.sh");
 const restoreScript = join(root, "scripts", "restore-drill.sh");
 const ensureScript = join(root, "deploy", "vps", "ensure-runtime-env.sh");
 const deployScript = join(root, "deploy", "vps", "deploy-pilot.sh");
+const fiscalStorageScript = join(root, "scripts", "check-fiscal-storage.sh");
 const observabilityCompose = join(root, "deploy", "vps", "compose.observability.yaml");
 const observabilityConfig = join(root, "infra", "observability", "otel-collector.debug.yaml");
 const rollbackScript = join(root, "deploy", "vps", "rollback-app.sh");
@@ -245,6 +254,11 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
     assert.match(afterFirst, /^PUBLIC_TABLE_SESSION_SIGNING_KEY=/m);
     assert.match(afterFirst, /^GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64=/m);
     assert.match(afterFirst, /^PLATFORM_ADMIN_GRANTS=/m);
+    assert.match(afterFirst, /^FISCAL_RELEASE_ENV=homologation$/m);
+    assert.match(afterFirst, /^FOCUS_NFE_PRIMARY_TOKEN=$/m);
+    assert.match(afterFirst, /^FOCUS_NFE_TIMEOUT_MS=15000$/m);
+    const fiscalKey = afterFirst.match(/^FISCAL_CREDENTIALS_ENCRYPTION_KEY=(.+)$/m)?.[1];
+    assert.equal(Buffer.from(fiscalKey ?? "", "base64").length, 32);
 
     const second = run(ensureScript, [envFile]);
     assert.equal(second.status, 0, output(second));
@@ -296,6 +310,22 @@ test("runtime env accepts incident transition grant and rejects duplicate keys a
   }
 });
 
+test("runtime env rejects an unknown fiscal release environment atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-fiscal-"));
+  const envFile = join(directory, ".env");
+  const existing = "POSTGRES_PASSWORD=preserve-me\nFISCAL_RELEASE_ENV=preview\n";
+  writeFileSync(envFile, existing);
+  try {
+    const result = run(ensureScript, [envFile]);
+    assert.notEqual(result.status, 0);
+    assert.match(output(result), /FISCAL_RELEASE_ENV_INVALID/);
+    assert.equal(readFileSync(envFile, "utf8"), existing);
+    assert.doesNotMatch(output(result), /preserve-me/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("bootstrap refuses to overwrite an existing env without explicit rotation", () => {
   const directory = mkdtempSync(join(tmpdir(), "giromesa-bootstrap-existing-"));
   const target = join(directory, ".env");
@@ -338,6 +368,103 @@ test("deploy invokes the complete backup before migration and never snapshots cl
   assert.doesNotMatch(deploy, /"\$ensure_runtime_env"/);
   assert.match(deploy, /for service in api worker/);
   assert.match(deploy, /docker stop --timeout/);
+  assert.match(deploy, /FISCAL_PRODUCTION_HOMOLOGATION_REQUIRED/);
+  assert.match(deploy, /check-fiscal-storage\.sh/);
+  assert.match(deploy, /fiscal-production-smoke\.sql/);
+});
+
+test("deploy fiscal gate accepts blocked homologation and rejects unhomologated production", () => {
+  const deploy = readFileSync(deployScript, "utf8");
+  const source = deploy.match(
+    /python3 - "\$fiscal_release_manifest" "\$release_package" "\$env_file" <<'PY'\n([\s\S]*?)\nPY\n/,
+  )?.[1];
+  assert.ok(source, "deploy must embed the fiscal release validator");
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-fiscal-deploy-gate-"));
+  const manifest = join(directory, "fiscal-release.json");
+  const envFile = join(directory, ".env");
+  writeFileSync(
+    manifest,
+    JSON.stringify({
+      schemaVersion: 1,
+      moduleVersion: JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version,
+      provider: "focus",
+      status: "blocked",
+      environment: "homologation",
+      scope: null,
+      evidence: null,
+      homologatedAt: null,
+      blockers: ["external homologation"],
+    }),
+  );
+  try {
+    writeFileSync(envFile, "FISCAL_RELEASE_ENV=homologation\n");
+    const homologation = spawnSync("python3", ["-", manifest, join(root, "package.json"), envFile], {
+      cwd: root,
+      encoding: "utf8",
+      input: source,
+    });
+    assert.equal(homologation.status, 0, output(homologation));
+
+    writeFileSync(
+      envFile,
+      [
+        "FISCAL_RELEASE_ENV=production",
+        "FOCUS_NFE_PRIMARY_TOKEN=configured",
+        `FISCAL_CREDENTIALS_ENCRYPTION_KEY=${Buffer.alloc(32, 1).toString("base64")}`,
+        "MEDIA_ROOT=/app/data/media",
+        "",
+      ].join("\n"),
+    );
+    const production = spawnSync("python3", ["-", manifest, join(root, "package.json"), envFile], {
+      cwd: root,
+      encoding: "utf8",
+      input: source,
+    });
+    assert.notEqual(production.status, 0);
+    assert.match(output(production), /FISCAL_PRODUCTION_HOMOLOGATION_REQUIRED/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("fiscal storage gate proves the API and worker share the configured mount", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-fiscal-storage-"));
+  const fakeBin = join(directory, "bin");
+  const objectDirectory = join(directory, "objects");
+  mkdirSync(fakeBin);
+  mkdirSync(objectDirectory);
+  const docker = join(fakeBin, "docker");
+  writeFileSync(
+    docker,
+    `#!/usr/bin/env bash
+set -Eeuo pipefail
+if [[ $1 == inspect ]]; then printf '%s\\n' "$FAKE_MOUNT"; exit 0; fi
+[[ $1 == exec ]] || exit 90
+code=$5
+probe=$6
+directory="$FAKE_MOUNT/fiscal"
+if [[ $code == *writeFileSync* ]]; then mkdir -p "$directory"; printf '%s' giromesa-fiscal-storage-v1 > "$directory/$probe"; exit 0; fi
+if [[ $code == *readFileSync* ]]; then [[ $(<"$directory/$probe") == giromesa-fiscal-storage-v1 ]]; exit; fi
+if [[ $code == *rmSync* ]]; then rm -f "$directory/$probe"; exit 0; fi
+exit 91
+`,
+  );
+  chmodSync(docker, 0o755);
+  try {
+    const result = run(
+      fiscalStorageScript,
+      ["shared", objectDirectory, "a".repeat(64), "b".repeat(64)],
+      {
+        PATH: `${posix(fakeBin)}:${process.env.PATH}`,
+        FAKE_MOUNT: posix(objectDirectory),
+      },
+    );
+    assert.equal(result.status, 0, output(result));
+    assert.match(output(result), /FISCAL_STORAGE_READY/);
+    assert.deepEqual(readdirSync(join(objectDirectory, "fiscal")), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("local observability overlay is pinned and explicitly debug-only without durable storage", () => {
@@ -524,6 +651,28 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(provenance, /--certificate-github-workflow-trigger "\$workflow_trigger"/);
   assert.doesNotMatch(provenance, /ci\.yml@refs\/heads\/release\/rollback-0029/);
   assert.match(provenance, /publish-images\.yml@refs\/heads\/main/);
+  for (const fiscalReleaseFile of [
+    "config/fiscal-release.json",
+    "scripts/check-fiscal-storage.sh",
+    "scripts/fiscal-production-smoke.sql",
+  ]) {
+    assert.equal(workflow.split(fiscalReleaseFile).length - 1, 1);
+    assert.match(provenance, new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
+    assert.match(readFileSync(trustedEntrypoint, "utf8"), new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
+  }
+  assert.match(workflow, /critical=\[[^\n]*"package\.json"/);
+  assert.match(provenance, /"package\.json"/);
+  assert.match(readFileSync(trustedEntrypoint, "utf8"), /"package\.json"/);
+  const entrypoint = readFileSync(trustedEntrypoint, "utf8");
+  for (const name of [
+    "FISCAL_RELEASE_ENV",
+    "FOCUS_NFE_PRIMARY_TOKEN",
+    "FISCAL_CREDENTIALS_ENCRYPTION_KEY",
+    "FOCUS_NFE_TIMEOUT_MS",
+    "MEDIA_ROOT",
+  ]) {
+    assert.match(entrypoint, new RegExp(`unset[^\\n]*${name}`));
+  }
   for (const line of workflow.match(/^\s*uses:\s*.+$/gm) ?? []) {
     assert.match(line, /@[0-9a-f]{40}(?:\s+#\s+v[^\s]+)?$/);
   }

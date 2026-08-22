@@ -1,3 +1,4 @@
+import { type BusinessHours, businessHoursSchema, timezoneSchema } from "@giromesa/contracts";
 import type { MenuItem } from "./menu.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -9,6 +10,14 @@ export type PublicMenuBranding = {
   slogan?: string;
   logoUrl?: string;
   notice?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  address?: string;
+  phone?: string;
+  instagram?: string;
+  openingHours?: string;
+  businessHours?: BusinessHours;
+  timezone?: string;
 };
 
 export type PublicMenuSnapshot = {
@@ -64,6 +73,10 @@ function isMenuItem(value: unknown): value is MenuItem {
   );
 }
 
+function optionalText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 export function normalizePublicMenu(payload: unknown): MenuItem[] | null {
   if (!isRecord(payload) || !Array.isArray(payload.items) || !payload.items.every(isMenuItem)) {
     return null;
@@ -80,14 +93,32 @@ export function normalizePublicMenuSnapshot(payload: unknown): PublicMenuSnapsho
     branding && typeof branding.displayName === "string" && branding.displayName.trim()
       ? {
           displayName: branding.displayName.trim(),
-          ...(typeof branding.slogan === "string" && branding.slogan.trim()
-            ? { slogan: branding.slogan.trim() }
-            : {}),
+          ...(optionalText(branding.slogan) ? { slogan: optionalText(branding.slogan) } : {}),
           ...(typeof branding.logoUrl === "string" && /^https?:\/\//.test(branding.logoUrl)
             ? { logoUrl: branding.logoUrl }
             : {}),
-          ...(typeof branding.notice === "string" && branding.notice.trim()
-            ? { notice: branding.notice.trim() }
+          ...(optionalText(branding.notice) ? { notice: optionalText(branding.notice) } : {}),
+          ...(typeof branding.primaryColor === "string" &&
+          /^#[0-9a-f]{6}$/i.test(branding.primaryColor)
+            ? { primaryColor: branding.primaryColor }
+            : {}),
+          ...(typeof branding.accentColor === "string" &&
+          /^#[0-9a-f]{6}$/i.test(branding.accentColor)
+            ? { accentColor: branding.accentColor }
+            : {}),
+          ...(optionalText(branding.address) ? { address: optionalText(branding.address) } : {}),
+          ...(optionalText(branding.phone) ? { phone: optionalText(branding.phone) } : {}),
+          ...(optionalText(branding.instagram)
+            ? { instagram: optionalText(branding.instagram) }
+            : {}),
+          ...(optionalText(branding.openingHours)
+            ? { openingHours: optionalText(branding.openingHours) }
+            : {}),
+          ...(businessHoursSchema.safeParse(branding.businessHours).success
+            ? { businessHours: businessHoursSchema.parse(branding.businessHours) }
+            : {}),
+          ...(timezoneSchema.safeParse(branding.timezone).success
+            ? { timezone: branding.timezone as string }
             : {}),
         }
       : undefined;

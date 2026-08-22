@@ -6,6 +6,19 @@ export type DeviceLocation = {
 
 export type LocationPermission = "granted" | "prompt" | "denied" | "unavailable";
 
+export function parseLocationNumber(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function hasAcceptableLocationAccuracy(
+  location: DeviceLocation,
+  maximumAccuracyMeters: number,
+) {
+  return location.accuracyMeters !== undefined && location.accuracyMeters <= maximumAccuracyMeters;
+}
+
 export async function requestDeviceLocation(): Promise<DeviceLocation> {
   if (!navigator.geolocation) {
     throw new Error("Este dispositivo não disponibilizou a localização.");

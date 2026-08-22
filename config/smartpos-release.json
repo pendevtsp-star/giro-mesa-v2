@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "webVersion": "0.2.3",
+  "providers": {
+    "rede": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": [
+        "modelo e firmware do terminal piloto",
+        "SDK e credenciais privadas",
+        "assinatura e publicação na Laranjinha Store",
+        "execução do roteiro no hardware e aceite da Rede"
+      ]
+    },
+    "paygo": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": [
+        "licenciamento e credenciais PayGo",
+        "modelo certificado e terminal físico",
+        "homologação das adquirentes habilitadas"
+      ]
+    },
+    "stone": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": [
+        "modelo e firmware Stone suportados",
+        "credenciais e deeplink homologado",
+        "publicação, roteiro físico e aceite do fornecedor"
+      ]
+    },
+    "getnet": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": ["projeto nativo específico, credenciais, hardware e homologação"]
+    },
+    "cielo": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": ["projeto LIO específico, credenciais, hardware e homologação"]
+    },
+    "pagbank": {
+      "enabled": false,
+      "status": "blocked",
+      "officialStoreUrl": null,
+      "terminal": null,
+      "app": null,
+      "evidence": null,
+      "blockers": ["projeto SmartPOS específico, credenciais, hardware e homologação"]
+    }
+  }
+}

@@ -843,6 +843,121 @@
     color: inherit;
   }
 
+  .smart-pos-trigger {
+    min-height: 48px;
+  }
+
+  .smart-pos-payment .gm-modal {
+    max-width: 440px;
+  }
+
+  .smart-pos-payment .gm-modal__body,
+  .smart-pos-form,
+  .smart-pos-result {
+    min-width: 0;
+  }
+
+  .smart-pos-form,
+  .smart-pos-result {
+    display: grid;
+    gap: 14px;
+  }
+
+  .smart-pos-payment__amount,
+  .smart-pos-result__heading {
+    align-items: center;
+    background: var(--gm-surface-soft);
+    border: 1px solid var(--gm-border);
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .smart-pos-payment__amount > *,
+  .smart-pos-result__heading > * {
+    min-width: 0;
+  }
+
+  .smart-pos-payment__amount small,
+  .smart-pos-result__heading small {
+    color: var(--gm-muted);
+    display: block;
+    font-size: 0.72rem;
+  }
+
+  .smart-pos-payment__amount strong,
+  .smart-pos-result__heading strong {
+    display: block;
+    font-family: var(--gm-display);
+    font-size: clamp(1.2rem, 6vw, 1.6rem);
+    overflow-wrap: anywhere;
+  }
+
+  .smart-pos-payment .smart-pos-form :is(input, select, .gm-button),
+  .smart-pos-result .gm-button,
+  .smart-pos-payment .gm-modal__header > .gm-button {
+    min-height: 48px;
+  }
+
+  .smart-pos-form :is(input, select) {
+    font-size: 1rem;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .smart-pos-methods {
+    border: 0;
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .smart-pos-payment .smart-pos-methods legend {
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .smart-pos-methods > div {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .smart-pos-methods .gm-button {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding-inline: 6px;
+    white-space: normal;
+    width: 100%;
+  }
+
+  .smart-pos-payment__actions,
+  .smart-pos-payment__submit {
+    display: grid;
+    gap: 8px;
+  }
+
+  .smart-pos-payment__actions .gm-button,
+  .smart-pos-payment__submit .gm-button {
+    width: 100%;
+  }
+
+  .smart-pos-payment__error {
+    color: var(--gm-danger);
+    font-size: 0.8rem;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .smart-pos-payment__loading {
+    color: var(--gm-muted);
+    margin: 0;
+  }
+
   @media (max-width: 1100px) {
     .counter-operation {
       grid-template-columns: minmax(320px, 0.82fr) minmax(470px, 1.18fr);
@@ -1068,6 +1183,21 @@
 
     .service-action-dock {
       bottom: 0;
+    }
+
+    .smart-pos-payment .gm-modal {
+      max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
+      padding: 14px;
+      width: 100%;
+    }
+
+    .smart-pos-payment .gm-modal__header {
+      align-items: start;
+      gap: 8px;
+    }
+
+    .smart-pos-payment .gm-modal__body {
+      scrollbar-gutter: auto;
     }
   }
 

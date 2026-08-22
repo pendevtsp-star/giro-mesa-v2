@@ -12,6 +12,8 @@
     "test": "node --experimental-strip-types --test lib/*.test.ts"
   },
   "dependencies": {
+    "@giromesa/contracts": "workspace:*",
+    "@giromesa/domain": "workspace:*",
     "@giromesa/ui": "workspace:*",
     "next": "16.3.0",
     "react": "19.2.0",

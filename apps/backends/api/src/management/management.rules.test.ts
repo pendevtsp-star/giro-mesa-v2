@@ -1,24 +1,48 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ConflictException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import {
+  assertCashDrawerDebit,
   assertManagementScope,
   COMMISSION_CENTS_MAX,
+  canGrantPersonAccessRole,
   cashConference,
+  cashDifferenceSeverity,
+  cashTenderConference,
+  cashTransferLockOrder,
   commissionAmountFromBasisPoints,
   inventoryChange,
   managementReplay,
   managementRequestHash,
+  personAccessPublicStatus,
   profitabilityCoverage,
   purchaseLineReconciliation,
   purchaseReceiptPlan,
   purchaseStockConversion,
   reportPercentageChange,
   reportPeriodContext,
+  requiresCashApproval,
   settlement,
 } from "./management.rules.js";
+import { cashShiftExportQuerySchema, closeCashShiftSchema } from "./management.schemas.js";
 
 describe("management rules", () => {
+  it("impede escalada de acesso e deriva expiração sem estado duplicado", () => {
+    assert.equal(canGrantPersonAccessRole("manager", "waiter"), true);
+    assert.equal(canGrantPersonAccessRole("manager", "finance"), false);
+    assert.equal(canGrantPersonAccessRole("owner", "manager"), true);
+    assert.equal(canGrantPersonAccessRole("owner", "owner"), false);
+    assert.equal(
+      personAccessPublicStatus(
+        "pending",
+        new Date("2026-01-01T00:00:00Z"),
+        new Date("2026-01-02T00:00:00Z"),
+      ),
+      "expired",
+    );
+    assert.equal(personAccessPublicStatus("terminated", null), "none");
+  });
+
   it("keeps calculated commissions inside PostgreSQL integer cents", () => {
     assert.equal(
       commissionAmountFromBasisPoints(COMMISSION_CENTS_MAX, 10_000),
@@ -174,12 +198,81 @@ describe("management rules", () => {
     assert.deepEqual(
       cashConference({
         openingCents: 20_000,
-        suppliesCents: 5_000,
-        withdrawalsCents: 2_500,
-        cashReceiptsCents: 37_000,
+        drawerInCents: 42_000,
+        drawerOutCents: 2_500,
         countedCents: 59_000,
       }),
       { expectedCents: 59_500, differenceCents: -500 },
+    );
+    assert.throws(
+      () => assertCashDrawerDebit(999, 1_000),
+      (error: unknown) => {
+        const response = (error as ConflictException).getResponse();
+        return typeof response === "object" && response !== null && "code" in response
+          ? response.code === "CASH_DRAWER_INSUFFICIENT"
+          : false;
+      },
+    );
+    assert.deepEqual(cashTransferLockOrder("shift-b", "shift-a"), ["shift-a", "shift-b"]);
+    assert.throws(() => cashTransferLockOrder("shift-a", "shift-a"), ConflictException);
+  });
+
+  it("conferences every expected tender and applies approval and discrepancy thresholds", () => {
+    const breakdown = cashTenderConference(
+      new Map([
+        ["cash" as const, 10_000],
+        ["pix" as const, 5_000],
+      ]),
+      [
+        { method: "cash", observedCents: 9_500, source: "manual" },
+        { method: "pix", observedCents: 5_000, source: "smartpos" },
+      ],
+    );
+    assert.deepEqual(breakdown, [
+      {
+        method: "cash",
+        expectedCents: 10_000,
+        observedCents: 9_500,
+        differenceCents: -500,
+        source: "manual",
+      },
+      {
+        method: "pix",
+        expectedCents: 5_000,
+        observedCents: 5_000,
+        differenceCents: 0,
+        source: "smartpos",
+      },
+    ]);
+    assert.equal(cashDifferenceSeverity(breakdown, 1_000), "warning");
+    assert.equal(cashDifferenceSeverity(breakdown, 500), "critical");
+    assert.equal(requiresCashApproval("cashier", 50_001, 50_000), true);
+    assert.equal(requiresCashApproval("cashier", 50_000, 50_000), false);
+    assert.equal(requiresCashApproval("manager", 90_000, 50_000), false);
+    assert.throws(
+      () =>
+        cashTenderConference(new Map([["pix", 5_000]]), [
+          { method: "cash", observedCents: 0, source: "manual" },
+        ]),
+      (error: unknown) => {
+        const response = (error as BadRequestException).getResponse();
+        return typeof response === "object" && response !== null && "code" in response
+          ? response.code === "CASH_TENDER_COUNTS_INCOMPLETE"
+          : false;
+      },
+    );
+  });
+
+  it("keeps cash export filters importable and rejects browser smartpos evidence", () => {
+    assert.deepEqual(
+      cashShiftExportQuerySchema.parse({ format: "csv", from: "2026-08-01", to: "2026-08-21" }),
+      { format: "csv", from: "2026-08-01", to: "2026-08-21" },
+    );
+    assert.equal(
+      closeCashShiftSchema.safeParse({
+        tenderCounts: [{ method: "cash", observedCents: 1_000, source: "smartpos" }],
+      }).success,
+      false,
     );
   });
 

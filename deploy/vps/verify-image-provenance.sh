@@ -205,6 +205,7 @@ try:
     lock = json.loads(pathlib.Path(lock_path).read_text(encoding="utf-8"))
     postgres_lock = lock["images"]["postgres"]
     expected_files={"deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"}
+    if role == "target": expected_files.update({"package.json","config/fiscal-release.json","scripts/check-fiscal-storage.sh","scripts/fiscal-production-smoke.sql"})
     files=value.get("releaseFiles",{}); root=pathlib.Path(release_root).resolve()
     expected_files.update(str(path.relative_to(root)).replace("\\", "/") for path in (root / "packages/db/drizzle").glob("[0-9][0-9][0-9][0-9]_*.sql"))
     files_valid=set(files)==expected_files and all((root/name).is_file() and not (root/name).is_symlink() and digest=="sha256:"+hashlib.sha256((root/name).read_bytes()).hexdigest() for name,digest in files.items())

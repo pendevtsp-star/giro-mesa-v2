@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { edgeFiscalEventSchema, focusCompanyOnboardingSchema } from "./fiscal.schemas.js";
+import {
+  edgeFiscalEventSchema,
+  focusCompanyOnboardingSchema,
+  productTaxRevisionImportSchema,
+} from "./fiscal.schemas.js";
 import {
   buildAccountingPackage,
   buildFocusCompanyInput,
   competenceBounds,
+  providerStatusPayload,
 } from "./fiscal.service.js";
-import { parseFocusCompany, parseFocusDocument } from "./focus-nfe.client.js";
+import { FocusNfeClient, parseFocusCompany, parseFocusDocument } from "./focus-nfe.client.js";
 
 describe("fiscal core", () => {
   it("uses a canonical first-day competence", () => {
@@ -65,6 +70,16 @@ describe("fiscal core", () => {
     assert.throws(() =>
       edgeFiscalEventSchema.parse({ ...event, type: "fiscal.document.reconciled" }),
     );
+  });
+
+  it("rejects duplicate products in a fiscal CSV import", () => {
+    const row = {
+      productId: "9f33ca16-47d7-4c9c-b212-8366c985b7d1",
+      status: "active" as const,
+      effectiveFrom: "2026-08-21",
+      classification: { ncm: "21069090", cfop: "5102", origin: 0 },
+    };
+    assert.equal(productTaxRevisionImportSchema.safeParse({ rows: [row, row] }).success, false);
   });
 
   it("maps the unit profile to a Focus company without exposing credentials", () => {
@@ -132,5 +147,48 @@ describe("fiscal core", () => {
     assert.equal(document.status, "authorized");
     assert.equal(document.number, 123);
     assert.equal(document.taxCents, 1234);
+  });
+
+  it("authenticates private Focus artifacts without exposing the token", async () => {
+    const originalFetch = globalThis.fetch;
+    let authorization: string | null = null;
+    globalThis.fetch = async (_input, init) => {
+      authorization = new Headers(init?.headers).get("authorization");
+      return new Response("<procInutNFe />", { status: 200 });
+    };
+    try {
+      const artifact = await new FocusNfeClient().artifact(
+        "https://api.focusnfe.com.br/xml/1",
+        "production",
+        "secret-token",
+      );
+      assert.equal(artifact.toString(), "<procInutNFe />");
+      assert.equal(authorization, `Basic ${Buffer.from("secret-token:").toString("base64")}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("returns business status without provider identifiers or credentials", () => {
+    const status = providerStatusPayload(
+      {
+        provider: "focus",
+        environment: "homologation",
+        settings: {
+          focus: {
+            companyId: "internal-company-id",
+            cnpj: "05953016000132",
+            status: "ready",
+            tokenHomologation: { encryptedSecret: "secret" },
+          },
+        },
+      },
+      true,
+      true,
+    );
+    assert.equal(status.connection?.registered, true);
+    assert.equal("provider" in status, false);
+    assert.equal("companyId" in (status.connection ?? {}), false);
+    assert.equal("tokenHomologation" in (status.connection ?? {}), false);
   });
 });

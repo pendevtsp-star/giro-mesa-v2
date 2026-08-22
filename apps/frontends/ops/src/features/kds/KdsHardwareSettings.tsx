@@ -5,6 +5,7 @@ import {
   DEFAULT_KDS_BUMP_BAR_MAP,
   type KdsBumpAction,
   type KdsBumpBarMap,
+  kdsBumpKeyLabel,
   normalizeKdsBumpKey,
 } from "./kds.bumpbar";
 
@@ -66,7 +67,7 @@ export function KdsHardwareSettings({
         </Badge>
       </header>
 
-      <fieldset className="gm-form-grid">
+      <fieldset className="gm-form-grid kds-printer-settings">
         <legend>Impressora térmica</legend>
         <label className="gm-form-field">
           <span>Identificador no Edge</span>
@@ -74,9 +75,13 @@ export function KdsHardwareSettings({
             className="gm-form-control"
             maxLength={80}
             onChange={(event) =>
-              onPrinterPreferencesChange({ ...printerPreferences, printerId: event.target.value })
+              onPrinterPreferencesChange({
+                ...printerPreferences,
+                printerId: event.target.value || "default",
+              })
             }
-            value={printerPreferences.printerId}
+            placeholder="Padrão"
+            value={printerPreferences.printerId === "default" ? "" : printerPreferences.printerId}
           />
         </label>
         <label className="gm-form-field">
@@ -117,7 +122,7 @@ export function KdsHardwareSettings({
                 }
               }}
               readOnly
-              value={key}
+              value={kdsBumpKeyLabel(key)}
             />
           </label>
         ))}

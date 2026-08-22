@@ -70,11 +70,10 @@
     align-items: end;
     display: grid;
     gap: var(--gm-space-3);
-    grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) auto;
+    grid-template-columns: minmax(280px, 1fr) 12rem auto;
     padding: var(--gm-space-3);
   }
 
-  .arrival-bar > label:not(.search-field),
   .seat-guest-form label {
     display: grid;
     font-size: 0.72rem;
@@ -86,6 +85,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--gm-space-2);
+    justify-content: flex-end;
   }
 
   .reservations-card .data-row > div:first-child {
@@ -182,15 +182,30 @@
     margin: 0;
   }
 
+  @media (max-width: 900px) {
+    .arrival-bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .arrival-bar > .gm-form-field:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+
   @media (max-width: 640px) {
     .arrival-bar {
       align-items: stretch;
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .arrival-bar > .gm-form-field:first-child {
+      grid-column: auto;
+    }
+
     .arrival-bar__actions {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      justify-content: stretch;
     }
 
     .arrival-bar__actions .gm-button {

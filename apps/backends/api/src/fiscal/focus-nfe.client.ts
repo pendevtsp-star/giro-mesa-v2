@@ -57,8 +57,17 @@ export interface FocusDocumentResult {
   number: number | null;
   series: string | null;
   taxCents: number | null;
+  itemTaxCents: number[];
   xmlUrl: string | null;
   pdfUrl: string | null;
+  code: string | null;
+  message: string | null;
+}
+
+export interface FocusInvalidationResult {
+  status: "invalidated" | "rejected";
+  reference: string | null;
+  xmlUrl: string | null;
   code: string | null;
   message: string | null;
 }
@@ -149,6 +158,122 @@ export class FocusNfeClient {
         body: { justificativa: justification },
       }),
     );
+  }
+
+  async invalidateNfce(
+    input: {
+      cnpj: string;
+      series: string;
+      initialNumber: number;
+      finalNumber: number;
+      justification: string;
+    },
+    environment: FocusEnvironment,
+    token: string,
+  ): Promise<FocusInvalidationResult> {
+    const value = record(
+      await this.request("/v2/nfce/inutilizacao", {
+        baseUrl: environment === "production" ? MANAGEMENT_BASE_URL : HOMOLOGATION_BASE_URL,
+        method: "POST",
+        token,
+        body: {
+          cnpj: input.cnpj,
+          serie: input.series,
+          numero_inicial: String(input.initialNumber),
+          numero_final: String(input.finalNumber),
+          justificativa: input.justification,
+        },
+      }),
+    );
+    const rawStatus = (
+      optionalText(value.status) ??
+      optionalText(value.codigo) ??
+      ""
+    ).toLowerCase();
+    return {
+      status:
+        rawStatus.includes("autoriz") || rawStatus.includes("inutil") || rawStatus === "102"
+          ? "invalidated"
+          : "rejected",
+      reference: optionalText(value.id) ?? optionalText(value.protocolo),
+      xmlUrl: optionalText(value.caminho_xml) ?? optionalText(value.caminho_xml_inutilizacao),
+      code: optionalText(value.codigo),
+      message: optionalText(value.mensagem),
+    };
+  }
+
+  async findNfceInvalidation(
+    input: { cnpj: string; series: string; initialNumber: number; finalNumber: number },
+    environment: FocusEnvironment,
+    token: string,
+  ): Promise<FocusInvalidationResult | null> {
+    const query = new URLSearchParams({
+      cnpj: input.cnpj,
+      numero_inicial: String(input.initialNumber),
+      numero_final: String(input.finalNumber),
+    });
+    const payload = await this.request(`/v2/nfce/inutilizacoes?${query}`, {
+      baseUrl: environment === "production" ? MANAGEMENT_BASE_URL : HOMOLOGATION_BASE_URL,
+      token,
+    });
+    const container = recordOrEmpty(payload);
+    const rows = Array.isArray(payload)
+      ? payload
+      : Array.isArray(container.inutilizacoes)
+        ? container.inutilizacoes
+        : [];
+    const match = rows.map(recordOrEmpty).find((row) => {
+      const series = optionalText(row.serie);
+      const initial = Number(row.numero_inicial);
+      const final = Number(row.numero_final);
+      return (
+        series === input.series && initial === input.initialNumber && final === input.finalNumber
+      );
+    });
+    if (!match) return null;
+    return {
+      status: "invalidated",
+      reference: optionalText(match.id) ?? optionalText(match.protocolo),
+      xmlUrl: optionalText(match.caminho_xml) ?? optionalText(match.caminho_xml_inutilizacao),
+      code: optionalText(match.codigo),
+      message: optionalText(match.mensagem),
+    };
+  }
+
+  async artifact(url: string, environment: FocusEnvironment, token: string) {
+    const baseUrl = environment === "production" ? MANAGEMENT_BASE_URL : HOMOLOGATION_BASE_URL;
+    let parsed: URL;
+    try {
+      parsed = new URL(url, baseUrl);
+    } catch {
+      throw new FocusNfeError(400, "FOCUS_ARTIFACT_URL_INVALID", "URL fiscal inválida.");
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      !["api.focusnfe.com.br", "homologacao.focusnfe.com.br"].includes(parsed.hostname)
+    ) {
+      throw new FocusNfeError(400, "FOCUS_ARTIFACT_URL_INVALID", "URL fiscal inválida.");
+    }
+    let response: Response;
+    try {
+      response = await fetch(parsed, {
+        headers: { authorization: `Basic ${Buffer.from(`${token}:`).toString("base64")}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      throw new FocusNfeError(503, "FOCUS_UNAVAILABLE", "Artefato fiscal indisponível.");
+    }
+    if (!response.ok)
+      throw new FocusNfeError(
+        response.status,
+        "FOCUS_ARTIFACT_UNAVAILABLE",
+        "Artefato fiscal indisponível.",
+      );
+    const content = Buffer.from(await response.arrayBuffer());
+    if (content.length === 0 || content.length > 15 * 1024 * 1024)
+      throw new FocusNfeError(502, "FOCUS_RESPONSE_TOO_LARGE", "Artefato fiscal inválido.");
+    return content;
   }
 
   private primaryToken() {
@@ -259,12 +384,21 @@ export function parseFocusDocument(value: unknown): FocusDocumentResult {
         : rawStatus.includes("conting")
           ? "contingency"
           : "rejected";
+  const requested = recordOrEmpty(document.requisicao_nota_fiscal);
+  const items = Array.isArray(document.items)
+    ? document.items
+    : Array.isArray(requested.items)
+      ? requested.items
+      : [];
   return {
     status,
     accessKey: optionalText(document.chave_nfe),
     number: optionalInteger(document.numero),
     series: optionalText(document.serie),
     taxCents: decimalToCents(document.valor_total_tributos),
+    itemTaxCents: items.map(
+      (item) => decimalToCents(recordOrEmpty(item).valor_total_tributos) ?? 0,
+    ),
     xmlUrl:
       optionalText(document.caminho_xml_nota_fiscal) ??
       optionalText(document.caminho_xml_cancelamento),
@@ -303,6 +437,12 @@ function record(value: unknown): Record<string, unknown> {
     );
   }
   return value as Record<string, unknown>;
+}
+
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function requiredText(value: unknown) {

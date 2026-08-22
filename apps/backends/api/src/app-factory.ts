@@ -13,7 +13,7 @@ import { AuthService } from "./auth/auth.service.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
-import { requestRateLimit } from "./common/rate-limit.js";
+import { requestRateLimit, requestRateLimitKey } from "./common/rate-limit.js";
 import { DatabaseReadinessService, MetricsService } from "./health/health.module.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
@@ -34,8 +34,14 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(rateLimit, {
     max: (request) => requestRateLimit(request.method, request.url).max,
-    keyGenerator: (request) =>
-      `${request.ip}:${requestRateLimit(request.method, request.url).bucket}`,
+    keyGenerator: (request) => {
+      const bucket = requestRateLimit(request.method, request.url).bucket;
+      return requestRateLimitKey(
+        bucket,
+        request.ip,
+        request.cookies[SESSION_COOKIE_NAME] ?? request.headers.authorization,
+      );
+    },
     timeWindow: "1 minute",
   });
   await app.register(websocket, { options: { maxPayload: 16_384 } });

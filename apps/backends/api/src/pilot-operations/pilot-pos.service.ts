@@ -1,14 +1,22 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { OperationalCapability } from "@giromesa/contracts";
+import type { OperationalCapability, PaymentAttemptStatus } from "@giromesa/contracts";
 import {
   auditEvents,
   type Database,
+  deviceEnrollments,
+  fiscalDocuments,
   identities,
+  managementCashAdjustments,
+  managementCashEntries,
+  managementCashRegisters,
+  managementCashRegisterTerminals,
+  managementCashShifts,
   managementOperationalLosses,
   managementSettlementSettings,
   memberships,
   organizations,
   outboxEvents,
+  posCatalogBranding,
   posCatalogPromotions,
   posDiningRooms,
   posDiningTableGroupMembers,
@@ -30,6 +38,12 @@ import {
   posOrderItemModifiers,
   posOrderItems,
   posOrders,
+  posPaymentAttemptResults,
+  posPaymentAttempts,
+  posPaymentReconciliations,
+  posPaymentReversalResults,
+  posPaymentReversals,
+  posPaymentTerminalCertifications,
   posPrintJobs,
   posProductAvailability,
   posProductionStations,
@@ -69,12 +83,14 @@ import {
 import * as argon2 from "argon2";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { resolveEstablishmentName } from "../organizations/establishment-settings.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { bestPromotion, localCalendar } from "../public-menu/public-order-rules.js";
 import {
   approvalExpiresAt,
   assertKdsOrderHandoff,
   assertKdsTransition,
+  assertPaymentDeviceTransition,
   assertPrintJobTransition,
   assertTabCanClose,
   assertTenantScope,
@@ -86,6 +102,7 @@ import {
   kdsCapacityRecommendation,
   kdsPartialState,
   normalizeKdsAttentionText,
+  paymentAttemptExpiresAt,
   projectKdsAvailability,
   replayResult,
   requestHash,
@@ -131,7 +148,11 @@ import type {
   OpenOperationalShiftInput,
   OpenTabInput,
   OrderInput,
+  PaymentAttemptCreateInput,
+  PaymentDeviceResultInput,
   PaymentInput,
+  PaymentReversalCreateInput,
+  PaymentTerminalConfigurationInput,
   PrintJobInput,
   PrintJobQueryInput,
   PrintJobStatusInput,
@@ -157,19 +178,294 @@ import type {
   UpdateTabInput,
 } from "./pilot-schemas.js";
 import { pointInsideFloorPolygon } from "./pilot-schemas.js";
+import { PilotSmartPosService } from "./pilot-smartpos.service.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
+export type PaymentDeviceSignature = {
+  credentialId?: string;
+  timestamp?: string;
+  nonce?: string;
+  signature?: string;
+  method: string;
+  path: string;
+  body?: unknown;
+};
 
 @Injectable()
 export class PilotPosService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    private readonly smartPos: PilotSmartPosService = new PilotSmartPosService(database, scope),
   ) {}
 
   private async requireAccess(identityId: string, organizationId: string, unitId: string) {
     return this.scope.requireUnitAccess(identityId, organizationId, unitId);
+  }
+
+  private async createPosPayment(
+    tx: Transaction,
+    input: typeof posTabPayments.$inferInsert,
+    routing: { cashRegisterId?: string; installationId?: string } = {},
+  ) {
+    if (routing.cashRegisterId && !routing.installationId) {
+      const [cashRegister] = await tx
+        .select({ id: managementCashRegisters.id })
+        .from(managementCashRegisters)
+        .where(
+          and(
+            eq(managementCashRegisters.organizationId, input.organizationId),
+            eq(managementCashRegisters.unitId, input.unitId),
+            eq(managementCashRegisters.id, routing.cashRegisterId),
+            eq(managementCashRegisters.active, true),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!cashRegister) {
+        throw new ConflictException({
+          code: "CASH_REGISTER_NOT_FOUND",
+          message: "A gaveta informada não está ativa nesta unidade.",
+        });
+      }
+    }
+    let cashRegisterId = routing.installationId ? undefined : routing.cashRegisterId;
+    if (routing.installationId) {
+      const [binding] = await tx
+        .select({ cashRegisterId: managementCashRegisterTerminals.cashRegisterId })
+        .from(managementCashRegisterTerminals)
+        .where(
+          and(
+            eq(managementCashRegisterTerminals.organizationId, input.organizationId),
+            eq(managementCashRegisterTerminals.unitId, input.unitId),
+            eq(managementCashRegisterTerminals.installationId, routing.installationId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      cashRegisterId = binding?.cashRegisterId;
+    }
+    let cashShift: { id: string } | undefined;
+    if (cashRegisterId) {
+      [cashShift] = await tx
+        .select({ id: managementCashShifts.id })
+        .from(managementCashShifts)
+        .where(
+          and(
+            eq(managementCashShifts.organizationId, input.organizationId),
+            eq(managementCashShifts.unitId, input.unitId),
+            eq(managementCashShifts.cashRegisterId, cashRegisterId),
+            eq(managementCashShifts.status, "open"),
+          ),
+        )
+        .for("update")
+        .limit(1);
+    } else {
+      const openShifts = await tx
+        .select({ id: managementCashShifts.id })
+        .from(managementCashShifts)
+        .where(
+          and(
+            eq(managementCashShifts.organizationId, input.organizationId),
+            eq(managementCashShifts.unitId, input.unitId),
+            eq(managementCashShifts.status, "open"),
+          ),
+        )
+        .orderBy(asc(managementCashShifts.id))
+        .for("update")
+        .limit(2);
+      if (openShifts.length > 1) {
+        throw new ConflictException({
+          code: routing.installationId
+            ? "CASH_REGISTER_BINDING_REQUIRED"
+            : "CASH_REGISTER_REQUIRED",
+          message: routing.installationId
+            ? "Vincule o terminal a uma gaveta antes de receber pagamentos."
+            : "Informe a gaveta que deve receber o pagamento.",
+        });
+      }
+      [cashShift] = openShifts;
+    }
+    if (!cashShift && input.method === "cash") {
+      throw new ConflictException({
+        code: "CASH_SHIFT_REQUIRED",
+        message: "Abra o caixa da unidade antes de registrar um pagamento em dinheiro.",
+      });
+    }
+    const [payment] = await tx.insert(posTabPayments).values(input).returning();
+    if (!payment) throw new Error("Payment insert did not return a row");
+    if (cashShift) {
+      await tx.insert(managementCashEntries).values({
+        organizationId: payment.organizationId,
+        unitId: payment.unitId,
+        cashShiftId: cashShift.id,
+        direction: "in",
+        entryType: "pos_payment",
+        paymentMethod: payment.method,
+        affectsDrawer: payment.method === "cash",
+        amountCents: payment.amountCents,
+        sourceType: "pos_tab_payment",
+        sourceId: payment.id,
+        actorIdentityId: payment.createdByIdentityId,
+        occurredAt: payment.createdAt,
+      });
+    }
+    return payment;
+  }
+
+  private async recordApprovedPaymentReversalAccounting(
+    tx: Transaction,
+    input: {
+      organizationId: string;
+      unitId: string;
+      reversalId: string;
+      paymentId: string;
+      installationId: string;
+      actorIdentityId: string;
+      paymentMethod: typeof posTabPayments.$inferSelect.method;
+      amountCents: number;
+      occurredAt: Date;
+    },
+  ) {
+    const [originalEntry] = await tx
+      .select({
+        cashShiftId: managementCashEntries.cashShiftId,
+        paymentMethod: managementCashEntries.paymentMethod,
+        affectsDrawer: managementCashEntries.affectsDrawer,
+      })
+      .from(managementCashEntries)
+      .where(
+        and(
+          eq(managementCashEntries.organizationId, input.organizationId),
+          eq(managementCashEntries.unitId, input.unitId),
+          eq(managementCashEntries.sourceType, "pos_tab_payment"),
+          eq(managementCashEntries.sourceId, input.paymentId),
+        ),
+      )
+      .limit(1);
+
+    const [originalShift] = originalEntry
+      ? await tx
+          .select({
+            id: managementCashShifts.id,
+            cashRegisterId: managementCashShifts.cashRegisterId,
+            status: managementCashShifts.status,
+          })
+          .from(managementCashShifts)
+          .where(
+            and(
+              eq(managementCashShifts.organizationId, input.organizationId),
+              eq(managementCashShifts.unitId, input.unitId),
+              eq(managementCashShifts.id, originalEntry.cashShiftId),
+            ),
+          )
+          .for("update")
+          .limit(1)
+      : [];
+    const paymentMethod = originalEntry?.paymentMethod ?? input.paymentMethod;
+    const affectsDrawer = originalEntry?.affectsDrawer ?? input.paymentMethod === "cash";
+
+    if (originalShift?.status === "open") {
+      const [inserted] = await tx
+        .insert(managementCashEntries)
+        .values({
+          organizationId: input.organizationId,
+          unitId: input.unitId,
+          cashShiftId: originalShift.id,
+          direction: "out",
+          entryType: "reversal",
+          paymentMethod,
+          affectsDrawer,
+          amountCents: input.amountCents,
+          sourceType: "payment_reversal",
+          sourceId: input.reversalId,
+          actorIdentityId: input.actorIdentityId,
+          description: "Estorno aprovado de pagamento POS.",
+          occurredAt: input.occurredAt,
+        })
+        .onConflictDoNothing()
+        .returning({ id: managementCashEntries.id });
+      const [existing] = inserted
+        ? [inserted]
+        : await tx
+            .select({ id: managementCashEntries.id })
+            .from(managementCashEntries)
+            .where(
+              and(
+                eq(managementCashEntries.organizationId, input.organizationId),
+                eq(managementCashEntries.unitId, input.unitId),
+                eq(managementCashEntries.sourceType, "payment_reversal"),
+                eq(managementCashEntries.sourceId, input.reversalId),
+              ),
+            )
+            .limit(1);
+      return {
+        cashEntryId: existing?.id ?? null,
+        cashAdjustmentId: null,
+        cashRegisterId: originalShift.cashRegisterId,
+        originalCashShiftId: originalShift.id,
+      };
+    }
+
+    let cashRegisterId = originalShift?.cashRegisterId ?? null;
+    if (!cashRegisterId) {
+      const [binding] = await tx
+        .select({ cashRegisterId: managementCashRegisterTerminals.cashRegisterId })
+        .from(managementCashRegisterTerminals)
+        .where(
+          and(
+            eq(managementCashRegisterTerminals.organizationId, input.organizationId),
+            eq(managementCashRegisterTerminals.unitId, input.unitId),
+            eq(managementCashRegisterTerminals.installationId, input.installationId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      cashRegisterId = binding?.cashRegisterId ?? null;
+    }
+    const [inserted] = await tx
+      .insert(managementCashAdjustments)
+      .values({
+        organizationId: input.organizationId,
+        unitId: input.unitId,
+        cashRegisterId,
+        originalCashShiftId: originalShift?.id ?? null,
+        direction: "out",
+        entryType: "reversal",
+        paymentMethod,
+        affectsDrawer,
+        amountCents: input.amountCents,
+        sourceType: "payment_reversal",
+        sourceId: input.reversalId,
+        actorIdentityId: input.actorIdentityId,
+        description: originalShift
+          ? "Estorno aprovado após o fechamento do turno de caixa."
+          : "Estorno aprovado sem lançamento em turno de caixa.",
+        occurredAt: input.occurredAt,
+      })
+      .onConflictDoNothing()
+      .returning({ id: managementCashAdjustments.id });
+    const [existing] = inserted
+      ? [inserted]
+      : await tx
+          .select({ id: managementCashAdjustments.id })
+          .from(managementCashAdjustments)
+          .where(
+            and(
+              eq(managementCashAdjustments.organizationId, input.organizationId),
+              eq(managementCashAdjustments.unitId, input.unitId),
+              eq(managementCashAdjustments.sourceType, "payment_reversal"),
+              eq(managementCashAdjustments.sourceId, input.reversalId),
+            ),
+          )
+          .limit(1);
+    return {
+      cashEntryId: null,
+      cashAdjustmentId: existing?.id ?? null,
+      cashRegisterId,
+      originalCashShiftId: originalShift?.id ?? null,
+    };
   }
 
   private async requireScopedRole(
@@ -2246,10 +2542,24 @@ export class PilotPosService {
                 inArray(posOrderItemModifiers.orderItemId, itemIds),
               ),
             );
-    const [payments, events, presence] = await Promise.all([
+    const [paymentRows, events, presence] = await Promise.all([
       this.database.db
-        .select()
+        .select({
+          payment: posTabPayments,
+          reversedCents: sql<number>`coalesce(${posPaymentReversals.amountCents}, 0)`.mapWith(
+            Number,
+          ),
+        })
         .from(posTabPayments)
+        .leftJoin(
+          posPaymentReversals,
+          and(
+            eq(posPaymentReversals.organizationId, posTabPayments.organizationId),
+            eq(posPaymentReversals.unitId, posTabPayments.unitId),
+            eq(posPaymentReversals.paymentId, posTabPayments.id),
+            eq(posPaymentReversals.status, "approved"),
+          ),
+        )
         .where(
           and(
             eq(posTabPayments.organizationId, organizationId),
@@ -2290,7 +2600,28 @@ export class PilotPosService {
           ),
         ),
     ]);
-    return { tab, orders, items, modifiers, payments, events, presence };
+    const payments = paymentRows.map(({ payment, reversedCents }) => ({
+      ...payment,
+      reversedCents,
+      netAmountCents: payment.amountCents - reversedCents,
+      financialStatus: reversedCents > 0 ? ("reversed" as const) : ("posted" as const),
+    }));
+    const grossPaidCents = payments.reduce((total, payment) => total + payment.amountCents, 0);
+    const reversedCents = payments.reduce((total, payment) => total + payment.reversedCents, 0);
+    return {
+      tab,
+      orders,
+      items,
+      modifiers,
+      payments,
+      paymentSummary: {
+        grossPaidCents,
+        reversedCents,
+        paidCents: grossPaidCents - reversedCents,
+      },
+      events,
+      presence,
+    };
   }
 
   async openTab(
@@ -3093,6 +3424,1472 @@ export class PilotPosService {
     );
   }
 
+  private paymentAttemptView(attempt: typeof posPaymentAttempts.$inferSelect) {
+    return {
+      id: attempt.id,
+      tabId: attempt.tabId,
+      installationId: attempt.installationId,
+      provider: attempt.provider,
+      method: attempt.method,
+      amountCents: attempt.amountCents,
+      installments: attempt.installments,
+      status: attempt.status,
+      providerReference: attempt.providerReference,
+      failureCode: attempt.failureCode,
+      failureMessage: attempt.failureMessage,
+      expiresAt: attempt.expiresAt,
+      processingAt: attempt.processingAt,
+      resolvedAt: attempt.resolvedAt,
+      createdAt: attempt.createdAt,
+      updatedAt: attempt.updatedAt,
+    };
+  }
+
+  private paymentReversalView(reversal: typeof posPaymentReversals.$inferSelect) {
+    return {
+      id: reversal.id,
+      paymentId: reversal.paymentId,
+      installationId: reversal.installationId,
+      amountCents: reversal.amountCents,
+      reason: reversal.reason,
+      status: reversal.status,
+      providerReference: reversal.providerReference,
+      failureCode: reversal.failureCode,
+      resolvedAt: reversal.resolvedAt,
+      createdAt: reversal.createdAt,
+      updatedAt: reversal.updatedAt,
+    };
+  }
+
+  private async lockTabPaymentState(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${tabId}`}))`,
+    );
+    const [paymentTotals, reversalTotals, reservationTotals, lossTotals] = await Promise.all([
+      tx
+        .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)` })
+        .from(posTabPayments)
+        .where(
+          and(
+            eq(posTabPayments.organizationId, organizationId),
+            eq(posTabPayments.unitId, unitId),
+            eq(posTabPayments.tabId, tabId),
+          ),
+        ),
+      tx
+        .select({
+          reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`,
+        })
+        .from(posPaymentReversals)
+        .innerJoin(posTabPayments, eq(posTabPayments.id, posPaymentReversals.paymentId))
+        .where(
+          and(
+            eq(posPaymentReversals.organizationId, organizationId),
+            eq(posPaymentReversals.unitId, unitId),
+            eq(posPaymentReversals.status, "approved"),
+            eq(posTabPayments.tabId, tabId),
+          ),
+        ),
+      tx
+        .select({
+          reservedCents: sql<number>`coalesce(sum(${posPaymentAttempts.amountCents}) filter (where ${posPaymentAttempts.status} in ('processing', 'unknown') or (${posPaymentAttempts.status} = 'created' and ${posPaymentAttempts.expiresAt} > now())), 0)`,
+        })
+        .from(posPaymentAttempts)
+        .where(
+          and(
+            eq(posPaymentAttempts.organizationId, organizationId),
+            eq(posPaymentAttempts.unitId, unitId),
+            eq(posPaymentAttempts.tabId, tabId),
+          ),
+        ),
+      tx
+        .select({
+          coveredLossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}) filter (where ${managementOperationalLosses.status} = 'approved' and ${managementOperationalLosses.type} = 'unpaid_tab'), 0)`,
+        })
+        .from(managementOperationalLosses)
+        .where(
+          and(
+            eq(managementOperationalLosses.organizationId, organizationId),
+            eq(managementOperationalLosses.unitId, unitId),
+            eq(managementOperationalLosses.tabId, tabId),
+          ),
+        ),
+    ]);
+    return {
+      paidCents:
+        Number(paymentTotals[0]?.paidCents ?? 0) - Number(reversalTotals[0]?.reversedCents ?? 0),
+      reservedCents: Number(reservationTotals[0]?.reservedCents ?? 0),
+      coveredLossCents: Number(lossTotals[0]?.coveredLossCents ?? 0),
+    };
+  }
+
+  private assertTabPaymentFloor(
+    totalCents: number,
+    state: { paidCents: number; reservedCents: number; coveredLossCents: number },
+  ) {
+    const committedCents = state.paidCents + state.reservedCents + state.coveredLossCents;
+    if (totalCents < committedCents) {
+      throw new ConflictException({
+        code: "TAB_TOTAL_BELOW_COMMITTED_PAYMENTS",
+        message: "O novo total não pode ficar abaixo de pagamentos e cobranças reservadas.",
+        paidCents: state.paidCents,
+        reservedCents: state.reservedCents,
+        coveredLossCents: state.coveredLossCents,
+        minimumTotalCents: committedCents,
+      });
+    }
+  }
+
+  private paymentCapability(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    return this.smartPos.paymentCapability(tx, organizationId, unitId, installationId);
+  }
+  async getPaymentCapabilities(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, SYSTEM_ROLES);
+    return this.database.db.transaction((tx) =>
+      this.paymentCapability(tx, organizationId, unitId, installationId),
+    );
+  }
+
+  async configurePaymentTerminal(
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+    input: PaymentTerminalConfigurationInput,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      await this.smartPos.lockPaymentInstallation(tx, organizationId, unitId, installationId);
+      const [device] = await tx
+        .select({ id: deviceEnrollments.id })
+        .from(deviceEnrollments)
+        .where(
+          and(
+            eq(deviceEnrollments.organizationId, organizationId),
+            eq(deviceEnrollments.unitId, unitId),
+            eq(deviceEnrollments.id, installationId),
+            isNull(deviceEnrollments.revokedAt),
+          ),
+        )
+        .limit(1);
+      if (!device) throw new NotFoundException({ code: "PAYMENT_DEVICE_NOT_ENROLLED" });
+      const [certification] = input.certificationId
+        ? await tx
+            .select()
+            .from(posPaymentTerminalCertifications)
+            .where(
+              and(
+                eq(posPaymentTerminalCertifications.organizationId, organizationId),
+                eq(posPaymentTerminalCertifications.unitId, unitId),
+                eq(posPaymentTerminalCertifications.id, input.certificationId),
+              ),
+            )
+            .limit(1)
+        : [];
+      if (input.status === "homologated") {
+        if (!certification || certification.provider !== input.provider) {
+          throw new BadRequestException({ code: "PAYMENT_CERTIFICATION_INVALID" });
+        }
+        const certifiedMethods = new Set(certification.methods);
+        if (
+          certification.status !== "approved" ||
+          certification.killSwitchEnabled ||
+          input.methods.some((method) => !certifiedMethods.has(method)) ||
+          input.maxInstallments > certification.maxInstallments ||
+          (input.supports.cancel && !certification.supportsCancel) ||
+          (input.supports.recover && !certification.supportsRecover) ||
+          (input.supports.reversal && !certification.supportsReversal)
+        ) {
+          throw new BadRequestException({ code: "PAYMENT_CONFIGURATION_EXCEEDS_CERTIFICATION" });
+        }
+      }
+      const [profile] = await tx
+        .update(posTerminalProfiles)
+        .set({
+          paymentProvider: input.provider,
+          paymentStatus: input.status,
+          paymentCertificationId: input.certificationId,
+          paymentMethods: input.methods,
+          maxPaymentInstallments: input.maxInstallments,
+          paymentSupportsCancel: input.supports.cancel,
+          paymentSupportsRecover: input.supports.recover,
+          paymentSupportsReversal: input.supports.reversal,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(posTerminalProfiles.organizationId, organizationId),
+            eq(posTerminalProfiles.unitId, unitId),
+            eq(posTerminalProfiles.installationId, installationId),
+          ),
+        )
+        .returning({ installationId: posTerminalProfiles.installationId });
+      if (!profile) throw new NotFoundException({ code: "TERMINAL_PROFILE_NOT_FOUND" });
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        action: "pos.payment_terminal_configured",
+        entityType: "payment_terminal",
+        entityId: installationId,
+        metadata: input,
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.payment_terminal_configured",
+        aggregateType: "payment_terminal",
+        aggregateId: installationId,
+        payload: { organizationId, unitId, installationId, ...input },
+      });
+      return this.paymentCapability(tx, organizationId, unitId, installationId);
+    });
+  }
+
+  async createPaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    idempotencyKey: string,
+    input: PaymentAttemptCreateInput,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:payments:record",
+    );
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "payment-attempt.create",
+      { tabId, ...input },
+      async (tx) => {
+        await this.smartPos.lockPaymentInstallation(
+          tx,
+          organizationId,
+          unitId,
+          input.installationId,
+        );
+        const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
+        const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        const capability = await this.paymentCapability(
+          tx,
+          organizationId,
+          unitId,
+          input.installationId,
+        );
+        if (!capability.available || !capability.provider) {
+          throw new ConflictException({
+            code: capability.reason ?? "PAYMENT_TERMINAL_UNAVAILABLE",
+            message: "Este terminal não está homologado para pagamento integrado.",
+          });
+        }
+        if (!capability.methods.includes(input.method)) {
+          throw new ConflictException({
+            code: "PAYMENT_METHOD_UNAVAILABLE",
+            message: "Método indisponível neste terminal.",
+          });
+        }
+        if (input.installments > capability.maxInstallments) {
+          throw new ConflictException({
+            code: "PAYMENT_INSTALLMENTS_UNAVAILABLE",
+            message: "Parcelamento indisponível neste terminal.",
+            maxInstallments: capability.maxInstallments,
+          });
+        }
+        const remainingCents =
+          tab.totalCents -
+          paymentState.paidCents -
+          paymentState.reservedCents -
+          paymentState.coveredLossCents;
+        if (input.amountCents > remainingCents) {
+          throw new ConflictException({
+            code: "TAB_PAYMENT_AMOUNT_UNAVAILABLE",
+            message: "O valor excede o saldo livre da comanda.",
+            remainingCents: Math.max(0, remainingCents),
+          });
+        }
+        const now = new Date();
+        const [attempt] = await tx
+          .insert(posPaymentAttempts)
+          .values({
+            organizationId,
+            unitId,
+            tabId,
+            installationId: input.installationId,
+            requestedByIdentityId: identityId,
+            provider: capability.provider,
+            method: input.method,
+            amountCents: input.amountCents,
+            installments: input.installments,
+            expiresAt: paymentAttemptExpiresAt(now),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!attempt) throw new Error("Payment attempt insert did not return a row");
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          tabId,
+          "payment.attempt_created",
+          {
+            attemptId: attempt.id,
+            installationId: attempt.installationId,
+            provider: attempt.provider,
+            method: attempt.method,
+            amountCents: attempt.amountCents,
+          },
+          { entityType: "payment_attempt", entityId: attempt.id },
+        );
+        return {
+          attempt: this.paymentAttemptView(attempt),
+          action: { type: "start", attemptId: attempt.id, provider: attempt.provider },
+        };
+      },
+    );
+  }
+
+  async getPaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:payments:record",
+    );
+    const [attempt] = await this.database.db
+      .select()
+      .from(posPaymentAttempts)
+      .where(
+        and(
+          eq(posPaymentAttempts.organizationId, organizationId),
+          eq(posPaymentAttempts.unitId, unitId),
+          eq(posPaymentAttempts.id, attemptId),
+        ),
+      )
+      .limit(1);
+    if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+    return { attempt: this.paymentAttemptView(attempt) };
+  }
+
+  async recoverPaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:payments:record",
+    );
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "payment-attempt.recover",
+      { attemptId },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-attempt:${attemptId}`}))`,
+        );
+        const [attempt] = await tx
+          .select()
+          .from(posPaymentAttempts)
+          .where(
+            and(
+              eq(posPaymentAttempts.organizationId, organizationId),
+              eq(posPaymentAttempts.unitId, unitId),
+              eq(posPaymentAttempts.id, attemptId),
+            ),
+          )
+          .limit(1);
+        if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+        if (["approved", "declined", "canceled", "reversed"].includes(attempt.status)) {
+          return { attempt: this.paymentAttemptView(attempt), action: null };
+        }
+        if (attempt.status === "created") {
+          const now = new Date();
+          if (attempt.expiresAt > now) {
+            throw new ConflictException({
+              code: "PAYMENT_ATTEMPT_NOT_STARTED",
+              message: "Inicie a cobrança antes de solicitar recuperação.",
+            });
+          }
+          const [expired] = await tx
+            .update(posPaymentAttempts)
+            .set({
+              status: "canceled",
+              failureCode: "PAYMENT_ATTEMPT_EXPIRED",
+              failureMessage: "A tentativa expirou antes de abrir o provedor.",
+              resolvedAt: now,
+              updatedAt: now,
+            })
+            .where(eq(posPaymentAttempts.id, attempt.id))
+            .returning();
+          if (!expired) throw new Error("Expired payment attempt update did not return a row");
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            attempt.tabId,
+            "payment.attempt_expired",
+            { attemptId, installationId: attempt.installationId },
+            { entityType: "payment_attempt", entityId: attemptId },
+          );
+          return { attempt: this.paymentAttemptView(expired), action: null };
+        }
+        const capability = await this.paymentCapability(
+          tx,
+          organizationId,
+          unitId,
+          attempt.installationId,
+        );
+        if (!capability.available || !capability.supports.recover) {
+          throw new ConflictException({
+            code: "PAYMENT_RECOVERY_UNAVAILABLE",
+            message: "A recuperação não está disponível neste terminal.",
+          });
+        }
+        const now = new Date();
+        const [updated] = await tx
+          .update(posPaymentAttempts)
+          .set({
+            status: "processing",
+            processingAt: attempt.processingAt ?? now,
+            recoveryRequestedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(posPaymentAttempts.id, attempt.id))
+          .returning();
+        if (!updated) throw new Error("Payment attempt recovery did not return a row");
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          attempt.tabId,
+          "payment.recovery_requested",
+          { attemptId, installationId: attempt.installationId },
+          { entityType: "payment_attempt", entityId: attemptId },
+        );
+        return {
+          attempt: this.paymentAttemptView(updated),
+          action: { type: "recover", attemptId, provider: attempt.provider },
+        };
+      },
+    );
+  }
+
+  async cancelPaymentAttempt(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attemptId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:payments:record",
+    );
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "payment-attempt.cancel",
+      { attemptId },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-attempt:${attemptId}`}))`,
+        );
+        const [attempt] = await tx
+          .select()
+          .from(posPaymentAttempts)
+          .where(
+            and(
+              eq(posPaymentAttempts.organizationId, organizationId),
+              eq(posPaymentAttempts.unitId, unitId),
+              eq(posPaymentAttempts.id, attemptId),
+            ),
+          )
+          .limit(1);
+        if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+        if (["approved", "declined", "canceled", "reversed"].includes(attempt.status)) {
+          return { attempt: this.paymentAttemptView(attempt), action: null };
+        }
+        if (attempt.status === "unknown") {
+          throw new ConflictException({
+            code: "PAYMENT_RECOVERY_REQUIRED",
+            message: "Verifique o resultado antes de cancelar uma cobrança incerta.",
+          });
+        }
+        const now = new Date();
+        if (attempt.status === "created") {
+          const [canceled] = await tx
+            .update(posPaymentAttempts)
+            .set({ status: "canceled", cancelRequestedAt: now, resolvedAt: now, updatedAt: now })
+            .where(eq(posPaymentAttempts.id, attempt.id))
+            .returning();
+          if (!canceled) throw new Error("Payment attempt cancel did not return a row");
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            attempt.tabId,
+            "payment.attempt_canceled",
+            { attemptId },
+            { entityType: "payment_attempt", entityId: attemptId },
+          );
+          return { attempt: this.paymentAttemptView(canceled), action: null };
+        }
+        const capability = await this.paymentCapability(
+          tx,
+          organizationId,
+          unitId,
+          attempt.installationId,
+        );
+        if (!capability.available || !capability.supports.cancel) {
+          throw new ConflictException({
+            code: "PAYMENT_CANCEL_UNAVAILABLE",
+            message: "Cancelamento indisponível neste terminal.",
+          });
+        }
+        const [updated] = await tx
+          .update(posPaymentAttempts)
+          .set({ cancelRequestedAt: now, updatedAt: now })
+          .where(eq(posPaymentAttempts.id, attempt.id))
+          .returning();
+        if (!updated) throw new Error("Payment attempt cancel request did not return a row");
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          attempt.tabId,
+          "payment.cancel_requested",
+          { attemptId, installationId: attempt.installationId },
+          { entityType: "payment_attempt", entityId: attemptId },
+        );
+        return {
+          attempt: this.paymentAttemptView(updated),
+          action: { type: "cancel", attemptId, provider: attempt.provider },
+        };
+      },
+    );
+  }
+
+  async requestPaymentReversal(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    paymentId: string,
+    idempotencyKey: string,
+    input: PaymentReversalCreateInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "payment.reversal.create",
+      { paymentId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-reversal:${organizationId}:${unitId}:${paymentId}`}))`,
+        );
+        const [payment] = await tx
+          .select({
+            id: posTabPayments.id,
+            tabId: posTabPayments.tabId,
+            amountCents: posTabPayments.amountCents,
+            paymentAttemptId: posTabPayments.paymentAttemptId,
+            source: posTabPayments.source,
+            verified: posTabPayments.verified,
+            attemptStatus: posPaymentAttempts.status,
+            installationId: posPaymentAttempts.installationId,
+            provider: posPaymentAttempts.provider,
+          })
+          .from(posTabPayments)
+          .leftJoin(posPaymentAttempts, eq(posPaymentAttempts.id, posTabPayments.paymentAttemptId))
+          .where(
+            and(
+              eq(posTabPayments.organizationId, organizationId),
+              eq(posTabPayments.unitId, unitId),
+              eq(posTabPayments.id, paymentId),
+            ),
+          )
+          .limit(1);
+        if (
+          payment?.source !== "terminal" ||
+          !payment.verified ||
+          !payment.paymentAttemptId ||
+          !payment.installationId ||
+          !payment.provider
+        ) {
+          throw new ConflictException({ code: "PAYMENT_REVERSAL_REQUIRES_VERIFIED_TERMINAL" });
+        }
+        const [fiscalDocument] = await tx
+          .select({ status: fiscalDocuments.status })
+          .from(fiscalDocuments)
+          .where(
+            and(
+              eq(fiscalDocuments.organizationId, organizationId),
+              eq(fiscalDocuments.unitId, unitId),
+              eq(fiscalDocuments.tabId, payment.tabId),
+              inArray(fiscalDocuments.status, [
+                "pending",
+                "processing",
+                "authorized",
+                "contingency",
+              ]),
+            ),
+          )
+          .limit(1);
+        if (fiscalDocument) {
+          throw new ConflictException({
+            code: "PAYMENT_REVERSAL_REQUIRES_FISCAL_CANCELLATION",
+            message: "Cancele a NFC-e antes de estornar o pagamento.",
+          });
+        }
+        const [queuedFiscalEmission] = await tx.execute<{ active: boolean }>(sql`
+          select true as active
+          from outbox_events events
+          inner join fiscal_profiles profiles
+            on profiles.organization_id = ${organizationId}
+           and profiles.unit_id = ${unitId}
+           and profiles.provider = 'focus'
+          where events.topic = 'pos.tab.closed'
+            and events.aggregate_id = ${payment.tabId}
+            and profiles.settings #>> '{focus,status}' = 'ready'
+            and coalesce((profiles.settings #>> '{focus,enabled,nfce}')::boolean, false)
+          limit 1
+        `);
+        if (queuedFiscalEmission?.active) {
+          throw new ConflictException({
+            code: "PAYMENT_REVERSAL_REQUIRES_FISCAL_CANCELLATION",
+            message: "Aguarde a NFC-e e cancele-a antes de estornar o pagamento.",
+          });
+        }
+        await this.smartPos.lockPaymentInstallation(
+          tx,
+          organizationId,
+          unitId,
+          payment.installationId,
+        );
+        if (payment.attemptStatus === "reversed") {
+          throw new ConflictException({ code: "PAYMENT_ALREADY_REVERSED" });
+        }
+        if (payment.attemptStatus !== "approved") {
+          throw new ConflictException({ code: "PAYMENT_REVERSAL_INVALID_ATTEMPT_STATE" });
+        }
+        await this.lockTabPaymentState(tx, organizationId, unitId, payment.tabId);
+        const capability = await this.paymentCapability(
+          tx,
+          organizationId,
+          unitId,
+          payment.installationId,
+        );
+        if (
+          !capability.available ||
+          !capability.supports.reversal ||
+          capability.provider !== payment.provider
+        ) {
+          throw new ConflictException({ code: "PAYMENT_REVERSAL_UNAVAILABLE" });
+        }
+        const [reversal] = await tx
+          .insert(posPaymentReversals)
+          .values({
+            organizationId,
+            unitId,
+            paymentId,
+            paymentAttemptId: payment.paymentAttemptId,
+            installationId: payment.installationId,
+            requestedByIdentityId: identityId,
+            amountCents: payment.amountCents,
+            reason: input.reason,
+          })
+          .returning();
+        if (!reversal) throw new Error("Payment reversal insert did not return a row");
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          payment.tabId,
+          "payment.reversal_requested",
+          {
+            reversalId: reversal.id,
+            paymentId,
+            paymentAttemptId: payment.paymentAttemptId,
+            amountCents: payment.amountCents,
+          },
+          { entityType: "payment_reversal", entityId: reversal.id },
+        );
+        return {
+          reversal: this.paymentReversalView(reversal),
+          action: {
+            type: "reverse" as const,
+            reversalId: reversal.id,
+            paymentAttemptId: payment.paymentAttemptId,
+            provider: payment.provider,
+          },
+        };
+      },
+    );
+  }
+
+  private requirePaymentDevice(tx: Transaction, request: PaymentDeviceSignature) {
+    return this.smartPos.authenticatePaymentDevice(tx, request);
+  }
+
+  async getDevicePaymentAttempt(request: PaymentDeviceSignature, attemptId: string) {
+    return this.database.db.transaction(async (tx) => {
+      const device = await this.requirePaymentDevice(tx, request);
+      const [attempt] = await tx
+        .select()
+        .from(posPaymentAttempts)
+        .where(
+          and(
+            eq(posPaymentAttempts.organizationId, device.organizationId),
+            eq(posPaymentAttempts.unitId, device.unitId),
+            eq(posPaymentAttempts.installationId, device.id),
+            eq(posPaymentAttempts.id, attemptId),
+          ),
+        )
+        .limit(1);
+      if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+      if (attempt.status === "created") {
+        throw new ConflictException({
+          code:
+            attempt.expiresAt <= new Date()
+              ? "PAYMENT_ATTEMPT_EXPIRED"
+              : "PAYMENT_ATTEMPT_MUST_BE_CLAIMED",
+          message: "A tentativa precisa ser reivindicada antes de abrir o provedor.",
+        });
+      }
+      return { attempt: this.paymentAttemptView(attempt) };
+    });
+  }
+
+  async claimDevicePaymentAttempt(request: PaymentDeviceSignature, attemptId: string) {
+    const result = await this.database.db.transaction(async (tx) => {
+      const device = await this.requirePaymentDevice(tx, request);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`pos-attempt:${attemptId}`}))`);
+      const [current] = await tx
+        .select()
+        .from(posPaymentAttempts)
+        .where(
+          and(
+            eq(posPaymentAttempts.organizationId, device.organizationId),
+            eq(posPaymentAttempts.unitId, device.unitId),
+            eq(posPaymentAttempts.installationId, device.id),
+            eq(posPaymentAttempts.id, attemptId),
+          ),
+        )
+        .limit(1);
+      if (!current) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+      if (current.status === "processing" || current.status === "unknown") {
+        const capability = await this.paymentCapability(
+          tx,
+          current.organizationId,
+          current.unitId,
+          current.installationId,
+        );
+        const action = current.cancelRequestedAt ? ("cancel" as const) : ("recover" as const);
+        if (
+          (action === "cancel" && !capability.supports.cancel) ||
+          (action === "recover" && !capability.supports.recover)
+        ) {
+          throw new ConflictException({
+            code:
+              action === "cancel" ? "PAYMENT_CANCEL_UNAVAILABLE" : "PAYMENT_RECOVERY_UNAVAILABLE",
+          });
+        }
+        return { attempt: current, action, capability };
+      }
+      if (current.status !== "created") {
+        throw new ConflictException({
+          code: "PAYMENT_ATTEMPT_ALREADY_RESOLVED",
+          message: "A tentativa não está disponível para iniciar.",
+        });
+      }
+      const now = new Date();
+      if (current.expiresAt <= now) {
+        const [expired] = await tx
+          .update(posPaymentAttempts)
+          .set({
+            status: "canceled",
+            failureCode: "PAYMENT_ATTEMPT_EXPIRED",
+            failureMessage: "A tentativa expirou antes de abrir o provedor.",
+            resolvedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(posPaymentAttempts.id, current.id))
+          .returning();
+        if (!expired) throw new Error("Expired payment attempt update did not return a row");
+        await this.recordEvent(
+          tx,
+          current.requestedByIdentityId,
+          current.organizationId,
+          current.unitId,
+          current.tabId,
+          "payment.attempt_expired",
+          { attemptId, installationId: current.installationId },
+          { entityType: "payment_attempt", entityId: attemptId },
+        );
+        return { attempt: expired, action: null };
+      }
+      const paymentState = await this.lockTabPaymentState(
+        tx,
+        current.organizationId,
+        current.unitId,
+        current.tabId,
+      );
+      const tab = await this.requireOpenTab(
+        tx,
+        current.organizationId,
+        current.unitId,
+        current.tabId,
+      );
+      this.assertTabPaymentFloor(tab.totalCents, paymentState);
+      const capability = await this.paymentCapability(
+        tx,
+        current.organizationId,
+        current.unitId,
+        current.installationId,
+      );
+      if (!capability.available || capability.provider !== current.provider) {
+        throw new ConflictException({
+          code: "PAYMENT_TERMINAL_UNAVAILABLE",
+          message: "O terminal deixou de estar homologado para esta tentativa.",
+        });
+      }
+      const [claimed] = await tx
+        .update(posPaymentAttempts)
+        .set({ status: "processing", processingAt: now, updatedAt: now })
+        .where(eq(posPaymentAttempts.id, current.id))
+        .returning();
+      if (!claimed) throw new Error("Payment attempt claim did not return a row");
+      await this.recordEvent(
+        tx,
+        current.requestedByIdentityId,
+        current.organizationId,
+        current.unitId,
+        current.tabId,
+        "payment.attempt_claimed",
+        { attemptId, installationId: current.installationId, provider: current.provider },
+        { entityType: "payment_attempt", entityId: attemptId },
+      );
+      return { attempt: claimed, action: "start" as const, capability };
+    });
+    if (result.attempt.failureCode === "PAYMENT_ATTEMPT_EXPIRED") {
+      throw new ConflictException({
+        code: "PAYMENT_ATTEMPT_EXPIRED",
+        message: "A tentativa expirou antes de abrir o provedor.",
+      });
+    }
+    if (!result.action || !result.capability?.certification) {
+      throw new ConflictException({ code: "PAYMENT_CERTIFICATION_MISSING" });
+    }
+    return {
+      attempt: this.paymentAttemptView(result.attempt),
+      action: result.action,
+      capabilities: result.capability,
+      certification: result.capability.certification,
+    };
+  }
+
+  async recordDevicePaymentResult(
+    request: PaymentDeviceSignature,
+    attemptId: string,
+    input: PaymentDeviceResultInput,
+  ) {
+    const resultHash = requestHash(`payment-device-result:${attemptId}`, input);
+    const result = await this.database.db.transaction(async (tx) => {
+      const device = await this.requirePaymentDevice(tx, request);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`pos-attempt:${attemptId}`}))`);
+      const [attempt] = await tx
+        .select()
+        .from(posPaymentAttempts)
+        .where(
+          and(
+            eq(posPaymentAttempts.organizationId, device.organizationId),
+            eq(posPaymentAttempts.unitId, device.unitId),
+            eq(posPaymentAttempts.installationId, device.id),
+            eq(posPaymentAttempts.id, attemptId),
+          ),
+        )
+        .limit(1);
+      if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+      const [existingResult] = await tx
+        .select({
+          attemptId: posPaymentAttemptResults.attemptId,
+          requestHash: posPaymentAttemptResults.requestHash,
+        })
+        .from(posPaymentAttemptResults)
+        .where(
+          and(
+            eq(posPaymentAttemptResults.organizationId, device.organizationId),
+            eq(posPaymentAttemptResults.unitId, device.unitId),
+            eq(posPaymentAttemptResults.installationId, device.id),
+            eq(posPaymentAttemptResults.deviceResultId, input.resultId),
+          ),
+        )
+        .limit(1);
+      if (existingResult) {
+        if (existingResult.attemptId !== attemptId || existingResult.requestHash !== resultHash) {
+          if (["approved", "declined", "canceled", "reversed"].includes(attempt.status)) {
+            if (
+              !(await this.hasRecordedPaymentResultIncident(
+                tx,
+                attempt.organizationId,
+                attempt.unitId,
+                "pos.payment.attempt_result_conflict",
+                attemptId,
+                resultHash,
+              ))
+            ) {
+              await this.recordEvent(
+                tx,
+                attempt.requestedByIdentityId,
+                attempt.organizationId,
+                attempt.unitId,
+                attempt.tabId,
+                "payment.attempt_result_conflict",
+                {
+                  attemptId,
+                  installationId: attempt.installationId,
+                  currentStatus: attempt.status,
+                  reportedStatus: input.status,
+                  resultId: input.resultId,
+                  requestHash: resultHash,
+                  failureCode: input.failureCode ?? null,
+                },
+                { entityType: "payment_attempt", entityId: attemptId },
+              );
+            }
+            return { terminalResultConflict: true as const };
+          }
+          throw new ConflictException({
+            code: "PAYMENT_DEVICE_RESULT_CONFLICT",
+            message: "O identificador do resultado já foi usado com outro conteúdo.",
+          });
+        }
+        if (
+          ["approved", "declined", "canceled", "reversed"].includes(attempt.status) &&
+          (await this.hasRecordedPaymentResultIncident(
+            tx,
+            attempt.organizationId,
+            attempt.unitId,
+            "pos.payment.attempt_result_conflict",
+            attemptId,
+            resultHash,
+          ))
+        ) {
+          return { terminalResultConflict: true as const };
+        }
+        return { attempt: this.paymentAttemptView(attempt), idempotentReplay: true };
+      }
+      if (["approved", "declined", "canceled", "reversed"].includes(attempt.status)) {
+        await tx.insert(posPaymentAttemptResults).values({
+          organizationId: device.organizationId,
+          unitId: device.unitId,
+          attemptId,
+          installationId: device.id,
+          deviceResultId: input.resultId,
+          requestHash: resultHash,
+          status: input.status,
+          providerReference: input.providerReference,
+          authorizationCode: input.authorizationCode,
+          failureCode: input.failureCode,
+          failureMessage: input.failureCode ? "Falha reportada pelo provedor de pagamento." : null,
+          occurredAt: new Date(input.occurredAt),
+        });
+        await this.recordEvent(
+          tx,
+          attempt.requestedByIdentityId,
+          attempt.organizationId,
+          attempt.unitId,
+          attempt.tabId,
+          "payment.attempt_result_conflict",
+          {
+            attemptId,
+            installationId: attempt.installationId,
+            currentStatus: attempt.status,
+            reportedStatus: input.status,
+            resultId: input.resultId,
+            requestHash: resultHash,
+            failureCode: input.failureCode ?? null,
+          },
+          { entityType: "payment_attempt", entityId: attemptId },
+        );
+        return { terminalResultConflict: true as const };
+      }
+      assertPaymentDeviceTransition(attempt.status as PaymentAttemptStatus, input.status);
+      if (input.status === "approved" && input.providerReference) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-provider-ref:${attempt.organizationId}:${attempt.unitId}:${attempt.provider}:${input.providerReference}`}))`,
+        );
+        const [referenceOwner] = await tx
+          .select({ id: posPaymentAttempts.id })
+          .from(posPaymentAttempts)
+          .where(
+            and(
+              eq(posPaymentAttempts.organizationId, device.organizationId),
+              eq(posPaymentAttempts.unitId, device.unitId),
+              eq(posPaymentAttempts.provider, attempt.provider),
+              eq(posPaymentAttempts.providerReference, input.providerReference),
+            ),
+          )
+          .limit(1);
+        if (referenceOwner && referenceOwner.id !== attemptId) {
+          throw new ConflictException({
+            code: "PAYMENT_PROVIDER_REFERENCE_CONFLICT",
+            message: "A referência do provedor já pertence a outra tentativa.",
+          });
+        }
+      }
+      const occurredAt = new Date(input.occurredAt);
+      const now = new Date();
+      const terminal = ["approved", "declined", "canceled"].includes(input.status);
+      const failureMessage = input.failureCode
+        ? "Falha reportada pelo provedor de pagamento."
+        : null;
+      const [updated] = await tx
+        .update(posPaymentAttempts)
+        .set({
+          status: input.status,
+          providerReference: input.providerReference ?? attempt.providerReference,
+          authorizationCode: input.authorizationCode ?? null,
+          failureCode: input.failureCode ?? null,
+          failureMessage,
+          processingAt:
+            input.status === "processing" ? (attempt.processingAt ?? now) : attempt.processingAt,
+          resolvedAt: terminal ? now : null,
+          updatedAt: now,
+        })
+        .where(eq(posPaymentAttempts.id, attempt.id))
+        .returning();
+      if (!updated) throw new Error("Payment attempt result did not return a row");
+      await tx.insert(posPaymentAttemptResults).values({
+        organizationId: device.organizationId,
+        unitId: device.unitId,
+        attemptId,
+        installationId: device.id,
+        deviceResultId: input.resultId,
+        requestHash: resultHash,
+        status: input.status,
+        providerReference: input.providerReference,
+        authorizationCode: input.authorizationCode,
+        failureCode: input.failureCode,
+        failureMessage,
+        occurredAt,
+      });
+      let paymentId: string | null = null;
+      if (input.status === "approved") {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${attempt.organizationId}:${attempt.unitId}:${attempt.tabId}`}))`,
+        );
+        const [existingPayment] = await tx
+          .select({ id: posTabPayments.id })
+          .from(posTabPayments)
+          .where(
+            and(
+              eq(posTabPayments.organizationId, attempt.organizationId),
+              eq(posTabPayments.unitId, attempt.unitId),
+              eq(posTabPayments.paymentAttemptId, attempt.id),
+            ),
+          )
+          .limit(1);
+        if (existingPayment) {
+          paymentId = existingPayment.id;
+        } else {
+          const payment = await this.createPosPayment(
+            tx,
+            {
+              organizationId: attempt.organizationId,
+              unitId: attempt.unitId,
+              tabId: attempt.tabId,
+              method: attempt.method,
+              amountCents: attempt.amountCents,
+              reference: input.providerReference,
+              paymentAttemptId: attempt.id,
+              source: "terminal",
+              verified: true,
+              createdByIdentityId: attempt.requestedByIdentityId,
+              createdAt: now,
+            },
+            { installationId: attempt.installationId },
+          );
+          paymentId = payment.id;
+        }
+      }
+      await this.recordEvent(
+        tx,
+        attempt.requestedByIdentityId,
+        attempt.organizationId,
+        attempt.unitId,
+        attempt.tabId,
+        input.status === "approved" ? "payment.recorded" : `payment.attempt_${input.status}`,
+        {
+          attemptId,
+          paymentId,
+          installationId: attempt.installationId,
+          provider: attempt.provider,
+          method: attempt.method,
+          amountCents: attempt.amountCents,
+          resultId: input.resultId,
+          failureCode: input.failureCode ?? null,
+        },
+        { entityType: "payment_attempt", entityId: attemptId },
+      );
+      return {
+        attempt: this.paymentAttemptView(updated),
+        paymentId,
+        idempotentReplay: false,
+      };
+    });
+    if ("terminalResultConflict" in result) {
+      throw new ConflictException({
+        code: "PAYMENT_DEVICE_RESULT_TERMINAL_CONFLICT",
+        message: "O resultado conflitante foi preservado para reconciliação financeira.",
+      });
+    }
+    return result;
+  }
+
+  async claimDevicePaymentReversal(request: PaymentDeviceSignature, reversalId: string) {
+    return this.database.db.transaction(async (tx) => {
+      const device = await this.requirePaymentDevice(tx, request);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`pos-reversal:${reversalId}`}))`,
+      );
+      const [reversal] = await tx
+        .select()
+        .from(posPaymentReversals)
+        .where(
+          and(
+            eq(posPaymentReversals.organizationId, device.organizationId),
+            eq(posPaymentReversals.unitId, device.unitId),
+            eq(posPaymentReversals.installationId, device.id),
+            eq(posPaymentReversals.id, reversalId),
+          ),
+        )
+        .limit(1);
+      if (!reversal) throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      const [attempt] = await tx
+        .select({ provider: posPaymentAttempts.provider })
+        .from(posPaymentAttempts)
+        .where(eq(posPaymentAttempts.id, reversal.paymentAttemptId))
+        .limit(1);
+      if (!attempt) throw new NotFoundException({ code: "PAYMENT_ATTEMPT_NOT_FOUND" });
+      const capability = await this.paymentCapability(
+        tx,
+        device.organizationId,
+        device.unitId,
+        device.id,
+      );
+      if (
+        !capability.available ||
+        !capability.supports.reversal ||
+        capability.provider !== attempt.provider
+      ) {
+        throw new ConflictException({ code: "PAYMENT_REVERSAL_UNAVAILABLE" });
+      }
+      if (reversal.status === "processing" || reversal.status === "unknown") {
+        return {
+          reversal: this.paymentReversalView(reversal),
+          action: {
+            type: "recover" as const,
+            reversalId,
+            paymentAttemptId: reversal.paymentAttemptId,
+            provider: attempt.provider,
+          },
+        };
+      }
+      if (reversal.status !== "pending") {
+        throw new ConflictException({ code: "PAYMENT_REVERSAL_ALREADY_RESOLVED" });
+      }
+      const [claimed] = await tx
+        .update(posPaymentReversals)
+        .set({ status: "processing", updatedAt: new Date() })
+        .where(eq(posPaymentReversals.id, reversal.id))
+        .returning();
+      if (!claimed) throw new Error("Payment reversal claim did not return a row");
+      return {
+        reversal: this.paymentReversalView(claimed),
+        action: {
+          type: "reverse" as const,
+          reversalId,
+          paymentAttemptId: reversal.paymentAttemptId,
+          provider: attempt.provider,
+        },
+      };
+    });
+  }
+
+  async recordDevicePaymentReversalResult(
+    request: PaymentDeviceSignature,
+    reversalId: string,
+    input: PaymentDeviceResultInput,
+  ) {
+    const resultHash = requestHash(`payment-device-reversal-result:${reversalId}`, input);
+    const result = await this.database.db.transaction(async (tx) => {
+      const device = await this.requirePaymentDevice(tx, request);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`pos-reversal:${reversalId}`}))`,
+      );
+      const [reversal] = await tx
+        .select()
+        .from(posPaymentReversals)
+        .where(
+          and(
+            eq(posPaymentReversals.organizationId, device.organizationId),
+            eq(posPaymentReversals.unitId, device.unitId),
+            eq(posPaymentReversals.installationId, device.id),
+            eq(posPaymentReversals.id, reversalId),
+          ),
+        )
+        .limit(1);
+      if (!reversal) throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      const [existingResult] = await tx
+        .select({
+          reversalId: posPaymentReversalResults.reversalId,
+          requestHash: posPaymentReversalResults.requestHash,
+        })
+        .from(posPaymentReversalResults)
+        .where(
+          and(
+            eq(posPaymentReversalResults.organizationId, device.organizationId),
+            eq(posPaymentReversalResults.unitId, device.unitId),
+            eq(posPaymentReversalResults.installationId, device.id),
+            eq(posPaymentReversalResults.deviceResultId, input.resultId),
+          ),
+        )
+        .limit(1);
+      if (existingResult) {
+        if (existingResult.reversalId !== reversalId || existingResult.requestHash !== resultHash) {
+          if (["approved", "declined", "canceled"].includes(reversal.status)) {
+            await this.recordPaymentReversalResultIncident(tx, {
+              organizationId: device.organizationId,
+              unitId: device.unitId,
+              actorIdentityId: reversal.requestedByIdentityId,
+              reversalId,
+              paymentId: reversal.paymentId,
+              paymentAttemptId: reversal.paymentAttemptId,
+              installationId: reversal.installationId,
+              currentStatus: reversal.status,
+              reportedStatus: input.status,
+              resultId: input.resultId,
+              resultHash,
+              failureCode: input.failureCode ?? null,
+            });
+            return { terminalResultConflict: true as const };
+          }
+          throw new ConflictException({ code: "PAYMENT_REVERSAL_RESULT_CONFLICT" });
+        }
+        if (
+          ["approved", "declined", "canceled"].includes(reversal.status) &&
+          (await this.hasRecordedPaymentResultIncident(
+            tx,
+            device.organizationId,
+            device.unitId,
+            "pos.payment.reversal_result_conflict",
+            reversalId,
+            resultHash,
+          ))
+        ) {
+          return { terminalResultConflict: true as const };
+        }
+        return { reversal: this.paymentReversalView(reversal), idempotentReplay: true };
+      }
+      if (["approved", "declined", "canceled"].includes(reversal.status)) {
+        await tx.insert(posPaymentReversalResults).values({
+          organizationId: device.organizationId,
+          unitId: device.unitId,
+          reversalId,
+          installationId: device.id,
+          deviceResultId: input.resultId,
+          requestHash: resultHash,
+          status: input.status,
+          providerReference: input.providerReference,
+          failureCode: input.failureCode,
+          occurredAt: new Date(input.occurredAt),
+        });
+        await this.recordPaymentReversalResultIncident(tx, {
+          organizationId: device.organizationId,
+          unitId: device.unitId,
+          actorIdentityId: reversal.requestedByIdentityId,
+          reversalId,
+          paymentId: reversal.paymentId,
+          paymentAttemptId: reversal.paymentAttemptId,
+          installationId: reversal.installationId,
+          currentStatus: reversal.status,
+          reportedStatus: input.status,
+          resultId: input.resultId,
+          resultHash,
+          failureCode: input.failureCode ?? null,
+        });
+        return { terminalResultConflict: true as const };
+      }
+      const allowed: Record<typeof reversal.status, readonly (typeof input.status)[]> = {
+        pending: [],
+        processing: ["processing", "approved", "declined", "canceled", "unknown"],
+        unknown: ["approved", "declined", "canceled", "unknown"],
+        approved: [],
+        declined: [],
+        canceled: [],
+      };
+      if (!allowed[reversal.status].includes(input.status)) {
+        throw new ConflictException({ code: "PAYMENT_REVERSAL_ALREADY_RESOLVED" });
+      }
+      const [payment] = await tx
+        .select({ tabId: posTabPayments.tabId, method: posTabPayments.method })
+        .from(posTabPayments)
+        .where(
+          and(
+            eq(posTabPayments.organizationId, device.organizationId),
+            eq(posTabPayments.unitId, device.unitId),
+            eq(posTabPayments.id, reversal.paymentId),
+          ),
+        )
+        .limit(1);
+      if (!payment) throw new NotFoundException({ code: "PAYMENT_NOT_FOUND" });
+      if (input.status === "approved") {
+        await this.lockTabPaymentState(tx, device.organizationId, device.unitId, payment.tabId);
+      }
+      const occurredAt = new Date(input.occurredAt);
+      const now = new Date();
+      const terminal = ["approved", "declined", "canceled"].includes(input.status);
+      const [updated] = await tx
+        .update(posPaymentReversals)
+        .set({
+          status: input.status,
+          providerReference: input.providerReference ?? reversal.providerReference,
+          failureCode: input.failureCode ?? null,
+          resolvedAt: terminal ? now : null,
+          updatedAt: now,
+        })
+        .where(eq(posPaymentReversals.id, reversal.id))
+        .returning();
+      if (!updated) throw new Error("Payment reversal result did not return a row");
+      await tx.insert(posPaymentReversalResults).values({
+        organizationId: device.organizationId,
+        unitId: device.unitId,
+        reversalId,
+        installationId: device.id,
+        deviceResultId: input.resultId,
+        requestHash: resultHash,
+        status: input.status,
+        providerReference: input.providerReference,
+        failureCode: input.failureCode,
+        occurredAt,
+      });
+      let reversalAccounting: {
+        cashEntryId: string | null;
+        cashAdjustmentId: string | null;
+        cashRegisterId: string | null;
+        originalCashShiftId: string | null;
+      } | null = null;
+      if (input.status === "approved") {
+        const [reversedAttempt] = await tx
+          .update(posPaymentAttempts)
+          .set({ status: "reversed", resolvedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(posPaymentAttempts.id, reversal.paymentAttemptId),
+              eq(posPaymentAttempts.status, "approved"),
+            ),
+          )
+          .returning({ id: posPaymentAttempts.id });
+        if (!reversedAttempt) throw new ConflictException({ code: "PAYMENT_REVERSAL_RACE" });
+        await tx
+          .update(posPaymentReconciliations)
+          .set({ status: "reversed", updatedAt: now })
+          .where(
+            and(
+              eq(posPaymentReconciliations.organizationId, device.organizationId),
+              eq(posPaymentReconciliations.unitId, device.unitId),
+              eq(posPaymentReconciliations.paymentId, reversal.paymentId),
+              ne(posPaymentReconciliations.status, "reversed"),
+            ),
+          );
+        reversalAccounting = await this.recordApprovedPaymentReversalAccounting(tx, {
+          organizationId: device.organizationId,
+          unitId: device.unitId,
+          reversalId: reversal.id,
+          paymentId: reversal.paymentId,
+          installationId: reversal.installationId,
+          actorIdentityId: reversal.requestedByIdentityId,
+          paymentMethod: payment.method,
+          amountCents: reversal.amountCents,
+          occurredAt,
+        });
+      }
+      await this.recordEvent(
+        tx,
+        reversal.requestedByIdentityId,
+        device.organizationId,
+        device.unitId,
+        payment.tabId,
+        input.status === "approved"
+          ? "payment.reversal_approved"
+          : `payment.reversal_${input.status}`,
+        {
+          reversalId,
+          paymentId: reversal.paymentId,
+          paymentAttemptId: reversal.paymentAttemptId,
+          amountCents: reversal.amountCents,
+          resultId: input.resultId,
+          failureCode: input.failureCode ?? null,
+          cashEntryId: reversalAccounting?.cashEntryId ?? null,
+          cashAdjustmentId: reversalAccounting?.cashAdjustmentId ?? null,
+          cashRegisterId: reversalAccounting?.cashRegisterId ?? null,
+          originalCashShiftId: reversalAccounting?.originalCashShiftId ?? null,
+        },
+        { entityType: "payment_reversal", entityId: reversalId },
+      );
+      return { reversal: this.paymentReversalView(updated), idempotentReplay: false };
+    });
+    if ("terminalResultConflict" in result) {
+      throw new ConflictException({
+        code: "PAYMENT_REVERSAL_RESULT_TERMINAL_CONFLICT",
+        message: "O resultado conflitante foi preservado para reconciliação financeira.",
+      });
+    }
+    return result;
+  }
+
   async recordPayment(
     identityId: string,
     organizationId: string,
@@ -3107,6 +4904,25 @@ export class PilotPosService {
       unitId,
       "operations:payments:record",
     );
+    if (input.cashRegisterId && !input.installationId) {
+      await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    }
+    if (["credit_card", "debit_card", "pix"].includes(input.method)) {
+      const [integratedTerminal] = await this.database.db
+        .select({ installationId: posTerminalProfiles.installationId })
+        .from(posTerminalProfiles)
+        .where(
+          and(
+            eq(posTerminalProfiles.organizationId, organizationId),
+            eq(posTerminalProfiles.unitId, unitId),
+            eq(posTerminalProfiles.paymentStatus, "homologated"),
+          ),
+        )
+        .limit(1);
+      if (integratedTerminal) {
+        await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+      }
+    }
     return this.idempotent(
       identityId,
       organizationId,
@@ -3115,45 +4931,46 @@ export class PilotPosService {
       "tab.payment.record",
       { tabId, ...input },
       async (tx) => {
+        const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
-        const paymentTotals = await tx
-          .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)` })
-          .from(posTabPayments)
-          .where(
-            and(
-              eq(posTabPayments.organizationId, organizationId),
-              eq(posTabPayments.unitId, unitId),
-              eq(posTabPayments.tabId, tabId),
-            ),
-          );
-        const paid = Number(paymentTotals[0]?.paidCents ?? 0);
-        if (paid + input.amountCents > tab.totalCents) {
+        const availableCents =
+          tab.totalCents -
+          paymentState.paidCents -
+          paymentState.reservedCents -
+          paymentState.coveredLossCents;
+        if (input.amountCents > availableCents) {
           throw new ConflictException({
             code: "TAB_OVERPAYMENT",
-            message: "O pagamento excede o saldo da comanda.",
-            remainingCents: tab.totalCents - paid,
+            message: "O pagamento excede o saldo livre da comanda.",
+            remainingCents: Math.max(0, availableCents),
           });
         }
-        const [payment] = await tx
-          .insert(posTabPayments)
-          .values({
+        const { cashRegisterId, installationId, ...paymentInput } = input;
+        const payment = await this.createPosPayment(
+          tx,
+          {
             organizationId,
             unitId,
             tabId,
-            ...input,
+            ...paymentInput,
+            source: "manual",
+            verified: input.method === "cash",
             createdByIdentityId: identityId,
-          })
-          .returning();
-        if (!payment) throw new Error("Payment insert did not return a row");
+          },
+          { cashRegisterId, installationId },
+        );
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "payment.recorded", {
           paymentId: payment.id,
           method: payment.method,
           amountCents: payment.amountCents,
+          source: payment.source,
+          verified: payment.verified,
         });
         return {
           payment,
-          paidCents: paid + input.amountCents,
-          remainingCents: tab.totalCents - paid - input.amountCents,
+          paidCents: paymentState.paidCents + input.amountCents,
+          remainingCents: availableCents - input.amountCents,
+          availableCents: availableCents - input.amountCents,
         };
       },
     );
@@ -3471,6 +5288,7 @@ export class PilotPosService {
       "tab.close",
       { tabId, ...input },
       async (tx) => {
+        const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
         let singleTabGroup = tab.tableId
           ? await this.findSingleTabGroup(tx, organizationId, unitId, tab.tableId)
@@ -3486,32 +5304,14 @@ export class PilotPosService {
             tab.tableId as string,
           );
         }
-        const paymentTotals = await tx
-          .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)` })
-          .from(posTabPayments)
-          .where(
-            and(
-              eq(posTabPayments.organizationId, organizationId),
-              eq(posTabPayments.unitId, unitId),
-              eq(posTabPayments.tabId, tabId),
-            ),
-          );
-        const [lossTotals] = await tx
-          .select({
-            lossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}), 0)`,
-          })
-          .from(managementOperationalLosses)
-          .where(
-            and(
-              eq(managementOperationalLosses.organizationId, organizationId),
-              eq(managementOperationalLosses.unitId, unitId),
-              eq(managementOperationalLosses.tabId, tabId),
-              eq(managementOperationalLosses.status, "approved"),
-              eq(managementOperationalLosses.type, "unpaid_tab"),
-            ),
-          );
-        const paidCents = Number(paymentTotals[0]?.paidCents ?? 0);
-        const operationalLossCents = Number(lossTotals?.lossCents ?? 0);
+        if (paymentState.reservedCents > 0) {
+          throw new ConflictException({
+            code: "TAB_HAS_ACTIVE_PAYMENT_ATTEMPT",
+            message: "Conclua ou cancele a cobrança ativa antes de fechar a comanda.",
+          });
+        }
+        const paidCents = paymentState.paidCents;
+        const operationalLossCents = paymentState.coveredLossCents;
         assertTabCanClose(tab.totalCents, paidCents + operationalLossCents);
         const now = new Date();
         const [closed] = await tx
@@ -3650,6 +5450,48 @@ export class PilotPosService {
           throw new ConflictException({
             code: "TAB_NOT_CLOSED",
             message: "Somente atendimentos encerrados podem ser reabertos.",
+          });
+        }
+        const [fiscalDocument] = await tx
+          .select({ status: fiscalDocuments.status })
+          .from(fiscalDocuments)
+          .where(
+            and(
+              eq(fiscalDocuments.organizationId, organizationId),
+              eq(fiscalDocuments.unitId, unitId),
+              eq(fiscalDocuments.tabId, tabId),
+              inArray(fiscalDocuments.status, [
+                "pending",
+                "processing",
+                "authorized",
+                "contingency",
+              ]),
+            ),
+          )
+          .limit(1);
+        if (fiscalDocument) {
+          throw new ConflictException({
+            code: "TAB_REOPEN_REQUIRES_FISCAL_CANCELLATION",
+            message: "Cancele a NFC-e antes de reabrir este atendimento.",
+          });
+        }
+        const [queuedFiscalEmission] = await tx.execute<{ active: boolean }>(sql`
+          select true as active
+          from outbox_events events
+          inner join fiscal_profiles profiles
+            on profiles.organization_id = ${organizationId}
+           and profiles.unit_id = ${unitId}
+           and profiles.provider = 'focus'
+          where events.topic = 'pos.tab.closed'
+            and events.aggregate_id = ${tabId}
+            and profiles.settings #>> '{focus,status}' = 'ready'
+            and coalesce((profiles.settings #>> '{focus,enabled,nfce}')::boolean, false)
+          limit 1
+        `);
+        if (queuedFiscalEmission?.active) {
+          throw new ConflictException({
+            code: "TAB_REOPEN_REQUIRES_FISCAL_CANCELLATION",
+            message: "Aguarde a NFC-e e cancele-a antes de reabrir este atendimento.",
           });
         }
         const now = new Date();
@@ -4757,21 +6599,20 @@ export class PilotPosService {
     if (sources.length !== sourceIds.length) {
       throw new NotFoundException({ code: "SOURCE_TAB_NOT_FOUND" });
     }
-    const [payment] = await tx
-      .select({ id: posTabPayments.id })
-      .from(posTabPayments)
-      .where(
-        and(
-          eq(posTabPayments.organizationId, organizationId),
-          eq(posTabPayments.unitId, unitId),
-          inArray(posTabPayments.tabId, [targetTabId, ...sourceIds]),
-        ),
-      )
-      .limit(1);
-    if (payment) {
+    const paymentStates = [];
+    for (const mergedTabId of [...new Set([targetTabId, ...sourceIds])].sort()) {
+      paymentStates.push(await this.lockTabPaymentState(tx, organizationId, unitId, mergedTabId));
+    }
+    if (paymentStates.some((state) => state.paidCents > 0 || state.coveredLossCents > 0)) {
       throw new ConflictException({
         code: "TAB_MERGE_HAS_PAYMENTS",
-        message: "Não é possível unificar comandas depois do primeiro pagamento.",
+        message: "Não é possível unificar comandas depois de registrar cobertura financeira.",
+      });
+    }
+    if (paymentStates.some((state) => state.reservedCents > 0)) {
+      throw new ConflictException({
+        code: "TAB_MERGE_HAS_ACTIVE_PAYMENT_ATTEMPT",
+        message: "Não é possível unificar comandas com uma cobrança ativa.",
       });
     }
     if (target.tableId) {
@@ -11112,7 +12953,19 @@ export class PilotPosService {
         ),
       )
       .limit(1);
-    return profile ?? null;
+    if (!profile) return null;
+    const [binding] = await this.database.db
+      .select({ cashRegisterId: managementCashRegisterTerminals.cashRegisterId })
+      .from(managementCashRegisterTerminals)
+      .where(
+        and(
+          eq(managementCashRegisterTerminals.organizationId, organizationId),
+          eq(managementCashRegisterTerminals.unitId, unitId),
+          eq(managementCashRegisterTerminals.installationId, installationId),
+        ),
+      )
+      .limit(1);
+    return { ...profile, cashRegisterId: binding?.cashRegisterId ?? null };
   }
 
   async putTerminalProfile(
@@ -11132,8 +12985,30 @@ export class PilotPosService {
       "terminal.profile.put",
       { installationId, ...input },
       async (tx) => {
+        const { cashRegisterId, ...profileInput } = input;
         if (input.stationId) {
           await this.lockAndAssertKdsStations(tx, organizationId, unitId, [input.stationId]);
+        }
+        if (cashRegisterId) {
+          const [cashRegister] = await tx
+            .select({ id: managementCashRegisters.id })
+            .from(managementCashRegisters)
+            .where(
+              and(
+                eq(managementCashRegisters.organizationId, organizationId),
+                eq(managementCashRegisters.unitId, unitId),
+                eq(managementCashRegisters.id, cashRegisterId),
+                eq(managementCashRegisters.active, true),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          if (!cashRegister) {
+            throw new ConflictException({
+              code: "CASH_REGISTER_NOT_FOUND",
+              message: "A gaveta informada não está ativa nesta unidade.",
+            });
+          }
         }
         const now = new Date();
         const [profile] = await tx
@@ -11142,7 +13017,7 @@ export class PilotPosService {
             organizationId,
             unitId,
             installationId,
-            ...input,
+            ...profileInput,
             createdByIdentityId: identityId,
             updatedByIdentityId: identityId,
             createdAt: now,
@@ -11155,14 +13030,60 @@ export class PilotPosService {
               posTerminalProfiles.installationId,
             ],
             set: {
-              ...input,
+              ...profileInput,
               updatedByIdentityId: identityId,
               updatedAt: now,
             },
           })
           .returning();
         if (!profile) throw new Error("Terminal profile upsert did not return a row");
-        const metadata = { installationId, ...input };
+        if (cashRegisterId) {
+          await tx
+            .insert(managementCashRegisterTerminals)
+            .values({
+              organizationId,
+              unitId,
+              installationId,
+              cashRegisterId,
+              updatedByIdentityId: identityId,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoUpdate({
+              target: [
+                managementCashRegisterTerminals.organizationId,
+                managementCashRegisterTerminals.unitId,
+                managementCashRegisterTerminals.installationId,
+              ],
+              set: { cashRegisterId, updatedByIdentityId: identityId, updatedAt: now },
+            });
+        } else if (cashRegisterId === null) {
+          await tx
+            .delete(managementCashRegisterTerminals)
+            .where(
+              and(
+                eq(managementCashRegisterTerminals.organizationId, organizationId),
+                eq(managementCashRegisterTerminals.unitId, unitId),
+                eq(managementCashRegisterTerminals.installationId, installationId),
+              ),
+            );
+        }
+        const [binding] = await tx
+          .select({ cashRegisterId: managementCashRegisterTerminals.cashRegisterId })
+          .from(managementCashRegisterTerminals)
+          .where(
+            and(
+              eq(managementCashRegisterTerminals.organizationId, organizationId),
+              eq(managementCashRegisterTerminals.unitId, unitId),
+              eq(managementCashRegisterTerminals.installationId, installationId),
+            ),
+          )
+          .limit(1);
+        const metadata = {
+          installationId,
+          ...profileInput,
+          cashRegisterId: binding?.cashRegisterId ?? null,
+        };
         await tx.insert(auditEvents).values({
           organizationId,
           unitId,
@@ -11178,7 +13099,7 @@ export class PilotPosService {
           aggregateId: installationId,
           payload: { organizationId, unitId, ...metadata },
         });
-        return profile;
+        return { ...profile, cashRegisterId: binding?.cashRegisterId ?? null };
       },
     );
   }
@@ -11412,7 +13333,7 @@ export class PilotPosService {
     unitId: string,
     tab: typeof posTabs.$inferSelect,
   ): Promise<Record<string, unknown>> {
-    const [table, items, payments] = await Promise.all([
+    const [table, items, payments, establishment] = await Promise.all([
       tab.tableId
         ? tx
             .select({ label: posDiningTables.label })
@@ -11467,8 +13388,20 @@ export class PilotPosService {
           amountCents: posTabPayments.amountCents,
           reference: posTabPayments.reference,
           createdAt: posTabPayments.createdAt,
+          reversedCents: sql<number>`coalesce(${posPaymentReversals.amountCents}, 0)`.mapWith(
+            Number,
+          ),
         })
         .from(posTabPayments)
+        .leftJoin(
+          posPaymentReversals,
+          and(
+            eq(posPaymentReversals.organizationId, posTabPayments.organizationId),
+            eq(posPaymentReversals.unitId, posTabPayments.unitId),
+            eq(posPaymentReversals.paymentId, posTabPayments.id),
+            eq(posPaymentReversals.status, "approved"),
+          ),
+        )
         .where(
           and(
             eq(posTabPayments.organizationId, organizationId),
@@ -11476,6 +13409,24 @@ export class PilotPosService {
             eq(posTabPayments.tabId, tab.id),
           ),
         ),
+      tx
+        .select({
+          unitName: units.name,
+          tradeName: organizations.tradeName,
+          branding: posCatalogBranding.config,
+        })
+        .from(units)
+        .innerJoin(organizations, eq(organizations.id, units.organizationId))
+        .leftJoin(
+          posCatalogBranding,
+          and(
+            eq(posCatalogBranding.organizationId, units.organizationId),
+            eq(posCatalogBranding.unitId, units.id),
+          ),
+        )
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
     ]);
     const itemIds = items.map((item) => item.id);
     const modifiers =
@@ -11497,10 +13448,16 @@ export class PilotPosService {
                 inArray(posOrderItemModifiers.orderItemId, itemIds),
               ),
             );
-    const paidCents = payments.reduce((total, payment) => total + payment.amountCents, 0);
+    const grossPaidCents = payments.reduce((total, payment) => total + payment.amountCents, 0);
+    const reversedCents = payments.reduce((total, payment) => total + payment.reversedCents, 0);
+    const paidCents = grossPaidCents - reversedCents;
     return {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
+      establishmentName: resolveEstablishmentName(
+        establishment?.branding,
+        establishment?.tradeName ?? establishment?.unitName ?? "Estabelecimento",
+      ),
       tab: {
         id: tab.id,
         label:
@@ -11522,6 +13479,8 @@ export class PilotPosService {
         serviceChargeCents: tab.serviceChargeCents,
         tipCents: tab.tipCents,
         totalCents: tab.totalCents,
+        grossPaidCents,
+        reversedCents,
         paidCents,
         remainingCents: Math.max(0, tab.totalCents - paidCents),
       },
@@ -11529,6 +13488,8 @@ export class PilotPosService {
       modifiers,
       payments: payments.map((payment) => ({
         ...payment,
+        netAmountCents: payment.amountCents - payment.reversedCents,
+        financialStatus: payment.reversedCents > 0 ? "reversed" : "posted",
         createdAt: payment.createdAt.toISOString(),
       })),
     };
@@ -11540,6 +13501,7 @@ export class PilotPosService {
     unitId: string,
     tabId: string,
   ) {
+    const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
     const [[tab], [settings]] = await Promise.all([
       tx
         .select({
@@ -11599,6 +13561,7 @@ export class PilotPosService {
       tab.tipCents,
       settings?.configuration.serviceBase ?? "net_after_discounts",
     );
+    this.assertTabPaymentFloor(totals.totalCents, paymentState);
     await tx
       .update(posTabs)
       .set({ ...totals, updatedAt: new Date() })
@@ -11665,6 +13628,93 @@ export class PilotPosService {
       });
       return { ...stored, idempotentReplay: false };
     });
+  }
+
+  private async recordPaymentReversalResultIncident(
+    tx: Transaction,
+    incident: {
+      organizationId: string;
+      unitId: string;
+      actorIdentityId: string;
+      reversalId: string;
+      paymentId: string;
+      paymentAttemptId: string;
+      installationId: string;
+      currentStatus: string;
+      reportedStatus: string;
+      resultId: string;
+      resultHash: string;
+      failureCode: string | null;
+    },
+  ) {
+    if (
+      await this.hasRecordedPaymentResultIncident(
+        tx,
+        incident.organizationId,
+        incident.unitId,
+        "pos.payment.reversal_result_conflict",
+        incident.reversalId,
+        incident.resultHash,
+      )
+    ) {
+      return;
+    }
+    const [payment] = await tx
+      .select({ tabId: posTabPayments.tabId })
+      .from(posTabPayments)
+      .where(
+        and(
+          eq(posTabPayments.organizationId, incident.organizationId),
+          eq(posTabPayments.unitId, incident.unitId),
+          eq(posTabPayments.id, incident.paymentId),
+        ),
+      )
+      .limit(1);
+    if (!payment) throw new NotFoundException({ code: "PAYMENT_NOT_FOUND" });
+    await this.recordEvent(
+      tx,
+      incident.actorIdentityId,
+      incident.organizationId,
+      incident.unitId,
+      payment.tabId,
+      "payment.reversal_result_conflict",
+      {
+        reversalId: incident.reversalId,
+        paymentId: incident.paymentId,
+        paymentAttemptId: incident.paymentAttemptId,
+        installationId: incident.installationId,
+        currentStatus: incident.currentStatus,
+        reportedStatus: incident.reportedStatus,
+        resultId: incident.resultId,
+        requestHash: incident.resultHash,
+        failureCode: incident.failureCode,
+      },
+      { entityType: "payment_reversal", entityId: incident.reversalId },
+    );
+  }
+
+  private async hasRecordedPaymentResultIncident(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    action: string,
+    entityId: string,
+    resultHash: string,
+  ) {
+    const [incident] = await tx
+      .select({ id: auditEvents.id })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationId),
+          eq(auditEvents.unitId, unitId),
+          eq(auditEvents.action, action),
+          eq(auditEvents.entityId, entityId),
+          sql`${auditEvents.metadata}->>'requestHash' = ${resultHash}`,
+        ),
+      )
+      .limit(1);
+    return Boolean(incident);
   }
 
   private async recordEvent(

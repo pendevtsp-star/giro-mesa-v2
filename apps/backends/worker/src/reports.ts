@@ -826,6 +826,7 @@ export async function processDueReportSchedules(
       };
       const csvContent = buildScheduledReportCsv(query, report);
       const rows = parseReportCsv(csvContent);
+      const idempotencyKey = `report-schedule:${schedule.id}:${scheduledFor.toISOString()}`;
       const artifact =
         schedule.format === "csv"
           ? {
@@ -838,9 +839,27 @@ export async function processDueReportSchedules(
               schedule.format,
               rows,
               `Relatório GiroMesa ${period.from} a ${period.to}`,
+              {
+                subtitle: "Relatório agendado",
+                period,
+                timezone: schedule.timezone,
+                generatedAt: now,
+                reference: idempotencyKey,
+                family: schedule.family,
+                filters: {
+                  família: schedule.family,
+                  comparação: schedule.comparison_mode,
+                  custos_incluídos: includeCosts,
+                },
+                warnings:
+                  costCoverage === "complete"
+                    ? []
+                    : [
+                        "A cobertura de custos está incompleta; margens e resultados não devem ser interpretados como definitivos.",
+                      ],
+              },
             );
       const rowCount = rows.length;
-      const idempotencyKey = `report-schedule:${schedule.id}:${scheduledFor.toISOString()}`;
       const [reportExport] = await tx
         .insert(managementReportExports)
         .values({

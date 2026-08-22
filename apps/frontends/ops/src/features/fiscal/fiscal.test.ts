@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  fiscalRejectionGuidance,
   InvalidFiscalPayloadError,
   parseAccountantWorkspace,
+  parseFiscalDocumentDetail,
   parseFiscalWorkspace,
 } from "./fiscal";
 
@@ -47,17 +49,13 @@ describe("contrato fiscal do Ops", () => {
         products: { total: 20, classified: 18, missingClassification: 2 },
       },
       provider: {
-        provider: "focus",
         status: "ready",
         environment: "homologation",
-        platformConfigured: true,
         nextAction: "Conexão pronta para o ambiente selecionado.",
         connection: {
-          companyId: "focus-company-1",
-          cnpj: "05953016000132",
+          registered: true,
           status: "ready",
           certificateValidUntil: "2027-08-17",
-          enabled: { nfce: true, nfe: false, nfse: false },
           lastCheckedAt: "2026-08-17T11:00:00Z",
           environments: { homologation: true, production: true },
         },
@@ -81,7 +79,7 @@ describe("contrato fiscal do Ops", () => {
     });
 
     expect(workspace.dashboard.summary.totalCents).toBe(4500);
-    expect(workspace.dashboard.provider.name).toBe("Focus NFe");
+    expect(workspace.dashboard.provider.registered).toBe(true);
     expect(workspace.dashboard.provider.status).toBe("ready");
     expect(workspace.dashboard.pending).toHaveLength(4);
     expect(workspace.profile?.series.nfce).toBe("1");
@@ -128,5 +126,49 @@ describe("contrato fiscal do Ops", () => {
         requests: [],
       }),
     ).toThrow(InvalidFiscalPayloadError);
+  });
+
+  it("normaliza o detalhe da nota e traduz rejeições em próxima ação", () => {
+    const detail = parseFiscalDocumentDetail({
+      id: "document-1",
+      orderId: "order-1",
+      model: "nfce",
+      number: 42,
+      series: "1",
+      status: "rejected",
+      customerDocument: "12345678901",
+      totalCents: 2500,
+      taxCents: 300,
+      issuedAt: "2026-08-21T12:00:00Z",
+      authorizedAt: null,
+      canceledAt: null,
+      accessKey: null,
+      items: [
+        {
+          id: "item-1",
+          lineNumber: 1,
+          description: "Almoço",
+          quantityMilli: 1000,
+          unitPriceCents: 2500,
+          totalCents: 2500,
+          taxCents: 300,
+        },
+      ],
+      events: [
+        {
+          id: "event-1",
+          type: "fiscal.document.issue_result",
+          status: "rejected",
+          code: "NCM_INVALIDO",
+          message: "NCM inválido",
+          occurredAt: "2026-08-21T12:01:00Z",
+        },
+      ],
+    });
+
+    expect(detail.items[0]?.quantityMilli).toBe(1000);
+    expect(fiscalRejectionGuidance(detail.events[0]?.code ?? null, null)).toContain(
+      "classificação fiscal",
+    );
   });
 });

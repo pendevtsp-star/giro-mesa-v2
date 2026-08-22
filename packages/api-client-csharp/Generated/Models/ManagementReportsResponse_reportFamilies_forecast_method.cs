@@ -8,9 +8,9 @@ namespace GiroMesa.ApiClient.Models
     public enum ManagementReportsResponse_reportFamilies_forecast_method
     #pragma warning restore CS1591
     {
-        [EnumMember(Value = "historical_daily_average_v1")]
+        [EnumMember(Value = "weekday_seasonality_v2")]
         #pragma warning disable CS1591
-        Historical_daily_average_v1,
+        Weekday_seasonality_v2,
         #pragma warning restore CS1591
     }
 }

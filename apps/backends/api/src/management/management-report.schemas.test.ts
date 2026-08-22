@@ -5,6 +5,8 @@ import {
   reportCostBackfillSchema,
   reportDrillDownQuerySchema,
   reportExportInputSchema,
+  reportQuerySchema,
+  reportReconciliationClosureSchema,
   reportScheduleCreateSchema,
   reportViewCreateSchema,
 } from "./management-report.schemas.js";
@@ -106,11 +108,34 @@ describe("management report schemas", () => {
           comparisonMode: "previous_period",
           family: "reconciliation",
         },
+        isDefault: true,
+        sortOrder: 4,
       }).success,
       true,
     );
     assert.equal(
-      reportAlertActionSchema.safeParse({ status: "resolved", version: 2 }).success,
+      reportAlertActionSchema.safeParse({ status: "resolved", version: 2, comment: "Revisado" })
+        .success,
+      true,
+    );
+    assert.equal(
+      reportQuerySchema.safeParse({
+        from: "2026-08-01",
+        to: "2026-08-31",
+        family: "multiunit",
+        minimumComparableOperatingDays: 7,
+      }).success,
+      true,
+    );
+    assert.equal(
+      reportReconciliationClosureSchema.safeParse({
+        from: "2026-08-01",
+        to: "2026-08-31",
+        status: "closed",
+        checklist: { payments: true, fiscal: true, external: true },
+        note: "Fechamento conferido",
+        evidence: ["https://example.test/evidence/1"],
+      }).success,
       true,
     );
     assert.equal(

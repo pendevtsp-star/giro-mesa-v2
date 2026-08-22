@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./establishment-hours": {
+      "types": "./dist/establishment-hours.d.ts",
+      "default": "./dist/establishment-hours.js"
     }
   },
   "scripts": {

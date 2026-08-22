@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import type { TimeTrackingLocation } from "../../management.shared";
 import {
   distanceMeters,
+  hasAcceptableLocationAccuracy,
   openStreetMapEmbedUrl,
   openStreetMapSearchUrl,
+  parseLocationNumber,
   requestDeviceLocation,
 } from "./time-tracking-location";
 
@@ -17,20 +19,15 @@ type PrimaryLocation = {
   accuracyToleranceMeters: string;
 };
 
-function numberOrNull(value: string) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function newLocation(primary: PrimaryLocation): TimeTrackingLocation {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `location-${Date.now()}`,
     label: "Novo local permitido",
     address: "",
-    latitude: numberOrNull(primary.latitude) ?? 0,
-    longitude: numberOrNull(primary.longitude) ?? 0,
-    radiusMeters: numberOrNull(primary.radiusMeters) ?? 100,
-    accuracyToleranceMeters: numberOrNull(primary.accuracyToleranceMeters) ?? 50,
+    latitude: parseLocationNumber(primary.latitude) ?? 0,
+    longitude: parseLocationNumber(primary.longitude) ?? 0,
+    radiusMeters: parseLocationNumber(primary.radiusMeters) ?? 100,
+    accuracyToleranceMeters: parseLocationNumber(primary.accuracyToleranceMeters) ?? 50,
   };
 }
 
@@ -48,9 +45,9 @@ export function TimeTrackingLocationControls({
   onPrimaryChange: (next: Partial<PrimaryLocation>) => void;
 }) {
   const [feedback, setFeedback] = useState("");
-  const latitude = numberOrNull(primary.latitude);
-  const longitude = numberOrNull(primary.longitude);
-  const radiusMeters = numberOrNull(primary.radiusMeters);
+  const latitude = parseLocationNumber(primary.latitude);
+  const longitude = parseLocationNumber(primary.longitude);
+  const radiusMeters = parseLocationNumber(primary.radiusMeters);
   const mapUrl =
     latitude === null || longitude === null || radiusMeters === null
       ? null
@@ -65,7 +62,7 @@ export function TimeTrackingLocationControls({
               latitude,
               longitude,
               radiusMeters,
-              accuracyToleranceMeters: numberOrNull(primary.accuracyToleranceMeters) ?? 0,
+              accuracyToleranceMeters: parseLocationNumber(primary.accuracyToleranceMeters) ?? 0,
             },
           ]),
       ...locations,
@@ -76,6 +73,13 @@ export function TimeTrackingLocationControls({
   async function applyCurrentLocation() {
     try {
       const position = await requestDeviceLocation();
+      const maximumAccuracy = parseLocationNumber(maxLocationAccuracyMeters) ?? 100;
+      if (!hasAcceptableLocationAccuracy(position, maximumAccuracy)) {
+        setFeedback(
+          `O navegador encontrou apenas uma localização aproximada (${position.accuracyMeters?.toLocaleString("pt-BR") ?? "precisão desconhecida"} m; máximo ${maximumAccuracy.toLocaleString("pt-BR")} m). O local não foi alterado. Ative a localização precisa e o Wi-Fi ou tente pelo celular no restaurante.`,
+        );
+        return;
+      }
       onPrimaryChange({
         latitude: String(position.latitude),
         longitude: String(position.longitude),
@@ -93,8 +97,8 @@ export function TimeTrackingLocationControls({
   async function testCurrentLocation() {
     try {
       const position = await requestDeviceLocation();
-      const maximumAccuracy = numberOrNull(maxLocationAccuracyMeters);
-      if (maximumAccuracy !== null && (position.accuracyMeters ?? Infinity) > maximumAccuracy) {
+      const maximumAccuracy = parseLocationNumber(maxLocationAccuracyMeters) ?? 100;
+      if (!hasAcceptableLocationAccuracy(position, maximumAccuracy)) {
         setFeedback(
           `Precisão de ${position.accuracyMeters ?? "desconhecida"} m acima do limite de ${maximumAccuracy} m.`,
         );
@@ -211,7 +215,7 @@ export function TimeTrackingLocationControls({
               type="number"
               value={location.latitude}
               onChange={(event) => {
-                const value = numberOrNull(event.target.value);
+                const value = parseLocationNumber(event.target.value);
                 if (value !== null) updateLocation(location.id, { latitude: value });
               }}
             />
@@ -226,7 +230,7 @@ export function TimeTrackingLocationControls({
               type="number"
               value={location.longitude}
               onChange={(event) => {
-                const value = numberOrNull(event.target.value);
+                const value = parseLocationNumber(event.target.value);
                 if (value !== null) updateLocation(location.id, { longitude: value });
               }}
             />
@@ -239,7 +243,7 @@ export function TimeTrackingLocationControls({
               type="number"
               value={location.radiusMeters}
               onChange={(event) => {
-                const value = numberOrNull(event.target.value);
+                const value = parseLocationNumber(event.target.value);
                 if (value !== null) updateLocation(location.id, { radiusMeters: value });
               }}
             />
@@ -252,7 +256,7 @@ export function TimeTrackingLocationControls({
               type="number"
               value={location.accuracyToleranceMeters}
               onChange={(event) => {
-                const value = numberOrNull(event.target.value);
+                const value = parseLocationNumber(event.target.value);
                 if (value !== null) updateLocation(location.id, { accuracyToleranceMeters: value });
               }}
             />

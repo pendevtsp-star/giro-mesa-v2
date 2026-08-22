@@ -64,9 +64,12 @@ services:
     <<: *backend-service
     image: ${GIROMESA_IMAGE_PREFIX:-ghcr.io/pendevtsp-star/giro-mesa-v2}-worker:${GIROMESA_IMAGE_TAG:-pilot}
     environment:
+      MEDIA_ROOT: /app/data/media
       WORKER_HEARTBEAT_FILE: ${WORKER_HEARTBEAT_FILE:-/tmp/giromesa-worker-heartbeat}
       WORKER_HEARTBEAT_MAX_AGE_MS: ${WORKER_HEARTBEAT_MAX_AGE_MS:-30000}
       WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN: ${WORKER_HEARTBEAT_CLEANUP_ON_SHUTDOWN:-false}
+    volumes:
+      - media_data:/app/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +86,9 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.giromesa.com.br}
       NEXT_PUBLIC_OPS_URL: ${NEXT_PUBLIC_OPS_URL:-https://app.giromesa.com.br}
+      NEXT_PUBLIC_REDE_STORE_URL: ${NEXT_PUBLIC_REDE_STORE_URL:-}
+      NEXT_PUBLIC_PAYGO_STORE_URL: ${NEXT_PUBLIC_PAYGO_STORE_URL:-}
+      NEXT_PUBLIC_STONE_STORE_URL: ${NEXT_PUBLIC_STONE_STORE_URL:-}
       NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-true}
       NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
     depends_on:
