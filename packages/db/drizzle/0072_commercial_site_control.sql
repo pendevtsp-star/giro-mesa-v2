@@ -140,7 +140,7 @@ ALTER TABLE "commercial_lead_states" ADD CONSTRAINT "commercial_lead_states_assi
 ALTER TABLE "commercial_lead_states" ADD CONSTRAINT "commercial_lead_states_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE set null;--> statement-breakpoint
 ALTER TABLE "billing_checkouts" ADD CONSTRAINT "billing_checkouts_promotion_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."commercial_promotions"("id") ON DELETE set null;--> statement-breakpoint
 ALTER TABLE "billing_checkouts" ADD CONSTRAINT "billing_checkouts_promotion_discount_check" CHECK ("promotion_discount_cents" >= 0);--> statement-breakpoint
-CREATE UNIQUE INDEX "commercial_catalog_single_published_unique" ON "commercial_catalog_versions" ((status)) WHERE status::text = 'published';--> statement-breakpoint
+CREATE UNIQUE INDEX "commercial_catalog_single_published_unique" ON "commercial_catalog_versions" ((status)) WHERE status = 'published'::catalog_status;--> statement-breakpoint
 CREATE UNIQUE INDEX "commercial_catalog_single_scheduled_unique" ON "commercial_catalog_versions" ((true)) WHERE "scheduled_publish_at" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "commercial_promotions_version_code_unique" ON "commercial_promotions" ("catalog_version_id", "code") WHERE "code" is not null;--> statement-breakpoint
 CREATE INDEX "commercial_promotions_window_idx" ON "commercial_promotions" ("catalog_version_id", "active", "starts_at", "ends_at");--> statement-breakpoint

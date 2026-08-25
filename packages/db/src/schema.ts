@@ -413,7 +413,7 @@ export const commercialCatalogVersions = pgTable(
     uniqueIndex("commercial_catalog_version_unique").on(table.version),
     uniqueIndex("commercial_catalog_single_published_unique")
       .on(table.status)
-      .where(sql`${table.status}::text = 'published'`),
+      .where(sql`${table.status} = 'published'::catalog_status`),
     uniqueIndex("commercial_catalog_single_scheduled_unique")
       .on(table.status)
       .where(sql`${table.status}::text = 'scheduled'`),
