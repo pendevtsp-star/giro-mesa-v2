@@ -38,20 +38,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+    "artifact": "git:7694ecb1ed431879a85c93293485862be72869d9",
     "migration": {
-      "id": "0045_strong_pride",
+      "id": "0074_crm_operational_inbox",
       "status": "verified",
-      "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
+      "evidence": "git:7694ecb1ed431879a85c93293485862be72869d9"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
+        "evidence": "git:7694ecb1ed431879a85c93293485862be72869d9"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:5421cefb866576183119b265fcaa9f042745e591"
+        "evidence": "git:7694ecb1ed431879a85c93293485862be72869d9"
       }
     }
   },
