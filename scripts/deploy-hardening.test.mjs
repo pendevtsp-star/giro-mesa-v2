@@ -577,6 +577,8 @@ test("deployment and rollback compose contracts always include observability and
   assert.match(rollback, /compose\.images\.yaml/);
   assert.match(images, /postgres@sha256:[0-9a-f]{64}/);
   assert.match(images, /clamav\/clamav-debian@sha256:[0-9a-f]{64}/);
+  assert.match(deploy, /export GIROMESA_CLAMAV_IMAGE=clamav\/clamav-debian@sha256:[0-9a-f]{64}/);
+  assert.match(rollback, /export GIROMESA_CLAMAV_IMAGE=clamav\/clamav-debian@sha256:[0-9a-f]{64}/);
   assert.match(base, /ACCOUNTANT_ATTACHMENT_CLAMD_HOST:.*clamav/);
   assert.match(base, /clamav_data:\/var\/lib\/clamav/);
   assert.doesNotMatch(base, /3310:3310/);
